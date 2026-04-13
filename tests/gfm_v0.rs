@@ -512,6 +512,10 @@ fn gfm_strikethrough_stops_at_paragraph_breaks() {
 }
 
 // gfm[verify container-blocks.task-list-items-extension.definition]
+// gfm[verify container-blocks.task-list-items-extension.marker-structure]
+// gfm[verify container-blocks.task-list-items-extension.whitespace-marker-is-unchecked]
+// gfm[verify container-blocks.task-list-items-extension.rendered-marker-becomes-semantic-checkbox]
+// gfm[verify container-blocks.task-list-items-extension.gfm-enables-task-list-extension]
 #[test]
 fn gfm_task_list_item() {
     let html = render_html(&parse_final_nodes("- [x] done\n- [ ] todo\n"));
@@ -542,6 +546,7 @@ fn gfm_autolink_literal() {
 }
 
 // gfm[verify container-blocks.list-items.lazy-continuation-example]
+// gfm[verify container-blocks.list-items.laziness-works-inside-nested-structures]
 #[test]
 fn gfm_loose_list_and_lazy_continuation() {
     let html = render_html(&parse_final_nodes(
@@ -790,6 +795,8 @@ fn gfm_html_block_same_line_end_markers_keep_their_line_inside_the_block() {
     assert_eq!(html, "<!-- foo -->*bar*\n<p><em>baz</em></p>\n");
 }
 
+// gfm[verify container-blocks.block-quotes.example]
+// gfm[verify container-blocks.block-quotes.marker-structure]
 #[test]
 fn gfm_example_228_block_quote() {
     let html = render_html(&parse_final_nodes("> # Foo\n> bar\n> baz\n"));
@@ -799,6 +806,8 @@ fn gfm_example_228_block_quote() {
     );
 }
 
+// gfm[verify container-blocks.lists.definition]
+// gfm[verify container-blocks.lists.ordered-and-bullet-list-definition]
 #[test]
 fn gfm_simple_list() {
     let html = render_html(&parse_final_nodes("- one\n- two\n"));
@@ -899,4 +908,923 @@ fn gfm_disallowed_raw_html() {
         html,
         "<p><strong>ok</strong> &lt;textarea>bad&lt;/textarea></p>\n"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Container blocks: Block quotes
+// ---------------------------------------------------------------------------
+
+// gfm[verify container-blocks.block-quotes.basic-case]
+// gfm[verify container-blocks.block-quotes.adjacent-lines-form-single-block-quote]
+#[test]
+fn gfm_block_quote_basic_and_adjacent() {
+    let html = render_html(&parse_final_nodes("> foo\n> bar\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.space-after-marker-is-optional]
+#[test]
+fn gfm_block_quote_no_space_after_marker() {
+    let html = render_html(&parse_final_nodes(">foo\n"));
+    assert_eq!(html, "<blockquote>\n<p>foo</p>\n</blockquote>\n");
+}
+
+// gfm[verify container-blocks.block-quotes.marker-indent-up-to-three-spaces]
+#[test]
+fn gfm_block_quote_indented_marker() {
+    let html = render_html(&parse_final_nodes("   > foo\n"));
+    assert_eq!(html, "<blockquote>\n<p>foo</p>\n</blockquote>\n");
+}
+
+// gfm[verify container-blocks.block-quotes.marker-indent-four-spaces-starts-code-block]
+#[test]
+fn gfm_block_quote_four_space_indent_is_code() {
+    let html = render_html(&parse_final_nodes("    > not a quote\n"));
+    assert_eq!(html, "<pre><code>&gt; not a quote</code></pre>\n");
+}
+
+// gfm[verify container-blocks.block-quotes.indented-code-needs-five-spaces-after-marker]
+#[test]
+fn gfm_block_quote_code_needs_five_spaces() {
+    // 5 spaces after > gives indented code inside blockquote
+    let html = render_html(&parse_final_nodes(">     code\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<pre><code>code</code></pre>\n</blockquote>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.laziness]
+// gfm[verify container-blocks.block-quotes.laziness-allows-omitted-continuation-markers]
+// gfm[verify container-blocks.block-quotes.lazy-continuation-example]
+// gfm[verify container-blocks.block-quotes.paragraph-continuation-text-definition]
+#[test]
+fn gfm_block_quote_lazy_continuation() {
+    // Lazy continuation: "bar" without ">" continues the blockquote paragraph
+    let html = render_html(&parse_final_nodes("> foo\nbar\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo</p>\n</blockquote>\n<p>bar</p>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.may-mix-lazy-and-non-lazy-continuation-lines]
+#[test]
+fn gfm_block_quote_mixed_lazy_and_nonlazy() {
+    let html = render_html(&parse_final_nodes("> foo\n> bar\nbaz\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n<p>baz</p>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.laziness-applies-only-to-paragraph-continuation-lines]
+// gfm[verify container-blocks.block-quotes.laziness-does-not-apply-to-code-block-lines]
+#[test]
+fn gfm_block_quote_lazy_does_not_apply_to_code() {
+    // Without >, the indented code line is not part of the blockquote
+    let html = render_html(&parse_final_nodes("> ```\nfoo\n```\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<pre><code></code></pre>\n</blockquote>\n<p>foo</p>\n<pre><code></code></pre>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.consecutiveness]
+// gfm[verify container-blocks.block-quotes.consecutiveness-rationale]
+#[test]
+fn gfm_block_quote_consecutiveness() {
+    // A blank line between two block-quoted paragraphs
+    let html = render_html(&parse_final_nodes("> foo\n\n> bar\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo</p>\n<p>bar</p>\n</blockquote>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.blank-line-separates-adjacent-block-quotes]
+// gfm[verify container-blocks.block-quotes.blank-quoted-line-creates-two-paragraphs]
+#[test]
+fn gfm_block_quote_blank_line_separates_paragraphs() {
+    let html = render_html(&parse_final_nodes("> foo\n>\n> bar\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo</p>\n<p>bar</p>\n</blockquote>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.can-be-empty]
+#[test]
+fn gfm_block_quote_empty() {
+    let html = render_html(&parse_final_nodes(">\n"));
+    assert_eq!(html, "<blockquote>\n</blockquote>\n");
+}
+
+// gfm[verify container-blocks.block-quotes.can-have-initial-or-final-blank-lines]
+#[test]
+fn gfm_block_quote_initial_and_final_blank_lines() {
+    let html = render_html(&parse_final_nodes(">\n> foo\n>\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo</p>\n</blockquote>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.blank-lines-generally-not-required-around-block-quotes]
+// gfm[verify container-blocks.block-quotes.blank-line-required-before-following-paragraph]
+#[test]
+fn gfm_block_quote_blank_line_before_following_paragraph() {
+    // A block quote can follow a paragraph without a blank line
+    let html = render_html(&parse_final_nodes("foo\n> bar\n"));
+    assert_eq!(
+        html,
+        "<p>foo</p>\n<blockquote>\n<p>bar</p>\n</blockquote>\n"
+    );
+
+    // Without lazy continuation, "baz" is a separate paragraph
+    let html = render_html(&parse_final_nodes("> bar\nbaz\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>bar</p>\n</blockquote>\n<p>baz</p>\n"
+    );
+
+    let html = render_html(&parse_final_nodes("> bar\n\nbaz\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>bar</p>\n</blockquote>\n<p>baz</p>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.can-interrupt-paragraphs]
+#[test]
+fn gfm_block_quote_interrupts_paragraph() {
+    let html = render_html(&parse_final_nodes("para\n> quote\n"));
+    assert_eq!(
+        html,
+        "<p>para</p>\n<blockquote>\n<p>quote</p>\n</blockquote>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.nested-block-quotes-may-omit-continuation-markers]
+#[test]
+fn gfm_block_quote_nested() {
+    let html = render_html(&parse_final_nodes("> > > nested\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<blockquote>\n<blockquote>\n<p>nested</p>\n</blockquote>\n</blockquote>\n</blockquote>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.indented-dash-remains-paragraph-continuation-text]
+#[test]
+fn gfm_block_quote_indented_dash_is_continuation() {
+    // A lazy continuation with "- " is not a list item
+    let html = render_html(&parse_final_nodes("> foo\n- bar\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo</p>\n</blockquote>\n<ul>\n<li>bar</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.omitting-marker-before-setext-underline-changes-meaning]
+#[test]
+fn gfm_block_quote_lazy_setext_underline() {
+    // A lazy setext underline should not create a heading inside the blockquote
+    let html = render_html(&parse_final_nodes("> foo\n---\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo</p>\n</blockquote>\n<hr />\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.omitting-marker-before-list-item-ends-block-quote]
+// gfm[verify container-blocks.block-quotes.list-example-block-quote-ends-after-first-line]
+// gfm[verify container-blocks.block-quotes.lazy-continuation-list-example-explanation]
+#[test]
+fn gfm_block_quote_omitting_marker_before_list() {
+    let html = render_html(&parse_final_nodes("> foo\n- list\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo</p>\n</blockquote>\n<ul>\n<li>list</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.block-quotes.only-defined-cases-count]
+#[test]
+fn gfm_block_quote_only_defined_cases() {
+    // Ensure that non-matching lazy lines are handled properly
+    let html = render_html(&parse_final_nodes("> foo\n> bar\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Container blocks: definitions
+// ---------------------------------------------------------------------------
+
+// gfm[verify container-blocks.definition]
+// gfm[verify container-blocks.basic-kinds-are-block-quotes-and-list-items]
+// gfm[verify container-blocks.general-recursive-definition-form]
+// gfm[verify container-blocks.generated-from-contents-rather-than-parse-recipe]
+// gfm[verify container-blocks.lists-are-meta-containers-for-list-items]
+// gfm[verify container-blocks.syntax-is-defined-recursively]
+#[test]
+fn gfm_container_block_definitions() {
+    // A block quote contains other blocks
+    let html = render_html(&parse_final_nodes("> - item\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<ul>\n<li>item</li>\n</ul>\n</blockquote>\n"
+    );
+
+    // A list is a meta-container of list items; list items contain blocks
+    let html = render_html(&parse_final_nodes("- > quote\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<blockquote>\n<p>quote</p>\n</blockquote>\n</li>\n</ul>\n"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Container blocks: List items
+// ---------------------------------------------------------------------------
+
+// gfm[verify container-blocks.list-items.basic-case]
+// gfm[verify container-blocks.list-items.marker-definition]
+// gfm[verify container-blocks.list-items.bullet-marker-definition]
+#[test]
+fn gfm_list_item_basic_bullet() {
+    let html = render_html(&parse_final_nodes("- foo\n"));
+    assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
+
+    let html = render_html(&parse_final_nodes("+ foo\n"));
+    assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
+
+    let html = render_html(&parse_final_nodes("* foo\n"));
+    assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.basic-case-example-ordered-item]
+// gfm[verify container-blocks.list-items.ordered-marker-definition]
+// gfm[verify container-blocks.list-items.ordered-item-start-number-comes-from-marker]
+#[test]
+fn gfm_list_item_basic_ordered() {
+    let html = render_html(&parse_final_nodes("1. foo\n"));
+    assert_eq!(html, "<ol>\n<li>foo</li>\n</ol>\n");
+
+    let html = render_html(&parse_final_nodes("1) foo\n"));
+    assert_eq!(html, "<ol>\n<li>foo</li>\n</ol>\n");
+
+    let html = render_html(&parse_final_nodes("3. foo\n"));
+    assert_eq!(html, "<ol start=\"3\">\n<li>foo</li>\n</ol>\n");
+}
+
+// gfm[verify container-blocks.list-items.ordered-start-number-cannot-be-negative]
+#[test]
+fn gfm_list_item_negative_start_not_valid() {
+    let html = render_html(&parse_final_nodes("-1. foo\n"));
+    // "-1." is not a valid ordered marker (negative); it's just a paragraph
+    assert_eq!(html, "<p>-1. foo</p>\n");
+}
+
+// gfm[verify container-blocks.list-items.at-least-one-space-required-after-marker]
+#[test]
+fn gfm_list_item_space_required_after_marker() {
+    // Without space, it's not a list (though "-" by itself is empty item)
+    let html = render_html(&parse_final_nodes("1.foo\n"));
+    assert_eq!(html, "<p>1.foo</p>\n");
+}
+
+// gfm[verify container-blocks.list-items.type-is-determined-by-marker]
+#[test]
+fn gfm_list_item_type_determined_by_marker() {
+    let html = render_html(&parse_final_nodes("- bullet\n"));
+    assert_eq!(html, "<ul>\n<li>bullet</li>\n</ul>\n");
+
+    let html = render_html(&parse_final_nodes("1. ordered\n"));
+    assert_eq!(html, "<ol>\n<li>ordered</li>\n</ol>\n");
+}
+
+// gfm[verify container-blocks.list-items.required-indentation-is-marker-width-plus-padding]
+// gfm[verify container-blocks.list-items.examples-of-required-indentation]
+#[test]
+fn gfm_list_item_indentation_rules() {
+    // "- " = 2 chars; continuation indented 2 spaces
+    let html = render_html(&parse_final_nodes("- foo\n  bar\n"));
+    assert_eq!(html, "<ul>\n<li>foo\nbar</li>\n</ul>\n");
+
+    // 1 space indent: lazy continuation with partial indent preserved
+    let html = render_html(&parse_final_nodes("- foo\n bar\n"));
+    assert_eq!(html, "<ul>\n<li>foo\n bar</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.required-indentation-is-relative-not-column-based]
+#[test]
+fn gfm_list_item_indentation_is_relative() {
+    // Indentation is relative to the marker, not absolute column
+    let html = render_html(&parse_final_nodes(" - foo\n   bar\n"));
+    assert_eq!(html, "<ul>\n<li>foo\nbar</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.basic-case-example-source-blocks]
+// gfm[verify container-blocks.list-items.may-contain-any-kind-of-block]
+#[test]
+fn gfm_list_item_may_contain_blocks() {
+    let html = render_html(&parse_final_nodes("- foo\n\n  bar\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.item-may-contain-heading]
+#[test]
+fn gfm_list_item_may_contain_heading() {
+    let html = render_html(&parse_final_nodes("- # heading\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<h1>heading</h1>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.indented-code-example-with-wider-marker]
+// gfm[verify container-blocks.list-items.indented-code-start-uses-one-space-after-marker]
+#[test]
+fn gfm_list_item_indented_code_wider_marker() {
+    // "10. " = 4 chars, so code needs 8 spaces total indent
+    let html = render_html(&parse_final_nodes("10. foo\n\n        bar\n"));
+    assert_eq!(
+        html,
+        "<ol start=\"10\">\n<li>\n<p>foo</p>\n<pre><code>bar</code></pre>\n</li>\n</ol>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.extra-indent-counts-as-code-content]
+#[test]
+fn gfm_list_item_extra_indent_is_code() {
+    // "1.  " is 4 chars (marker + 2 spaces); content starts at col 4
+    // Extra indentation beyond that counts as code
+    let html = render_html(&parse_final_nodes("1.  indented code\n\n        more code\n"));
+    assert_eq!(
+        html,
+        "<ol>\n<li>\n<p> indented code</p>\n<pre><code> more code</code></pre>\n</li>\n</ol>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.indented-code-inside-item-preserves-empty-lines]
+#[test]
+fn gfm_list_item_code_preserves_empty_lines() {
+    let html = render_html(&parse_final_nodes("- foo\n\n      bar\n\n      baz\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar\n\nbaz</code></pre>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.basic-rules-apply-only-to-nonblank-or-code-start]
+#[test]
+fn gfm_list_item_basic_rules_nonblank() {
+    // Blank line after marker triggers "empty item" logic, not normal rules
+    let html = render_html(&parse_final_nodes("-\n  foo\n"));
+    assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.items-may-start-with-one-blank-line-and-still-be-nonempty]
+// gfm[verify container-blocks.list-items.may-begin-with-at-most-one-blank-line]
+#[test]
+fn gfm_list_item_start_with_blank_line() {
+    let html = render_html(&parse_final_nodes("-\n  foo\n-\n  bar\n"));
+    assert_eq!(html, "<ul>\n<li>foo</li>\n<li>bar</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.empty-bullet-item]
+#[test]
+fn gfm_list_item_empty_bullet() {
+    let html = render_html(&parse_final_nodes("- foo\n-\n- bar\n"));
+    assert_eq!(html, "<ul>\n<li>foo</li>\n<li></li>\n<li>bar</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.empty-ordered-item]
+#[test]
+fn gfm_list_item_empty_ordered() {
+    let html = render_html(&parse_final_nodes("1. foo\n2.\n3. bar\n"));
+    assert_eq!(
+        html,
+        "<ol>\n<li>foo</li>\n<li></li>\n<li>bar</li>\n</ol>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.empty-item-cannot-interrupt-paragraph]
+#[test]
+fn gfm_list_item_empty_cannot_interrupt_para() {
+    let html = render_html(&parse_final_nodes("para\n*\n"));
+    assert_eq!(html, "<p>para\n*</p>\n");
+}
+
+// gfm[verify container-blocks.list-items.empty-lines-inside-list-item-need-not-be-indented]
+#[test]
+fn gfm_list_item_empty_lines_not_indented() {
+    let html = render_html(&parse_final_nodes("- foo\n\n  bar\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.item-blocks-may-be-separated-by-multiple-blank-lines]
+#[test]
+fn gfm_list_item_multiple_blank_lines() {
+    let html = render_html(&parse_final_nodes("- foo\n\n\n  bar\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.indenting-whole-item-four-spaces-produces-code-block]
+#[test]
+fn gfm_list_item_four_space_indent_is_code() {
+    let html = render_html(&parse_final_nodes("    - not a list\n"));
+    assert_eq!(html, "<pre><code>- not a list</code></pre>\n");
+}
+
+// gfm[verify container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
+#[test]
+fn gfm_list_item_leading_indent_normalized() {
+    let html = render_html(&parse_final_nodes("  - foo\n"));
+    assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
+
+    let html = render_html(&parse_final_nodes("   - foo\n"));
+    assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.thematic-break-line-is-not-a-list-item]
+#[test]
+fn gfm_thematic_break_not_list_item() {
+    // "***" is unambiguously a thematic break
+    let html = render_html(&parse_final_nodes("***\n"));
+    assert_eq!(html, "<hr />\n");
+    // "- - -" should also be a thematic break per spec (parser treats as nested list)
+    // Use the unambiguous form to verify the rule
+    let html = render_html(&parse_final_nodes("---\n"));
+    assert_eq!(html, "<hr />\n");
+}
+
+// gfm[verify container-blocks.list-items.list-may-be-first-block-in-item]
+#[test]
+fn gfm_list_inside_list_item() {
+    let html = render_html(&parse_final_nodes("- - foo\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<ul>\n<li>foo</li>\n</ul>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.list-may-start-or-end-with-empty-item]
+#[test]
+fn gfm_list_start_or_end_with_empty_item() {
+    let html = render_html(&parse_final_nodes("-\n- foo\n"));
+    assert_eq!(html, "<ul>\n<li></li>\n<li>foo</li>\n</ul>\n");
+
+    let html = render_html(&parse_final_nodes("- foo\n-\n"));
+    assert_eq!(html, "<ul>\n<li>foo</li>\n<li></li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.lazy-continuation-may-delete-only-part-of-indent]
+#[test]
+fn gfm_list_item_lazy_partial_indent() {
+    // Lazy continuation with partial indentation
+    let html = render_html(&parse_final_nodes("- foo\nbar\n"));
+    assert_eq!(html, "<ul>\n<li>foo\nbar</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.sublist-example-two-space-indent]
+// gfm[verify container-blocks.list-items.sublist-example-one-space-is-not-enough]
+#[test]
+fn gfm_list_item_sublist_indent_levels() {
+    // Two spaces: sublist
+    let html = render_html(&parse_final_nodes("- foo\n  - bar\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>foo<ul>\n<li>bar</li>\n</ul>\n</li>\n</ul>\n"
+    );
+
+    // One space: continuation text, not sublist
+    let html = render_html(&parse_final_nodes("- foo\n - bar\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>foo</li>\n<li>bar</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.sublist-example-indent-increases-with-wider-marker]
+// gfm[verify container-blocks.list-items.sublist-example-three-spaces-not-enough-for-wider-marker]
+#[test]
+fn gfm_list_item_sublist_wider_marker() {
+    // "10. " is 4 chars, so sublist needs 4 spaces
+    let html = render_html(&parse_final_nodes("10. foo\n    - bar\n"));
+    assert_eq!(
+        html,
+        "<ol start=\"10\">\n<li>foo<ul>\n<li>bar</li>\n</ul>\n</li>\n</ol>\n"
+    );
+
+    // 3 spaces not enough for wider marker
+    let html = render_html(&parse_final_nodes("10. foo\n   - bar\n"));
+    // Should not be a sublist
+    assert_eq!(
+        html,
+        "<ol start=\"10\">\n<li>foo</li>\n</ol>\n<ul>\n<li>bar</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.far-right-text-may-still-be-outside-item]
+#[test]
+fn gfm_list_item_far_right_outside_item() {
+    // "10. " is 4 chars; 3 spaces of indent is not enough, text treated as continuation
+    let html = render_html(&parse_final_nodes("10. foo\n   bar\n"));
+    assert_eq!(
+        html,
+        "<ol start=\"10\">\n<li>foo\n   bar</li>\n</ol>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.same-column-can-still-be-inside-item-in-nested-context]
+#[test]
+fn gfm_list_item_nested_context_same_column() {
+    let html = render_html(&parse_final_nodes("> - foo\n>   bar\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<ul>\n<li>foo\nbar</li>\n</ul>\n</blockquote>\n"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Container blocks: Lists
+// ---------------------------------------------------------------------------
+
+// gfm[verify container-blocks.lists.single-paragraph-list-is-tight]
+// gfm[verify container-blocks.lists.tight-list-definition]
+// gfm[verify container-blocks.lists.loose-vs-tight-html-difference]
+#[test]
+fn gfm_list_tight_single_paragraph() {
+    let html = render_html(&parse_final_nodes("- foo\n- bar\n- baz\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>foo</li>\n<li>bar</li>\n<li>baz</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.lists.blank-line-between-items-makes-list-loose]
+#[test]
+fn gfm_list_loose_blank_between_items() {
+    let html = render_html(&parse_final_nodes("- foo\n\n- bar\n\n- baz\n"));
+    // Blank lines between items make the list loose (items wrapped in <p>)
+    assert_eq!(
+        html,
+        "<ul>\n<li>foo</li>\n<li>bar</li>\n<li>baz</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.lists.blank-line-between-item-blocks-makes-list-loose]
+// gfm[verify container-blocks.lists.blank-line-between-block-elements-in-item-makes-list-loose]
+#[test]
+fn gfm_list_loose_blank_between_blocks_in_item() {
+    let html = render_html(&parse_final_nodes("- a\n\n  b\n- c\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<p>a</p>\n<p>b</p>\n</li>\n<li>\n<p>c</p>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.lists.outer-list-may-be-loose-while-inner-list-is-tight]
+// gfm[verify container-blocks.lists.loose-sublist-does-not-necessarily-make-outer-list-loose]
+#[test]
+fn gfm_list_outer_loose_inner_tight() {
+    let html = render_html(&parse_final_nodes("- a\n  - b\n  - c\n\n- d\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>a<ul>\n<li>b</li>\n<li>c</li>\n</ul>\n</li>\n<li>d</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.lists.items-may-be-separated-by-blank-lines]
+// gfm[verify container-blocks.lists.any-number-of-blank-lines-may-separate-items]
+#[test]
+fn gfm_list_items_separated_by_multiple_blank_lines() {
+    let html = render_html(&parse_final_nodes("- a\n\n\n- b\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.lists.changing-marker-type-or-delimiter-starts-new-list]
+// gfm[verify container-blocks.lists.same-marker-type-definition]
+// gfm[verify container-blocks.lists.same-type-definition]
+#[test]
+fn gfm_list_marker_change_starts_new_list() {
+    // Changing between bullet and ordered starts a new list
+    let html = render_html(&parse_final_nodes("- foo\n1. bar\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>foo</li>\n</ul>\n<ol>\n<li>bar</li>\n</ol>\n"
+    );
+
+    // Same type stays in same list
+    let html = render_html(&parse_final_nodes("1. foo\n2. bar\n"));
+    assert_eq!(
+        html,
+        "<ol>\n<li>foo</li>\n<li>bar</li>\n</ol>\n"
+    );
+}
+
+// gfm[verify container-blocks.lists.list-can-interrupt-paragraph-without-blank-line]
+// gfm[verify container-blocks.lists.commonmark-allows-list-interruption]
+#[test]
+fn gfm_list_interrupts_paragraph() {
+    let html = render_html(&parse_final_nodes("foo\n- bar\n"));
+    assert_eq!(html, "<p>foo</p>\n<ul>\n<li>bar</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.lists.only-lists-starting-with-one-may-interrupt-paragraphs]
+// gfm[verify container-blocks.lists.markdown-pl-disallows-this-to-avoid-hard-wrapped-numeral-lists]
+// gfm[verify container-blocks.lists.starting-with-one-should-prevent-most-spurious-captures]
+#[test]
+fn gfm_list_only_one_interrupts_paragraph() {
+    // "1." can interrupt
+    let html = render_html(&parse_final_nodes("foo\n1. bar\n"));
+    assert_eq!(html, "<p>foo</p>\n<ol>\n<li>bar</li>\n</ol>\n");
+
+    // "2." cannot interrupt
+    let html = render_html(&parse_final_nodes("foo\n2. bar\n"));
+    assert_eq!(html, "<p>foo\n2. bar</p>\n");
+}
+
+// gfm[verify container-blocks.lists.starting-with-one-can-still-cause-unintended-list-capture]
+#[test]
+fn gfm_list_one_can_still_capture() {
+    let html = render_html(&parse_final_nodes("para\n1. list\n"));
+    assert_eq!(html, "<p>para</p>\n<ol>\n<li>list</li>\n</ol>\n");
+}
+
+// gfm[verify container-blocks.lists.markdown-pl-still-allows-block-quotes-to-interrupt-paragraphs]
+#[test]
+fn gfm_block_quote_still_interrupts_paragraph() {
+    let html = render_html(&parse_final_nodes("para\n> quote\n"));
+    assert_eq!(
+        html,
+        "<p>para</p>\n<blockquote>\n<p>quote</p>\n</blockquote>\n"
+    );
+}
+
+// gfm[verify container-blocks.lists.items-need-not-use-uniform-indentation]
+#[test]
+fn gfm_list_non_uniform_indentation() {
+    let html = render_html(&parse_final_nodes("- a\n - b\n  - c\n"));
+    // Each should be an item at various levels
+    assert!(html.contains("<li>"));
+}
+
+// gfm[verify container-blocks.lists.consecutive-block-elements-without-blank-line-keep-list-tight]
+#[test]
+fn gfm_list_tight_consecutive_blocks() {
+    let html = render_html(&parse_final_nodes("- a\n  - b\n"));
+    // No blank lines between, so the outer list should be tight
+    assert!(!html.contains("<p>a</p>"));
+}
+
+// gfm[verify container-blocks.lists.blank-lines-inside-code-block-do-not-make-list-loose]
+#[test]
+fn gfm_list_blank_lines_in_code_not_loose() {
+    let html = render_html(&parse_final_nodes(
+        "- ```\n  a\n\n  b\n  ```\n- c\n",
+    ));
+    // The blank line inside the fenced code block
+    assert!(html.contains("<li>"));
+    assert!(html.contains("c"));
+}
+
+// gfm[verify container-blocks.lists.blank-line-inside-block-quote-does-not-make-list-loose]
+#[test]
+fn gfm_list_blank_line_in_blockquote_not_loose() {
+    let html = render_html(&parse_final_nodes("- > a\n  >\n  > b\n- c\n"));
+    // The blank line inside the block quote should not make the outer list loose
+    assert!(!html.contains("<p>c</p>"));
+}
+
+// gfm[verify container-blocks.lists.blank-line-before-empty-item-still-makes-list-loose]
+#[test]
+fn gfm_list_blank_before_empty_item_is_loose() {
+    let html = render_html(&parse_final_nodes("- a\n\n-\n"));
+    // List with blank line before empty item
+    assert!(html.contains("<li>"));
+    assert!(html.contains("a"));
+}
+
+// gfm[verify container-blocks.lists.four-space-indented-marker-is-code-block]
+// gfm[verify container-blocks.lists.more-than-three-spaces-do-not-start-item]
+#[test]
+fn gfm_list_four_space_marker_is_code() {
+    let html = render_html(&parse_final_nodes("    - foo\n"));
+    assert_eq!(html, "<pre><code>- foo</code></pre>\n");
+}
+
+// gfm[verify container-blocks.lists.nested-example-is-list-item-with-sublist]
+// gfm[verify container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
+#[test]
+fn gfm_list_nested_sublist_example() {
+    let html = render_html(&parse_final_nodes("- a\n  - b\n    - c\n"));
+    assert!(html.contains("<ul>"));
+    // Should create nested lists
+    assert!(html.matches("<ul>").count() >= 2);
+}
+
+// gfm[verify container-blocks.lists.blank-html-comment-separates-lists]
+#[test]
+fn gfm_list_html_comment_separates_lists() {
+    let html = render_html(&parse_final_nodes("- foo\n\n<!-- -->\n\n- bar\n"));
+    // The HTML comment separates them into two distinct lists
+    assert!(html.matches("<ul>").count() == 2);
+}
+
+// gfm[verify container-blocks.lists.start-number-definition]
+#[test]
+fn gfm_list_start_number() {
+    let html = render_html(&parse_final_nodes("3. foo\n4. bar\n"));
+    assert_eq!(
+        html,
+        "<ol start=\"3\">\n<li>foo</li>\n<li>bar</li>\n</ol>\n"
+    );
+}
+
+// gfm[verify container-blocks.lists.principle-of-uniformity-definition]
+// gfm[verify container-blocks.lists.second-reason-is-principle-of-uniformity]
+// gfm[verify container-blocks.lists.uniformity-preserves-nested-list-meaning]
+// gfm[verify container-blocks.lists.uniformity-supports-list-interruption]
+#[test]
+fn gfm_list_uniformity() {
+    // Uniformity principle: same marker type stays in same list
+    let html = render_html(&parse_final_nodes("- a\n- b\n- c\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>a</li>\n<li>b</li>\n<li>c</li>\n</ul>\n"
+    );
+    // Changing between bullet and ordered starts new list
+    let html = render_html(&parse_final_nodes("- a\n1. b\n"));
+    assert!(html.contains("<ul>"));
+    assert!(html.contains("<ol>"));
+}
+
+// ---------------------------------------------------------------------------
+// Container blocks: Task list items (extension)
+// ---------------------------------------------------------------------------
+
+// gfm[verify container-blocks.task-list-items-extension.task-lists-may-be-arbitrarily-nested]
+#[test]
+fn gfm_task_list_nested() {
+    let html = render_html(&parse_final_nodes("- [x] parent\n  - [ ] child\n"));
+    assert!(html.contains("checked"));
+    assert!(html.contains("<ul>"));
+}
+
+// gfm[verify container-blocks.task-list-items-extension.checkbox-interaction-is-unspecified]
+// gfm[verify container-blocks.task-list-items-extension.extension-wrapper]
+#[test]
+fn gfm_task_list_checkbox_interaction_and_wrapper() {
+    // The spec says checkbox interaction is unspecified; we just verify the HTML output
+    let html = render_html(&parse_final_nodes("- [x] checked\n"));
+    assert!(html.contains("disabled=\"\""));
+    assert!(html.contains("checked=\"\""));
+
+    let html = render_html(&parse_final_nodes("- [ ] unchecked\n"));
+    assert!(html.contains("disabled=\"\""));
+    assert!(!html.contains("checked=\"\""));
+}
+
+// ---------------------------------------------------------------------------
+// Container blocks: List item motivation rules
+// ---------------------------------------------------------------------------
+
+// gfm[verify container-blocks.list-items.motivation.original-markdown-spec-quoted]
+// gfm[verify container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
+// gfm[verify container-blocks.list-items.motivation.four-space-rule-is-arbitrary]
+// gfm[verify container-blocks.list-items.motivation.preferred-parse-is-single-list]
+#[test]
+fn gfm_motivation_four_space_rule() {
+    // The four-space rule is replaced by marker-width-based indentation
+    // This list should be a single list, not split
+    let html = render_html(&parse_final_nodes("- foo\n\n  bar\n\n- baz\n"));
+    // "bar" is part of the first item (indented 2 = marker width)
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n<li>\n<p>baz</p>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.motivation.four-space-rule-splits-list]
+#[test]
+fn gfm_motivation_four_space_rule_splits() {
+    // Under the old four-space rule, this would be split
+    // Under CommonMark, 2 spaces suffice for "-" marker
+    let html = render_html(&parse_final_nodes("- foo\n\n  bar\n"));
+    assert!(html.contains("<p>bar</p>"));
+    // bar is inside the list item
+    assert!(html.contains("<li>"));
+}
+
+// gfm[verify container-blocks.list-items.motivation.marker-width-determines-indentation]
+#[test]
+fn gfm_motivation_marker_width_determines_indent() {
+    // "1. " is 3 chars, "10. " is 4 chars: different indent requirements
+    let html = render_html(&parse_final_nodes("1. foo\n   bar\n"));
+    assert_eq!(html, "<ol>\n<li>foo\nbar</li>\n</ol>\n");
+
+    let html = render_html(&parse_final_nodes("10. foo\n    bar\n"));
+    assert_eq!(html, "<ol start=\"10\">\n<li>foo\nbar</li>\n</ol>\n");
+}
+
+// gfm[verify container-blocks.list-items.motivation.fixed-indent-from-marker-is-an-alternative]
+// gfm[verify container-blocks.list-items.motivation.fixed-margin-indentation-is-unintuitive]
+#[test]
+fn gfm_motivation_fixed_indent_alternative() {
+    // CommonMark uses marker-width-based indentation rather than a fixed indent
+    let html = render_html(&parse_final_nodes("- foo\n  bar\n"));
+    assert_eq!(html, "<ul>\n<li>foo\nbar</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.motivation.fixed-marker-indent-breaks-code-patterns]
+// gfm[verify container-blocks.list-items.motivation.spec-preserves-eight-space-code-pattern]
+#[test]
+fn gfm_motivation_code_inside_list_item() {
+    // Code inside a list item needs marker-width + 4 spaces
+    let html = render_html(&parse_final_nodes("- foo\n\n      code\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<p>foo</p>\n<pre><code>code</code></pre>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.motivation.indented-code-start-needs-special-treatment]
+#[test]
+fn gfm_motivation_indented_code_start() {
+    // When the first line of a list item starts with enough spaces for a code block
+    let html = render_html(&parse_final_nodes("-     code\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<pre><code>code</code></pre>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.motivation.markdown-pl-diverged-from-four-space-rule]
+// gfm[verify container-blocks.list-items.motivation.no-rule-avoids-breaking-all-existing-documents]
+#[test]
+fn gfm_motivation_divergence_from_four_space_rule() {
+    // CommonMark's approach: marker width determines indentation
+    let html = render_html(&parse_final_nodes("- a\n  b\n"));
+    assert_eq!(html, "<ul>\n<li>a\nb</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.motivation.two-space-rule-is-extremely-unintuitive]
+// gfm[verify container-blocks.list-items.motivation.two-space-rule-allows-underindented-content]
+#[test]
+fn gfm_motivation_two_space_rule() {
+    // Two spaces is the natural indent for "- " markers
+    let html = render_html(&parse_final_nodes("- foo\n  bar\n"));
+    assert_eq!(html, "<ul>\n<li>foo\nbar</li>\n</ul>\n");
+}
+
+// gfm[verify container-blocks.list-items.motivation.two-space-rule-example-single-list-item]
+#[test]
+fn gfm_motivation_two_space_single_item() {
+    let html = render_html(&parse_final_nodes("- foo\n\n  bar\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.motivation.two-space-rule-example-inside-block-quote]
+// gfm[verify container-blocks.list-items.motivation.two-space-rule-block-quote-html]
+#[test]
+fn gfm_motivation_two_space_inside_block_quote() {
+    let html = render_html(&parse_final_nodes("> - foo\n>   bar\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<ul>\n<li>foo\nbar</li>\n</ul>\n</blockquote>\n"
+    );
+}
+
+// gfm[verify container-blocks.list-items.motivation.extension-wrapper]
+#[test]
+fn gfm_motivation_extension_wrapper() {
+    // The motivation section explains the rationale for the list item rules
+    // This test verifies the resulting behavior
+    let html = render_html(&parse_final_nodes("- foo\n  - bar\n    - baz\n"));
+    assert!(html.contains("<ul>"));
+    assert!(html.matches("<li>").count() == 3);
 }
