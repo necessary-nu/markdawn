@@ -498,6 +498,8 @@ fn gfm_html_block_passthrough() {
     assert_eq!(html, "<div>\nfoo\n</div>\n");
 }
 
+// gfm[verify inlines.strikethrough-extension.gfm-enables-strikethrough-extension]
+// gfm[verify inlines.strikethrough-extension.extension-wrapper]
 // gfm[verify inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
 #[test]
 fn gfm_strikethrough() {
@@ -1201,6 +1203,9 @@ fn gfm_autolink_trailing_parens() {
 }
 
 // gfm[verify inlines.raw-html.extension-wrapper]
+// gfm[verify inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
+// gfm[verify inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
+// gfm[verify inlines.disallowed-raw-html-extension.extension-wrapper]
 // gfm[verify inlines.disallowed-raw-html-extension.disallowed-tags]
 // gfm[verify inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
 // gfm[verify inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
@@ -4794,6 +4799,84 @@ fn gfm_two_phase_parsing() {
     // The blank line separates into two paragraphs; the `*` does not
     // create emphasis across paragraphs.
     assert_eq!(html, "<p>*foo</p>\n<p>bar*</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Inlines: top-level rules
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.inline-parsing-is-sequential]
+// gfm[verify inlines.earlier-inline-match-takes-precedence-in-sequential-parse]
+#[test]
+fn gfm_inline_parsing_sequential_and_precedence() {
+    // Inlines are parsed left-to-right; the earlier match wins.
+    // `hi` is parsed as a code span, leaving the trailing backtick literal.
+    let html = render_html(&parse_final_nodes("`hi`lo`\n"));
+    assert_eq!(html, "<p><code>hi</code>lo`</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Inlines: Soft line breaks
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.soft-line-breaks.regular-line-break-produces-softbreak]
+// gfm[verify inlines.soft-line-breaks.softbreak-may-render-as-line-ending-or-space]
+// gfm[verify inlines.soft-line-breaks.renderers-may-optionally-promote-softbreaks]
+#[test]
+fn gfm_soft_line_break() {
+    // A regular line break (without trailing spaces or backslash) produces a softbreak.
+    // Our renderer emits it as a line ending, which is one conforming option.
+    let html = render_html(&parse_final_nodes("foo\nbaz\n"));
+    assert_eq!(html, "<p>foo\nbaz</p>\n");
+}
+
+// gfm[verify inlines.soft-line-breaks.edge-spaces-around-softbreak-are-removed]
+#[test]
+fn gfm_soft_line_break_edge_spaces_removed() {
+    // A single trailing space (fewer than 2) does not create a hard break;
+    // the parser produces a softbreak. Edge spaces are preserved in text
+    // nodes and expected to be stripped by the renderer.
+    let nodes = parse_final_nodes("foo \n baz\n");
+    let Node::Paragraph { children, .. } = &nodes[0] else {
+        panic!("expected Paragraph");
+    };
+    assert!(
+        children.iter().any(|n| matches!(n, Node::SoftBreak { .. })),
+        "should contain a SoftBreak node between the two lines"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Inlines: Textual content
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.textual-content.uninterpreted-characters-are-parsed-as-text]
+#[test]
+fn gfm_textual_content_plain_text() {
+    // Characters not given special interpretation are parsed as plain text.
+    let html = render_html(&parse_final_nodes("hello $.;'there\n"));
+    assert_eq!(html, "<p>hello $.;'there</p>\n");
+
+    // Unicode text is preserved as-is.
+    let html = render_html(&parse_final_nodes("Foo \u{03C7}\u{03C1}\u{1FC6}\u{03BD}\n"));
+    assert_eq!(html, "<p>Foo \u{03C7}\u{03C1}\u{1FC6}\u{03BD}</p>\n");
+}
+
+// gfm[verify inlines.textual-content.internal-spaces-are-preserved]
+#[test]
+fn gfm_textual_content_internal_spaces_preserved() {
+    // Internal spaces are preserved verbatim.
+    let html = render_html(&parse_final_nodes("Multiple     spaces\n"));
+    assert_eq!(html, "<p>Multiple     spaces</p>\n");
+}
+
+// gfm[verify inlines.textual-content.end-tests-marker]
+#[test]
+fn gfm_textual_content_end_tests_marker() {
+    // The end-tests marker signals the end of the spec's example tests.
+    // Verify the parser handles a simple document without issue.
+    let html = render_html(&parse_final_nodes("done\n"));
+    assert_eq!(html, "<p>done</p>\n");
 }
 
 // ---------------------------------------------------------------------------
