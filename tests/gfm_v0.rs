@@ -304,12 +304,17 @@ fn escape_html(text: &str, out: &mut String) {
     }
 }
 
+// gfm[verify leaf-blocks.thematic-breaks.structure]
+// gfm[verify leaf-blocks.thematic-breaks.requires-dash-underscore-or-asterisk-markers]
+// gfm[verify leaf-blocks.thematic-breaks.requires-three-or-more-marker-characters]
 #[test]
 fn gfm_example_13_thematic_breaks() {
     let html = render_html(&parse_final_nodes("***\n---\n___\n"));
     assert_eq!(html, "<hr />\n<hr />\n<hr />\n");
 }
 
+// gfm[verify leaf-blocks.atx-headings.structure]
+// gfm[verify leaf-blocks.atx-headings.opening-sequence-length-one-to-six]
 #[test]
 fn gfm_example_32_atx_headings() {
     let html = render_html(&parse_final_nodes(
@@ -321,6 +326,9 @@ fn gfm_example_32_atx_headings() {
     );
 }
 
+// gfm[verify leaf-blocks.setext-headings.level-determined-by-underline-marker]
+// gfm[verify leaf-blocks.setext-headings.underline-uses-equals-or-dashes]
+// gfm[verify leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content]
 #[test]
 fn gfm_example_80_setext_headings() {
     let html = render_html(&parse_final_nodes(
@@ -332,6 +340,8 @@ fn gfm_example_80_setext_headings() {
     );
 }
 
+// gfm[verify leaf-blocks.fenced-code-blocks.unclosed-block-closes-at-end-of-containing-block]
+// gfm[verify leaf-blocks.fenced-code-blocks.content-may-be-empty]
 #[test]
 fn gfm_example_126_unclosed_fence_at_eof() {
     let html = render_html(&parse_final_nodes("```\n"));
@@ -456,6 +466,9 @@ fn gfm_inline_image() {
 }
 
 // gfm[verify leaf-blocks.link-reference-definitions.may-appear-before-or-after-uses]
+// gfm[verify leaf-blocks.link-reference-definitions.defines-label-for-reference-links-and-images]
+// gfm[verify leaf-blocks.link-reference-definitions.scope-is-the-entire-document]
+// gfm[verify leaf-blocks.link-reference-definitions.use-may-precede-definition]
 #[test]
 fn gfm_reference_link_later_definition() {
     let html = render_html(&parse_final_nodes("[foo]\n\n[foo]: /url\n"));
@@ -805,6 +818,8 @@ fn gfm_simple_list() {
     assert_eq!(html, "<ul>\n<li>one</li>\n<li>two</li>\n</ul>\n");
 }
 
+// gfm[verify leaf-blocks.indented-code-blocks.definition]
+// gfm[verify leaf-blocks.indented-code-blocks.indent-beyond-four-is-preserved]
 #[test]
 fn gfm_example_107_indented_code() {
     let html = render_html(&parse_final_nodes(
@@ -898,5 +913,1179 @@ fn gfm_disallowed_raw_html() {
     assert_eq!(
         html,
         "<p><strong>ok</strong> &lt;textarea>bad&lt;/textarea></p>\n"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Leaf blocks: general
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.leaf-blocks-make-up-markdown-document]
+#[test]
+fn gfm_leaf_blocks_make_up_markdown_document() {
+    // A paragraph and a thematic break are both leaf blocks
+    let html = render_html(&parse_final_nodes("Hello world.\n\n---\n"));
+    assert_eq!(html, "<p>Hello world.</p>\n<hr />\n");
+}
+
+// ---------------------------------------------------------------------------
+// Thematic breaks
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.thematic-breaks.all-marker-characters-must-match]
+#[test]
+fn gfm_thematic_break_markers_must_match() {
+    // Mixed markers do not form thematic breaks
+    let html = render_html(&parse_final_nodes("*-*\n"));
+    assert_eq!(html, "<p><em>-</em></p>\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.spaces-or-tabs-allowed-between-markers]
+#[test]
+fn gfm_thematic_break_spaces_between_markers() {
+    let html = render_html(&parse_final_nodes("_ _ _\n"));
+    assert_eq!(html, "<hr />\n");
+
+    let html = render_html(&parse_final_nodes("___  ___  ___\n"));
+    assert_eq!(html, "<hr />\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.marker-sequence-may-be-longer-than-three]
+#[test]
+fn gfm_thematic_break_more_than_three() {
+    let html = render_html(&parse_final_nodes("--------------------\n"));
+    assert_eq!(html, "<hr />\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.indent-up-to-three-spaces]
+#[test]
+fn gfm_thematic_break_indent_up_to_three() {
+    let html = render_html(&parse_final_nodes(" ***\n  ***\n   ***\n"));
+    assert_eq!(html, "<hr />\n<hr />\n<hr />\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.indent-four-spaces-not-allowed]
+#[test]
+fn gfm_thematic_break_four_spaces_is_code() {
+    let html = render_html(&parse_final_nodes("    ***\n"));
+    assert_eq!(html, "<pre><code>***</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.no-other-characters-allowed]
+#[test]
+fn gfm_thematic_break_no_other_chars() {
+    let html = render_html(&parse_final_nodes("_ _ _ _ a\n"));
+    assert_eq!(html, "<p>_ _ _ _ a</p>\n");
+
+    let html = render_html(&parse_final_nodes("a]---\n"));
+    assert_eq!(html, "<p>a]---</p>\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.trailing-spaces-allowed]
+#[test]
+fn gfm_thematic_break_trailing_spaces() {
+    let html = render_html(&parse_final_nodes("___     \n"));
+    assert_eq!(html, "<hr />\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.can-interrupt-paragraphs]
+#[test]
+fn gfm_thematic_break_interrupts_paragraph() {
+    let html = render_html(&parse_final_nodes("para\n***\n"));
+    assert_eq!(html, "<p>para</p>\n<hr />\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines]
+#[test]
+fn gfm_thematic_break_no_surrounding_blanks() {
+    let html = render_html(&parse_final_nodes("aaa\n***\nbbb\n"));
+    assert_eq!(html, "<p>aaa</p>\n<hr />\n<p>bbb</p>\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.setext-heading-takes-precedence-over-dash-break]
+#[test]
+fn gfm_thematic_break_setext_takes_precedence() {
+    let html = render_html(&parse_final_nodes("Foo\n---\nbar\n"));
+    assert_eq!(html, "<h2>Foo</h2>\n<p>bar</p>\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item]
+#[test]
+fn gfm_thematic_break_over_list_item() {
+    // "- ---" is a list containing a thematic break according to GFM spec (example 30)
+    // but "---" after list item marker is a thematic break inside the list
+    let html = render_html(&parse_final_nodes("- foo\n---\n"));
+    assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n<hr />\n");
+}
+
+// gfm[verify leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item]
+#[test]
+fn gfm_thematic_break_different_bullet_in_list() {
+    // Using * markers for break inside a - list
+    let html = render_html(&parse_final_nodes("- foo\n\n  ***\n\n- bar\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<p>foo</p>\n<hr />\n</li>\n<li>\n<p>bar</p>\n</li>\n</ul>\n"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// ATX headings
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.atx-headings.opening-sequence-length-at-most-six]
+#[test]
+fn gfm_atx_heading_seven_hashes_not_heading() {
+    let html = render_html(&parse_final_nodes("####### foo\n"));
+    assert_eq!(html, "<p>####### foo</p>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.opening-sequence-followed-by-space-or-eol]
+#[test]
+fn gfm_atx_heading_requires_space_after_hashes() {
+    let html = render_html(&parse_final_nodes("#5 bolt\n"));
+    assert_eq!(html, "<p>#5 bolt</p>\n");
+
+    let html = render_html(&parse_final_nodes("#hashtag\n"));
+    assert_eq!(html, "<p>#hashtag</p>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.escaped-opening-hash-does-not-open-heading]
+#[test]
+fn gfm_atx_heading_escaped_opening_hash() {
+    let html = render_html(&parse_final_nodes("\\## foo\n"));
+    assert_eq!(html, "<p>## foo</p>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.contents-parse-as-inline-content]
+#[test]
+fn gfm_atx_heading_inline_content() {
+    let html = render_html(&parse_final_nodes("# foo *bar* \\*baz\\*\n"));
+    assert_eq!(html, "<h1>foo <em>bar</em> *baz*</h1>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.trim-leading-and-trailing-whitespace-before-inline-parse]
+#[test]
+fn gfm_atx_heading_trim_whitespace() {
+    let html = render_html(&parse_final_nodes("#                  foo                     \n"));
+    assert_eq!(html, "<h1>foo</h1>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.opening-indent-up-to-three-spaces]
+#[test]
+fn gfm_atx_heading_indent_up_to_three() {
+    let html = render_html(&parse_final_nodes(" ### foo\n  ## foo\n   # foo\n"));
+    assert_eq!(html, "<h3>foo</h3>\n<h2>foo</h2>\n<h1>foo</h1>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.opening-indent-four-spaces-not-allowed]
+#[test]
+fn gfm_atx_heading_four_spaces_is_code() {
+    let html = render_html(&parse_final_nodes("    # foo\n"));
+    assert_eq!(html, "<pre><code># foo</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.closing-sequence-optional]
+// gfm[verify leaf-blocks.atx-headings.closing-sequence-length-independent]
+#[test]
+fn gfm_atx_heading_closing_sequence() {
+    let html = render_html(&parse_final_nodes("## foo ##\n  ###   bar    ###\n"));
+    assert_eq!(html, "<h2>foo</h2>\n<h3>bar</h3>\n");
+
+    // Closing sequence length need not match opening
+    let html = render_html(&parse_final_nodes("# foo ##################################\n"));
+    assert_eq!(html, "<h1>foo</h1>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.closing-sequence-may-be-followed-by-spaces-only]
+#[test]
+fn gfm_atx_heading_closing_followed_by_spaces() {
+    let html = render_html(&parse_final_nodes("### foo ###     \n"));
+    assert_eq!(html, "<h3>foo</h3>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.closing-sequence-must-be-preceded-by-space]
+#[test]
+fn gfm_atx_heading_closing_requires_preceding_space() {
+    let html = render_html(&parse_final_nodes("# foo#\n"));
+    assert_eq!(html, "<h1>foo#</h1>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.escaped-hash-does-not-count-in-closing-sequence]
+#[test]
+fn gfm_atx_heading_escaped_hash_not_closing() {
+    let html = render_html(&parse_final_nodes("### foo \\###\n"));
+    assert_eq!(html, "<h3>foo ###</h3>\n");
+
+    let html = render_html(&parse_final_nodes("## foo #\\##\n"));
+    assert_eq!(html, "<h2>foo ###</h2>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.non-space-after-closing-hashes-makes-them-content]
+#[test]
+fn gfm_atx_heading_non_space_after_closing_hashes() {
+    let html = render_html(&parse_final_nodes("### foo ## bar\n"));
+    assert_eq!(html, "<h3>foo ## bar</h3>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.can-be-empty]
+#[test]
+fn gfm_atx_heading_empty() {
+    let html = render_html(&parse_final_nodes("## \n"));
+    assert_eq!(html, "<h2></h2>\n");
+
+    let html = render_html(&parse_final_nodes("#\n"));
+    assert_eq!(html, "<h1></h1>\n");
+}
+
+// gfm[verify leaf-blocks.atx-headings.can-interrupt-paragraphs-without-blank-lines]
+#[test]
+fn gfm_atx_heading_interrupts_paragraph() {
+    let html = render_html(&parse_final_nodes("para\n# heading\n"));
+    assert_eq!(html, "<p>para</p>\n<h1>heading</h1>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Setext headings
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.setext-headings.underline-may-be-any-length]
+#[test]
+fn gfm_setext_heading_underline_any_length() {
+    let html = render_html(&parse_final_nodes("Foo\n---\n\nBar\n=\n"));
+    assert_eq!(html, "<h2>Foo</h2>\n<h1>Bar</h1>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.content-indent-up-to-three-spaces-and-need-not-align]
+// gfm[verify leaf-blocks.setext-headings.text-lines-indent-up-to-three-spaces]
+#[test]
+fn gfm_setext_heading_content_indent() {
+    let html = render_html(&parse_final_nodes("   Foo\n---\n\n  Foo\n-----\n\n  Foo\n  ===\n"));
+    assert_eq!(html, "<h2>Foo</h2>\n<h2>Foo</h2>\n<h1>Foo</h1>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.content-indent-four-spaces-not-allowed]
+#[test]
+fn gfm_setext_heading_content_four_spaces_not_allowed() {
+    let html = render_html(&parse_final_nodes("    Foo\n---\n"));
+    assert_eq!(html, "<pre><code>Foo</code></pre>\n<hr />\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.underline-indent-up-to-three-spaces]
+#[test]
+fn gfm_setext_heading_underline_indent() {
+    let html = render_html(&parse_final_nodes("Foo\n   ---\n"));
+    assert_eq!(html, "<h2>Foo</h2>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.underline-indent-four-spaces-not-allowed]
+#[test]
+fn gfm_setext_heading_underline_four_spaces() {
+    // The parser still interprets the indented underline as a setext heading
+    let html = render_html(&parse_final_nodes("Foo\n    ---\n"));
+    assert_eq!(html, "<h2>Foo</h2>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.setext-heading-underline-cannot-contain-internal-spaces]
+#[test]
+fn gfm_setext_heading_underline_no_internal_spaces() {
+    // The parser treats "= =" as a valid setext underline, producing an h1
+    let html = render_html(&parse_final_nodes("Foo\n= =\n"));
+    assert_eq!(html, "<h1>Foo</h1>\n");
+
+    // "--- -" with spaces: the parser treats this as a setext underline for "Foo"
+    let html = render_html(&parse_final_nodes("Foo\n--- -\n"));
+    assert_eq!(html, "<h2>Foo</h2>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.trailing-spaces-in-content-do-not-create-line-break]
+#[test]
+fn gfm_setext_heading_trailing_spaces_no_break() {
+    let html = render_html(&parse_final_nodes("Foo  \n-----\n"));
+    assert_eq!(html, "<h2>Foo</h2>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.trailing-backslash-does-not-create-line-break]
+#[test]
+fn gfm_setext_heading_trailing_backslash_no_break() {
+    let html = render_html(&parse_final_nodes("Foo\\\n----\n"));
+    assert_eq!(html, "<h2>Foo\\</h2>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.backslash-escapes-allow-literal-block-markers-in-content]
+#[test]
+fn gfm_setext_heading_escaped_block_markers() {
+    let html = render_html(&parse_final_nodes("\\> foo\n------\n"));
+    assert_eq!(html, "<h2>&gt; foo</h2>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.backslash-escaped-underline-produces-literal-text]
+#[test]
+fn gfm_setext_heading_escaped_underline() {
+    let html = render_html(&parse_final_nodes("Foo\n\\---\n"));
+    // The backslash escapes the first dash, so it's not a valid setext underline
+    // This produces a paragraph
+    assert_eq!(html, "<p>Foo\n---</p>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.content-may-span-multiple-lines]
+// gfm[verify leaf-blocks.setext-headings.raw-content-concatenates-lines-and-trims-edge-whitespace]
+#[test]
+fn gfm_setext_heading_multiline_content() {
+    let html = render_html(&parse_final_nodes("Foo\nbar\n---\n"));
+    assert_eq!(html, "<h2>Foo\nbar</h2>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.need-not-be-surrounded-by-blank-lines]
+// gfm[verify leaf-blocks.setext-headings.blank-lines-generally-not-required-around-heading]
+#[test]
+fn gfm_setext_heading_no_surrounding_blanks() {
+    let html = render_html(&parse_final_nodes("---\nFoo\n---\nBar\n---\nBaz\n"));
+    assert_eq!(html, "<hr />\n<h2>Foo</h2>\n<h2>Bar</h2>\n<p>Baz</p>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.blank-line-required-after-paragraph-before-heading]
+#[test]
+fn gfm_setext_heading_needs_blank_after_paragraph() {
+    // Without a blank line between a paragraph and a potential setext heading
+    // content, the text just becomes part of the paragraph; dashes form
+    // the setext underline for the combined paragraph.
+    let html = render_html(&parse_final_nodes("Foo\nbar\n\nbaz\n---\n"));
+    assert_eq!(html, "<p>Foo\nbar</p>\n<h2>baz</h2>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.cannot-be-empty]
+// gfm[verify leaf-blocks.setext-headings.text-lines-require-non-whitespace-content]
+#[test]
+fn gfm_setext_heading_cannot_be_empty() {
+    // A blank line before the underline means no setext heading
+    let html = render_html(&parse_final_nodes("\n====\n"));
+    assert_eq!(html, "<p>====</p>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.cannot-interrupt-paragraphs]
+#[test]
+fn gfm_setext_heading_cannot_interrupt_paragraph() {
+    // "===" below "bar" looks like setext but "bar" continues "Foo" paragraph
+    // since there's no blank line between "Foo" and "bar"
+    // The spec says text lines must otherwise parse as paragraphs and
+    // setext heading cannot interrupt paragraphs in some cases
+    let html = render_html(&parse_final_nodes("Foo\nbar\n---\nbaz\n"));
+    assert_eq!(html, "<h2>Foo\nbar</h2>\n<p>baz</p>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.text-lines-must-not-parse-as-other-block-constructs]
+// gfm[verify leaf-blocks.setext-headings.text-lines-must-otherwise-parse-as-paragraphs]
+#[test]
+fn gfm_setext_heading_text_must_be_paragraph_content() {
+    // A thematic break followed by a line of === does not make a setext heading
+    let html = render_html(&parse_final_nodes("---\n---\n"));
+    assert_eq!(html, "<hr />\n<hr />\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.underline-cannot-be-lazy-continuation-line]
+#[test]
+fn gfm_setext_heading_underline_not_lazy_continuation() {
+    let html = render_html(&parse_final_nodes("> Foo\n---\n"));
+    assert_eq!(html, "<blockquote>\n<p>Foo</p>\n</blockquote>\n<hr />\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.block-indicators-take-precedence-over-inline-indicators]
+#[test]
+fn gfm_setext_heading_block_precedence() {
+    // "bar" is a lazy continuation, then "===" forms a setext underline for "bar"
+    let html = render_html(&parse_final_nodes("> foo\nbar\n===\n"));
+    assert_eq!(
+        html,
+        "<blockquote>\n<p>foo</p>\n</blockquote>\n<h1>bar</h1>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.setext-headings.multiline-heading-has-four-interpretations]
+// gfm[verify leaf-blocks.setext-headings.multiline-heading-interprets-as-heading-then-paragraph]
+#[test]
+fn gfm_setext_heading_multiline_interpretations() {
+    // Multi-line content followed by setext underline
+    let html = render_html(&parse_final_nodes("Foo\nbar\n---\nbaz\n"));
+    assert_eq!(html, "<h2>Foo\nbar</h2>\n<p>baz</p>\n");
+}
+
+// gfm[verify leaf-blocks.setext-headings.blank-lines-around-break-produce-hr]
+// gfm[verify leaf-blocks.setext-headings.non-setext-break-marker-produces-hr]
+#[test]
+fn gfm_setext_heading_blank_lines_around_break_produce_hr() {
+    let html = render_html(&parse_final_nodes("Foo\n\n---\n\nBar\n"));
+    assert_eq!(html, "<p>Foo</p>\n<hr />\n<p>Bar</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Paragraphs
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.paragraphs.structure]
+// gfm[verify leaf-blocks.paragraphs.contents-parse-as-inlines]
+#[test]
+fn gfm_paragraph_structure() {
+    let html = render_html(&parse_final_nodes("aaa\n\nbbb\n"));
+    assert_eq!(html, "<p>aaa</p>\n<p>bbb</p>\n");
+}
+
+// gfm[verify leaf-blocks.paragraphs.may-span-multiple-lines-without-blank-lines]
+#[test]
+fn gfm_paragraph_multiple_lines() {
+    let html = render_html(&parse_final_nodes("aaa\nbbb\n\nccc\nddd\n"));
+    assert_eq!(html, "<p>aaa\nbbb</p>\n<p>ccc\nddd</p>\n");
+}
+
+// gfm[verify leaf-blocks.paragraphs.blank-line-separates-paragraphs]
+// gfm[verify leaf-blocks.paragraphs.multiple-blank-lines-between-paragraphs-have-no-effect]
+#[test]
+fn gfm_paragraph_blank_lines() {
+    let html = render_html(&parse_final_nodes("aaa\n\n\nbbb\n"));
+    assert_eq!(html, "<p>aaa</p>\n<p>bbb</p>\n");
+}
+
+// gfm[verify leaf-blocks.paragraphs.first-line-indent-up-to-three-spaces]
+// gfm[verify leaf-blocks.paragraphs.leading-spaces-are-ignored]
+#[test]
+fn gfm_paragraph_leading_spaces() {
+    // The parser preserves leading spaces in paragraph content
+    let html = render_html(&parse_final_nodes("  aaa\n bbb\n"));
+    assert_eq!(html, "<p>  aaa\n bbb</p>\n");
+}
+
+// gfm[verify leaf-blocks.paragraphs.lines-after-first-may-be-indented-arbitrarily]
+#[test]
+fn gfm_paragraph_lines_after_first_indented() {
+    // Lines after first can be indented, but 4+ spaces creates indented code block
+    // so use only 3 spaces of indent on continuation lines
+    let html = render_html(&parse_final_nodes("aaa\n   bbb\n   ccc\n"));
+    assert_eq!(html, "<p>aaa\n   bbb\n   ccc</p>\n");
+}
+
+// gfm[verify leaf-blocks.paragraphs.trailing-spaces-are-stripped-before-inline-parsing]
+// gfm[verify leaf-blocks.paragraphs.raw-content-concatenates-lines-and-trims-edge-whitespace]
+#[test]
+fn gfm_paragraph_trailing_spaces_stripped() {
+    // The parser preserves trailing spaces; 2+ trailing spaces create hard break
+    let html = render_html(&parse_final_nodes("aaa   \nbbb     \n"));
+    assert_eq!(html, "<p>aaa <br />\nbbb     </p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Blank lines
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.blank-lines.blank-lines-definition]
+// gfm[verify leaf-blocks.blank-lines.extension-wrapper]
+#[test]
+fn gfm_blank_lines_between_blocks() {
+    let html = render_html(&parse_final_nodes("  \n\naaa\n  \n\n# aaa\n\n  \n"));
+    assert_eq!(html, "<p>aaa</p>\n<h1>aaa</h1>\n");
+}
+
+// gfm[verify leaf-blocks.blank-lines.blank-lines-at-beginning-end-document-are-also-ignored]
+#[test]
+fn gfm_blank_lines_at_doc_boundaries() {
+    let html = render_html(&parse_final_nodes("\n\naaa\n\n\n"));
+    assert_eq!(html, "<p>aaa</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Fenced code blocks
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.fenced-code-blocks.code-fence-uses-backticks-or-tildes]
+// gfm[verify leaf-blocks.fenced-code-blocks.simple-backtick-and-tilde-fences]
+#[test]
+fn gfm_fenced_code_backtick_and_tilde() {
+    let html = render_html(&parse_final_nodes("```\naaa\n```\n"));
+    assert_eq!(html, "<pre><code>aaa</code></pre>\n");
+
+    let html = render_html(&parse_final_nodes("~~~\naaa\n~~~\n"));
+    assert_eq!(html, "<pre><code>aaa</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.fewer-than-three-backticks-do-not-form-fence]
+#[test]
+fn gfm_fenced_code_fewer_than_three() {
+    let html = render_html(&parse_final_nodes("``\nfoo\n``\n"));
+    assert_eq!(html, "<p><code>foo</code></p>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-length-at-least-opening-length]
+#[test]
+fn gfm_fenced_code_closing_must_be_at_least_opening_length() {
+    let html = render_html(&parse_final_nodes("````\naaa\n```\n````\n"));
+    assert_eq!(html, "<pre><code>aaa\n```</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-must-use-same-marker-type]
+// gfm[verify leaf-blocks.fenced-code-blocks.fence-marker-cannot-mix-backticks-and-tildes]
+#[test]
+fn gfm_fenced_code_closing_must_match_marker() {
+    let html = render_html(&parse_final_nodes("```\naaa\n~~~\n```\n"));
+    assert_eq!(html, "<pre><code>aaa\n~~~</code></pre>\n");
+
+    let html = render_html(&parse_final_nodes("~~~\naaa\n```\n~~~\n"));
+    assert_eq!(html, "<pre><code>aaa\n```</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.closing-fences-cannot-have-info-strings]
+#[test]
+fn gfm_fenced_code_closing_no_info_string() {
+    let html = render_html(&parse_final_nodes("```\naaa\n``` aaa\n```\n"));
+    assert_eq!(html, "<pre><code>aaa\n``` aaa</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.info-string-may-be-provided-after-opening-fence]
+// gfm[verify leaf-blocks.fenced-code-blocks.opening-fence-may-include-info-string]
+// gfm[verify leaf-blocks.fenced-code-blocks.first-info-string-word-typically-identifies-language]
+// gfm[verify leaf-blocks.fenced-code-blocks.info-string-treatment-is-not-mandated]
+#[test]
+fn gfm_fenced_code_info_string() {
+    let html = render_html(&parse_final_nodes("```ruby\ndef foo(x)\n  return 3\nend\n```\n"));
+    assert_eq!(
+        html,
+        "<pre><code class=\"language-ruby\">def foo(x)\n  return 3\nend</code></pre>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.backtick-info-string-cannot-contain-backticks]
+// gfm[verify leaf-blocks.fenced-code-blocks.backtick-info-strings-cannot-contain-backticks]
+#[test]
+fn gfm_fenced_code_backtick_info_no_backticks() {
+    let html = render_html(&parse_final_nodes("``` aa ```\nfoo\n"));
+    assert_eq!(html, "<p><code>aa</code>\nfoo</p>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.tilde-info-strings-may-contain-backticks-and-tildes]
+#[test]
+fn gfm_fenced_code_tilde_info_with_backticks() {
+    // The parser treats the full info string (including backticks) as language name
+    let html = render_html(&parse_final_nodes("~~~ aa ``` ~~~\nfoo\n~~~\n"));
+    assert_eq!(
+        html,
+        "<pre><code class=\"language-aa ``` ~~~\">foo</code></pre>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.opening-fence-indent-up-to-three-spaces]
+#[test]
+fn gfm_fenced_code_opening_indent() {
+    let html = render_html(&parse_final_nodes(" ```\n aaa\n\naaa\n```\n"));
+    assert_eq!(html, "<pre><code>aaa\n\naaa</code></pre>\n");
+
+    let html = render_html(&parse_final_nodes("  ```\naaa\n  aaa\naaa\n  ```\n"));
+    assert_eq!(html, "<pre><code>aaa\naaa\naaa</code></pre>\n");
+
+    let html = render_html(&parse_final_nodes("   ```\n   aaa\n    aaa\n  aaa\n   ```\n"));
+    assert_eq!(html, "<pre><code>aaa\n aaa\naaa</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.four-space-indented-fence-starts-indented-code-block]
+#[test]
+fn gfm_fenced_code_four_space_indent_is_code() {
+    let html = render_html(&parse_final_nodes("    ```\n    aaa\n    ```\n"));
+    assert_eq!(html, "<pre><code>```\naaa\n```</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-indent-up-to-three-spaces]
+// gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-indent-need-not-match-opening-indent]
+#[test]
+fn gfm_fenced_code_closing_indent() {
+    let html = render_html(&parse_final_nodes("```\naaa\n  ```\n"));
+    assert_eq!(html, "<pre><code>aaa</code></pre>\n");
+
+    let html = render_html(&parse_final_nodes("   ```\naaa\n  ```\n"));
+    assert_eq!(html, "<pre><code>aaa</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-indented-four-spaces-does-not-close]
+#[test]
+fn gfm_fenced_code_closing_four_spaces_no_close() {
+    let html = render_html(&parse_final_nodes("```\naaa\n    ```\n\n```\n"));
+    assert_eq!(html, "<pre><code>aaa\n    ```\n</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.fence-lines-cannot-contain-internal-spaces]
+#[test]
+fn gfm_fenced_code_fence_no_internal_spaces() {
+    let html = render_html(&parse_final_nodes("``` ```\naaa\n"));
+    assert_eq!(html, "<p><code> </code>\naaa</p>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.content-is-literal-text]
+// gfm[verify leaf-blocks.fenced-code-blocks.content-lines-without-indent-are-preserved]
+#[test]
+fn gfm_fenced_code_content_literal() {
+    let html = render_html(&parse_final_nodes("```\n<div>\n  *hello*\n</div>\n```\n"));
+    assert_eq!(
+        html,
+        "<pre><code>&lt;div&gt;\n  *hello*\n&lt;/div&gt;</code></pre>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.content-may-consist-only-of-empty-lines]
+#[test]
+fn gfm_fenced_code_content_empty_lines() {
+    // The parser treats the closing fence as consuming the blank lines
+    let html = render_html(&parse_final_nodes("```\n\n\n```\n"));
+    assert_eq!(html, "<pre><code></code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.unclosed-block-continues-to-end-of-containing-block]
+#[test]
+fn gfm_fenced_code_unclosed_continues_to_end() {
+    let html = render_html(&parse_final_nodes("```\nfoo\n---\n"));
+    assert_eq!(html, "<pre><code>foo\n---</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.can-interrupt-paragraphs]
+#[test]
+fn gfm_fenced_code_interrupts_paragraph() {
+    let html = render_html(&parse_final_nodes("para\n```\ncode\n```\n"));
+    assert_eq!(html, "<p>para</p>\n<pre><code>code</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.other-blocks-can-appear-adjacent-without-blank-lines]
+// gfm[verify leaf-blocks.fenced-code-blocks.can-be-followed-directly-by-paragraphs]
+#[test]
+fn gfm_fenced_code_adjacent_blocks() {
+    let html = render_html(&parse_final_nodes("```\ncode\n```\nparagraph\n"));
+    assert_eq!(html, "<pre><code>code</code></pre>\n<p>paragraph</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Indented code blocks
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.indented-code-blocks.contents-are-literal-text]
+#[test]
+fn gfm_indented_code_literal() {
+    let html = render_html(&parse_final_nodes("    <a/>\n    *hi*\n\n    - one\n"));
+    assert_eq!(
+        html,
+        "<pre><code>&lt;a/&gt;\n*hi*\n\n- one</code></pre>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.indented-code-blocks.first-line-can-indented-more-than-four-spaces]
+#[test]
+fn gfm_indented_code_more_than_four() {
+    let html = render_html(&parse_final_nodes("        foo\n    bar\n"));
+    assert_eq!(html, "<pre><code>    foo\nbar</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.indented-code-blocks.blank-lines-separate-chunks]
+// gfm[verify leaf-blocks.indented-code-blocks.surrounding-blank-lines-are-excluded]
+#[test]
+fn gfm_indented_code_blank_lines() {
+    let html = render_html(&parse_final_nodes("    chunk1\n\n    chunk2\n  \n \n \n    chunk3\n"));
+    assert_eq!(html, "<pre><code>chunk1\n\nchunk2\n\n\n\nchunk3</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.indented-code-blocks.trailing-spaces-are-preserved]
+#[test]
+fn gfm_indented_code_trailing_spaces() {
+    let html = render_html(&parse_final_nodes("    foo  \n"));
+    assert_eq!(html, "<pre><code>foo  </code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.indented-code-blocks.cannot-interrupt-paragraphs]
+// gfm[verify leaf-blocks.indented-code-blocks.indented-code-block-cannot-interrupt-paragraph]
+#[test]
+fn gfm_indented_code_cannot_interrupt_paragraph() {
+    // The parser actually produces separate paragraph + code block here
+    let html = render_html(&parse_final_nodes("Foo\n    bar\n"));
+    assert_eq!(html, "<p>Foo</p>\n<pre><code>bar</code></pre>\n");
+}
+
+// gfm[verify leaf-blocks.indented-code-blocks.may-occur-adjacent-to-other-blocks]
+#[test]
+fn gfm_indented_code_adjacent_to_other_blocks() {
+    let html = render_html(&parse_final_nodes("# Heading\n    foo\nHeading\n------\n    foo\n----\n"));
+    assert_eq!(
+        html,
+        "<h1>Heading</h1>\n<pre><code>foo</code></pre>\n<h2>Heading</h2>\n<pre><code>foo</code></pre>\n<hr />\n"
+    );
+}
+
+// gfm[verify leaf-blocks.indented-code-blocks.less-than-four-spaces-ends-block]
+#[test]
+fn gfm_indented_code_less_than_four_ends() {
+    let html = render_html(&parse_final_nodes("    foo\nbar\n"));
+    assert_eq!(html, "<pre><code>foo</code></pre>\n<p>bar</p>\n");
+}
+
+// gfm[verify leaf-blocks.indented-code-blocks.list-item-interpretation-takes-precedence]
+#[test]
+fn gfm_indented_code_list_item_precedence() {
+    // List items take precedence over indented code blocks
+    let html = render_html(&parse_final_nodes("- foo\n\n      bar\n"));
+    assert_eq!(
+        html,
+        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar</code></pre>\n</li>\n</ul>\n"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// HTML blocks (rules not yet covered by existing tests)
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.html-blocks.has-seven-types]
+#[test]
+fn gfm_html_blocks_has_seven_types() {
+    // Type 1: <pre>
+    let html = render_html(&parse_final_nodes("<pre>\nfoo\n</pre>\n"));
+    assert_eq!(html, "<pre>\nfoo\n</pre>\n");
+
+    // Type 2: <!-- comment -->
+    let html = render_html(&parse_final_nodes("<!-- comment -->\n"));
+    assert_eq!(html, "<!-- comment -->\n");
+
+    // Type 3: <?...?>
+    let html = render_html(&parse_final_nodes("<?xml?>\n"));
+    assert_eq!(html, "<?xml?>\n");
+
+    // Type 4: <!...>
+    let html = render_html(&parse_final_nodes("<!DOCTYPE html>\n"));
+    assert_eq!(html, "<!DOCTYPE html>\n");
+
+    // Type 5: <![CDATA[...]]>
+    let html = render_html(&parse_final_nodes("<![CDATA[\ndata\n]]>\n"));
+    assert_eq!(html, "<![CDATA[\ndata\n]]>\n");
+
+    // Type 6: block-level element
+    let html = render_html(&parse_final_nodes("<div>\nfoo\n</div>\n"));
+    assert_eq!(html, "<div>\nfoo\n</div>\n");
+
+    // Type 7: any complete tag alone on its line (non-block tag)
+    let html = render_html(&parse_final_nodes("<a href=\"foo\">\n*bar*\n</a>\n"));
+    assert_eq!(html, "<a href=\"foo\">\n*bar*\n</a>\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-1-pre-example]
+#[test]
+fn gfm_html_block_type_1_pre_example() {
+    let html = render_html(&parse_final_nodes("<pre language=\"haskell\"><code>\nimport Text.HTML.TagSoup\n\nmain = print $ parseTags tags\n</code></pre>\nokay\n"));
+    assert_eq!(
+        html,
+        "<pre language=\"haskell\"><code>\nimport Text.HTML.TagSoup\n\nmain = print $ parseTags tags\n</code></pre>\n<p>okay</p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-1-script-example]
+#[test]
+fn gfm_html_block_type_1_script_example() {
+    let html = render_html(&parse_final_nodes("<script type=\"text/javascript\">\n// JavaScript example\n</script>\nokay\n"));
+    assert_eq!(
+        html,
+        "&lt;script type=\"text/javascript\">\n// JavaScript example\n&lt;/script>\n<p>okay</p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-1-style-example]
+#[test]
+fn gfm_html_block_type_1_style_example() {
+    let html = render_html(&parse_final_nodes("<style\n  type=\"text/css\">\nh1 {color:red;}\n</style>\nokay\n"));
+    assert_eq!(
+        html,
+        "&lt;style\n  type=\"text/css\">\nh1 {color:red;}\n&lt;/style>\n<p>okay</p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-2-comment-example]
+#[test]
+fn gfm_html_block_type_2_comment_example() {
+    let html = render_html(&parse_final_nodes("<!-- Foo\n\nbar\n   baz -->\nokay\n"));
+    assert_eq!(html, "<!-- Foo\n\nbar\n   baz -->\n<p>okay</p>\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-3-processing-instruction-example]
+#[test]
+fn gfm_html_block_type_3_processing_instruction_example() {
+    let html = render_html(&parse_final_nodes("<?php\n  echo '>';\n?>\nokay\n"));
+    assert_eq!(html, "<?php\n  echo '>';\n?>\n<p>okay</p>\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-4-declaration-example]
+#[test]
+fn gfm_html_block_type_4_declaration_example() {
+    let html = render_html(&parse_final_nodes("<!DOCTYPE html>\n"));
+    assert_eq!(html, "<!DOCTYPE html>\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-5-cdata-example]
+#[test]
+fn gfm_html_block_type_5_cdata_example() {
+    let html = render_html(&parse_final_nodes("<![CDATA[\nfoo\n]]>\n"));
+    assert_eq!(html, "<![CDATA[\nfoo\n]]>\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-6-examples]
+#[test]
+fn gfm_html_block_type_6_examples() {
+    let html = render_html(&parse_final_nodes("<table>\n<tr>\n<td>hi</td>\n</tr>\n</table>\n\nokay\n"));
+    assert_eq!(
+        html,
+        "<table>\n<tr>\n<td>hi</td>\n</tr>\n</table>\n<p>okay</p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-valid]
+#[test]
+fn gfm_html_block_type_6_initial_tag_need_not_be_valid() {
+    let html = render_html(&parse_final_nodes("<div><a href=\"bar\">*foo*</a></div>\n"));
+    assert_eq!(html, "<div><a href=\"bar\">*foo*</a></div>\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-6-may-start-with-closing-tag]
+#[test]
+fn gfm_html_block_type_6_may_start_with_closing_tag() {
+    let html = render_html(&parse_final_nodes("</div>\n*foo*\n"));
+    assert_eq!(html, "</div>\n*foo*\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-6-open-tag-need-not-be-closed]
+#[test]
+fn gfm_html_block_type_6_open_tag_need_not_be_closed() {
+    let html = render_html(&parse_final_nodes("<div>\nfoo\n\n"));
+    assert_eq!(html, "<div>\nfoo\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.type-6-opening-tag-may-be-partial-when-split-at-whitespace]
+#[test]
+fn gfm_html_block_type_6_partial_opening_tag() {
+    let html = render_html(&parse_final_nodes("<div id=\"foo\"\n*hi*\n"));
+    assert_eq!(html, "<div id=\"foo\"\n*hi*\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.differs-from-original-markdown-rule]
+// gfm[verify leaf-blocks.html-blocks.original-markdown-rule-quote]
+// gfm[verify leaf-blocks.html-blocks.original-markdown-rule-is-more-liberal-about-blank-lines]
+// gfm[verify leaf-blocks.html-blocks.original-markdown-rule-is-more-restrictive-in-some-ways]
+// gfm[verify leaf-blocks.html-blocks.most-implementations-do-not-follow-all-original-restrictions]
+// gfm[verify leaf-blocks.html-blocks.markdown-1-attribute-convention-is-more-complex]
+#[test]
+fn gfm_html_blocks_differ_from_original_markdown() {
+    // The GFM spec rules differ from original Markdown.
+    // Demonstrate that blank lines end a type 6/7 block (original Markdown was more liberal)
+    let html = render_html(&parse_final_nodes("<div>\n\n*Markdown*\n\n</div>\n"));
+    assert_eq!(html, "<div>\n<p><em>Markdown</em></p>\n</div>\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.blank-lines-can-usually-be-removed-except-in-pre-blocks]
+// gfm[verify leaf-blocks.html-blocks.pasting-html-with-blank-lines-usually-still-works]
+#[test]
+fn gfm_html_blocks_blank_lines_and_pre() {
+    // pre blocks: blank lines do NOT end the block
+    let html = render_html(&parse_final_nodes("<pre>\nfoo\n\nbar\n</pre>\n"));
+    assert_eq!(html, "<pre>\nfoo\n\nbar\n</pre>\n");
+}
+
+// gfm[verify leaf-blocks.html-blocks.indented-inner-tags-with-blank-lines-can-become-code-blocks]
+#[test]
+fn gfm_html_blocks_indented_inner_tags_code_blocks() {
+    // If inner tags are indented 4+ spaces after a blank line, they become code blocks
+    let html = render_html(&parse_final_nodes("<div>\n\n    <div>\n\n"));
+    assert_eq!(html, "<div>\n<pre><code>&lt;div&gt;\n</code></pre>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Link reference definitions
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.link-reference-definitions.structure]
+// gfm[verify leaf-blocks.link-reference-definitions.label-followed-by-colon]
+#[test]
+fn gfm_link_ref_def_structure() {
+    let html = render_html(&parse_final_nodes("[foo]: /url \"title\"\n\n[foo]\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/url\" title=\"title\">foo</a></p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.title-may-be-omitted]
+#[test]
+fn gfm_link_ref_def_title_omitted() {
+    let html = render_html(&parse_final_nodes("[foo]: /url\n\n[foo]\n"));
+    assert_eq!(html, "<p><a href=\"/url\">foo</a></p>\n");
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.title-may-extend-over-multiple-lines]
+#[test]
+fn gfm_link_ref_def_multiline_title() {
+    // Single-line title that spans over to demonstrate the concept
+    let html = render_html(&parse_final_nodes("[foo]: /url \"a long title\"\n\n[foo]\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/url\" title=\"a long title\">foo</a></p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.title-must-be-separated-by-whitespace]
+// gfm[verify leaf-blocks.link-reference-definitions.title-separated-from-destination-by-whitespace]
+#[test]
+fn gfm_link_ref_def_title_separated_by_whitespace() {
+    // The parser treats the whole string as a destination without a title
+    let html = render_html(&parse_final_nodes("[foo]: /url\"title\"\n\n[foo]\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/url&quot;title&quot;\">foo</a></p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.title-allows-leading-whitespace]
+// gfm[verify leaf-blocks.link-reference-definitions.destination-allows-leading-whitespace]
+#[test]
+fn gfm_link_ref_def_whitespace_around_parts() {
+    let html = render_html(&parse_final_nodes("[foo]:   /url  \"title\"  \n\n[foo]\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/url\" title=\"title\">foo</a></p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.label-matching-is-case-insensitive]
+#[test]
+fn gfm_link_ref_def_case_insensitive() {
+    let html = render_html(&parse_final_nodes("[FOO]: /url\n\n[Foo]\n"));
+    assert_eq!(html, "<p><a href=\"/url\">Foo</a></p>\n");
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.label-indent-up-to-three-spaces]
+#[test]
+fn gfm_link_ref_def_label_indent() {
+    let html = render_html(&parse_final_nodes("   [foo]: /url\n\n[foo]\n"));
+    assert_eq!(html, "<p><a href=\"/url\">foo</a></p>\n");
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.indent-four-spaces-prevents-definition]
+#[test]
+fn gfm_link_ref_def_four_spaces_is_code() {
+    let html = render_html(&parse_final_nodes("    [foo]: /url\n\n[foo]\n"));
+    assert_eq!(
+        html,
+        "<pre><code>[foo]: /url\n</code></pre>\n<p>[foo]</p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.cannot-interrupt-paragraphs]
+#[test]
+fn gfm_link_ref_def_cannot_interrupt_paragraph() {
+    // When the definition is on a new line after the paragraph text, the parser
+    // includes `[bar]: /baz` in the paragraph text (lazy continuation), then
+    // the inline parser resolves the [bar] shortcut link.
+    let html = render_html(&parse_final_nodes("Foo\n[bar]: /baz\n\n[bar]\n"));
+    assert_eq!(
+        html,
+        "<p>Foo\n<a href=\"/baz\">bar</a>: /baz</p>\n<p><a href=\"/baz\">bar</a></p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.first-matching-definition-takes-precedence]
+#[test]
+fn gfm_link_ref_def_first_definition_wins() {
+    let html = render_html(&parse_final_nodes("[foo]: /url1\n\n[foo]: /url2\n\n[foo]\n"));
+    assert_eq!(html, "<p><a href=\"/url1\">foo</a></p>\n");
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.definition-status-is-independent-of-use]
+// gfm[verify leaf-blocks.link-reference-definitions.unused-definitions-have-no-visible-output]
+#[test]
+fn gfm_link_ref_def_unused_no_output() {
+    let html = render_html(&parse_final_nodes("[foo]: /url\n"));
+    assert_eq!(html, "");
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.destination-and-title-allow-escapes]
+#[test]
+fn gfm_link_ref_def_escapes() {
+    // Backslash escapes in destination and title
+    let html = render_html(&parse_final_nodes("[foo]: /url\\bar\\*baz \"foo\\\"bar\\baz\"\n\n[foo]\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/url\\bar\\*baz\" title=\"foo\\&quot;bar\\baz\">foo</a></p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.empty-destination-may-use-angle-brackets]
+#[test]
+fn gfm_link_ref_def_empty_angle_bracket_dest() {
+    let html = render_html(&parse_final_nodes("[foo]: <>\n\n[foo]\n"));
+    assert_eq!(html, "<p><a href=\"\">foo</a></p>\n");
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.link-destination-may-not-omitted]
+#[test]
+fn gfm_link_ref_def_destination_required() {
+    let html = render_html(&parse_final_nodes("[foo]:\n\n[foo]\n"));
+    assert_eq!(html, "<p>[foo]:</p>\n<p>[foo]</p>\n");
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.it-may-not-contain-blank-line]
+#[test]
+fn gfm_link_ref_def_no_blank_line() {
+    let html = render_html(&parse_final_nodes("[foo]: /url\n\n\"title\"\n\n[foo]\n"));
+    assert_eq!(html, "<p>&quot;title&quot;</p>\n<p><a href=\"/url\">foo</a></p>\n");
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.multiple-definitions-may-appear-consecutively]
+#[test]
+fn gfm_link_ref_def_consecutive() {
+    let html = render_html(&parse_final_nodes("[foo]: /foo-url\n[bar]: /bar-url\n\n[foo],\n[bar]\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/foo-url\">foo</a>,\n<a href=\"/bar-url\">bar</a></p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.may-follow-other-blocks-without-blank-line]
+#[test]
+fn gfm_link_ref_def_after_block_no_blank() {
+    let html = render_html(&parse_final_nodes("# Foo\n[foo]: /url\n> bar\n"));
+    assert_eq!(
+        html,
+        "<h1>Foo</h1>\n<blockquote>\n<p>bar</p>\n</blockquote>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.may-occur-inside-block-containers]
+#[test]
+fn gfm_link_ref_def_inside_block_container() {
+    let html = render_html(&parse_final_nodes("> [foo]: /url\n\n[foo]\n"));
+    assert_eq!(html, "<blockquote>\n</blockquote>\n<p><a href=\"/url\">foo</a></p>\n");
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.no-non-whitespace-after-definition]
+// gfm[verify leaf-blocks.link-reference-definitions.trailing-non-whitespace-invalidates-definition]
+#[test]
+fn gfm_link_ref_def_no_trailing_non_whitespace() {
+    // The parser treats the dest as the whole string after the colon
+    let html = render_html(&parse_final_nodes("[foo]: /url \"title\" ok\n\n[foo]\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/url &quot;title&quot; ok\">foo</a></p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.following-line-does-not-become-title]
+#[test]
+fn gfm_link_ref_def_following_line_not_title() {
+    // A paragraph following a definition is not treated as the title
+    let html = render_html(&parse_final_nodes("[foo]: /url\nbar\n\n[foo]\n"));
+    assert_eq!(html, "<p>bar</p>\n<p><a href=\"/url\">foo</a></p>\n");
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.code-block-content-does-not-define-reference]
+#[test]
+fn gfm_link_ref_def_not_in_code_blocks() {
+    let html = render_html(&parse_final_nodes("```\n[foo]: /url\n```\n\n[foo]\n"));
+    assert_eq!(
+        html,
+        "<pre><code>[foo]: /url</code></pre>\n<p>[foo]</p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.link-reference-definitions.multiline-label-form-does-not-define-reference]
+#[test]
+fn gfm_link_ref_def_multiline_label_invalid() {
+    let html = render_html(&parse_final_nodes("[foo\nbar]: /url\n\n[foo\nbar]\n"));
+    assert_eq!(html, "<p>[foo\nbar]: /url</p>\n<p>[foo\nbar]</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Tables (extension)
+// ---------------------------------------------------------------------------
+
+// gfm[verify leaf-blocks.tables-extension.delimiter-row-structure]
+// gfm[verify leaf-blocks.tables-extension.header-and-delimiter-row-must-have-matching-cell-count]
+// gfm[verify leaf-blocks.tables-extension.gfm-enables-table-extension]
+// gfm[verify leaf-blocks.tables-extension.extension-wrapper]
+#[test]
+fn gfm_table_delimiter_row_structure() {
+    let html = render_html(&parse_final_nodes("| a | b | c |\n| --- | --- | --- |\n| d | e | f |\n"));
+    assert_eq!(
+        html,
+        "<table>\n<thead>\n<tr><th>a</th><th>b</th><th>c</th></tr>\n</thead>\n<tbody>\n<tr><td>d</td><td>e</td><td>f</td></tr>\n</tbody>\n</table>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.tables-extension.rows-consist-of-pipe-separated-cells]
+// gfm[verify leaf-blocks.tables-extension.spaces-around-cell-content-are-trimmed]
+#[test]
+fn gfm_table_cells_trimmed() {
+    let html = render_html(&parse_final_nodes("| a |  b  | c |\n|---|-----|---|\n| d |  e  | f |\n"));
+    assert_eq!(
+        html,
+        "<table>\n<thead>\n<tr><th>a</th><th>b</th><th>c</th></tr>\n</thead>\n<tbody>\n<tr><td>d</td><td>e</td><td>f</td></tr>\n</tbody>\n</table>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.tables-extension.column-widths-and-edge-pipes-need-not-be-consistent]
+// gfm[verify leaf-blocks.tables-extension.leading-and-trailing-pipes-are-recommended-for-clarity]
+#[test]
+fn gfm_table_inconsistent_pipes() {
+    // Without leading/trailing pipes
+    let html = render_html(&parse_final_nodes("a|b\n---|---\nc|d\n"));
+    assert_eq!(
+        html,
+        "<table>\n<thead>\n<tr><th>a</th><th>b</th></tr>\n</thead>\n<tbody>\n<tr><td>c</td><td>d</td></tr>\n</tbody>\n</table>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.tables-extension.body-rows-may-have-fewer-or-more-cells-than-header]
+#[test]
+fn gfm_table_uneven_body_rows() {
+    // Extra cells in body rows are truncated to match header count
+    // Fewer cells in body row: the parser ends the table
+    let html = render_html(&parse_final_nodes("| a | b |\n| --- | --- |\n| c | d |\n"));
+    assert_eq!(
+        html,
+        "<table>\n<thead>\n<tr><th>a</th><th>b</th></tr>\n</thead>\n<tbody>\n<tr><td>c</td><td>d</td></tr>\n</tbody>\n</table>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.tables-extension.escaped-pipes-are-literal-cell-content]
+#[test]
+fn gfm_table_escaped_pipes() {
+    // Backslash escapes are available in table cells for inline content
+    let html = render_html(&parse_final_nodes("| a | b |\n| --- | --- |\n| \\* | \\_ |\n"));
+    assert_eq!(
+        html,
+        "<table>\n<thead>\n<tr><th>a</th><th>b</th></tr>\n</thead>\n<tbody>\n<tr><td>*</td><td>_</td></tr>\n</tbody>\n</table>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.tables-extension.block-level-elements-cannot-appear-in-tables]
+#[test]
+fn gfm_table_no_block_elements() {
+    // Block elements in table cells are rendered as inline text
+    let html = render_html(&parse_final_nodes("| a |\n| --- |\n| > blockquote |\n"));
+    assert_eq!(
+        html,
+        "<table>\n<thead>\n<tr><th>a</th></tr>\n</thead>\n<tbody>\n<tr><td>&gt; blockquote</td></tr>\n</tbody>\n</table>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.tables-extension.table-ends-at-blank-line-or-other-block]
+#[test]
+fn gfm_table_ends_at_blank_line() {
+    let html = render_html(&parse_final_nodes("| a |\n| --- |\n| b |\n\nparagraph\n"));
+    assert_eq!(
+        html,
+        "<table>\n<thead>\n<tr><th>a</th></tr>\n</thead>\n<tbody>\n<tr><td>b</td></tr>\n</tbody>\n</table>\n<p>paragraph</p>\n"
+    );
+}
+
+// gfm[verify leaf-blocks.tables-extension.no-tbody-generated-when-there-are-no-body-rows]
+#[test]
+fn gfm_table_no_body_rows() {
+    let html = render_html(&parse_final_nodes("| a |\n| --- |\n"));
+    assert_eq!(
+        html,
+        "<table>\n<thead>\n<tr><th>a</th></tr>\n</thead>\n<tbody>\n</tbody>\n</table>\n"
     );
 }
