@@ -809,3 +809,40 @@ fn gfm_example_107_indented_code() {
         "<pre><code>a simple\n  indented code block</code></pre>\n"
     );
 }
+
+// gfm[verify inlines.code-spans.all-space-content-is-not-trimmed]
+#[test]
+fn gfm_code_span_all_spaces_not_trimmed() {
+    let html = render_html(&parse_final_nodes("`` ` ``\n"));
+    assert_eq!(html, "<p><code>`</code></p>\n");
+}
+
+// gfm[verify leaf-blocks.fenced-code-blocks.content-removes-up-to-opening-indent]
+// gfm[verify leaf-blocks.fenced-code-blocks.fences-may-be-indented-and-content-deindents-to-match]
+// gfm[verify leaf-blocks.fenced-code-blocks.short-indented-content-lines-remove-all-indent]
+#[test]
+fn gfm_fenced_code_deindent() {
+    let html = render_html(&parse_final_nodes("  ```\n  aaa\n aaa\naaa\n  ```\n"));
+    assert_eq!(html, "<pre><code>aaa\naaa\naaa</code></pre>\n");
+}
+
+// gfm[verify inlines.links.balanced-parentheses-are-allowed-in-destination]
+#[test]
+fn gfm_link_balanced_parens() {
+    let html = render_html(&parse_final_nodes("[link](/url(test))\n"));
+    assert_eq!(html, "<p><a href=\"/url(test)\">link</a></p>\n");
+}
+
+// gfm[verify inlines.links.destination-may-contain-spaces-only-in-angle-brackets]
+#[test]
+fn gfm_link_angle_bracket_dest() {
+    let html = render_html(&parse_final_nodes("[link](<url with spaces>)\n"));
+    assert_eq!(html, "<p><a href=\"url with spaces\">link</a></p>\n");
+}
+
+// gfm[verify inlines.links.destination-and-title-may-both-be-omitted]
+#[test]
+fn gfm_empty_inline_link() {
+    let html = render_html(&parse_final_nodes("[link]()\n"));
+    assert_eq!(html, "<p><a href=\"\">link</a></p>\n");
+}

@@ -1011,7 +1011,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             if !literal.is_empty() {
                 literal.push('\n');
             }
-            literal.push_str(&lines[index]);
+            literal.push_str(&strip_up_to_n_leading_spaces(&lines[index], opener.indent));
             index += 1;
         }
 
@@ -1221,6 +1221,7 @@ struct FenceOpener {
     marker: char,
     count: usize,
     info: Option<String>,
+    indent: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -1402,20 +1403,49 @@ fn parse_reference_definition(
 ) -> Option<(usize, (String, ReferenceDefinition))> {
     let line = trim_up_to_three_spaces(&lines[start]);
     let rest = line.strip_prefix('[')?;
-    let end = rest.find(']')?;
+    let end = find_unescaped_bracket(rest)?;
     let label = &rest[..end];
+    if label.trim().is_empty() {
+        return None;
+    }
     let after = rest[end + 1..].strip_prefix(':')?.trim();
     if after.is_empty() {
         return None;
     }
 
-    let (destination, title) =
-        split_destination_and_title(after).unwrap_or_else(|| (after.to_owned(), None));
+    let (destination, title) = if after.starts_with('<') {
+        let after_angle = &after[1..];
+        let angle_close = after_angle.find('>')?;
+        let dest = after_angle[..angle_close].to_owned();
+        let remainder = after_angle[angle_close + 1..].trim();
+        let title = if remainder.is_empty() {
+            None
+        } else {
+            parse_title(remainder)
+        };
+        (dest, title)
+    } else {
+        split_destination_and_title(after).unwrap_or_else(|| (after.to_owned(), None))
+    };
+
     let normalized = normalize_reference_label(label);
     Some((
         start + 1,
         (normalized, ReferenceDefinition { destination, title }),
     ))
+}
+
+fn find_unescaped_bracket(input: &str) -> Option<usize> {
+    let mut escaped = false;
+    for (i, ch) in input.char_indices() {
+        if escaped { escaped = false; continue; }
+        match ch {
+            '\\' => escaped = true,
+            ']' => return Some(i),
+            _ => {}
+        }
+    }
+    None
 }
 
 fn collect_block_quote_lines(lines: &[String], start: usize) -> Option<(usize, Vec<String>)> {
@@ -1696,6 +1726,17 @@ fn strip_indent_columns(line: &str, columns: usize) -> Option<String> {
     Some(out)
 }
 
+fn strip_up_to_n_leading_spaces(line: &str, n: usize) -> &str {
+    let mut removed = 0;
+    for (i, ch) in line.char_indices() {
+        if removed >= n || ch != ' ' {
+            return &line[i..];
+        }
+        removed += 1;
+    }
+    &line[line.len()..]
+}
+
 fn indent_width(current_columns: usize, ch: char) -> usize {
     match ch {
         ' ' => 1,
@@ -1713,18 +1754,19 @@ fn indent_width(current_columns: usize, ch: char) -> usize {
 // gfm[impl leaf-blocks.fenced-code-blocks.tilde-info-strings-may-contain-backticks-and-tildes]
 // gfm[impl leaf-blocks.fenced-code-blocks.fence-lines-cannot-contain-internal-spaces]
 fn parse_fence_opener(line: &str) -> Option<FenceOpener> {
-    let line = trim_up_to_three_spaces(line);
-    let marker = line.chars().next()?;
+    let trimmed = trim_up_to_three_spaces(line);
+    let indent = line.len() - trimmed.len();
+    let marker = trimmed.chars().next()?;
     if marker != '`' && marker != '~' {
         return None;
     }
 
-    let count = line.chars().take_while(|ch| *ch == marker).count();
+    let count = trimmed.chars().take_while(|ch| *ch == marker).count();
     if count < 3 {
         return None;
     }
 
-    let rest = &line[count..];
+    let rest = &trimmed[count..];
     if marker == '`' && rest.contains('`') {
         return None;
     }
@@ -1734,6 +1776,7 @@ fn parse_fence_opener(line: &str) -> Option<FenceOpener> {
         marker,
         count,
         info,
+        indent,
     })
 }
 
@@ -2775,13 +2818,16 @@ fn multiple_of_three_blocked(
         && !(opener_count % 3 == 0 && closer_count % 3 == 0)
 }
 
+// gfm[impl inlines.code-spans.all-space-content-is-not-trimmed]
+// gfm[impl inlines.code-spans.only-ascii-space-is-trimmed]
 fn normalize_code_span(code: &str) -> String {
-    let trimmed = if code.starts_with(' ') && code.ends_with(' ') && code.len() > 1 {
-        &code[1..code.len() - 1]
+    if code.starts_with(' ') && code.ends_with(' ') && code.len() > 1
+        && !code.chars().all(|ch| ch == ' ')
+    {
+        code[1..code.len() - 1].to_owned()
     } else {
-        code
-    };
-    trimmed.to_owned()
+        code.to_owned()
+    }
 }
 
 fn is_valid_tilde_opener(input: &str, index: usize, delim_len: usize) -> bool {
@@ -2873,11 +2919,31 @@ fn find_closing_bracket(input: &str, start: usize) -> Option<usize> {
 // gfm[impl inlines.links.angle-brackets-around-destination-must-be-unescaped]
 // gfm[impl inlines.links.backslash-before-non-escapable-character-is-literal-in-destination]
 // gfm[impl inlines.links.trailing-bracket-is-not-escaped-by-backslash-before-backslash]
+// gfm[impl inlines.links.destination-and-title-may-both-be-omitted]
 fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>)> {
-    let closing = rest.find(')')?;
+    let trimmed = rest.trim_start();
+
+    if trimmed.starts_with('<') {
+        let after_angle = &trimmed[1..];
+        let angle_close = after_angle.find('>')?;
+        let destination = after_angle[..angle_close].to_owned();
+        let after_gt = &after_angle[angle_close + 1..];
+        let paren_in_after_gt = find_closing_paren(after_gt)?;
+        let title_body = after_gt[..paren_in_after_gt].trim();
+        let title = if title_body.is_empty() {
+            None
+        } else {
+            parse_title(title_body)
+        };
+        let paren_pos_in_rest = rest.len() - after_gt.len() + paren_in_after_gt;
+        return Some((paren_pos_in_rest + 2, destination, title));
+    }
+
+    let closing = find_closing_paren(rest)?;
     let body = rest[..closing].trim();
+
     if body.is_empty() {
-        return None;
+        return Some((closing + 2, String::new(), None));
     }
 
     if let Some((destination, title)) = split_destination_and_title(body) {
@@ -2885,6 +2951,42 @@ fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>
     }
 
     Some((closing + 2, body.to_owned(), None))
+}
+
+fn find_closing_paren(input: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut escaped = false;
+    for (i, ch) in input.char_indices() {
+        if escaped { escaped = false; continue; }
+        match ch {
+            '\\' => escaped = true,
+            '(' => depth += 1,
+            ')' => {
+                if depth == 0 { return Some(i); }
+                depth -= 1;
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn parse_title(s: &str) -> Option<String> {
+    let first = s.chars().next()?;
+    let close = match first {
+        '"' => '"',
+        '\'' => '\'',
+        '(' => ')',
+        _ => return None,
+    };
+    if s.len() < 2 {
+        return None;
+    }
+    if s.ends_with(close) {
+        Some(s[1..s.len() - 1].to_owned())
+    } else {
+        None
+    }
 }
 
 // gfm[impl inlines.links.link-title-definition]
@@ -2897,28 +2999,24 @@ fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>
 // gfm[impl inlines.links.title-may-be-omitted]
 // gfm[impl inlines.links.title-must-be-separated-from-destination-by-whitespace]
 fn split_destination_and_title(body: &str) -> Option<(String, Option<String>)> {
-    for marker in ['"', '\'', '('] {
-        let Some(index) = body.find(marker) else {
+    let body_trimmed = body.trim();
+    for (i, ch) in body_trimmed.char_indices() {
+        if !ch.is_whitespace() {
             continue;
-        };
-        let destination = body[..index].trim();
-        let title_part = body[index..].trim();
+        }
+        let after = body_trimmed[i..].trim_start();
+        if after.is_empty() {
+            continue;
+        }
+        let marker = after.chars().next().unwrap();
+        if !matches!(marker, '"' | '\'' | '(') {
+            continue;
+        }
+        let destination = body_trimmed[..i].trim();
         if destination.is_empty() {
             continue;
         }
-
-        let title = match marker {
-            '"' if title_part.ends_with('"') && title_part.len() >= 2 => {
-                Some(title_part[1..title_part.len() - 1].to_owned())
-            }
-            '\'' if title_part.ends_with('\'') && title_part.len() >= 2 => {
-                Some(title_part[1..title_part.len() - 1].to_owned())
-            }
-            '(' if title_part.ends_with(')') && title_part.len() >= 2 => {
-                Some(title_part[1..title_part.len() - 1].to_owned())
-            }
-            _ => None,
-        };
+        let title = parse_title(after);
         if let Some(title) = title {
             return Some((destination.to_owned(), Some(title)));
         }
@@ -3520,21 +3618,298 @@ fn parse_entity_reference(input: &str) -> Option<(usize, String)> {
     } else if let Some(num) = entity.strip_prefix('#') {
         num.parse::<u32>().ok().and_then(char::from_u32)
     } else {
-        match entity {
-            "amp" => Some('&'),
-            "lt" => Some('<'),
-            "gt" => Some('>'),
-            "quot" => Some('"'),
-            "apos" => Some('\''),
-            "nbsp" => Some('\u{00A0}'),
-            _ => None,
-        }
+        // gfm[impl inlines.entity-and-numeric-character-references.entity-references-definition]
+        resolve_named_entity(entity)
     }?;
     Some((end + 1, decoded.to_string()))
 }
 
+fn resolve_named_entity(name: &str) -> Option<char> {
+    match name {
+        "amp" => Some('&'),
+        "AMP" => Some('&'),
+        "lt" => Some('<'),
+        "LT" => Some('<'),
+        "gt" => Some('>'),
+        "GT" => Some('>'),
+        "quot" => Some('"'),
+        "QUOT" => Some('"'),
+        "apos" => Some('\''),
+        "nbsp" => Some('\u{00A0}'),
+        "iexcl" => Some('\u{00A1}'),
+        "cent" => Some('\u{00A2}'),
+        "pound" => Some('\u{00A3}'),
+        "curren" => Some('\u{00A4}'),
+        "yen" => Some('\u{00A5}'),
+        "brvbar" => Some('\u{00A6}'),
+        "sect" => Some('\u{00A7}'),
+        "uml" => Some('\u{00A8}'),
+        "copy" => Some('\u{00A9}'),
+        "COPY" => Some('\u{00A9}'),
+        "ordf" => Some('\u{00AA}'),
+        "laquo" => Some('\u{00AB}'),
+        "not" => Some('\u{00AC}'),
+        "shy" => Some('\u{00AD}'),
+        "reg" => Some('\u{00AE}'),
+        "REG" => Some('\u{00AE}'),
+        "macr" => Some('\u{00AF}'),
+        "deg" => Some('\u{00B0}'),
+        "plusmn" => Some('\u{00B1}'),
+        "sup2" => Some('\u{00B2}'),
+        "sup3" => Some('\u{00B3}'),
+        "acute" => Some('\u{00B4}'),
+        "micro" => Some('\u{00B5}'),
+        "para" => Some('\u{00B6}'),
+        "middot" => Some('\u{00B7}'),
+        "cedil" => Some('\u{00B8}'),
+        "sup1" => Some('\u{00B9}'),
+        "ordm" => Some('\u{00BA}'),
+        "raquo" => Some('\u{00BB}'),
+        "frac14" => Some('\u{00BC}'),
+        "frac12" => Some('\u{00BD}'),
+        "frac34" => Some('\u{00BE}'),
+        "iquest" => Some('\u{00BF}'),
+        "Agrave" => Some('\u{00C0}'),
+        "Aacute" => Some('\u{00C1}'),
+        "Acirc" => Some('\u{00C2}'),
+        "Atilde" => Some('\u{00C3}'),
+        "Auml" => Some('\u{00C4}'),
+        "Aring" => Some('\u{00C5}'),
+        "AElig" => Some('\u{00C6}'),
+        "Ccedil" => Some('\u{00C7}'),
+        "Egrave" => Some('\u{00C8}'),
+        "Eacute" => Some('\u{00C9}'),
+        "Ecirc" => Some('\u{00CA}'),
+        "Euml" => Some('\u{00CB}'),
+        "Igrave" => Some('\u{00CC}'),
+        "Iacute" => Some('\u{00CD}'),
+        "Icirc" => Some('\u{00CE}'),
+        "Iuml" => Some('\u{00CF}'),
+        "ETH" => Some('\u{00D0}'),
+        "Ntilde" => Some('\u{00D1}'),
+        "Ograve" => Some('\u{00D2}'),
+        "Oacute" => Some('\u{00D3}'),
+        "Ocirc" => Some('\u{00D4}'),
+        "Otilde" => Some('\u{00D5}'),
+        "Ouml" => Some('\u{00D6}'),
+        "times" => Some('\u{00D7}'),
+        "Oslash" => Some('\u{00D8}'),
+        "Ugrave" => Some('\u{00D9}'),
+        "Uacute" => Some('\u{00DA}'),
+        "Ucirc" => Some('\u{00DB}'),
+        "Uuml" => Some('\u{00DC}'),
+        "Yacute" => Some('\u{00DD}'),
+        "THORN" => Some('\u{00DE}'),
+        "szlig" => Some('\u{00DF}'),
+        "agrave" => Some('\u{00E0}'),
+        "aacute" => Some('\u{00E1}'),
+        "acirc" => Some('\u{00E2}'),
+        "atilde" => Some('\u{00E3}'),
+        "auml" => Some('\u{00E4}'),
+        "aring" => Some('\u{00E5}'),
+        "aelig" => Some('\u{00E6}'),
+        "ccedil" => Some('\u{00E7}'),
+        "egrave" => Some('\u{00E8}'),
+        "eacute" => Some('\u{00E9}'),
+        "ecirc" => Some('\u{00EA}'),
+        "euml" => Some('\u{00EB}'),
+        "igrave" => Some('\u{00EC}'),
+        "iacute" => Some('\u{00ED}'),
+        "icirc" => Some('\u{00EE}'),
+        "iuml" => Some('\u{00EF}'),
+        "eth" => Some('\u{00F0}'),
+        "ntilde" => Some('\u{00F1}'),
+        "ograve" => Some('\u{00F2}'),
+        "oacute" => Some('\u{00F3}'),
+        "ocirc" => Some('\u{00F4}'),
+        "otilde" => Some('\u{00F5}'),
+        "ouml" => Some('\u{00F6}'),
+        "divide" => Some('\u{00F7}'),
+        "oslash" => Some('\u{00F8}'),
+        "ugrave" => Some('\u{00F9}'),
+        "uacute" => Some('\u{00FA}'),
+        "ucirc" => Some('\u{00FB}'),
+        "uuml" => Some('\u{00FC}'),
+        "yacute" => Some('\u{00FD}'),
+        "thorn" => Some('\u{00FE}'),
+        "yuml" => Some('\u{00FF}'),
+        "OElig" => Some('\u{0152}'),
+        "oelig" => Some('\u{0153}'),
+        "Scaron" => Some('\u{0160}'),
+        "scaron" => Some('\u{0161}'),
+        "Yuml" => Some('\u{0178}'),
+        "fnof" => Some('\u{0192}'),
+        "circ" => Some('\u{02C6}'),
+        "tilde" => Some('\u{02DC}'),
+        "Alpha" => Some('\u{0391}'),
+        "Beta" => Some('\u{0392}'),
+        "Gamma" => Some('\u{0393}'),
+        "Delta" => Some('\u{0394}'),
+        "Epsilon" => Some('\u{0395}'),
+        "Zeta" => Some('\u{0396}'),
+        "Eta" => Some('\u{0397}'),
+        "Theta" => Some('\u{0398}'),
+        "Iota" => Some('\u{0399}'),
+        "Kappa" => Some('\u{039A}'),
+        "Lambda" => Some('\u{039B}'),
+        "Mu" => Some('\u{039C}'),
+        "Nu" => Some('\u{039D}'),
+        "Xi" => Some('\u{039E}'),
+        "Omicron" => Some('\u{039F}'),
+        "Pi" => Some('\u{03A0}'),
+        "Rho" => Some('\u{03A1}'),
+        "Sigma" => Some('\u{03A3}'),
+        "Tau" => Some('\u{03A4}'),
+        "Upsilon" => Some('\u{03A5}'),
+        "Phi" => Some('\u{03A6}'),
+        "Chi" => Some('\u{03A7}'),
+        "Psi" => Some('\u{03A8}'),
+        "Omega" => Some('\u{03A9}'),
+        "alpha" => Some('\u{03B1}'),
+        "beta" => Some('\u{03B2}'),
+        "gamma" => Some('\u{03B3}'),
+        "delta" => Some('\u{03B4}'),
+        "epsilon" => Some('\u{03B5}'),
+        "zeta" => Some('\u{03B6}'),
+        "eta" => Some('\u{03B7}'),
+        "theta" => Some('\u{03B8}'),
+        "iota" => Some('\u{03B9}'),
+        "kappa" => Some('\u{03BA}'),
+        "lambda" => Some('\u{03BB}'),
+        "mu" => Some('\u{03BC}'),
+        "nu" => Some('\u{03BD}'),
+        "xi" => Some('\u{03BE}'),
+        "omicron" => Some('\u{03BF}'),
+        "pi" => Some('\u{03C0}'),
+        "rho" => Some('\u{03C1}'),
+        "sigmaf" => Some('\u{03C2}'),
+        "sigma" => Some('\u{03C3}'),
+        "tau" => Some('\u{03C4}'),
+        "upsilon" => Some('\u{03C5}'),
+        "phi" => Some('\u{03C6}'),
+        "chi" => Some('\u{03C7}'),
+        "psi" => Some('\u{03C8}'),
+        "omega" => Some('\u{03C9}'),
+        "thetasym" => Some('\u{03D1}'),
+        "upsih" => Some('\u{03D2}'),
+        "piv" => Some('\u{03D6}'),
+        "ensp" => Some('\u{2002}'),
+        "emsp" => Some('\u{2003}'),
+        "thinsp" => Some('\u{2009}'),
+        "zwnj" => Some('\u{200C}'),
+        "zwj" => Some('\u{200D}'),
+        "lrm" => Some('\u{200E}'),
+        "rlm" => Some('\u{200F}'),
+        "ndash" => Some('\u{2013}'),
+        "mdash" => Some('\u{2014}'),
+        "lsquo" => Some('\u{2018}'),
+        "rsquo" => Some('\u{2019}'),
+        "sbquo" => Some('\u{201A}'),
+        "ldquo" => Some('\u{201C}'),
+        "rdquo" => Some('\u{201D}'),
+        "bdquo" => Some('\u{201E}'),
+        "dagger" => Some('\u{2020}'),
+        "Dagger" => Some('\u{2021}'),
+        "bull" => Some('\u{2022}'),
+        "hellip" => Some('\u{2026}'),
+        "permil" => Some('\u{2030}'),
+        "prime" => Some('\u{2032}'),
+        "Prime" => Some('\u{2033}'),
+        "lsaquo" => Some('\u{2039}'),
+        "rsaquo" => Some('\u{203A}'),
+        "oline" => Some('\u{203E}'),
+        "frasl" => Some('\u{2044}'),
+        "euro" => Some('\u{20AC}'),
+        "image" => Some('\u{2111}'),
+        "weierp" => Some('\u{2118}'),
+        "real" => Some('\u{211C}'),
+        "trade" => Some('\u{2122}'),
+        "TRADE" => Some('\u{2122}'),
+        "alefsym" => Some('\u{2135}'),
+        "larr" => Some('\u{2190}'),
+        "uarr" => Some('\u{2191}'),
+        "rarr" => Some('\u{2192}'),
+        "darr" => Some('\u{2193}'),
+        "harr" => Some('\u{2194}'),
+        "crarr" => Some('\u{21B5}'),
+        "lArr" => Some('\u{21D0}'),
+        "uArr" => Some('\u{21D1}'),
+        "rArr" => Some('\u{21D2}'),
+        "dArr" => Some('\u{21D3}'),
+        "hArr" => Some('\u{21D4}'),
+        "nabla" => Some('\u{2207}'),
+        "isin" => Some('\u{2208}'),
+        "notin" => Some('\u{2209}'),
+        "ni" => Some('\u{220B}'),
+        "prod" => Some('\u{220F}'),
+        "sum" => Some('\u{2211}'),
+        "minus" => Some('\u{2212}'),
+        "lowast" => Some('\u{2217}'),
+        "radic" => Some('\u{221A}'),
+        "prop" => Some('\u{221D}'),
+        "infin" => Some('\u{221E}'),
+        "ang" => Some('\u{2220}'),
+        "and" => Some('\u{2227}'),
+        "or" => Some('\u{2228}'),
+        "cap" => Some('\u{2229}'),
+        "cup" => Some('\u{222A}'),
+        "int" => Some('\u{222B}'),
+        "there4" => Some('\u{2234}'),
+        "sim" => Some('\u{223C}'),
+        "cong" => Some('\u{2245}'),
+        "asymp" => Some('\u{2248}'),
+        "ne" => Some('\u{2260}'),
+        "equiv" => Some('\u{2261}'),
+        "le" => Some('\u{2264}'),
+        "ge" => Some('\u{2265}'),
+        "sub" => Some('\u{2282}'),
+        "sup" => Some('\u{2283}'),
+        "nsub" => Some('\u{2284}'),
+        "sube" => Some('\u{2286}'),
+        "supe" => Some('\u{2287}'),
+        "oplus" => Some('\u{2295}'),
+        "otimes" => Some('\u{2297}'),
+        "perp" => Some('\u{22A5}'),
+        "sdot" => Some('\u{22C5}'),
+        "lceil" => Some('\u{2308}'),
+        "rceil" => Some('\u{2309}'),
+        "lfloor" => Some('\u{230A}'),
+        "rfloor" => Some('\u{230B}'),
+        "lang" => Some('\u{2329}'),
+        "rang" => Some('\u{232A}'),
+        "loz" => Some('\u{25CA}'),
+        "spades" => Some('\u{2660}'),
+        "clubs" => Some('\u{2663}'),
+        "hearts" => Some('\u{2665}'),
+        "diams" => Some('\u{2666}'),
+        _ => None,
+    }
+}
+
+// gfm[impl inlines.autolinks.absolute-uri-definition]
+// gfm[impl inlines.autolinks.scheme-definition]
+// gfm[impl inlines.autolinks.autolink-schemes-are-case-insensitive]
 fn looks_like_url(text: &str) -> bool {
-    text.starts_with("http://") || text.starts_with("https://")
+    let Some(colon_pos) = text.find(':') else {
+        return false;
+    };
+    let scheme = &text[..colon_pos];
+    if scheme.is_empty() || scheme.len() > 32 {
+        return false;
+    }
+    let mut chars = scheme.chars();
+    let first = chars.next().unwrap();
+    if !first.is_ascii_alphabetic() {
+        return false;
+    }
+    if !chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '+' | '.' | '-')) {
+        return false;
+    }
+    if scheme.len() < 2 {
+        return false;
+    }
+    let after_scheme = &text[colon_pos + 1..];
+    !after_scheme.chars().any(|ch| ch.is_whitespace() || ch == '<' || ch == '>')
 }
 
 fn looks_like_email(text: &str) -> bool {
