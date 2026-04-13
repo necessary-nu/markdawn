@@ -647,7 +647,7 @@ fn gfm_html_block_type_1_interrupts_paragraph_and_closes_on_end_tag() {
     ));
     assert_eq!(
         html,
-        "<p>before</p>\n<script>\n*not emphasis*\n</script>\n<p>after</p>\n"
+        "<p>before</p>\n&lt;script>\n*not emphasis*\n&lt;/script>\n<p>after</p>\n"
     );
 }
 
@@ -664,7 +664,10 @@ fn gfm_html_block_type_1_keeps_trailing_text_on_end_marker_line_inside_block() {
     let html = render_html(&parse_final_nodes(
         "<script>\nfoo\n</script>1. *bar*\nafter\n",
     ));
-    assert_eq!(html, "<script>\nfoo\n</script>1. *bar*\n<p>after</p>\n");
+    assert_eq!(
+        html,
+        "&lt;script>\nfoo\n&lt;/script>1. *bar*\n<p>after</p>\n"
+    );
 }
 
 // gfm[verify leaf-blocks.html-blocks.type-3-processing-instruction-start-and-end-conditions]
@@ -778,7 +781,10 @@ fn gfm_html_block_type_6_interrupts_without_preceding_blank_line() {
 #[test]
 fn gfm_html_block_same_line_end_markers_keep_their_line_inside_the_block() {
     let html = render_html(&parse_final_nodes("<style>p{color:red;}</style>\n*foo*\n"));
-    assert_eq!(html, "<style>p{color:red;}</style>\n<p><em>foo</em></p>\n");
+    assert_eq!(
+        html,
+        "&lt;style>p{color:red;}&lt;/style>\n<p><em>foo</em></p>\n"
+    );
 
     let html = render_html(&parse_final_nodes("<!-- foo -->*bar*\n*baz*\n"));
     assert_eq!(html, "<!-- foo -->*bar*\n<p><em>baz</em></p>\n");
@@ -807,5 +813,53 @@ fn gfm_example_107_indented_code() {
     assert_eq!(
         html,
         "<pre><code>a simple\n  indented code block</code></pre>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks-extension.extended-www-autolink-definition]
+// gfm[verify inlines.autolinks-extension.extended-www-autolinks-insert-http-scheme]
+#[test]
+fn gfm_www_autolink() {
+    let html = render_html(&parse_final_nodes("visit www.example.com now\n"));
+    assert_eq!(
+        html,
+        "<p>visit <a href=\"http://www.example.com\">www.example.com</a> now</p>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
+#[test]
+fn gfm_autolink_trailing_punctuation() {
+    let html = render_html(&parse_final_nodes("visit https://example.com.\n"));
+    assert_eq!(
+        html,
+        "<p>visit <a href=\"https://example.com\">https://example.com</a>.</p>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
+// gfm[verify inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
+#[test]
+fn gfm_autolink_trailing_parens() {
+    let html = render_html(&parse_final_nodes(
+        "see https://en.wikipedia.org/wiki/Foo_(bar).\n",
+    ));
+    assert_eq!(
+        html,
+        "<p>see <a href=\"https://en.wikipedia.org/wiki/Foo_(bar)\">https://en.wikipedia.org/wiki/Foo_(bar)</a>.</p>\n"
+    );
+}
+
+// gfm[verify inlines.disallowed-raw-html-extension.disallowed-tags]
+// gfm[verify inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
+// gfm[verify inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
+#[test]
+fn gfm_disallowed_raw_html() {
+    let html = render_html(&parse_final_nodes(
+        "<strong>ok</strong> <textarea>bad</textarea>\n",
+    ));
+    assert_eq!(
+        html,
+        "<p><strong>ok</strong> &lt;textarea>bad&lt;/textarea></p>\n"
     );
 }
