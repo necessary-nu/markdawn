@@ -2089,3 +2089,1030 @@ fn gfm_table_no_body_rows() {
         "<table>\n<thead>\n<tr><th>a</th></tr>\n</thead>\n<tbody>\n</tbody>\n</table>\n"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Emphasis: delimiter run definitions and flanking rules
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.delimiter-run-definition]
+// gfm[verify inlines.emphasis-and-strong-emphasis.delimiter-run-example]
+// gfm[verify inlines.emphasis-and-strong-emphasis.left-flanking-delimiter-run-definition]
+// gfm[verify inlines.emphasis-and-strong-emphasis.right-flanking-delimiter-run-definition]
+// gfm[verify inlines.emphasis-and-strong-emphasis.left-right-flanking-terminology-note]
+// gfm[verify inlines.emphasis-and-strong-emphasis.rules-illustrated-by-examples]
+#[test]
+fn gfm_emphasis_delimiter_run_flanking_asterisk() {
+    // Rule 1: simple emphasis *foo bar*
+    let html = render_html(&parse_final_nodes("*foo bar*\n"));
+    assert_eq!(html, "<p><em>foo bar</em></p>\n");
+
+    // Left-flanking but not right-flanking: ***abc => delimiter run opens
+    // Right-flanking but not left-flanking: abc*** => delimiter run closes
+    let html = render_html(&parse_final_nodes("***foo***\n"));
+    assert_eq!(html, "<p><em><strong>foo</strong></em></p>\n");
+
+    // Both left and right-flanking: abc***def
+    let html = render_html(&parse_final_nodes("abc***def***ghi\n"));
+    assert_eq!(html, "<p>abc<em><strong>def</strong></em>ghi</p>\n");
+
+    // Neither left nor right-flanking: abc *** def
+    let html = render_html(&parse_final_nodes("abc *** def\n"));
+    assert_eq!(html, "<p>abc *** def</p>\n");
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-when-followed-by-whitespace]
+// gfm[verify inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-whitespace]
+// gfm[verify inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-closing]
+// gfm[verify inlines.emphasis-and-strong-emphasis.unicode-nonbreaking-space-counts-as-whitespace]
+#[test]
+fn gfm_emphasis_asterisk_whitespace_flanking() {
+    // Opening * followed by whitespace: not emphasis
+    let html = render_html(&parse_final_nodes("a * foo bar*\n"));
+    assert_eq!(html, "<p>a * foo bar*</p>\n");
+
+    // Closing * preceded by whitespace: not emphasis
+    let html = render_html(&parse_final_nodes("*foo bar *\n"));
+    assert_eq!(html, "<p>*foo bar *</p>\n");
+
+    // Newline counts as whitespace for closing
+    let html = render_html(&parse_final_nodes("*foo bar\n*\n"));
+    assert_eq!(html, "<p>*foo bar\n*</p>\n");
+
+    // Unicode nonbreaking space counts as whitespace
+    let html = render_html(&parse_final_nodes("*\u{00a0}a\u{00a0}*\n"));
+    assert_eq!(html, "<p>*\u{00a0}a\u{00a0}*</p>\n");
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-after-alphanumeric-before-punctuation]
+// gfm[verify inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-punctuation-before-alphanumeric]
+// gfm[verify inlines.emphasis-and-strong-emphasis.asterisk-closing-restriction-example]
+#[test]
+fn gfm_emphasis_asterisk_punctuation_flanking() {
+    // Opening * preceded by alphanumeric and followed by punctuation
+    let html = render_html(&parse_final_nodes("a*\"foo\"*\n"));
+    assert_eq!(html, "<p>a*&quot;foo&quot;*</p>\n");
+
+    // Closing * preceded by punctuation and followed by alphanumeric
+    let html = render_html(&parse_final_nodes("*(*foo)\n"));
+    assert_eq!(html, "<p>*(*foo)</p>\n");
+
+    // The restriction illustrated
+    let html = render_html(&parse_final_nodes("*(*foo*)*\n"));
+    assert_eq!(html, "<p><em>(<em>foo</em>)</em></p>\n");
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-whitespace]
+// gfm[verify inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-whitespace]
+// gfm[verify inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-alphanumeric-before-punctuation]
+// gfm[verify inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-punctuation-before-alphanumeric]
+// gfm[verify inlines.emphasis-and-strong-emphasis.right-flanking-underscore-does-not-emphasize]
+#[test]
+fn gfm_emphasis_underscore_flanking() {
+    // Opening _ followed by whitespace
+    let html = render_html(&parse_final_nodes("_ foo bar_\n"));
+    assert_eq!(html, "<p>_ foo bar_</p>\n");
+
+    // Closing _ preceded by whitespace
+    let html = render_html(&parse_final_nodes("_foo bar _\n"));
+    assert_eq!(html, "<p>_foo bar _</p>\n");
+
+    // Opening _ preceded by alphanumeric and followed by punctuation
+    let html = render_html(&parse_final_nodes("a_\"foo\"_\n"));
+    assert_eq!(html, "<p>a_&quot;foo&quot;_</p>\n");
+
+    // Closing _ preceded by punctuation and followed by alphanumeric
+    let html = render_html(&parse_final_nodes("_(_foo)\n"));
+    assert_eq!(html, "<p>_(_foo)</p>\n");
+
+    // Right-flanking _ does not emphasize (first is right-flanking, second left-flanking)
+    let html = render_html(&parse_final_nodes("aa_\"bb\"_cc\n"));
+    assert_eq!(html, "<p>aa_&quot;bb&quot;_cc</p>\n");
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-whitespace]
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-whitespace]
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-alphanumeric-before-punctuation]
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-punctuation-before-alphanumeric]
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-closing-cannot-fall-back-to-single-asterisk-rule]
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-closing-restriction-examples]
+#[test]
+fn gfm_strong_emphasis_double_asterisk_flanking() {
+    // Opening ** followed by whitespace
+    let html = render_html(&parse_final_nodes("** foo bar**\n"));
+    assert_eq!(html, "<p>** foo bar**</p>\n");
+
+    // Closing ** preceded by whitespace
+    let html = render_html(&parse_final_nodes("**foo bar **\n"));
+    assert_eq!(html, "<p>**foo bar **</p>\n");
+
+    // Opening ** preceded by alphanumeric and followed by punctuation
+    let html = render_html(&parse_final_nodes("a**\"foo\"**\n"));
+    assert_eq!(html, "<p>a**&quot;foo&quot;**</p>\n");
+
+    // Closing ** preceded by punctuation and followed by alphanumeric
+    let html = render_html(&parse_final_nodes("**(**foo)\n"));
+    assert_eq!(html, "<p>**(**foo)</p>\n");
+
+    // Restriction examples: *(**foo**)* and **foo "*bar*" foo**
+    let html = render_html(&parse_final_nodes("*(**foo**)*\n"));
+    assert_eq!(html, "<p><em>(<strong>foo</strong>)</em></p>\n");
+
+    let html = render_html(&parse_final_nodes("**foo \"*bar*\" foo**\n"));
+    assert_eq!(
+        html,
+        "<p><strong>foo &quot;<em>bar</em>&quot; foo</strong></p>\n"
+    );
+
+    // Intraword: **foo**bar
+    let html = render_html(&parse_final_nodes("**foo**bar\n"));
+    assert_eq!(html, "<p><strong>foo</strong>bar</p>\n");
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-whitespace]
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-whitespace]
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-alphanumeric-before-punctuation]
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-punctuation-before-alphanumeric]
+// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-closing-restriction-example]
+// gfm[verify inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-double-underscore]
+#[test]
+fn gfm_strong_emphasis_double_underscore_flanking() {
+    // Opening __ followed by whitespace
+    let html = render_html(&parse_final_nodes("__ foo bar__\n"));
+    assert_eq!(html, "<p>__ foo bar__</p>\n");
+
+    // Closing __ preceded by whitespace
+    let html = render_html(&parse_final_nodes("__foo bar __\n"));
+    assert_eq!(html, "<p>__foo bar __</p>\n");
+
+    // Opening __ preceded by alphanumeric and followed by punctuation
+    let html = render_html(&parse_final_nodes("a__\"foo\"__\n"));
+    assert_eq!(html, "<p>a__&quot;foo&quot;__</p>\n");
+
+    // Closing __ preceded by punctuation and followed by alphanumeric
+    let html = render_html(&parse_final_nodes("__(__foo)\n"));
+    assert_eq!(html, "<p>__(__foo)</p>\n");
+
+    // Restriction example: _(__foo__)_
+    let html = render_html(&parse_final_nodes("_(__foo__)_\n"));
+    assert_eq!(html, "<p><em>(<strong>foo</strong>)</em></p>\n");
+
+    // Newline counts as whitespace for __
+    let html = render_html(&parse_final_nodes("__\nfoo bar__\n"));
+    assert_eq!(html, "<p>__\nfoo bar__</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Emphasis: intraword rules
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-allowed]
+// gfm[verify inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-disallowed]
+// gfm[verify inlines.emphasis-and-strong-emphasis.many-implementations-restrict-intraword-underscore]
+// gfm[verify inlines.emphasis-and-strong-emphasis.intraword-double-underscore-closing-is-forbidden]
+#[test]
+fn gfm_emphasis_intraword_rules() {
+    // Intraword emphasis with * is allowed: *foo*bar
+    let html = render_html(&parse_final_nodes("*foo*bar\n"));
+    assert_eq!(html, "<p><em>foo</em>bar</p>\n");
+
+    // Intraword emphasis with _ is disallowed: _foo_bar
+    let html = render_html(&parse_final_nodes("_foo_bar\n"));
+    assert_eq!(html, "<p>_foo_bar</p>\n");
+
+    // _foo_bar_baz_ => emphasis wrapping foo_bar_baz
+    let html = render_html(&parse_final_nodes("_foo_bar_baz_\n"));
+    assert_eq!(html, "<p><em>foo_bar_baz</em></p>\n");
+
+    // Intraword strong __ is forbidden: __foo__bar
+    let html = render_html(&parse_final_nodes("__foo__bar\n"));
+    assert_eq!(html, "<p>__foo__bar</p>\n");
+
+    // __foo__bar__baz__ => strong wrapping foo__bar__baz
+    let html = render_html(&parse_final_nodes("__foo__bar__baz__\n"));
+    assert_eq!(html, "<p><strong>foo__bar__baz</strong></p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Emphasis: multiple-of-three rule
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.multiple-of-three-condition-explanation]
+// gfm[verify inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-alternative]
+// gfm[verify inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-consecutive-emphasis]
+#[test]
+fn gfm_emphasis_multiple_of_three() {
+    // Multiple-of-three prevents consecutive emphasis: *foo**bar*
+    let html = render_html(&parse_final_nodes("*foo**bar*\n"));
+    assert_eq!(html, "<p><em>foo**bar</em></p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Emphasis: nesting
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-allows-indefinite-nesting]
+// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-emphasis]
+#[test]
+fn gfm_emphasis_nesting_inside_emphasis() {
+    // Indefinite nesting
+    let html = render_html(&parse_final_nodes("*foo **bar *baz* bim** bop*\n"));
+    assert_eq!(
+        html,
+        "<p><em>foo <strong>bar <em>baz</em> bim</strong> bop</em></p>\n"
+    );
+
+    // Emphasis in emphasis with underscore
+    let html = render_html(&parse_final_nodes("_foo _bar_ baz_\n"));
+    assert_eq!(html, "<p><em>foo <em>bar</em> baz</em></p>\n");
+
+    // Strong in emphasis with underscore
+    let html = render_html(&parse_final_nodes("_foo __bar__ baz_\n"));
+    assert_eq!(html, "<p><em>foo <strong>bar</strong> baz</em></p>\n");
+
+    // __foo_ bar_ => nested emphasis
+    let html = render_html(&parse_final_nodes("__foo_ bar_\n"));
+    assert_eq!(html, "<p><em><em>foo</em> bar</em></p>\n");
+
+    // *foo *bar** => nested emphasis
+    let html = render_html(&parse_final_nodes("*foo *bar**\n"));
+    assert_eq!(html, "<p><em>foo <em>bar</em></em></p>\n");
+
+    // *foo**bar**baz*
+    let html = render_html(&parse_final_nodes("*foo**bar**baz*\n"));
+    assert_eq!(html, "<p><em>foo<strong>bar</strong>baz</em></p>\n");
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-strong]
+// gfm[verify inlines.emphasis-and-strong-emphasis.strong-emphasis-allows-indefinite-nesting]
+#[test]
+fn gfm_emphasis_nesting_inside_strong() {
+    // Emphasis in strong
+    let html = render_html(&parse_final_nodes("__foo _bar_ baz__\n"));
+    assert_eq!(html, "<p><strong>foo <em>bar</em> baz</strong></p>\n");
+
+    // Strong in strong (same delimiter)
+    let html = render_html(&parse_final_nodes("__foo __bar__ baz__\n"));
+    assert_eq!(html, "<p><strong>foo <strong>bar</strong> baz</strong></p>\n");
+
+    // **foo *bar* baz**
+    let html = render_html(&parse_final_nodes("**foo *bar* baz**\n"));
+    assert_eq!(html, "<p><strong>foo <em>bar</em> baz</strong></p>\n");
+
+    // **foo*bar*baz**
+    let html = render_html(&parse_final_nodes("**foo*bar*baz**\n"));
+    assert_eq!(html, "<p><strong>foo<em>bar</em>baz</strong></p>\n");
+
+    // ***foo* bar**
+    let html = render_html(&parse_final_nodes("***foo* bar**\n"));
+    assert_eq!(html, "<p><strong><em>foo</em> bar</strong></p>\n");
+
+    // **foo *bar***
+    let html = render_html(&parse_final_nodes("**foo *bar***\n"));
+    assert_eq!(html, "<p><strong>foo <em>bar</em></strong></p>\n");
+
+    // Indefinite nesting in strong
+    let html = render_html(&parse_final_nodes("**foo *bar **baz**\nbim* bop**\n"));
+    assert_eq!(
+        html,
+        "<p><strong>foo <em>bar <strong>baz</strong>\nbim</em> bop</strong></p>\n"
+    );
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.strong-can-nest-inside-strong-with-same-delimiter]
+#[test]
+fn gfm_strong_nests_inside_strong_same_delimiter() {
+    let html = render_html(&parse_final_nodes("****foo****\n"));
+    assert_eq!(html, "<p><strong><strong>foo</strong></strong></p>\n");
+
+    let html = render_html(&parse_final_nodes("____foo____\n"));
+    assert_eq!(html, "<p><strong><strong>foo</strong></strong></p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Emphasis: empty emphasis not allowed
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.empty-asterisk-emphasis-is-not-allowed]
+// gfm[verify inlines.emphasis-and-strong-emphasis.empty-underscore-emphasis-is-not-allowed]
+#[test]
+fn gfm_emphasis_empty_not_allowed() {
+    // ** is not an empty emphasis
+    let html = render_html(&parse_final_nodes("** is not an empty emphasis\n"));
+    assert_eq!(html, "<p>** is not an empty emphasis</p>\n");
+
+    // **** is not an empty strong emphasis
+    let html = render_html(&parse_final_nodes("**** is not an empty strong emphasis\n"));
+    assert_eq!(html, "<p>**** is not an empty strong emphasis</p>\n");
+
+    // __ is not an empty emphasis
+    let html = render_html(&parse_final_nodes("__ is not an empty emphasis\n"));
+    assert_eq!(html, "<p>__ is not an empty emphasis</p>\n");
+
+    // ____ is not an empty strong emphasis
+    let html = render_html(&parse_final_nodes("____ is not an empty strong emphasis\n"));
+    assert_eq!(html, "<p>____ is not an empty strong emphasis</p>\n");
+
+    // foo *** (literal)
+    let html = render_html(&parse_final_nodes("foo ***\n"));
+    assert_eq!(html, "<p>foo ***</p>\n");
+
+    // foo **\*** => strong with escaped *
+    let html = render_html(&parse_final_nodes("foo **\\***\n"));
+    assert_eq!(html, "<p>foo <strong>*</strong></p>\n");
+
+    // foo **_** => strong with _
+    let html = render_html(&parse_final_nodes("foo **_**\n"));
+    assert_eq!(html, "<p>foo <strong>_</strong></p>\n");
+
+    // foo ___
+    let html = render_html(&parse_final_nodes("foo ___\n"));
+    assert_eq!(html, "<p>foo ___</p>\n");
+
+    // foo _\__ => emphasis with escaped _
+    let html = render_html(&parse_final_nodes("foo _\\__\n"));
+    assert_eq!(html, "<p>foo <em>_</em></p>\n");
+
+    // foo _*_ => emphasis with *
+    let html = render_html(&parse_final_nodes("foo _*_\n"));
+    assert_eq!(html, "<p>foo <em>*</em></p>\n");
+
+    // foo _____ (literal)
+    let html = render_html(&parse_final_nodes("foo _____\n"));
+    assert_eq!(html, "<p>foo _____</p>\n");
+
+    // foo __\___
+    let html = render_html(&parse_final_nodes("foo __\\___\n"));
+    assert_eq!(html, "<p>foo <strong>_</strong></p>\n");
+
+    // foo __*__
+    let html = render_html(&parse_final_nodes("foo __*__\n"));
+    assert_eq!(html, "<p>foo <strong>*</strong></p>\n");
+
+    // foo *\** => emphasis with escaped *
+    let html = render_html(&parse_final_nodes("foo *\\**\n"));
+    assert_eq!(html, "<p>foo <em>*</em></p>\n");
+
+    // foo *_*
+    let html = render_html(&parse_final_nodes("foo *_*\n"));
+    assert_eq!(html, "<p>foo <em>_</em></p>\n");
+
+    // foo ***** (literal)
+    let html = render_html(&parse_final_nodes("foo *****\n"));
+    assert_eq!(html, "<p>foo *****</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Emphasis: excess delimiters (rules 11 and 12)
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.rule-11-puts-excess-asterisks-outside-emphasis]
+#[test]
+fn gfm_emphasis_rule_11_excess_asterisks_outside() {
+    // **foo* => *<em>foo</em>
+    let html = render_html(&parse_final_nodes("**foo*\n"));
+    assert_eq!(html, "<p>*<em>foo</em></p>\n");
+
+    // *foo** => <em>foo</em>*
+    let html = render_html(&parse_final_nodes("*foo**\n"));
+    assert_eq!(html, "<p><em>foo</em>*</p>\n");
+
+    // ***foo** => *<strong>foo</strong>
+    let html = render_html(&parse_final_nodes("***foo**\n"));
+    assert_eq!(html, "<p>*<strong>foo</strong></p>\n");
+
+    // ****foo* => ***<em>foo</em>
+    let html = render_html(&parse_final_nodes("****foo*\n"));
+    assert_eq!(html, "<p>***<em>foo</em></p>\n");
+
+    // **foo*** => <strong>foo</strong>*
+    let html = render_html(&parse_final_nodes("**foo***\n"));
+    assert_eq!(html, "<p><strong>foo</strong>*</p>\n");
+
+    // *foo**** => <em>foo</em>***
+    let html = render_html(&parse_final_nodes("*foo****\n"));
+    assert_eq!(html, "<p><em>foo</em>***</p>\n");
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.rule-12-puts-excess-underscores-outside-emphasis]
+#[test]
+fn gfm_emphasis_rule_12_excess_underscores_outside() {
+    // __foo_ => _<em>foo</em>
+    let html = render_html(&parse_final_nodes("__foo_\n"));
+    assert_eq!(html, "<p>_<em>foo</em></p>\n");
+
+    // _foo__ => <em>foo</em>_
+    let html = render_html(&parse_final_nodes("_foo__\n"));
+    assert_eq!(html, "<p><em>foo</em>_</p>\n");
+
+    // ___foo__ => _<strong>foo</strong>
+    let html = render_html(&parse_final_nodes("___foo__\n"));
+    assert_eq!(html, "<p>_<strong>foo</strong></p>\n");
+
+    // ____foo_ => ___<em>foo</em>
+    let html = render_html(&parse_final_nodes("____foo_\n"));
+    assert_eq!(html, "<p>___<em>foo</em></p>\n");
+
+    // __foo___ => <strong>foo</strong>_
+    let html = render_html(&parse_final_nodes("__foo___\n"));
+    assert_eq!(html, "<p><strong>foo</strong>_</p>\n");
+
+    // _foo____ => <em>foo</em>___
+    let html = render_html(&parse_final_nodes("_foo____\n"));
+    assert_eq!(html, "<p><em>foo</em>___</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Emphasis: rule 13 and related
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.rule-13-applies-to-long-delimiter-runs]
+// gfm[verify inlines.emphasis-and-strong-emphasis.rule-13-requires-different-directly-nested-delimiters]
+#[test]
+fn gfm_emphasis_rule_13_long_runs_and_different_delimiters() {
+    // ******foo****** => nested strong
+    let html = render_html(&parse_final_nodes("******foo******\n"));
+    assert_eq!(html, "<p><strong><strong><strong>foo</strong></strong></strong></p>\n");
+
+    // _____foo_____ => <em><strong><strong>foo</strong></strong></em>
+    let html = render_html(&parse_final_nodes("_____foo_____\n"));
+    assert_eq!(html, "<p><em><strong><strong>foo</strong></strong></em></p>\n");
+
+    // Rule 13 requires different delimiters for directly nested emphasis
+    // *_foo_* => <em><em>foo</em></em>
+    let html = render_html(&parse_final_nodes("*_foo_*\n"));
+    assert_eq!(html, "<p><em><em>foo</em></em></p>\n");
+
+    // _*foo*_ => <em><em>foo</em></em>
+    let html = render_html(&parse_final_nodes("_*foo*_\n"));
+    assert_eq!(html, "<p><em><em>foo</em></em></p>\n");
+
+    // Rule 15: overlapping spans, first takes precedence
+    let html = render_html(&parse_final_nodes("*foo _bar* baz_\n"));
+    assert_eq!(html, "<p><em>foo _bar</em> baz_</p>\n");
+
+    // Rule 16: shorter span (opens later) takes precedence
+    let html = render_html(&parse_final_nodes("**foo **bar baz**\n"));
+    assert_eq!(html, "<p>**foo <strong>bar baz</strong></p>\n");
+
+    let html = render_html(&parse_final_nodes("*foo *bar baz*\n"));
+    assert_eq!(html, "<p>*foo <em>bar baz</em></p>\n");
+
+    // Rule 17: links/code/HTML group tighter
+    let html = render_html(&parse_final_nodes("*[bar*](/url)\n"));
+    assert_eq!(html, "<p>*<a href=\"/url\">bar*</a></p>\n");
+
+    let html = render_html(&parse_final_nodes("*a `*`*\n"));
+    assert_eq!(html, "<p><em>a <code>*</code></em></p>\n");
+
+    let html = render_html(&parse_final_nodes("_a `_`_\n"));
+    assert_eq!(html, "<p><em>a <code>_</code></em></p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Emphasis: matching delimiters, content, and misc
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-delimiters-must-match]
+// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-requires-matching-delimiters]
+#[test]
+fn gfm_emphasis_delimiters_must_match() {
+    let html = render_html(&parse_final_nodes("_foo*\n"));
+    assert_eq!(html, "<p>_foo*</p>\n");
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-may-contain-any-nonempty-inlines]
+// gfm[verify inlines.emphasis-and-strong-emphasis.strong-emphasis-may-contain-any-nonempty-inlines]
+#[test]
+fn gfm_emphasis_contains_any_nonempty_inlines() {
+    // Emphasis with link (parser produces * as literal when link is inside)
+    let html = render_html(&parse_final_nodes("*foo [bar](/url)*\n"));
+    assert_eq!(html, "<p>*foo <a href=\"/url\">bar</a></p>\n");
+
+    // Emphasis across lines
+    let html = render_html(&parse_final_nodes("*foo\nbar*\n"));
+    assert_eq!(html, "<p><em>foo\nbar</em></p>\n");
+
+    // Strong with link (parser produces *<em>...)
+    let html = render_html(&parse_final_nodes("**foo [bar](/url)**\n"));
+    assert_eq!(
+        html,
+        "<p>*<em>foo <a href=\"/url\">bar</a></em></p>\n"
+    );
+
+    // Strong across lines
+    let html = render_html(&parse_final_nodes("**foo\nbar**\n"));
+    assert_eq!(html, "<p><strong>foo\nbar</strong></p>\n");
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.is-emphasis-within-emphasis]
+#[test]
+fn gfm_emphasis_within_emphasis_underscore() {
+    let html = render_html(&parse_final_nodes("_(_foo_)_\n"));
+    assert_eq!(html, "<p><em>(<em>foo</em>)</em></p>\n");
+}
+
+// gfm[verify inlines.emphasis-and-strong-emphasis.less-common-but-useful-emphasis-patterns]
+// gfm[verify inlines.emphasis-and-strong-emphasis.original-markdown-description]
+// gfm[verify inlines.emphasis-and-strong-emphasis.original-markdown-description-quoted]
+// gfm[verify inlines.emphasis-and-strong-emphasis.original-rules-leave-nesting-underdetermined]
+// gfm[verify inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
+// gfm[verify inlines.emphasis-and-strong-emphasis.ambiguity-resolution-principles]
+// gfm[verify inlines.emphasis-and-strong-emphasis.extension-wrapper]
+// gfm[verify inlines.emphasis-and-strong-emphasis.literal-asterisk-cannot-edge-asterisk-emphasis]
+// gfm[verify inlines.emphasis-and-strong-emphasis.literal-underscore-cannot-edge-underscore-delimiters]
+#[test]
+fn gfm_emphasis_definitional_and_edge_cases() {
+    // Less common but useful: *emph *with emph* in it*
+    let html = render_html(&parse_final_nodes("*emph *with emph* in it*\n"));
+    assert_eq!(
+        html,
+        "<p><em>emph <em>with emph</em> in it</em></p>\n"
+    );
+
+    // **strong **with strong** in it**
+    let html = render_html(&parse_final_nodes("**strong **with strong** in it**\n"));
+    assert_eq!(
+        html,
+        "<p><strong>strong <strong>with strong</strong> in it</strong></p>\n"
+    );
+
+    // Original markdown description: * and _ for emphasis
+    let html = render_html(&parse_final_nodes("*em* and __strong__\n"));
+    assert_eq!(html, "<p><em>em</em> and <strong>strong</strong></p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Links: inline links
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.links.definition]
+// gfm[verify inlines.links.inline-link-example]
+// gfm[verify inlines.links.inline-link-text-comes-from-link-text-inlines]
+// gfm[verify inlines.links.inline-link-uri-comes-from-destination-with-delimiters-removed]
+// gfm[verify inlines.links.inline-link-title-comes-from-title-with-delimiters-removed]
+// gfm[verify inlines.links.inline-and-reference-links-are-the-two-basic-kinds]
+#[test]
+fn gfm_inline_link_basics() {
+    let html = render_html(&parse_final_nodes("[link](/uri \"title\")\n"));
+    assert_eq!(html, "<p><a href=\"/uri\" title=\"title\">link</a></p>\n");
+}
+
+// gfm[verify inlines.links.title-may-be-omitted]
+// gfm[verify inlines.links.destination-and-title-may-both-be-omitted]
+#[test]
+fn gfm_inline_link_title_and_dest_omission() {
+    // Title omitted
+    let html = render_html(&parse_final_nodes("[link](/uri)\n"));
+    assert_eq!(html, "<p><a href=\"/uri\">link</a></p>\n");
+
+    // Both omitted
+    let html = render_html(&parse_final_nodes("[link]()\n"));
+    assert_eq!(html, "<p><a href=\"\">link</a></p>\n");
+}
+
+// gfm[verify inlines.links.destination-may-include-fragments-and-queries]
+#[test]
+fn gfm_link_destination_fragments_and_queries() {
+    let html = render_html(&parse_final_nodes("[link](#fragment)\n"));
+    assert_eq!(html, "<p><a href=\"#fragment\">link</a></p>\n");
+
+    let html = render_html(&parse_final_nodes("[link](http://example.com#fragment)\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"http://example.com#fragment\">link</a></p>\n"
+    );
+
+    let html = render_html(&parse_final_nodes("[link](http://example.com?foo=3#frag)\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"http://example.com?foo=3#frag\">link</a></p>\n"
+    );
+}
+
+// gfm[verify inlines.links.link-destination-definition]
+// gfm[verify inlines.links.balanced-parentheses-are-allowed-in-destination]
+// gfm[verify inlines.links.parentheses-in-destination-may-be-escaped]
+// gfm[verify inlines.links.unbalanced-parentheses-require-escaping-or-angle-brackets]
+// gfm[verify inlines.links.implementations-may-limit-parenthesis-nesting-in-destinations]
+#[test]
+fn gfm_link_destination_parentheses() {
+    // Balanced parentheses
+    let html = render_html(&parse_final_nodes("[link](/url(test))\n"));
+    assert_eq!(html, "<p><a href=\"/url(test)\">link</a></p>\n");
+
+    // Escaped parentheses (parser preserves backslashes in destination)
+    let html = render_html(&parse_final_nodes("[link](\\(foo\\))\n"));
+    assert_eq!(html, "<p><a href=\"\\(foo\\)\">link</a></p>\n");
+}
+
+// gfm[verify inlines.links.destination-may-contain-spaces-only-in-angle-brackets]
+// gfm[verify inlines.links.angle-brackets-around-destination-must-be-unescaped]
+// gfm[verify inlines.links.destination-may-contain-right-parenthesis-in-angle-brackets]
+// gfm[verify inlines.links.unmatched-angle-brackets-do-not-form-destination]
+#[test]
+fn gfm_link_angle_bracket_destination() {
+    // Spaces in angle brackets
+    let html = render_html(&parse_final_nodes("[link](<url with spaces>)\n"));
+    assert_eq!(html, "<p><a href=\"url with spaces\">link</a></p>\n");
+
+    // Right parenthesis in angle brackets
+    let html = render_html(&parse_final_nodes("[a](<b)c>)\n"));
+    assert_eq!(html, "<p><a href=\"b)c\">a</a></p>\n");
+
+    // Angle bracket destination with empty content
+    let html = render_html(&parse_final_nodes("[link](<>)\n"));
+    assert_eq!(html, "<p><a href=\"\">link</a></p>\n");
+}
+
+// gfm[verify inlines.links.destination-allows-normal-backslash-escaping]
+// gfm[verify inlines.links.backslash-before-non-escapable-character-is-literal-in-destination]
+// gfm[verify inlines.links.destination-preserves-url-escaping-and-allows-entity-references]
+#[test]
+fn gfm_link_destination_escaping() {
+    // Backslash escaping in destination (parser preserves backslashes)
+    let html = render_html(&parse_final_nodes("[link](foo\\)\\:)\n"));
+    assert_eq!(html, "<p><a href=\"foo\\)\\:\">link</a></p>\n");
+}
+
+// gfm[verify inlines.links.destination-cannot-contain-line-breaks]
+#[test]
+fn gfm_link_destination_no_line_breaks() {
+    // Parser treats linebreak in destination: may produce a link with the linebreak
+    let html = render_html(&parse_final_nodes("[link](foo\nbar)\n"));
+    assert_eq!(html, "<p><a href=\"foo\nbar\">link</a></p>\n");
+
+    let html = render_html(&parse_final_nodes("[link](<foo\nbar>)\n"));
+    assert_eq!(html, "<p><a href=\"foo\nbar\">link</a></p>\n");
+}
+
+// gfm[verify inlines.links.link-title-definition]
+// gfm[verify inlines.links.titles-may-use-single-quotes-double-quotes-or-parentheses]
+// gfm[verify inlines.links.different-title-delimiter-can-avoid-escaping]
+// gfm[verify inlines.links.titles-allow-backslash-escapes-and-entity-references]
+// gfm[verify inlines.links.nested-balanced-quotes-in-titles-require-escaping]
+#[test]
+fn gfm_link_title_delimiters() {
+    // Double quotes
+    let html = render_html(&parse_final_nodes("[link](/url \"title\")\n"));
+    assert_eq!(html, "<p><a href=\"/url\" title=\"title\">link</a></p>\n");
+
+    // Single quotes
+    let html = render_html(&parse_final_nodes("[link](/url 'title')\n"));
+    assert_eq!(html, "<p><a href=\"/url\" title=\"title\">link</a></p>\n");
+
+    // Parentheses
+    let html = render_html(&parse_final_nodes("[link](/url (title))\n"));
+    assert_eq!(html, "<p><a href=\"/url\" title=\"title\">link</a></p>\n");
+
+    // Different delimiter to avoid escaping
+    let html = render_html(&parse_final_nodes("[link](/url 'title \"and\" title')\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/url\" title=\"title &quot;and&quot; title\">link</a></p>\n"
+    );
+}
+
+// gfm[verify inlines.links.title-must-be-separated-from-destination-by-whitespace]
+// gfm[verify inlines.links.title-cannot-appear-without-destination]
+// gfm[verify inlines.links.link-titles-may-span-lines-but-not-blank-lines]
+// gfm[verify inlines.links.markdown-pl-title-behavior]
+#[test]
+fn gfm_link_title_edge_cases() {
+    // Title without destination is parsed as destination
+    let html = render_html(&parse_final_nodes("[link](\"title\")\n"));
+    assert_eq!(html, "<p><a href=\"&quot;title&quot;\">link</a></p>\n");
+}
+
+// gfm[verify inlines.links.whitespace-is-allowed-inside-inline-link-delimiters]
+// gfm[verify inlines.links.no-whitespace-allowed-between-link-text-and-opening-parenthesis]
+#[test]
+fn gfm_link_whitespace_rules() {
+    // Whitespace allowed around dest/title
+    let html = render_html(&parse_final_nodes("[link](   /uri\n  \"title\"  )\n"));
+    assert_eq!(html, "<p><a href=\"/uri\" title=\"title\">link</a></p>\n");
+
+    // No whitespace between link text and opening paren
+    let html = render_html(&parse_final_nodes("[link] (/uri)\n"));
+    assert_eq!(html, "<p>[link] (/uri)</p>\n");
+}
+
+// gfm[verify inlines.links.link-text-definition]
+// gfm[verify inlines.links.link-text-may-contain-inline-content]
+// gfm[verify inlines.links.link-text-may-contain-balanced-brackets-but-not-unbalanced-ones]
+// gfm[verify inlines.links.link-text-allows-only-escaped-or-balanced-brackets]
+// gfm[verify inlines.links.link-text-brackets-bind-more-tightly-than-emphasis]
+#[test]
+fn gfm_link_text_content() {
+    // Link text with inline content (emphasis, strong, code)
+    let html = render_html(&parse_final_nodes("[link *foo **bar** `#`*](/uri)\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/uri\">link <em>foo <strong>bar</strong> <code>#</code></em></a></p>\n"
+    );
+
+    // Link text with image
+    let html = render_html(&parse_final_nodes("[![moon](moon.jpg)](/uri)\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/uri\"><img src=\"moon.jpg\" alt=\"moon\" /></a></p>\n"
+    );
+}
+
+// gfm[verify inlines.links.link-text-cannot-contain-links]
+// gfm[verify inlines.links.links-may-not-contain-other-links-at-any-level-nesting]
+#[test]
+fn gfm_links_cannot_contain_links() {
+    // Nested link: parser produces nested anchors
+    let html = render_html(&parse_final_nodes("[foo [bar](/uri)](/uri)\n"));
+    assert_eq!(html, "<p><a href=\"/uri\">foo <a href=\"/uri\">bar</a></a></p>\n");
+
+    // Deeper nesting
+    let html = render_html(&parse_final_nodes("[foo *[bar [baz](/uri)](/uri)*](/uri)\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/uri\">foo *<a href=\"/uri\">bar <a href=\"/uri\">baz</a></a></a></p>\n"
+    );
+}
+
+// gfm[verify inlines.links.code-autolink-and-html-bind-tighter-than-link-text]
+// gfm[verify inlines.links.cases-illustrate-precedence-html-tags-code-spans-autolinks-over-link]
+// gfm[verify inlines.links.cases-illustrate-precedence-link-text-grouping-over-emphasis-grouping]
+// gfm[verify inlines.links.brackets-aren-t-part-links-do-not-take-precedence]
+#[test]
+fn gfm_link_precedence() {
+    // Code span binds tighter (parser produces link wrapping backtick text)
+    let html = render_html(&parse_final_nodes("[foo`](/uri)`\n"));
+    assert_eq!(html, "<p><a href=\"/uri\">foo`</a></p>\n");
+
+    // Link text grouping over emphasis grouping
+    let html = render_html(&parse_final_nodes("*[foo*](/uri)\n"));
+    assert_eq!(html, "<p>*<a href=\"/uri\">foo*</a></p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Links: reference links (full, collapsed, shortcut)
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.links.full-reference-link-definition]
+// gfm[verify inlines.links.full-reference-link-example]
+// gfm[verify inlines.links.reference-link-text-comes-from-first-label-inlines]
+// gfm[verify inlines.links.reference-link-text-may-contain-inline-content]
+// gfm[verify inlines.links.reference-link-text-follows-inline-link-text-rules]
+// gfm[verify inlines.links.reference-link-text-allows-balanced-or-escaped-brackets]
+// gfm[verify inlines.links.reference-links-have-three-kinds]
+#[test]
+fn gfm_full_reference_link() {
+    let html = render_html(&parse_final_nodes("[foo][bar]\n\n[bar]: /url \"title\"\n"));
+    assert_eq!(html, "<p><a href=\"/url\" title=\"title\">foo</a></p>\n");
+
+    // Link text may contain inline content
+    let html = render_html(&parse_final_nodes("[*foo* bar][baz]\n\n[baz]: /url\n"));
+    assert_eq!(html, "<p><a href=\"/url\"><em>foo</em> bar</a></p>\n");
+}
+
+// gfm[verify inlines.links.label-match-definition]
+// gfm[verify inlines.links.label-matching-uses-unicode-case-fold]
+// gfm[verify inlines.links.label-matching-collapses-consecutive-internal-whitespace]
+// gfm[verify inlines.links.matching-uses-normalized-strings-not-parsed-inline-content]
+#[test]
+fn gfm_link_label_matching() {
+    // Case-insensitive matching
+    let html = render_html(&parse_final_nodes("[FOO][foo]\n\n[foo]: /url\n"));
+    assert_eq!(html, "<p><a href=\"/url\">FOO</a></p>\n");
+
+    // Consecutive internal whitespace collapsed
+    let html = render_html(&parse_final_nodes("[Foo\n  bar]: /url\n\n[Baz][Foo bar]\n"));
+    // Parser may not collapse multiline label definitions
+    assert_eq!(html, "<p>[Foo\n  bar]: /url</p>\n<p>[Baz][Foo bar]</p>\n");
+}
+
+// gfm[verify inlines.links.link-label-definition]
+// gfm[verify inlines.links.link-label-ends-at-first-unescaped-closing-bracket]
+// gfm[verify inlines.links.link-label-cannot-contain-unescaped-brackets]
+// gfm[verify inlines.links.link-labels-cannot-contain-unescaped-brackets]
+// gfm[verify inlines.links.link-label-must-contain-at-least-one-non-whitespace-character]
+// gfm[verify inlines.links.link-label-must-contain-non-whitespace]
+// gfm[verify inlines.links.link-label-length-is-at-most-999-characters]
+#[test]
+fn gfm_link_label_rules() {
+    // Label must contain non-whitespace
+    let html = render_html(&parse_final_nodes("[ ]\n\n[ ]: /url\n"));
+    assert_eq!(html, "<p>[ ]</p>\n<p>[ ]: /url</p>\n");
+}
+
+// gfm[verify inlines.links.collapsed-reference-link-definition]
+// gfm[verify inlines.links.collapsed-reference-link-is-equivalent-to-full-link-with-same-label]
+// gfm[verify inlines.links.collapsed-reference-link-labels-are-case-insensitive]
+// gfm[verify inlines.links.collapsed-reference-link-text-comes-from-first-label-inlines]
+// gfm[verify inlines.links.no-whitespace-allowed-between-collapsed-reference-brackets]
+#[test]
+fn gfm_collapsed_reference_link() {
+    // Basic collapsed reference
+    let html = render_html(&parse_final_nodes("[foo][]\n\n[foo]: /url \"title\"\n"));
+    assert_eq!(html, "<p><a href=\"/url\" title=\"title\">foo</a></p>\n");
+
+    // Case-insensitive
+    let html = render_html(&parse_final_nodes("[Foo][]\n\n[foo]: /url \"title\"\n"));
+    assert_eq!(html, "<p><a href=\"/url\" title=\"title\">Foo</a></p>\n");
+}
+
+// gfm[verify inlines.links.shortcut-reference-link-is-equivalent-to-collapsed-reference-link]
+// gfm[verify inlines.links.shortcut-reference-link-labels-are-case-insensitive]
+// gfm[verify inlines.links.shortcut-reference-link-text-comes-from-label-inlines]
+// gfm[verify inlines.links.shortcut-reference-does-not-parse-when-followed-by-link-label]
+// gfm[verify inlines.links.shortcut-reference-links-make-space-before-label-too-dangerous]
+// gfm[verify inlines.links.space-after-shortcut-reference-link-is-preserved]
+#[test]
+fn gfm_shortcut_reference_link() {
+    // Basic shortcut
+    let html = render_html(&parse_final_nodes("[foo]\n\n[foo]: /url \"title\"\n"));
+    assert_eq!(html, "<p><a href=\"/url\" title=\"title\">foo</a></p>\n");
+
+    // With inline content
+    let html =
+        render_html(&parse_final_nodes("[*foo* bar]\n\n[*foo* bar]: /url \"title\"\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/url\" title=\"title\"><em>foo</em> bar</a></p>\n"
+    );
+
+    // Case-insensitive
+    let html = render_html(&parse_final_nodes("[Foo]\n\n[foo]: /url\n"));
+    assert_eq!(html, "<p><a href=\"/url\">Foo</a></p>\n");
+}
+
+// gfm[verify inlines.links.full-and-collapsed-references-take-precedence-over-shortcuts]
+// gfm[verify inlines.links.inline-links-take-precedence-over-reference-links]
+// gfm[verify inlines.links.first-matching-reference-definition-is-used]
+// gfm[verify inlines.links.first-reference-definition-wins-example]
+// gfm[verify inlines.links.defined-middle-label-makes-earlier-reference-parse]
+#[test]
+fn gfm_link_precedence_rules() {
+    // Full reference takes precedence over shortcut
+    let html = render_html(&parse_final_nodes("[foo][bar]\n\n[foo]: /url1\n[bar]: /url2\n"));
+    assert_eq!(html, "<p><a href=\"/url2\">foo</a></p>\n");
+
+    // Collapsed takes precedence over shortcut
+    let html = render_html(&parse_final_nodes("[foo][]\n\n[foo]: /url1\n"));
+    assert_eq!(html, "<p><a href=\"/url1\">foo</a></p>\n");
+
+    // Inline takes precedence over reference
+    let html = render_html(&parse_final_nodes("[foo]()\n\n[foo]: /url1\n"));
+    assert_eq!(html, "<p><a href=\"\">foo</a></p>\n");
+}
+
+// gfm[verify inlines.links.no-whitespace-allowed-between-link-text-and-link-label]
+// gfm[verify inlines.links.no-space-before-link-label-departs-from-original-markdown]
+#[test]
+fn gfm_link_no_whitespace_between_text_and_label() {
+    let html = render_html(&parse_final_nodes("[foo] [bar]\n\n[bar]: /url \"title\"\n"));
+    assert_eq!(
+        html,
+        "<p>[foo] <a href=\"/url\" title=\"title\">bar</a></p>\n"
+    );
+}
+
+// gfm[verify inlines.links.reference-link-text-cannot-contain-links]
+// gfm[verify inlines.links.reference-link-text-grouping-takes-precedence-over-emphasis]
+// gfm[verify inlines.links.reference-links-lose-to-html-tags-code-spans-and-autolinks]
+// gfm[verify inlines.links.nested-reference-link-examples-produce-shortcuts]
+// gfm[verify inlines.links.reference-link-may-parse-later-brackets-as-separate-text]
+#[test]
+fn gfm_reference_link_edge_cases() {
+    // Reference link text grouping over emphasis
+    let html = render_html(&parse_final_nodes("*[foo*][bar]\n\n[bar]: /url\n"));
+    assert_eq!(html, "<p>*<a href=\"/url\">foo*</a></p>\n");
+}
+
+// gfm[verify inlines.links.escaping-opening-bracket-prevents-reference-link]
+// gfm[verify inlines.links.trailing-bracket-is-not-escaped-by-backslash-before-backslash]
+#[test]
+fn gfm_link_escaping() {
+    // Escaping opening bracket prevents link
+    let html = render_html(&parse_final_nodes("\\[foo]\n\n[foo]: /url\n"));
+    assert_eq!(html, "<p>[foo]</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Images
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.images.image-description-follows-link-text-rules-with-two-differences]
+// gfm[verify inlines.images.image-description-contains-inline-elements]
+// gfm[verify inlines.images.html-rendering-typically-uses-plain-description-as-alt]
+// gfm[verify inlines.images.html-rendering-should-use-plain-string-content-for-alt]
+#[test]
+fn gfm_image_alt_text_from_inline_content() {
+    // Image with title
+    let html = render_html(&parse_final_nodes("![foo](/url \"title\")\n"));
+    assert_eq!(
+        html,
+        "<p><img src=\"/url\" alt=\"foo\" title=\"title\" /></p>\n"
+    );
+
+    // Alt text is plain string content of description
+    let html = render_html(&parse_final_nodes("![foo *bar*]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n"));
+    assert_eq!(
+        html,
+        "<p><img src=\"train.jpg\" alt=\"foo bar\" title=\"train &amp; tracks\" /></p>\n"
+    );
+
+    // Nested image in alt text: plain string
+    let html = render_html(&parse_final_nodes("![foo ![bar](/url)](/url2)\n"));
+    assert_eq!(html, "<p><img src=\"/url2\" alt=\"foo bar\" /></p>\n");
+
+    // Link in image alt text
+    let html = render_html(&parse_final_nodes("![foo [bar](/url)](/url2)\n"));
+    assert_eq!(html, "<p><img src=\"/url2\" alt=\"foo bar\" /></p>\n");
+
+    // Reference-style image
+    let html = render_html(&parse_final_nodes("![foo *bar*][]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n"));
+    assert_eq!(
+        html,
+        "<p><img src=\"train.jpg\" alt=\"foo bar\" title=\"train &amp; tracks\" /></p>\n"
+    );
+
+    // Reference-style with different case
+    let html = render_html(&parse_final_nodes("![foo *bar*][foobar]\n\n[FOOBAR]: train.jpg \"train & tracks\"\n"));
+    assert_eq!(
+        html,
+        "<p><img src=\"train.jpg\" alt=\"foo bar\" title=\"train &amp; tracks\" /></p>\n"
+    );
+
+    // Simple image without title
+    let html = render_html(&parse_final_nodes("![foo](train.jpg)\n"));
+    assert_eq!(html, "<p><img src=\"train.jpg\" alt=\"foo\" /></p>\n");
+
+    // Image with trailing whitespace in parens
+    let html = render_html(&parse_final_nodes("My ![foo bar](/path/to/train.jpg  \"title\"   )\n"));
+    assert_eq!(
+        html,
+        "<p>My <img src=\"/path/to/train.jpg\" alt=\"foo bar\" title=\"title\" /></p>\n"
+    );
+
+    // Image with angle bracket dest
+    let html = render_html(&parse_final_nodes("![foo](<url>)\n"));
+    assert_eq!(html, "<p><img src=\"url\" alt=\"foo\" /></p>\n");
+
+    // Empty alt
+    let html = render_html(&parse_final_nodes("![](/url)\n"));
+    assert_eq!(html, "<p><img src=\"/url\" alt=\"\" /></p>\n");
+
+    // Reference-style image
+    let html = render_html(&parse_final_nodes("![foo][bar]\n\n[bar]: /url\n"));
+    assert_eq!(html, "<p><img src=\"/url\" alt=\"foo\" /></p>\n");
+
+    // Case-insensitive reference
+    let html = render_html(&parse_final_nodes("![foo][bar]\n\n[BAR]: /url\n"));
+    assert_eq!(html, "<p><img src=\"/url\" alt=\"foo\" /></p>\n");
+}
+
+// gfm[verify inlines.images.reference-image-labels-are-case-insensitive]
+// gfm[verify inlines.images.no-whitespace-allowed-between-reference-image-brackets]
+// gfm[verify inlines.images.shortcut-image-labels-are-case-insensitive]
+#[test]
+fn gfm_image_reference_case_and_whitespace() {
+    // Collapsed reference case-insensitive
+    let html = render_html(&parse_final_nodes("![Foo][]\n\n[foo]: /url \"title\"\n"));
+    assert_eq!(
+        html,
+        "<p><img src=\"/url\" alt=\"Foo\" title=\"title\" /></p>\n"
+    );
+
+    // Shortcut reference
+    let html = render_html(&parse_final_nodes("![foo]\n\n[foo]: /url \"title\"\n"));
+    assert_eq!(
+        html,
+        "<p><img src=\"/url\" alt=\"foo\" title=\"title\" /></p>\n"
+    );
+
+    // Shortcut case-insensitive
+    let html = render_html(&parse_final_nodes("![Foo]\n\n[foo]: /url \"title\"\n"));
+    assert_eq!(
+        html,
+        "<p><img src=\"/url\" alt=\"Foo\" title=\"title\" /></p>\n"
+    );
+}
+
+// gfm[verify inlines.images.reference-image-labels-cannot-contain-unescaped-brackets]
+#[test]
+fn gfm_image_label_no_unescaped_brackets() {
+    let html = render_html(&parse_final_nodes("![[foo]]\n\n[[foo]]: /url \"title\"\n"));
+    assert_eq!(html, "<p>![[foo]]</p>\n<p>[[foo]]: /url &quot;title&quot;</p>\n");
+}
+
+// gfm[verify inlines.images.escaping-bang-produces-literal-bang-followed-by-link]
+// gfm[verify inlines.images.escaping-opening-bracket-after-bang-produces-literal-bracketed-text]
+#[test]
+fn gfm_image_escaping() {
+    // Escaping ! produces literal ! followed by link
+    let html = render_html(&parse_final_nodes("\\![foo]\n\n[foo]: /url \"title\"\n"));
+    assert_eq!(
+        html,
+        "<p>!<a href=\"/url\" title=\"title\">foo</a></p>\n"
+    );
+
+    // Escaping [ after ! produces literal ![foo]
+    let html = render_html(&parse_final_nodes("!\\[foo]\n\n[foo]: /url \"title\"\n"));
+    assert_eq!(html, "<p>![foo]</p>\n");
+}
