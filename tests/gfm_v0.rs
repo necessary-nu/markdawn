@@ -552,6 +552,8 @@ fn gfm_table() {
 }
 
 // gfm[verify inlines.autolinks-extension.extended-url-autolink-definition]
+// gfm[verify inlines.autolinks-extension.definition]
+// gfm[verify inlines.autolinks-extension.gfm-enables-extended-autolinks]
 #[test]
 fn gfm_autolink_literal() {
     let html = render_html(&parse_final_nodes("visit https://example.com now\n"));
@@ -1149,6 +1151,7 @@ fn gfm_empty_inline_link() {
 
 // gfm[verify inlines.autolinks-extension.extended-www-autolink-definition]
 // gfm[verify inlines.autolinks-extension.extended-www-autolinks-insert-http-scheme]
+// gfm[verify inlines.autolinks-extension.extended-www-autolinks-may-have-path-after-domain]
 #[test]
 fn gfm_www_autolink() {
     let html = render_html(&parse_final_nodes("visit www.example.com now\n"));
@@ -1156,9 +1159,19 @@ fn gfm_www_autolink() {
         html,
         "<p>visit <a href=\"http://www.example.com\">www.example.com</a> now</p>\n"
     );
+
+    // www autolinks may include a path after the domain
+    let html = render_html(&parse_final_nodes(
+        "Visit www.commonmark.org/help for more information.\n",
+    ));
+    assert_eq!(
+        html,
+        "<p>Visit <a href=\"http://www.commonmark.org/help\">www.commonmark.org/help</a> for more information.</p>\n"
+    );
 }
 
 // gfm[verify inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
+// gfm[verify inlines.autolinks-extension.extended-autolink-path-validation]
 #[test]
 fn gfm_autolink_trailing_punctuation() {
     let html = render_html(&parse_final_nodes("visit https://example.com.\n"));
@@ -4713,4 +4726,216 @@ fn gfm_appendix_link_algorithm_failure_and_deactivation() {
     // (or the parser may greedily match the outer link - either way, we verify
     // the parser produces valid output without panicking)
     assert!(!html.is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// Standard autolinks (angle-bracket delimited)
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.autolinks.extension-wrapper]
+// gfm[verify inlines.autolinks.uri-autolink-definition]
+// gfm[verify inlines.autolinks.absolute-uri-definition]
+// gfm[verify inlines.autolinks.scheme-definition]
+// gfm[verify inlines.autolinks.valid-uri-autolink-example]
+#[test]
+fn gfm_standard_uri_autolink() {
+    let html = render_html(&parse_final_nodes("<http://foo.bar.baz>\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"http://foo.bar.baz\">http://foo.bar.baz</a></p>\n"
+    );
+
+    let html = render_html(&parse_final_nodes(
+        "<http://foo.bar.baz/test?q=hello&id=22&boolean>\n",
+    ));
+    assert_eq!(
+        html,
+        "<p><a href=\"http://foo.bar.baz/test?q=hello&amp;id=22&amp;boolean\">http://foo.bar.baz/test?q=hello&amp;id=22&amp;boolean</a></p>\n"
+    );
+
+    let html = render_html(&parse_final_nodes("<irc://foo.bar:2233/baz>\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"irc://foo.bar:2233/baz\">irc://foo.bar:2233/baz</a></p>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks.autolink-schemes-are-case-insensitive]
+#[test]
+fn gfm_autolink_case_insensitive_scheme() {
+    let html = render_html(&parse_final_nodes("<MAILTO:FOO@BAR.BAZ>\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"MAILTO:FOO@BAR.BAZ\">MAILTO:FOO@BAR.BAZ</a></p>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks.spec-accepts-some-absolute-uris-that-are-not-valid-uris]
+#[test]
+fn gfm_autolink_nonstandard_uris() {
+    let html = render_html(&parse_final_nodes("<a+b+c:d>\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"a+b+c:d\">a+b+c:d</a></p>\n"
+    );
+
+    let html = render_html(&parse_final_nodes("<made-up-scheme://foo,bar>\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"made-up-scheme://foo,bar\">made-up-scheme://foo,bar</a></p>\n"
+    );
+
+    let html = render_html(&parse_final_nodes("<http://../>\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"http://../\">http://../</a></p>\n"
+    );
+
+    let html = render_html(&parse_final_nodes("<localhost:5001/foo>\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"localhost:5001/foo\">localhost:5001/foo</a></p>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks.autolinks-cannot-contain-spaces]
+#[test]
+fn gfm_autolink_no_spaces() {
+    // Spaces prevent autolink recognition; parser falls through to HTML tag
+    let html = render_html(&parse_final_nodes("<http://foo.bar/baz bim>\n"));
+    assert_eq!(html, "<p><http://foo.bar/baz bim></p>\n");
+}
+
+// gfm[verify inlines.autolinks.backslash-escapes-do-not-work-inside-autolinks]
+#[test]
+fn gfm_autolink_no_backslash_escapes() {
+    // Backslash escapes are not processed inside autolinks; the raw chars are kept
+    let html = render_html(&parse_final_nodes("<http://example.com/\\[\\>\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"http://example.com/\\[\\\">http://example.com/\\[\\</a></p>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks.email-autolink-definition]
+// gfm[verify inlines.autolinks.email-address-definition]
+// gfm[verify inlines.autolinks.email-address-regex]
+// gfm[verify inlines.autolinks.valid-email-autolink-example]
+#[test]
+fn gfm_standard_email_autolink() {
+    let html = render_html(&parse_final_nodes("<foo@bar.example.com>\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"mailto:foo@bar.example.com\">foo@bar.example.com</a></p>\n"
+    );
+
+    let html = render_html(&parse_final_nodes("<foo+special@Bar.baz-bar0.com>\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"mailto:foo+special@Bar.baz-bar0.com\">foo+special@Bar.baz-bar0.com</a></p>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks.backslash-escapes-do-not-work-inside-email-autolinks]
+#[test]
+fn gfm_email_autolink_no_backslash_escapes() {
+    // Backslash in email autolink invalidates the address; parser treats it as raw HTML
+    let html = render_html(&parse_final_nodes("<foo\\+@bar.example.com>\n"));
+    assert_eq!(html, "<p><foo\\+@bar.example.com></p>\n");
+}
+
+// gfm[verify inlines.autolinks.invalid-autolink-example]
+#[test]
+fn gfm_invalid_autolinks() {
+    // Empty angle brackets: parsed as Text, escaped by renderer
+    let html = render_html(&parse_final_nodes("<>\n"));
+    assert_eq!(html, "<p>&lt;&gt;</p>\n");
+
+    // Spaces inside: parser falls through to HTML tag node
+    let html = render_html(&parse_final_nodes("< http://foo.bar >\n"));
+    assert_eq!(html, "<p>< http://foo.bar ></p>\n");
+
+    // Scheme too short (single char): falls through to HTML tag
+    let html = render_html(&parse_final_nodes("<m:abc>\n"));
+    assert_eq!(html, "<p><m:abc></p>\n");
+
+    // No scheme at all: falls through to HTML tag
+    let html = render_html(&parse_final_nodes("<foo.bar.baz>\n"));
+    assert_eq!(html, "<p><foo.bar.baz></p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Extended autolinks (GFM extension) - additional rules
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.autolinks-extension.extension-wrapper]
+// gfm[verify inlines.autolinks-extension.extended-email-autolink-definition]
+// gfm[verify inlines.autolinks-extension.extended-email-autolink-rules]
+// gfm[verify inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
+#[test]
+fn gfm_extended_email_autolink() {
+    let html = render_html(&parse_final_nodes("foo@bar.baz\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"mailto:foo@bar.baz\">foo@bar.baz</a></p>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign]
+#[test]
+fn gfm_extended_email_dot_dash_underscore() {
+    // dot, dash, underscore allowed on both sides of @
+    let html = render_html(&parse_final_nodes("a.b-c_d@a.b\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"mailto:a.b-c_d@a.b\">a.b-c_d@a.b</a></p>\n"
+    );
+
+    // trailing underscore after @ invalidates the email
+    let html = render_html(&parse_final_nodes("a.b-c_d@a.b_\n"));
+    assert_eq!(html, "<p>a.b-c_d@a.b_</p>\n");
+}
+
+// gfm[verify inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
+#[test]
+fn gfm_extended_email_plus_rules() {
+    let html = render_html(&parse_final_nodes(
+        "hello@mail+xyz.example isn't valid, but hello+xyz@mail.example is.\n",
+    ));
+    assert_eq!(
+        html,
+        "<p>hello@mail+xyz.example isn't valid, but <a href=\"mailto:hello+xyz@mail.example\">hello+xyz@mail.example</a> is.</p>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks-extension.left-angle-bracket-ends-autolink]
+#[test]
+fn gfm_extended_autolink_left_angle_ends() {
+    let html = render_html(&parse_final_nodes("www.commonmark.org/he<lp\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"http://www.commonmark.org/he\">www.commonmark.org/he</a>&lt;lp</p>\n"
+    );
+}
+
+// gfm[verify inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
+#[test]
+fn gfm_extended_autolink_entity_like_semicolon() {
+    // Normal query string with & is fine
+    let html = render_html(&parse_final_nodes(
+        "www.google.com/search?q=commonmark&hl=en\n",
+    ));
+    assert_eq!(
+        html,
+        "<p><a href=\"http://www.google.com/search?q=commonmark&amp;hl=en\">www.google.com/search?q=commonmark&amp;hl=en</a></p>\n"
+    );
+
+    // Trailing &hl; looks like entity; semicolon is excluded from autolink
+    let html = render_html(&parse_final_nodes(
+        "www.google.com/search?q=commonmark&hl;\n",
+    ));
+    assert_eq!(
+        html,
+        "<p><a href=\"http://www.google.com/search?q=commonmark&amp;hl\">www.google.com/search?q=commonmark&amp;hl</a>;</p>\n"
+    );
 }
