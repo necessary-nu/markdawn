@@ -813,7 +813,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 start + 1,
                 ParsedBlock {
                     node: Node::Html {
-                        html: lines[start].clone(),
+                        html: filter_disallowed_html(&lines[start]),
                         meta: Meta::default(),
                     },
                     provisional: false,
@@ -855,7 +855,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             index,
             ParsedBlock {
                 node: Node::Html {
-                    html,
+                    html: filter_disallowed_html(&html),
                     meta: Meta::default(),
                 },
                 provisional: !closed && !finalizing,
@@ -2447,7 +2447,7 @@ where
             close + 1
         };
 
-        let html = remaining[..end].to_owned();
+        let html = filter_disallowed_html(&remaining[..end]);
         self.index += end;
         Some(html)
     }
@@ -2526,15 +2526,16 @@ where
         for prefix in ["https://", "http://"] {
             if let Some(rest) = remaining.strip_prefix(prefix) {
                 let end = rest
-                    .find(|ch: char| ch.is_whitespace() || matches!(ch, '<' | '>'))
+                    .find(|ch: char| ch.is_whitespace() || matches!(ch, '<'))
                     .unwrap_or(rest.len());
-                let body = format!("{prefix}{}", &rest[..end]);
-                self.index += body.len();
+                let raw = format!("{prefix}{}", &rest[..end]);
+                let trimmed = trim_autolink_trailing(&raw);
+                self.index += trimmed.len();
                 return Some(Node::Link {
-                    destination: body.clone(),
+                    destination: trimmed.to_owned(),
                     title: None,
                     children: vec![Node::Text {
-                        text: body,
+                        text: trimmed.to_owned(),
                         meta: self.meta.clone(),
                     }],
                     meta: self.meta.clone(),
@@ -2542,8 +2543,27 @@ where
             }
         }
 
+        if remaining.starts_with("www.") {
+            let end = remaining
+                .find(|ch: char| ch.is_whitespace() || matches!(ch, '<'))
+                .unwrap_or(remaining.len());
+            let raw = &remaining[..end];
+            let trimmed = trim_autolink_trailing(raw);
+            self.index += trimmed.len();
+            let destination = format!("http://{trimmed}");
+            return Some(Node::Link {
+                destination,
+                title: None,
+                children: vec![Node::Text {
+                    text: trimmed.to_owned(),
+                    meta: self.meta.clone(),
+                }],
+                meta: self.meta.clone(),
+            });
+        }
+
         let end = remaining
-            .find(|ch: char| ch.is_whitespace() || matches!(ch, '<' | '>'))
+            .find(|ch: char| ch.is_whitespace() || matches!(ch, '<'))
             .unwrap_or(remaining.len());
         let candidate = &remaining[..end];
         if looks_like_email(candidate) {
@@ -3912,11 +3932,153 @@ fn looks_like_url(text: &str) -> bool {
     !after_scheme.chars().any(|ch| ch.is_whitespace() || ch == '<' || ch == '>')
 }
 
+// gfm[impl inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
+// gfm[impl inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
+// gfm[impl inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
+// gfm[impl inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
+// gfm[impl inlines.autolinks-extension.left-angle-bracket-ends-autolink]
+fn trim_autolink_trailing(url: &str) -> &str {
+    let mut end = url.len();
+    let bytes = url.as_bytes();
+
+    loop {
+        if end == 0 {
+            break;
+        }
+        let last = bytes[end - 1];
+
+        if matches!(
+            last,
+            b'?' | b'!' | b'.' | b',' | b':' | b'*' | b'_' | b'~' | b'\''
+        ) {
+            end -= 1;
+            continue;
+        }
+
+        if last == b')' {
+            let open = url[..end].matches('(').count();
+            let close = url[..end].matches(')').count();
+            if close > open {
+                end -= 1;
+                continue;
+            }
+        }
+
+        if last == b';' {
+            if let Some(amp) = url[..end].rfind('&') {
+                let entity = &url[amp + 1..end - 1];
+                if !entity.is_empty() && entity.chars().all(|c| c.is_ascii_alphanumeric()) {
+                    end -= 1;
+                    continue;
+                }
+            }
+        }
+
+        break;
+    }
+
+    &url[..end]
+}
+
+const DISALLOWED_HTML_TAGS: &[&str] = &[
+    "textarea",
+    "title",
+    "style",
+    "xmp",
+    "iframe",
+    "noembed",
+    "noframes",
+    "script",
+    "plaintext",
+];
+
+// gfm[impl inlines.disallowed-raw-html-extension.disallowed-tags]
+// gfm[impl inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
+// gfm[impl inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
+// gfm[impl inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
+// gfm[impl inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
+// gfm[impl inlines.disallowed-raw-html-extension.extension-wrapper]
+fn filter_disallowed_html(html: &str) -> String {
+    let mut result = String::with_capacity(html.len());
+    let mut i = 0;
+    let bytes = html.as_bytes();
+
+    while i < bytes.len() {
+        if bytes[i] == b'<' {
+            let after_angle = i + 1;
+            let is_closing = after_angle < bytes.len() && bytes[after_angle] == b'/';
+            let tag_name_start = if is_closing {
+                after_angle + 1
+            } else {
+                after_angle
+            };
+
+            let mut matched = false;
+            for tag in DISALLOWED_HTML_TAGS {
+                let tag_end = tag_name_start + tag.len();
+                if tag_end <= bytes.len() {
+                    let candidate = &html[tag_name_start..tag_end];
+                    if candidate.eq_ignore_ascii_case(tag) {
+                        let boundary_ok = tag_end >= bytes.len()
+                            || matches!(
+                                bytes[tag_end],
+                                b' ' | b'\t' | b'\n' | b'>' | b'/'
+                            );
+                        if boundary_ok {
+                            result.push_str("&lt;");
+                            i += 1;
+                            matched = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if !matched {
+                result.push('<');
+                i += 1;
+            }
+        } else {
+            result.push(html[i..].chars().next().unwrap());
+            i += html[i..].chars().next().unwrap().len_utf8();
+        }
+    }
+
+    result
+}
+
+// gfm[impl inlines.autolinks-extension.extended-email-autolink-rules]
+// gfm[impl inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
+// gfm[impl inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign]
+// gfm[impl inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
 fn looks_like_email(text: &str) -> bool {
     let Some((local, domain)) = text.split_once('@') else {
         return false;
     };
-    !local.is_empty() && domain.contains('.') && !domain.starts_with('.') && !domain.ends_with('.')
+    if local.is_empty()
+        || !local
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '+'))
+    {
+        return false;
+    }
+    if local.ends_with('-') {
+        return false;
+    }
+    if domain.is_empty()
+        || !domain.contains('.')
+        || domain.starts_with('.')
+        || domain.ends_with('.')
+    {
+        return false;
+    }
+    if !domain
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-'))
+    {
+        return false;
+    }
+    true
 }
 
 // gfm[impl preliminaries.characters-and-lines.character-class-definitions]
