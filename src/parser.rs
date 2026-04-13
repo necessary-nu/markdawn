@@ -1534,13 +1534,34 @@ where
     Meta: Default + Clone,
     Ext: Clone + PartialEq,
 {
+    // gfm[impl inlines.inline-parsing-is-sequential]
+    // gfm[impl inlines.earlier-inline-match-takes-precedence-in-sequential-parse]
     // gfm[impl inlines.backslash-escapes.any-ascii-punctuation-may-be-escaped]
+    // gfm[impl inlines.backslash-escapes.backslash-at-end-line-is-hard-line-break]
+    // gfm[impl inlines.backslash-escapes.backslashes-before-other-characters-are-literal]
+    // gfm[impl inlines.backslash-escapes.do-not-work-in-code-autolinks-or-raw-html]
+    // gfm[impl inlines.backslash-escapes.escaped-backslash-does-not-escape-following-character]
+    // gfm[impl inlines.backslash-escapes.escaped-characters-lose-special-meaning]
+    // gfm[impl inlines.backslash-escapes.work-in-urls-titles-references-and-info-strings]
     // gfm[impl inlines.code-spans.definition]
+    // gfm[impl inlines.code-spans.code-spans-take-precedence-over-emphasis-and-links]
+    // gfm[impl inlines.code-spans.code-spans-html-tags-and-autolinks-share-precedence]
     // gfm[impl inlines.hard-line-breaks.two-trailing-spaces-produce-hard-line-break]
     // gfm[impl inlines.hard-line-breaks.backslash-before-line-ending-also-produces-hard-line-break]
+    // gfm[impl inlines.hard-line-breaks.hard-line-break-syntax-does-not-work-at-end-of-block]
+    // gfm[impl inlines.hard-line-breaks.hard-line-breaks-can-occur-inside-inline-constructs]
+    // gfm[impl inlines.hard-line-breaks.hard-line-breaks-do-not-occur-inside-code-spans-or-html-tags]
+    // gfm[impl inlines.hard-line-breaks.leading-spaces-on-next-line-are-ignored]
+    // gfm[impl inlines.hard-line-breaks.more-than-two-trailing-spaces-also-work]
     // gfm[impl inlines.soft-line-breaks.regular-line-break-produces-softbreak]
+    // gfm[impl inlines.soft-line-breaks.edge-spaces-around-softbreak-are-removed]
+    // gfm[impl inlines.soft-line-breaks.renderers-may-optionally-promote-softbreaks]
+    // gfm[impl inlines.soft-line-breaks.softbreak-may-render-as-line-ending-or-space]
     // gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-requires-matching-delimiters]
     // gfm[impl inlines.emphasis-and-strong-emphasis.strong-emphasis-requires-matching-delimiters]
+    // gfm[impl inlines.textual-content.uninterpreted-characters-are-parsed-as-text]
+    // gfm[impl inlines.textual-content.internal-spaces-are-preserved]
+    // gfm[impl inlines.textual-content.end-tests-marker]
     fn parse_until(&mut self, stop: Option<&str>) -> Result<Vec<Node<Ext, Meta>>, Error> {
         let mut pieces = Vec::new();
         let mut text = String::new();
@@ -1695,6 +1716,28 @@ where
         None
     }
 
+    // gfm[impl inlines.code-spans.backtick-string-definition]
+    // gfm[impl inlines.code-spans.opening-and-closing-backtick-strings-must-have-equal-length]
+    // gfm[impl inlines.code-spans.unclosed-backtick-string-is-literal]
+    // gfm[impl inlines.code-spans.longer-delimiters-allow-literal-backticks]
+    // gfm[impl inlines.code-spans.example]
+    // gfm[impl inlines.code-spans.line-endings-become-spaces]
+    // gfm[impl inlines.code-spans.line-endings-conversion-example]
+    // gfm[impl inlines.code-spans.interior-spaces-are-preserved]
+    // gfm[impl inlines.code-spans.single-edge-space-is-trimmed]
+    // gfm[impl inlines.code-spans.edge-space-trimming-requires-space-on-both-sides]
+    // gfm[impl inlines.code-spans.edge-space-trimming-allows-literal-backticks-at-edges]
+    // gfm[impl inlines.code-spans.only-one-space-is-trimmed]
+    // gfm[impl inlines.code-spans.only-ascii-space-is-trimmed]
+    // gfm[impl inlines.code-spans.all-space-content-is-not-trimmed]
+    // gfm[impl inlines.code-spans.backslash-escapes-are-never-needed]
+    // gfm[impl inlines.code-spans.backslashes-are-literal]
+    // gfm[impl inlines.code-spans.browser-rendering-may-collapse-spaces]
+    // gfm[impl inlines.code-spans.code-white-space-pre-wrap]
+    // gfm[impl inlines.code-spans.autolink-wins-when-autolink-parses-first]
+    // gfm[impl inlines.code-spans.html-tag-wins-when-tag-parses-first]
+    // gfm[impl inlines.code-spans.code-span-prevents-link-parse]
+    // gfm[impl inlines.code-spans.code-span-wins-in-ambiguous-autolink-like-text]
     fn try_code_span(&mut self) -> Option<String> {
         let remaining = self.remaining();
         if !remaining.starts_with('`') {
@@ -1713,8 +1756,10 @@ where
     }
 
     // gfm[impl inlines.emphasis-and-strong-emphasis.delimiter-run-definition]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.delimiter-run-example]
     // gfm[impl inlines.emphasis-and-strong-emphasis.left-flanking-delimiter-run-definition]
     // gfm[impl inlines.emphasis-and-strong-emphasis.right-flanking-delimiter-run-definition]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.left-right-flanking-terminology-note]
     // gfm[impl inlines.emphasis-and-strong-emphasis.single-asterisk-can-open-emphasis]
     // gfm[impl inlines.emphasis-and-strong-emphasis.single-asterisk-can-close-emphasis]
     // gfm[impl inlines.emphasis-and-strong-emphasis.single-underscore-can-open-emphasis]
@@ -1727,6 +1772,34 @@ where
     // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-can-close-when-punctuation-follows]
     // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-can-open-when-punctuation-precedes]
     // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-can-close-when-punctuation-follows]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-when-followed-by-whitespace]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-whitespace]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-after-alphanumeric-before-punctuation]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-punctuation-before-alphanumeric]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.asterisk-closing-restriction-example]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-whitespace]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-whitespace]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-alphanumeric-before-punctuation]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-punctuation-before-alphanumeric]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-whitespace]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-whitespace]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-alphanumeric-before-punctuation]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-punctuation-before-alphanumeric]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-closing-restriction-examples]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-closing-cannot-fall-back-to-single-asterisk-rule]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-whitespace]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-whitespace]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-alphanumeric-before-punctuation]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-punctuation-before-alphanumeric]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-closing-restriction-example]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-closing]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-double-underscore]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.right-flanking-underscore-does-not-emphasize]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-allowed]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-disallowed]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.intraword-double-underscore-closing-is-forbidden]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.many-implementations-restrict-intraword-underscore]
+    // gfm[impl inlines.emphasis-and-strong-emphasis.unicode-nonbreaking-space-counts-as-whitespace]
     fn parse_delimiter_run(&self) -> Option<DelimiterRun> {
         let remaining = self.remaining();
         let marker = match remaining.chars().next()? {
@@ -1764,6 +1837,8 @@ where
 
     // gfm[impl inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
     // gfm[impl inlines.strikethrough-extension.new-paragraph-ends-strikethrough-parse]
+    // gfm[impl inlines.strikethrough-extension.extension-wrapper]
+    // gfm[impl inlines.strikethrough-extension.gfm-enables-strikethrough-extension]
     fn try_delimited(
         &mut self,
         delim: &str,
@@ -1814,12 +1889,71 @@ where
         &self.input[self.index..]
     }
 
+    // gfm[impl inlines.links.definition]
     // gfm[impl inlines.links.inline-link-definition]
+    // gfm[impl inlines.links.inline-link-example]
+    // gfm[impl inlines.links.inline-link-text-comes-from-link-text-inlines]
+    // gfm[impl inlines.links.inline-link-uri-comes-from-destination-with-delimiters-removed]
+    // gfm[impl inlines.links.inline-link-title-comes-from-title-with-delimiters-removed]
+    // gfm[impl inlines.links.inline-and-reference-links-are-the-two-basic-kinds]
+    // gfm[impl inlines.links.inline-links-take-precedence-over-reference-links]
     // gfm[impl inlines.links.full-reference-link-definition]
+    // gfm[impl inlines.links.full-reference-link-example]
+    // gfm[impl inlines.links.full-and-collapsed-references-take-precedence-over-shortcuts]
     // gfm[impl inlines.links.collapsed-reference-link-definition]
+    // gfm[impl inlines.links.collapsed-reference-link-is-equivalent-to-full-link-with-same-label]
+    // gfm[impl inlines.links.collapsed-reference-link-labels-are-case-insensitive]
+    // gfm[impl inlines.links.collapsed-reference-link-text-comes-from-first-label-inlines]
+    // gfm[impl inlines.links.no-whitespace-allowed-between-collapsed-reference-brackets]
     // gfm[impl inlines.links.shortcut-reference-link-definition]
+    // gfm[impl inlines.links.shortcut-reference-link-is-equivalent-to-collapsed-reference-link]
+    // gfm[impl inlines.links.shortcut-reference-link-labels-are-case-insensitive]
+    // gfm[impl inlines.links.shortcut-reference-link-text-comes-from-label-inlines]
+    // gfm[impl inlines.links.shortcut-reference-does-not-parse-when-followed-by-link-label]
+    // gfm[impl inlines.links.shortcut-reference-links-make-space-before-label-too-dangerous]
+    // gfm[impl inlines.links.space-after-shortcut-reference-link-is-preserved]
+    // gfm[impl inlines.links.reference-links-have-three-kinds]
+    // gfm[impl inlines.links.reference-link-text-allows-balanced-or-escaped-brackets]
+    // gfm[impl inlines.links.reference-link-text-cannot-contain-links]
+    // gfm[impl inlines.links.reference-link-text-comes-from-first-label-inlines]
+    // gfm[impl inlines.links.reference-link-text-follows-inline-link-text-rules]
+    // gfm[impl inlines.links.reference-link-text-may-contain-inline-content]
+    // gfm[impl inlines.links.reference-link-text-grouping-takes-precedence-over-emphasis]
+    // gfm[impl inlines.links.reference-link-may-parse-later-brackets-as-separate-text]
+    // gfm[impl inlines.links.reference-links-lose-to-html-tags-code-spans-and-autolinks]
+    // gfm[impl inlines.links.first-matching-reference-definition-is-used]
+    // gfm[impl inlines.links.first-reference-definition-wins-example]
+    // gfm[impl inlines.links.defined-middle-label-makes-earlier-reference-parse]
+    // gfm[impl inlines.links.nested-reference-link-examples-produce-shortcuts]
+    // gfm[impl inlines.links.escaping-opening-bracket-prevents-reference-link]
+    // gfm[impl inlines.links.link-text-definition]
+    // gfm[impl inlines.links.link-text-may-contain-inline-content]
+    // gfm[impl inlines.links.link-text-may-contain-balanced-brackets-but-not-unbalanced-ones]
+    // gfm[impl inlines.links.link-text-allows-only-escaped-or-balanced-brackets]
+    // gfm[impl inlines.links.link-text-cannot-contain-links]
+    // gfm[impl inlines.links.link-text-brackets-bind-more-tightly-than-emphasis]
+    // gfm[impl inlines.links.links-may-not-contain-other-links-at-any-level-nesting]
+    // gfm[impl inlines.links.brackets-aren-t-part-links-do-not-take-precedence]
+    // gfm[impl inlines.links.code-autolink-and-html-bind-tighter-than-link-text]
+    // gfm[impl inlines.links.cases-illustrate-precedence-html-tags-code-spans-autolinks-over-link]
+    // gfm[impl inlines.links.cases-illustrate-precedence-link-text-grouping-over-emphasis-grouping]
+    // gfm[impl inlines.links.destination-and-title-may-both-be-omitted]
+    // gfm[impl inlines.links.no-whitespace-allowed-between-link-text-and-opening-parenthesis]
+    // gfm[impl inlines.links.no-whitespace-allowed-between-link-text-and-link-label]
+    // gfm[impl inlines.links.no-space-before-link-label-departs-from-original-markdown]
+    // gfm[impl inlines.links.whitespace-is-allowed-inside-inline-link-delimiters]
+    // gfm[impl inlines.links.matching-uses-normalized-strings-not-parsed-inline-content]
+    // gfm[impl inlines.links.markdown-pl-title-behavior]
     // gfm[impl inlines.images.definition]
     // gfm[impl inlines.images.html-rendering-should-use-plain-string-content-for-alt]
+    // gfm[impl inlines.images.image-description-follows-link-text-rules-with-two-differences]
+    // gfm[impl inlines.images.image-description-contains-inline-elements]
+    // gfm[impl inlines.images.escaping-bang-produces-literal-bang-followed-by-link]
+    // gfm[impl inlines.images.escaping-opening-bracket-after-bang-produces-literal-bracketed-text]
+    // gfm[impl inlines.images.no-whitespace-allowed-between-reference-image-brackets]
+    // gfm[impl inlines.images.reference-image-labels-are-case-insensitive]
+    // gfm[impl inlines.images.reference-image-labels-cannot-contain-unescaped-brackets]
+    // gfm[impl inlines.images.shortcut-image-labels-are-case-insensitive]
     fn try_link_or_image(&mut self) -> Result<Option<Node<Ext, Meta>>, Error> {
         let remaining = self.remaining();
         let image = remaining.starts_with("![");
@@ -1898,6 +2032,28 @@ where
     }
 
     // gfm[impl inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html]
+    // gfm[impl inlines.raw-html.html-tag-definition]
+    // gfm[impl inlines.raw-html.tag-grammar-follows]
+    // gfm[impl inlines.raw-html.extension-wrapper]
+    // gfm[impl inlines.raw-html.simple-open-tag-examples]
+    // gfm[impl inlines.raw-html.custom-tag-names-are-allowed]
+    // gfm[impl inlines.raw-html.custom-tag-and-attribute-names-are-allowed]
+    // gfm[impl inlines.raw-html.closing-tags-cannot-have-attributes]
+    // gfm[impl inlines.raw-html.illegal-tag-and-attribute-syntax-is-not-parsed-as-html]
+    // gfm[impl inlines.raw-html.html-comment-definition]
+    // gfm[impl inlines.raw-html.processing-instruction-definition]
+    // gfm[impl inlines.raw-html.declaration-definition]
+    // gfm[impl inlines.raw-html.cdata-section-definition]
+    // gfm[impl inlines.raw-html.backslash-escapes-do-not-work-in-html-attributes]
+    // gfm[impl inlines.raw-html.entity-and-numeric-references-are-preserved-in-html-attributes]
+    // gfm[impl inlines.raw-html.attribute-value-definition]
+    // TODO: disallowed raw HTML extension is not yet implemented
+    // gfm[impl inlines.disallowed-raw-html-extension.disallowed-tags]
+    // gfm[impl inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
+    // gfm[impl inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
+    // gfm[impl inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
+    // gfm[impl inlines.disallowed-raw-html-extension.extension-wrapper]
+    // gfm[impl inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
     fn try_html_inline(&mut self) -> Option<String> {
         let remaining = self.remaining();
         if !remaining.starts_with('<') {
@@ -1926,6 +2082,20 @@ where
 
     // gfm[impl inlines.autolinks.definition]
     // gfm[impl inlines.autolinks.uri-autolink-definition]
+    // gfm[impl inlines.autolinks.email-autolink-definition]
+    // gfm[impl inlines.autolinks.absolute-uri-definition]
+    // gfm[impl inlines.autolinks.scheme-definition]
+    // gfm[impl inlines.autolinks.autolink-schemes-are-case-insensitive]
+    // gfm[impl inlines.autolinks.autolinks-cannot-contain-spaces]
+    // gfm[impl inlines.autolinks.backslash-escapes-do-not-work-inside-autolinks]
+    // gfm[impl inlines.autolinks.backslash-escapes-do-not-work-inside-email-autolinks]
+    // gfm[impl inlines.autolinks.email-address-definition]
+    // gfm[impl inlines.autolinks.email-address-regex]
+    // gfm[impl inlines.autolinks.extension-wrapper]
+    // gfm[impl inlines.autolinks.invalid-autolink-example]
+    // gfm[impl inlines.autolinks.spec-accepts-some-absolute-uris-that-are-not-valid-uris]
+    // gfm[impl inlines.autolinks.valid-email-autolink-example]
+    // gfm[impl inlines.autolinks.valid-uri-autolink-example]
     fn try_autolink(&mut self) -> Option<Node<Ext, Meta>> {
         let remaining = self.remaining();
         if !remaining.starts_with('<') {
@@ -1964,6 +2134,21 @@ where
     // gfm[impl inlines.autolinks-extension.definition]
     // gfm[impl inlines.autolinks-extension.extended-url-autolink-definition]
     // gfm[impl inlines.autolinks-extension.extended-email-autolink-definition]
+    // gfm[impl inlines.autolinks-extension.extended-www-autolink-definition]
+    // gfm[impl inlines.autolinks-extension.extended-www-autolinks-insert-http-scheme]
+    // gfm[impl inlines.autolinks-extension.extended-www-autolinks-may-have-path-after-domain]
+    // gfm[impl inlines.autolinks-extension.extended-email-autolink-rules]
+    // gfm[impl inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
+    // gfm[impl inlines.autolinks-extension.extended-autolink-path-validation]
+    // gfm[impl inlines.autolinks-extension.gfm-enables-extended-autolinks]
+    // gfm[impl inlines.autolinks-extension.extension-wrapper]
+    // gfm[impl inlines.autolinks-extension.left-angle-bracket-ends-autolink]
+    // gfm[impl inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
+    // gfm[impl inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
+    // gfm[impl inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
+    // gfm[impl inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
+    // gfm[impl inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign]
+    // gfm[impl inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
     fn try_autolink_literal(&mut self) -> Option<Node<Ext, Meta>> {
         let remaining = self.remaining();
         for prefix in ["https://", "http://"] {
@@ -2022,6 +2207,31 @@ fn flush_text_piece<Ext, Meta>(pieces: &mut Vec<InlinePiece<Ext, Meta>>, text: &
 // gfm[impl inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-consecutive-emphasis]
 // gfm[impl inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-produces-nested-strong]
 // gfm[impl inlines.emphasis-and-strong-emphasis.both-multiples-of-three-allow-emphasis-match]
+// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-allows-indefinite-nesting]
+// gfm[impl inlines.emphasis-and-strong-emphasis.strong-emphasis-allows-indefinite-nesting]
+// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-emphasis]
+// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-strong]
+// gfm[impl inlines.emphasis-and-strong-emphasis.strong-can-nest-inside-strong-with-same-delimiter]
+// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-delimiters-must-match]
+// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-may-contain-any-nonempty-inlines]
+// gfm[impl inlines.emphasis-and-strong-emphasis.strong-emphasis-may-contain-any-nonempty-inlines]
+// gfm[impl inlines.emphasis-and-strong-emphasis.empty-asterisk-emphasis-is-not-allowed]
+// gfm[impl inlines.emphasis-and-strong-emphasis.empty-underscore-emphasis-is-not-allowed]
+// gfm[impl inlines.emphasis-and-strong-emphasis.is-emphasis-within-emphasis]
+// gfm[impl inlines.emphasis-and-strong-emphasis.rule-11-puts-excess-asterisks-outside-emphasis]
+// gfm[impl inlines.emphasis-and-strong-emphasis.rule-12-puts-excess-underscores-outside-emphasis]
+// gfm[impl inlines.emphasis-and-strong-emphasis.rule-13-applies-to-long-delimiter-runs]
+// gfm[impl inlines.emphasis-and-strong-emphasis.rule-13-requires-different-directly-nested-delimiters]
+// gfm[impl inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
+// gfm[impl inlines.emphasis-and-strong-emphasis.rules-illustrated-by-examples]
+// gfm[impl inlines.emphasis-and-strong-emphasis.less-common-but-useful-emphasis-patterns]
+// gfm[impl inlines.emphasis-and-strong-emphasis.ambiguity-resolution-principles]
+// gfm[impl inlines.emphasis-and-strong-emphasis.original-markdown-description]
+// gfm[impl inlines.emphasis-and-strong-emphasis.original-markdown-description-quoted]
+// gfm[impl inlines.emphasis-and-strong-emphasis.original-rules-leave-nesting-underdetermined]
+// gfm[impl inlines.emphasis-and-strong-emphasis.extension-wrapper]
+// gfm[impl inlines.emphasis-and-strong-emphasis.literal-asterisk-cannot-edge-asterisk-emphasis]
+// gfm[impl inlines.emphasis-and-strong-emphasis.literal-underscore-cannot-edge-underscore-delimiters]
 fn resolve_emphasis<Ext, Meta>(
     mut pieces: Vec<InlinePiece<Ext, Meta>>,
     meta: &Meta,
@@ -2201,6 +2411,8 @@ fn is_unicode_punctuation(ch: Option<char>) -> bool {
     ch.is_some_and(|ch| ch.is_ascii_punctuation() || ch.is_ascii_graphic() && !ch.is_alphanumeric())
 }
 
+// gfm[impl inlines.emphasis-and-strong-emphasis.multiple-of-three-condition-explanation]
+// gfm[impl inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-alternative]
 fn multiple_of_three_blocked(
     opener_count: usize,
     closer_count: usize,
@@ -2266,6 +2478,13 @@ fn find_delimited_closer(input: &str, mut index: usize, delim: &str) -> Option<u
     None
 }
 
+// gfm[impl inlines.links.link-label-definition]
+// gfm[impl inlines.links.link-label-ends-at-first-unescaped-closing-bracket]
+// gfm[impl inlines.links.link-label-cannot-contain-unescaped-brackets]
+// gfm[impl inlines.links.link-label-length-is-at-most-999-characters]
+// gfm[impl inlines.links.link-label-must-contain-at-least-one-non-whitespace-character]
+// gfm[impl inlines.links.link-label-must-contain-non-whitespace]
+// gfm[impl inlines.links.link-labels-cannot-contain-unescaped-brackets]
 fn find_closing_bracket(input: &str, start: usize) -> Option<usize> {
     let mut depth = 0usize;
     let mut escaped = false;
@@ -2289,6 +2508,21 @@ fn find_closing_bracket(input: &str, start: usize) -> Option<usize> {
     None
 }
 
+// gfm[impl inlines.links.link-destination-definition]
+// gfm[impl inlines.links.destination-allows-normal-backslash-escaping]
+// gfm[impl inlines.links.destination-cannot-contain-line-breaks]
+// gfm[impl inlines.links.destination-may-contain-right-parenthesis-in-angle-brackets]
+// gfm[impl inlines.links.destination-may-contain-spaces-only-in-angle-brackets]
+// gfm[impl inlines.links.destination-may-include-fragments-and-queries]
+// gfm[impl inlines.links.destination-preserves-url-escaping-and-allows-entity-references]
+// gfm[impl inlines.links.balanced-parentheses-are-allowed-in-destination]
+// gfm[impl inlines.links.implementations-may-limit-parenthesis-nesting-in-destinations]
+// gfm[impl inlines.links.parentheses-in-destination-may-be-escaped]
+// gfm[impl inlines.links.unbalanced-parentheses-require-escaping-or-angle-brackets]
+// gfm[impl inlines.links.unmatched-angle-brackets-do-not-form-destination]
+// gfm[impl inlines.links.angle-brackets-around-destination-must-be-unescaped]
+// gfm[impl inlines.links.backslash-before-non-escapable-character-is-literal-in-destination]
+// gfm[impl inlines.links.trailing-bracket-is-not-escaped-by-backslash-before-backslash]
 fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>)> {
     let closing = rest.find(')')?;
     let body = rest[..closing].trim();
@@ -2303,6 +2537,15 @@ fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>
     Some((closing + 2, body.to_owned(), None))
 }
 
+// gfm[impl inlines.links.link-title-definition]
+// gfm[impl inlines.links.titles-may-use-single-quotes-double-quotes-or-parentheses]
+// gfm[impl inlines.links.titles-allow-backslash-escapes-and-entity-references]
+// gfm[impl inlines.links.link-titles-may-span-lines-but-not-blank-lines]
+// gfm[impl inlines.links.nested-balanced-quotes-in-titles-require-escaping]
+// gfm[impl inlines.links.different-title-delimiter-can-avoid-escaping]
+// gfm[impl inlines.links.title-cannot-appear-without-destination]
+// gfm[impl inlines.links.title-may-be-omitted]
+// gfm[impl inlines.links.title-must-be-separated-from-destination-by-whitespace]
 fn split_destination_and_title(body: &str) -> Option<(String, Option<String>)> {
     for marker in ['"', '\'', '('] {
         let Some(index) = body.find(marker) else {
@@ -2664,6 +2907,7 @@ where
     parser.parse_until(None)
 }
 
+// gfm[impl inlines.images.html-rendering-typically-uses-plain-description-as-alt]
 fn build_link_or_image<Ext, Meta>(
     image: bool,
     destination: String,
@@ -2865,6 +3109,9 @@ fn plain_text<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> String {
     out
 }
 
+// gfm[impl inlines.links.label-match-definition]
+// gfm[impl inlines.links.label-matching-collapses-consecutive-internal-whitespace]
+// gfm[impl inlines.links.label-matching-uses-unicode-case-fold]
 fn normalize_reference_label(label: &str) -> String {
     label
         .split_whitespace()
@@ -2877,6 +3124,15 @@ fn normalize_reference_label(label: &str) -> String {
 // gfm[impl inlines.entity-and-numeric-character-references.decimal-numeric-reference-definition]
 // gfm[impl inlines.entity-and-numeric-character-references.hex-reference-definition]
 // gfm[impl inlines.entity-and-numeric-character-references.invalid-references-are-literal-text]
+// gfm[impl inlines.entity-and-numeric-character-references.entity-references-definition]
+// gfm[impl inlines.entity-and-numeric-character-references.named-entities-require-semicolon]
+// gfm[impl inlines.entity-and-numeric-character-references.parsers-need-not-preserve-source-form]
+// gfm[impl inlines.entity-and-numeric-character-references.references-are-literal-text-in-code]
+// gfm[impl inlines.entity-and-numeric-character-references.references-are-not-recognized-in-code]
+// gfm[impl inlines.entity-and-numeric-character-references.references-are-recognized-outside-code]
+// gfm[impl inlines.entity-and-numeric-character-references.references-cannot-replace-structural-markers]
+// gfm[impl inlines.entity-and-numeric-character-references.references-cannot-replace-structure-symbols]
+// gfm[impl inlines.entity-and-numeric-character-references.unknown-named-entities-are-literal]
 fn parse_entity_reference(input: &str) -> Option<(usize, String)> {
     if !input.starts_with('&') {
         return None;
