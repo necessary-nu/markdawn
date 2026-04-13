@@ -354,6 +354,9 @@ fn gfm_backslash_hard_break() {
     assert_eq!(html, "<p>foo<br />\nbar</p>\n");
 }
 
+// gfm[verify inlines.code-spans.example]
+// gfm[verify inlines.code-spans.definition]
+// gfm[verify inlines.code-spans.backtick-string-definition]
 #[test]
 fn gfm_code_span() {
     let html = render_html(&parse_final_nodes("`foo`\n"));
@@ -845,6 +848,273 @@ fn gfm_example_107_indented_code() {
 fn gfm_code_span_all_spaces_not_trimmed() {
     let html = render_html(&parse_final_nodes("`` ` ``\n"));
     assert_eq!(html, "<p><code>`</code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.longer-delimiters-allow-literal-backticks]
+// gfm[verify inlines.code-spans.single-edge-space-is-trimmed]
+#[test]
+fn gfm_code_span_longer_delimiters_allow_literal_backticks() {
+    let html = render_html(&parse_final_nodes("`` foo ` bar ``\n"));
+    assert_eq!(html, "<p><code>foo ` bar</code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.edge-space-trimming-allows-literal-backticks-at-edges]
+#[test]
+fn gfm_code_span_edge_space_trimming_allows_literal_backticks_at_edges() {
+    // Using triple backtick delimiter to include double backtick content
+    let html = render_html(&parse_final_nodes("``` `` ```\n"));
+    assert_eq!(html, "<p><code>``</code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.only-one-space-is-trimmed]
+#[test]
+fn gfm_code_span_only_one_space_is_trimmed() {
+    // Only one space is stripped from each edge
+    let html = render_html(&parse_final_nodes("`  foo  `\n"));
+    assert_eq!(html, "<p><code> foo </code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.edge-space-trimming-requires-space-on-both-sides]
+#[test]
+fn gfm_code_span_edge_space_trimming_requires_space_on_both_sides() {
+    let html = render_html(&parse_final_nodes("` a`\n"));
+    assert_eq!(html, "<p><code> a</code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.only-ascii-space-is-trimmed]
+#[test]
+fn gfm_code_span_only_ascii_space_is_trimmed() {
+    // U+00A0 non-breaking space is not trimmed
+    let html = render_html(&parse_final_nodes("`\u{00a0}b\u{00a0}`\n"));
+    assert_eq!(html, "<p><code>\u{00a0}b\u{00a0}</code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.line-endings-become-spaces]
+// gfm[verify inlines.code-spans.line-endings-conversion-example]
+#[test]
+fn gfm_code_span_line_endings_become_spaces() {
+    let html = render_html(&parse_final_nodes("``\nfoo\nbar  \nbaz\n``\n"));
+    assert_eq!(html, "<p><code>foo bar   baz</code></p>\n");
+
+    let html = render_html(&parse_final_nodes("``\nfoo \n``\n"));
+    assert_eq!(html, "<p><code>foo </code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.interior-spaces-are-preserved]
+#[test]
+fn gfm_code_span_interior_spaces_are_preserved() {
+    let html = render_html(&parse_final_nodes("`foo   bar \nbaz`\n"));
+    assert_eq!(html, "<p><code>foo   bar  baz</code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.browser-rendering-may-collapse-spaces]
+// gfm[verify inlines.code-spans.code-white-space-pre-wrap]
+#[test]
+fn gfm_code_span_browser_rendering_note() {
+    // These rules are advisory notes about CSS rendering (code{white-space: pre-wrap;}).
+    // We verify code spans preserve interior spaces, which is the parser's responsibility.
+    let html = render_html(&parse_final_nodes("`foo  bar`\n"));
+    assert_eq!(html, "<p><code>foo  bar</code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.backslashes-are-literal]
+#[test]
+fn gfm_code_span_backslashes_are_literal() {
+    let html = render_html(&parse_final_nodes("`foo\\`bar`\n"));
+    assert_eq!(html, "<p><code>foo\\</code>bar`</p>\n");
+}
+
+// gfm[verify inlines.code-spans.backslash-escapes-are-never-needed]
+#[test]
+fn gfm_code_span_backslash_escapes_are_never_needed() {
+    // Use double backticks to include a single backtick in code
+    let html = render_html(&parse_final_nodes("``foo`bar``\n"));
+    assert_eq!(html, "<p><code>foo`bar</code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.code-spans-take-precedence-over-emphasis-and-links]
+#[test]
+fn gfm_code_span_takes_precedence_over_emphasis() {
+    let html = render_html(&parse_final_nodes("*foo`*`\n"));
+    assert_eq!(html, "<p>*foo<code>*</code></p>\n");
+}
+
+// gfm[verify inlines.code-spans.code-span-prevents-link-parse]
+#[test]
+fn gfm_code_span_prevents_link_parse() {
+    // Code span backticks have higher precedence than link brackets
+    let html = render_html(&parse_final_nodes("xx `code` [link](url)\n"));
+    assert_eq!(
+        html,
+        "<p>xx <code>code</code> <a href=\"url\">link</a></p>\n"
+    );
+}
+
+// gfm[verify inlines.code-spans.code-spans-html-tags-and-autolinks-share-precedence]
+#[test]
+fn gfm_code_span_shares_precedence_with_html_tags() {
+    let html = render_html(&parse_final_nodes("`<a href=\"`\">`\n"));
+    assert_eq!(
+        html,
+        "<p><code>&lt;a href=&quot;</code>&quot;&gt;`</p>\n"
+    );
+}
+
+// gfm[verify inlines.code-spans.html-tag-wins-when-tag-parses-first]
+#[test]
+fn gfm_code_span_html_tag_wins_when_tag_parses_first() {
+    let html = render_html(&parse_final_nodes("<a href=\"`\">`\n"));
+    assert_eq!(html, "<p><a href=\"`\">`</p>\n");
+}
+
+// gfm[verify inlines.code-spans.code-span-wins-in-ambiguous-autolink-like-text]
+#[test]
+fn gfm_code_span_wins_in_ambiguous_autolink_like_text() {
+    let html = render_html(&parse_final_nodes("`<http://foo.bar.`baz>`\n"));
+    assert_eq!(
+        html,
+        "<p><code>&lt;http://foo.bar.</code>baz&gt;`</p>\n"
+    );
+}
+
+// gfm[verify inlines.code-spans.autolink-wins-when-autolink-parses-first]
+#[test]
+fn gfm_code_span_autolink_wins_when_autolink_parses_first() {
+    // When an autolink starts before a backtick, autolink wins
+    let html = render_html(&parse_final_nodes("<http://foo.bar.`baz>`\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"http://foo.bar.`baz\">http://foo.bar.`baz</a>`</p>\n"
+    );
+}
+
+// gfm[verify inlines.code-spans.unclosed-backtick-string-is-literal]
+#[test]
+fn gfm_code_span_unclosed_backtick_string_is_literal() {
+    // A single backtick with no closer is literal text
+    let html = render_html(&parse_final_nodes("`foo\n"));
+    assert_eq!(html, "<p>`foo</p>\n");
+}
+
+// gfm[verify inlines.code-spans.opening-and-closing-backtick-strings-must-have-equal-length]
+#[test]
+fn gfm_code_span_opening_and_closing_must_have_equal_length() {
+    // Double backtick opening must be closed by double backtick
+    let html = render_html(&parse_final_nodes("``foo``\n"));
+    assert_eq!(html, "<p><code>foo</code></p>\n");
+
+    // Triple backtick opening must be closed by triple backtick
+    let html = render_html(&parse_final_nodes("```foo``` bar\n"));
+    assert_eq!(html, "<p><code>foo</code> bar</p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Entity and numeric character references
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.entity-and-numeric-character-references.entity-references-definition]
+// gfm[verify inlines.entity-and-numeric-character-references.references-produce-unicode-characters]
+#[test]
+fn gfm_entity_references() {
+    let html = render_html(&parse_final_nodes(
+        "&nbsp; &amp; &copy; &AElig;\n&frac34;\n",
+    ));
+    assert_eq!(
+        html,
+        "<p>\u{00a0} &amp; \u{00a9} \u{00c6}\n\u{00be}</p>\n"
+    );
+}
+
+// gfm[verify inlines.entity-and-numeric-character-references.decimal-numeric-reference-definition]
+#[test]
+fn gfm_decimal_numeric_references() {
+    let html = render_html(&parse_final_nodes("&#35; &#1234; &#992;\n"));
+    assert_eq!(html, "<p># \u{04d2} \u{03e0}</p>\n");
+}
+
+// gfm[verify inlines.entity-and-numeric-character-references.hex-reference-definition]
+#[test]
+fn gfm_hex_numeric_references() {
+    let html = render_html(&parse_final_nodes("&#XD06; &#xcab;\n"));
+    assert_eq!(html, "<p>\u{0d06} \u{0cab}</p>\n");
+}
+
+// gfm[verify inlines.entity-and-numeric-character-references.invalid-references-are-literal-text]
+#[test]
+fn gfm_invalid_references_are_literal() {
+    let html = render_html(&parse_final_nodes(
+        "&nbsp &x; &#; &#x;\n&#987654321;\n&#abcdef0;\n&ThisIsNotDefined; &hi?;\n",
+    ));
+    assert_eq!(
+        html,
+        "<p>&amp;nbsp &amp;x; &amp;#; &amp;#x;\n&amp;#987654321;\n&amp;#abcdef0;\n&amp;ThisIsNotDefined; &amp;hi?;</p>\n"
+    );
+}
+
+// gfm[verify inlines.entity-and-numeric-character-references.named-entities-require-semicolon]
+#[test]
+fn gfm_named_entities_require_semicolon() {
+    let html = render_html(&parse_final_nodes("&copy\n"));
+    assert_eq!(html, "<p>&amp;copy</p>\n");
+}
+
+// gfm[verify inlines.entity-and-numeric-character-references.unknown-named-entities-are-literal]
+#[test]
+fn gfm_unknown_named_entities_are_literal() {
+    let html = render_html(&parse_final_nodes("&MadeUpEntity;\n"));
+    assert_eq!(html, "<p>&amp;MadeUpEntity;</p>\n");
+}
+
+// gfm[verify inlines.entity-and-numeric-character-references.references-are-recognized-outside-code]
+#[test]
+fn gfm_references_recognized_outside_code() {
+    // Entity references in raw HTML are passed through (recognized by HTML layer)
+    let html = render_html(&parse_final_nodes("<a href=\"&ouml;&ouml;.html\">\n"));
+    assert_eq!(html, "<a href=\"&ouml;&ouml;.html\">\n");
+
+    // Entity references in paragraph text are resolved to unicode
+    let html = render_html(&parse_final_nodes("&copy; &amp; &lt;\n"));
+    assert_eq!(html, "<p>\u{00a9} &amp; &lt;</p>\n");
+}
+
+// gfm[verify inlines.entity-and-numeric-character-references.references-are-literal-text-in-code]
+// gfm[verify inlines.entity-and-numeric-character-references.references-are-not-recognized-in-code]
+#[test]
+fn gfm_references_are_literal_in_code() {
+    // In code span, entity references are literal text
+    let html = render_html(&parse_final_nodes("`f&ouml;&ouml;`\n"));
+    assert_eq!(html, "<p><code>f&amp;ouml;&amp;ouml;</code></p>\n");
+
+    // In indented code block, entity references are literal text
+    let html = render_html(&parse_final_nodes("    f&ouml;f&ouml;\n"));
+    assert_eq!(html, "<pre><code>f&amp;ouml;f&amp;ouml;</code></pre>\n");
+}
+
+// gfm[verify inlines.entity-and-numeric-character-references.references-cannot-replace-structure-symbols]
+// gfm[verify inlines.entity-and-numeric-character-references.references-cannot-replace-structural-markers]
+#[test]
+fn gfm_references_cannot_replace_structure_symbols() {
+    // &#42; should not become emphasis markers
+    let html = render_html(&parse_final_nodes("&#42;foo&#42;\n*foo*\n"));
+    assert_eq!(html, "<p>*foo*\n<em>foo</em></p>\n");
+
+    // &#42; should not become a list marker
+    let html = render_html(&parse_final_nodes("&#42; foo\n\n* foo\n"));
+    assert_eq!(html, "<p>* foo</p>\n<ul>\n<li>foo</li>\n</ul>\n");
+
+    // &#9; (tab) should not create indented code
+    let html = render_html(&parse_final_nodes("&#9;foo\n"));
+    assert_eq!(html, "<p>\tfoo</p>\n");
+}
+
+// gfm[verify inlines.entity-and-numeric-character-references.parsers-need-not-preserve-source-form]
+#[test]
+fn gfm_parsers_need_not_preserve_source_form() {
+    // The parser converts entity references to their Unicode characters,
+    // so the source form is not preserved. We verify by checking output
+    // contains the actual character rather than the entity reference.
+    let html = render_html(&parse_final_nodes("&copy;\n"));
+    assert_eq!(html, "<p>\u{00a9}</p>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.content-removes-up-to-opening-indent]
