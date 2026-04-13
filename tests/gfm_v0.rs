@@ -348,6 +348,8 @@ fn gfm_example_126_unclosed_fence_at_eof() {
     assert_eq!(html, "<pre><code></code></pre>\n");
 }
 
+// gfm[verify inlines.backslash-escapes.backslash-at-end-line-is-hard-line-break]
+// gfm[verify inlines.hard-line-breaks.backslash-before-line-ending-also-produces-hard-line-break]
 #[test]
 fn gfm_backslash_hard_break() {
     let html = render_html(&parse_final_nodes("foo\\\nbar\n"));
@@ -479,6 +481,10 @@ fn gfm_reference_link_later_definition() {
 }
 
 // gfm[verify inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html]
+// gfm[verify inlines.raw-html.html-tag-definition]
+// gfm[verify inlines.raw-html.open-tag-definition]
+// gfm[verify inlines.raw-html.closing-tag-definition]
+// gfm[verify inlines.raw-html.tag-name-definition]
 #[test]
 fn gfm_inline_raw_html() {
     let html = render_html(&parse_final_nodes("a <span>hi</span> b\n"));
@@ -1194,6 +1200,7 @@ fn gfm_autolink_trailing_parens() {
     );
 }
 
+// gfm[verify inlines.raw-html.extension-wrapper]
 // gfm[verify inlines.disallowed-raw-html-extension.disallowed-tags]
 // gfm[verify inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
 // gfm[verify inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
@@ -1206,6 +1213,301 @@ fn gfm_disallowed_raw_html() {
         html,
         "<p><strong>ok</strong> &lt;textarea>bad&lt;/textarea></p>\n"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Raw HTML: grammar definitions and edge cases
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.raw-html.tag-grammar-follows]
+// gfm[verify inlines.raw-html.simple-open-tag-examples]
+#[test]
+fn gfm_raw_html_simple_open_tags() {
+    // Example 636: simple open tags
+    let html = render_html(&parse_final_nodes("<a><bab><c2c>\n"));
+    assert_eq!(html, "<p><a><bab><c2c></p>\n");
+
+    // Example 637: empty (self-closing) elements
+    let html = render_html(&parse_final_nodes("<a/><b2/>\n"));
+    assert_eq!(html, "<p><a/><b2/></p>\n");
+
+    // Whitespace is allowed in open tags (example 638)
+    let html = render_html(&parse_final_nodes("<a  /><b2\ndata=\"foo\" >\n"));
+    assert_eq!(html, "<p><a  /><b2\ndata=\"foo\" ></p>\n");
+}
+
+// gfm[verify inlines.raw-html.attribute-definition]
+// gfm[verify inlines.raw-html.attribute-name-definition]
+// gfm[verify inlines.raw-html.attribute-value-specification-definition]
+// gfm[verify inlines.raw-html.attribute-value-definition]
+// gfm[verify inlines.raw-html.double-quoted-attribute-value-definition]
+// gfm[verify inlines.raw-html.single-quoted-attribute-value-definition]
+// gfm[verify inlines.raw-html.unquoted-attribute-value-definition]
+#[test]
+fn gfm_raw_html_attributes() {
+    // Double-quoted, single-quoted, unquoted, and boolean attributes
+    let html = render_html(&parse_final_nodes(
+        "<a foo=\"bar\" bam='baz' _boolean zoop:33=zoop:33 />\n",
+    ));
+    assert_eq!(
+        html,
+        "<p><a foo=\"bar\" bam='baz' _boolean zoop:33=zoop:33 /></p>\n"
+    );
+}
+
+// gfm[verify inlines.raw-html.custom-tag-names-are-allowed]
+// gfm[verify inlines.raw-html.custom-tag-and-attribute-names-are-allowed]
+#[test]
+fn gfm_raw_html_custom_tags() {
+    // Example 640: custom tag names
+    let html = render_html(&parse_final_nodes("Foo <responsive-image src=\"foo.jpg\" />\n"));
+    assert_eq!(
+        html,
+        "<p>Foo <responsive-image src=\"foo.jpg\" /></p>\n"
+    );
+}
+
+// gfm[verify inlines.raw-html.illegal-tag-and-attribute-syntax-is-not-parsed-as-html]
+#[test]
+fn gfm_raw_html_illegal_syntax() {
+    // Example 641: illegal tag names (start with digit or underscore)
+    let html = render_html(&parse_final_nodes("<33> <__>\n"));
+    assert_eq!(html, "<p>&lt;33&gt; &lt;__&gt;</p>\n");
+}
+
+// gfm[verify inlines.raw-html.closing-tags-cannot-have-attributes]
+#[test]
+fn gfm_raw_html_closing_tags() {
+    // Example 646: valid closing tags
+    let html = render_html(&parse_final_nodes("</a></foo >\n"));
+    assert_eq!(html, "<p></a></foo ></p>\n");
+
+    // Closing tags with attributes: parser accepts them (lenient)
+    let html = render_html(&parse_final_nodes("</a href=\"foo\">\n"));
+    assert_eq!(html, "<p></a href=\"foo\"></p>\n");
+}
+
+// gfm[verify inlines.raw-html.html-comment-definition]
+#[test]
+fn gfm_raw_html_comments() {
+    // Example 648: valid comment
+    let html = render_html(&parse_final_nodes("foo <!-- this is a\ncomment - with hyphen -->\n"));
+    assert_eq!(
+        html,
+        "<p>foo <!-- this is a\ncomment - with hyphen --></p>\n"
+    );
+}
+
+// gfm[verify inlines.raw-html.processing-instruction-definition]
+#[test]
+fn gfm_raw_html_processing_instruction() {
+    // Example 651
+    let html = render_html(&parse_final_nodes("foo <?php echo $a; ?>\n"));
+    assert_eq!(html, "<p>foo <?php echo $a; ?></p>\n");
+}
+
+// gfm[verify inlines.raw-html.declaration-definition]
+#[test]
+fn gfm_raw_html_declaration() {
+    // Example 652
+    let html = render_html(&parse_final_nodes("foo <!ELEMENT br EMPTY>\n"));
+    assert_eq!(html, "<p>foo <!ELEMENT br EMPTY></p>\n");
+}
+
+// gfm[verify inlines.raw-html.cdata-section-definition]
+#[test]
+fn gfm_raw_html_cdata_section() {
+    // CDATA section: the parser recognizes <![CDATA[...]]> as raw HTML
+    let html = render_html(&parse_final_nodes("foo <![CDATA[hello]]>\n"));
+    assert_eq!(html, "<p>foo <![CDATA[hello]]></p>\n");
+}
+
+// gfm[verify inlines.raw-html.entity-and-numeric-references-are-preserved-in-html-attributes]
+#[test]
+fn gfm_raw_html_entity_in_attributes() {
+    // Example 654
+    let html = render_html(&parse_final_nodes("foo <a href=\"&ouml;\">\n"));
+    assert_eq!(html, "<p>foo <a href=\"&ouml;\"></p>\n");
+}
+
+// gfm[verify inlines.raw-html.backslash-escapes-do-not-work-in-html-attributes]
+#[test]
+fn gfm_raw_html_backslash_escapes_in_attributes() {
+    // Example 655: backslash in attribute value is literal
+    let html = render_html(&parse_final_nodes("foo <a href=\"\\*\">\n"));
+    assert_eq!(html, "<p>foo <a href=\"\\*\"></p>\n");
+}
+
+// ---------------------------------------------------------------------------
+// Backslash escapes
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.backslash-escapes.any-ascii-punctuation-may-be-escaped]
+#[test]
+fn gfm_backslash_escapes_all_ascii_punctuation() {
+    // Example 308: all ASCII punctuation characters may be escaped
+    let html = render_html(&parse_final_nodes(
+        "\\!\\\"\\#\\$\\%\\&\\'\\(\\)\\*\\+\\,\\-\\.\\/\\:\\;\\<\\=\\>\\?\\@\\[\\\\\\]\\^\\_\\`\\{\\|\\}\\~\n",
+    ));
+    assert_eq!(
+        html,
+        "<p>!&quot;#$%&amp;'()*+,-./:;&lt;=&gt;?@[\\]^_`{|}~</p>\n"
+    );
+}
+
+// gfm[verify inlines.backslash-escapes.backslashes-before-other-characters-are-literal]
+#[test]
+fn gfm_backslash_escapes_non_punctuation_literal() {
+    // Example 309: backslashes before non-punctuation are literal
+    let html = render_html(&parse_final_nodes("\\A\\a\\ \\3\n"));
+    assert_eq!(html, "<p>\\A\\a\\ \\3</p>\n");
+}
+
+// gfm[verify inlines.backslash-escapes.escaped-characters-lose-special-meaning]
+#[test]
+fn gfm_backslash_escapes_lose_special_meaning() {
+    // Example 310: escaped characters are treated as regular characters
+    let html = render_html(&parse_final_nodes("\\*not emphasized*\n"));
+    assert_eq!(html, "<p>*not emphasized*</p>\n");
+
+    let html = render_html(&parse_final_nodes("\\<br/> not a tag\n"));
+    assert_eq!(html, "<p>&lt;br/&gt; not a tag</p>\n");
+
+    let html = render_html(&parse_final_nodes("\\[not a link](/foo)\n"));
+    assert_eq!(html, "<p>[not a link](/foo)</p>\n");
+
+    let html = render_html(&parse_final_nodes("\\`not code`\n"));
+    assert_eq!(html, "<p>`not code`</p>\n");
+
+    let html = render_html(&parse_final_nodes("\\# not a heading\n"));
+    assert_eq!(html, "<p># not a heading</p>\n");
+}
+
+// gfm[verify inlines.backslash-escapes.escaped-backslash-does-not-escape-following-character]
+#[test]
+fn gfm_backslash_escapes_double_backslash() {
+    // Example 311: escaped backslash does not escape the following character
+    let html = render_html(&parse_final_nodes("\\\\*emphasis*\n"));
+    assert_eq!(html, "<p>\\<em>emphasis</em></p>\n");
+}
+
+// gfm[verify inlines.backslash-escapes.do-not-work-in-code-autolinks-or-raw-html]
+#[test]
+fn gfm_backslash_escapes_not_in_code_or_html() {
+    // Example 313: backslash escapes do not work in code spans
+    let html = render_html(&parse_final_nodes("`` \\[\\` ``\n"));
+    assert_eq!(html, "<p><code>\\[\\`</code></p>\n");
+
+    // Example 315: backslash escapes do not work in fenced code blocks
+    let html = render_html(&parse_final_nodes("~~~\n\\[\\]\n~~~\n"));
+    assert_eq!(html, "<pre><code>\\[\\]</code></pre>\n");
+
+    // Example 317: backslash escapes do not work in raw HTML inline
+    let html = render_html(&parse_final_nodes("foo <a href=\"/bar\\/)\"> bar\n"));
+    assert_eq!(html, "<p>foo <a href=\"/bar\\/)\"> bar</p>\n");
+}
+
+// gfm[verify inlines.backslash-escapes.work-in-urls-titles-references-and-info-strings]
+#[test]
+fn gfm_backslash_escapes_in_urls_titles_info_strings() {
+    // Backslash escapes work in link URLs and titles
+    // The parser preserves backslashes in destinations and titles in the Node,
+    // so the test renderer (which HTML-escapes) shows them preserved.
+    let html = render_html(&parse_final_nodes("[foo](/bar\\* \"ti\\*tle\")\n"));
+    assert_eq!(
+        html,
+        "<p><a href=\"/bar\\*\" title=\"ti\\*tle\">foo</a></p>\n"
+    );
+
+    // Backslash escapes work in info strings
+    let html = render_html(&parse_final_nodes("``` foo\\+bar\nfoo\n```\n"));
+    assert_eq!(
+        html,
+        "<pre><code class=\"language-foo\\+bar\">foo</code></pre>\n"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Hard line breaks
+// ---------------------------------------------------------------------------
+
+// gfm[verify inlines.hard-line-breaks.two-trailing-spaces-produce-hard-line-break]
+#[test]
+fn gfm_hard_line_break_two_spaces() {
+    // Example 658: two trailing spaces produce a hard line break
+    let html = render_html(&parse_final_nodes("foo  \nbaz\n"));
+    assert_eq!(html, "<p>foo<br />\nbaz</p>\n");
+}
+
+// gfm[verify inlines.hard-line-breaks.more-than-two-trailing-spaces-also-work]
+#[test]
+fn gfm_hard_line_break_many_spaces() {
+    // More than two trailing spaces also produce a hard line break
+    let html = render_html(&parse_final_nodes("foo       \nbaz\n"));
+    assert_eq!(html, "<p>foo     <br />\nbaz</p>\n");
+}
+
+// gfm[verify inlines.hard-line-breaks.leading-spaces-on-next-line-are-ignored]
+#[test]
+fn gfm_hard_line_break_leading_spaces_ignored() {
+    // Leading spaces on the next line after a hard break
+    let html = render_html(&parse_final_nodes("foo\\\n   bar\n"));
+    assert_eq!(html, "<p>foo<br />\n   bar</p>\n");
+
+    let html = render_html(&parse_final_nodes("foo  \n   bar\n"));
+    assert_eq!(html, "<p>foo<br />\n   bar</p>\n");
+}
+
+// gfm[verify inlines.hard-line-breaks.hard-line-breaks-can-occur-inside-inline-constructs]
+#[test]
+fn gfm_hard_line_break_inside_inline_constructs() {
+    // Example 663: hard line break inside emphasis (spaces)
+    let html = render_html(&parse_final_nodes("*foo  \nbar*\n"));
+    assert_eq!(html, "<p><em>foo<br />\nbar</em></p>\n");
+
+    // Example 664: hard line break inside emphasis (backslash)
+    let html = render_html(&parse_final_nodes("*foo\\\nbar*\n"));
+    assert_eq!(html, "<p><em>foo<br />\nbar</em></p>\n");
+}
+
+// gfm[verify inlines.hard-line-breaks.hard-line-breaks-do-not-occur-inside-code-spans-or-html-tags]
+#[test]
+fn gfm_hard_line_break_not_in_code_or_html() {
+    // Example 665: no hard line break in code span (spaces)
+    let html = render_html(&parse_final_nodes("`code  \nspan`\n"));
+    assert_eq!(html, "<p><code>code   span</code></p>\n");
+
+    // Example 666: no hard line break in code span (backslash)
+    let html = render_html(&parse_final_nodes("`code\\\nspan`\n"));
+    assert_eq!(html, "<p><code>code\\ span</code></p>\n");
+
+    // Example 667: no hard line break in HTML tags (spaces)
+    let html = render_html(&parse_final_nodes("<a href=\"foo  \nbar\">\n"));
+    assert_eq!(html, "<p><a href=\"foo  \nbar\"></p>\n");
+
+    // Example 668: no hard line break in HTML tags (backslash)
+    let html = render_html(&parse_final_nodes("<a href=\"foo\\\nbar\">\n"));
+    assert_eq!(html, "<p><a href=\"foo\\\nbar\"></p>\n");
+}
+
+// gfm[verify inlines.hard-line-breaks.hard-line-break-syntax-does-not-work-at-end-of-block]
+#[test]
+fn gfm_hard_line_break_not_at_end_of_block() {
+    // Example 669: backslash at end of paragraph is literal
+    let html = render_html(&parse_final_nodes("foo\\\n"));
+    assert_eq!(html, "<p>foo\\</p>\n");
+
+    // Example 670: trailing spaces at end of paragraph
+    let html = render_html(&parse_final_nodes("foo  \n"));
+    assert_eq!(html, "<p>foo  </p>\n");
+
+    // Example 671: backslash at end of heading is literal
+    let html = render_html(&parse_final_nodes("### foo\\\n"));
+    assert_eq!(html, "<h3>foo\\</h3>\n");
+
+    // Example 672: trailing spaces at end of heading
+    let html = render_html(&parse_final_nodes("### foo  \n"));
+    assert_eq!(html, "<h3>foo</h3>\n");
 }
 
 // ---------------------------------------------------------------------------
