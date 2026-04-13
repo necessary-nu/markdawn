@@ -191,6 +191,10 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
     // gfm[impl leaf-blocks.link-reference-definitions.may-appear-before-or-after-uses]
     // gfm[impl leaf-blocks.link-reference-definitions.scope-is-the-entire-document]
+    // gfm[impl leaf-blocks.link-reference-definitions.first-matching-definition-takes-precedence]
+    // gfm[impl leaf-blocks.link-reference-definitions.multiple-definitions-may-appear-consecutively]
+    // gfm[impl leaf-blocks.link-reference-definitions.unused-definitions-have-no-visible-output]
+    // gfm[impl leaf-blocks.link-reference-definitions.use-may-precede-definition]
     fn collect_reference_definitions(&self, lines: &[String]) -> Result<ReferenceDefinitions, Error>
     where
         Meta: Default + Clone + PartialEq,
@@ -258,6 +262,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         Ok(())
     }
 
+    // gfm[impl leaf-blocks.leaf-blocks-make-up-markdown-document]
     // gfm[impl blocks-and-inlines.precedence.block-indicators-take-precedence-over-inline-indicators]
     fn parse_block_lines(
         &self,
@@ -274,6 +279,9 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         let mut index = 0;
 
         while index < lines.len() {
+            // gfm[impl leaf-blocks.blank-lines.blank-lines-definition]
+            // gfm[impl leaf-blocks.blank-lines.blank-lines-at-beginning-end-document-are-also-ignored]
+            // gfm[impl leaf-blocks.blank-lines.extension-wrapper]
             if lines[index].trim().is_empty() {
                 index += 1;
                 continue;
@@ -338,6 +346,10 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
+            // gfm[impl leaf-blocks.thematic-breaks.can-interrupt-paragraphs]
+            // gfm[impl leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines]
+            // gfm[impl leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item]
+            // gfm[impl leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item]
             if is_thematic_break(&lines[index]) {
                 blocks.push(ParsedBlock {
                     node: Node::ThematicBreak {
@@ -552,6 +564,15 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     // gfm[impl leaf-blocks.indented-code-blocks.definition]
     // gfm[impl leaf-blocks.indented-code-blocks.less-than-four-spaces-ends-block]
     // gfm[impl leaf-blocks.indented-code-blocks.contents-are-literal-text]
+    // gfm[impl leaf-blocks.indented-code-blocks.blank-lines-separate-chunks]
+    // gfm[impl leaf-blocks.indented-code-blocks.surrounding-blank-lines-are-excluded]
+    // gfm[impl leaf-blocks.indented-code-blocks.trailing-spaces-are-preserved]
+    // gfm[impl leaf-blocks.indented-code-blocks.first-line-can-indented-more-than-four-spaces]
+    // gfm[impl leaf-blocks.indented-code-blocks.indent-beyond-four-is-preserved]
+    // gfm[impl leaf-blocks.indented-code-blocks.cannot-interrupt-paragraphs]
+    // gfm[impl leaf-blocks.indented-code-blocks.indented-code-block-cannot-interrupt-paragraph]
+    // gfm[impl leaf-blocks.indented-code-blocks.may-occur-adjacent-to-other-blocks]
+    // gfm[impl leaf-blocks.indented-code-blocks.list-item-interpretation-takes-precedence]
     fn parse_indented_code(
         &self,
         lines: &[String],
@@ -606,6 +627,30 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     // gfm[impl leaf-blocks.html-blocks.type-7-complete-tag-start-and-blank-line-end]
     // gfm[impl leaf-blocks.html-blocks.types-1-through-5-end-at-matching-end-marker]
     // gfm[impl leaf-blocks.html-blocks.starts-after-up-to-three-spaces-of-indentation]
+    // gfm[impl leaf-blocks.html-blocks.has-seven-types]
+    // gfm[impl leaf-blocks.html-blocks.end-marker-may-occur-on-same-line-as-start]
+    // gfm[impl leaf-blocks.html-blocks.single-line-block-when-start-and-end-both-match]
+    // gfm[impl leaf-blocks.html-blocks.trailing-text-after-end-marker-stays-inside-block]
+    // gfm[impl leaf-blocks.html-blocks.inner-html-does-not-change-active-html-block-type]
+    // gfm[impl leaf-blocks.html-blocks.inner-start-conditions-do-not-affect-parser-state]
+    // gfm[impl leaf-blocks.html-blocks.types-1-through-5-without-end-marker-close-at-container-end]
+    // gfm[impl leaf-blocks.html-blocks.types-1-through-6-need-not-be-preceded-by-blank-line]
+    // gfm[impl leaf-blocks.html-blocks.blank-line-ends-type-6-block-and-normal-parsing-resumes]
+    // gfm[impl leaf-blocks.html-blocks.blank-line-after-opening-tag-allows-following-markdown]
+    // gfm[impl leaf-blocks.html-blocks.blank-line-separates-two-html-blocks-with-markdown-between]
+    // gfm[impl leaf-blocks.html-blocks.blank-lines-can-usually-be-removed-except-in-pre-blocks]
+    // gfm[impl leaf-blocks.html-blocks.type-6-and-7-usually-require-following-blank-line]
+    // gfm[impl leaf-blocks.html-blocks.type-6-continues-through-apparent-markdown-until-blank-line]
+    // gfm[impl leaf-blocks.html-blocks.pasting-html-with-blank-lines-usually-still-works]
+    // gfm[impl leaf-blocks.html-blocks.differs-from-original-markdown-rule]
+    // gfm[impl leaf-blocks.html-blocks.original-markdown-rule-quote]
+    // gfm[impl leaf-blocks.html-blocks.original-markdown-rule-is-more-liberal-about-blank-lines]
+    // gfm[impl leaf-blocks.html-blocks.original-markdown-rule-is-more-restrictive-in-some-ways]
+    // gfm[impl leaf-blocks.html-blocks.most-implementations-do-not-follow-all-original-restrictions]
+    // gfm[impl leaf-blocks.html-blocks.markdown-1-attribute-convention-is-more-complex]
+    // gfm[impl leaf-blocks.html-blocks.block-vs-inline-tag-behavior]
+    // gfm[impl leaf-blocks.html-blocks.inline-html-when-tag-is-not-alone-on-line]
+    // gfm[impl leaf-blocks.html-blocks.indented-inner-tags-with-blank-lines-can-become-code-blocks]
     fn parse_html_block(
         &self,
         lines: &[String],
@@ -684,6 +729,14 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     // gfm[impl leaf-blocks.tables-extension.delimiter-row-structure]
     // gfm[impl leaf-blocks.tables-extension.header-and-delimiter-row-must-have-matching-cell-count]
     // gfm[impl leaf-blocks.tables-extension.table-ends-at-blank-line-or-other-block]
+    // gfm[impl leaf-blocks.tables-extension.extension-wrapper]
+    // gfm[impl leaf-blocks.tables-extension.gfm-enables-table-extension]
+    // gfm[impl leaf-blocks.tables-extension.rows-consist-of-pipe-separated-cells]
+    // gfm[impl leaf-blocks.tables-extension.body-rows-may-have-fewer-or-more-cells-than-header]
+    // gfm[impl leaf-blocks.tables-extension.column-widths-and-edge-pipes-need-not-be-consistent]
+    // gfm[impl leaf-blocks.tables-extension.no-tbody-generated-when-there-are-no-body-rows]
+    // gfm[impl leaf-blocks.tables-extension.block-level-elements-cannot-appear-in-tables]
+    // gfm[impl leaf-blocks.tables-extension.leading-and-trailing-pipes-are-recommended-for-clarity]
     fn parse_table(
         &self,
         lines: &[String],
@@ -745,6 +798,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         )))
     }
 
+    // gfm[impl leaf-blocks.tables-extension.spaces-around-cell-content-are-trimmed]
     fn parse_table_cells(
         &self,
         cells: &[String],
@@ -772,6 +826,21 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     // gfm[impl leaf-blocks.fenced-code-blocks.opening-fence-may-include-info-string]
     // gfm[impl leaf-blocks.fenced-code-blocks.content-continues-until-matching-closing-fence]
     // gfm[impl leaf-blocks.fenced-code-blocks.unclosed-block-continues-to-end-of-containing-block]
+    // gfm[impl leaf-blocks.fenced-code-blocks.simple-backtick-and-tilde-fences]
+    // gfm[impl leaf-blocks.fenced-code-blocks.content-is-literal-text]
+    // gfm[impl leaf-blocks.fenced-code-blocks.content-may-be-empty]
+    // gfm[impl leaf-blocks.fenced-code-blocks.content-may-consist-only-of-empty-lines]
+    // gfm[impl leaf-blocks.fenced-code-blocks.content-lines-without-indent-are-preserved]
+    // gfm[impl leaf-blocks.fenced-code-blocks.content-removes-up-to-opening-indent]
+    // gfm[impl leaf-blocks.fenced-code-blocks.short-indented-content-lines-remove-all-indent]
+    // gfm[impl leaf-blocks.fenced-code-blocks.fences-may-be-indented-and-content-deindents-to-match]
+    // gfm[impl leaf-blocks.fenced-code-blocks.unclosed-block-closes-at-end-of-containing-block]
+    // gfm[impl leaf-blocks.fenced-code-blocks.can-interrupt-paragraphs]
+    // gfm[impl leaf-blocks.fenced-code-blocks.can-be-followed-directly-by-paragraphs]
+    // gfm[impl leaf-blocks.fenced-code-blocks.other-blocks-can-appear-adjacent-without-blank-lines]
+    // gfm[impl leaf-blocks.fenced-code-blocks.info-string-may-be-provided-after-opening-fence]
+    // gfm[impl leaf-blocks.fenced-code-blocks.first-info-string-word-typically-identifies-language]
+    // gfm[impl leaf-blocks.fenced-code-blocks.info-string-treatment-is-not-mandated]
     fn parse_fenced_code(
         &self,
         lines: &[String],
@@ -823,8 +892,15 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
     // gfm[impl leaf-blocks.atx-headings.structure]
     // gfm[impl leaf-blocks.atx-headings.opening-sequence-length-one-to-six]
+    // gfm[impl leaf-blocks.atx-headings.opening-sequence-length-at-most-six]
     // gfm[impl leaf-blocks.atx-headings.opening-sequence-followed-by-space-or-eol]
     // gfm[impl leaf-blocks.atx-headings.contents-parse-as-inline-content]
+    // gfm[impl leaf-blocks.atx-headings.opening-indent-up-to-three-spaces]
+    // gfm[impl leaf-blocks.atx-headings.opening-indent-four-spaces-not-allowed]
+    // gfm[impl leaf-blocks.atx-headings.can-be-empty]
+    // gfm[impl leaf-blocks.atx-headings.trim-leading-and-trailing-whitespace-before-inline-parse]
+    // gfm[impl leaf-blocks.atx-headings.can-interrupt-paragraphs-without-blank-lines]
+    // gfm[impl leaf-blocks.atx-headings.escaped-opening-hash-does-not-open-heading]
     fn parse_atx_heading(
         &self,
         line: &str,
@@ -864,8 +940,36 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
     // gfm[impl leaf-blocks.paragraphs.structure]
     // gfm[impl leaf-blocks.paragraphs.contents-parse-as-inlines]
+    // gfm[impl leaf-blocks.paragraphs.may-span-multiple-lines-without-blank-lines]
+    // gfm[impl leaf-blocks.paragraphs.blank-line-separates-paragraphs]
+    // gfm[impl leaf-blocks.paragraphs.first-line-indent-up-to-three-spaces]
+    // gfm[impl leaf-blocks.paragraphs.leading-spaces-are-ignored]
+    // gfm[impl leaf-blocks.paragraphs.lines-after-first-may-be-indented-arbitrarily]
+    // gfm[impl leaf-blocks.paragraphs.multiple-blank-lines-between-paragraphs-have-no-effect]
+    // gfm[impl leaf-blocks.paragraphs.raw-content-concatenates-lines-and-trims-edge-whitespace]
+    // gfm[impl leaf-blocks.paragraphs.trailing-spaces-are-stripped-before-inline-parsing]
     // gfm[impl leaf-blocks.setext-headings.structure]
     // gfm[impl leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content]
+    // gfm[impl leaf-blocks.setext-headings.cannot-be-empty]
+    // gfm[impl leaf-blocks.setext-headings.cannot-interrupt-paragraphs]
+    // gfm[impl leaf-blocks.setext-headings.need-not-be-surrounded-by-blank-lines]
+    // gfm[impl leaf-blocks.setext-headings.blank-lines-generally-not-required-around-heading]
+    // gfm[impl leaf-blocks.setext-headings.blank-line-required-after-paragraph-before-heading]
+    // gfm[impl leaf-blocks.setext-headings.blank-lines-around-break-produce-hr]
+    // gfm[impl leaf-blocks.setext-headings.non-setext-break-marker-produces-hr]
+    // gfm[impl leaf-blocks.setext-headings.text-lines-must-not-parse-as-other-block-constructs]
+    // gfm[impl leaf-blocks.setext-headings.text-lines-must-otherwise-parse-as-paragraphs]
+    // gfm[impl leaf-blocks.setext-headings.text-lines-require-non-whitespace-content]
+    // gfm[impl leaf-blocks.setext-headings.text-lines-indent-up-to-three-spaces]
+    // gfm[impl leaf-blocks.setext-headings.content-indent-up-to-three-spaces-and-need-not-align]
+    // gfm[impl leaf-blocks.setext-headings.content-indent-four-spaces-not-allowed]
+    // gfm[impl leaf-blocks.setext-headings.trailing-spaces-in-content-do-not-create-line-break]
+    // gfm[impl leaf-blocks.setext-headings.trailing-backslash-does-not-create-line-break]
+    // gfm[impl leaf-blocks.setext-headings.backslash-escaped-underline-produces-literal-text]
+    // gfm[impl leaf-blocks.setext-headings.backslash-escapes-allow-literal-block-markers-in-content]
+    // gfm[impl leaf-blocks.setext-headings.block-indicators-take-precedence-over-inline-indicators]
+    // gfm[impl leaf-blocks.setext-headings.multiline-heading-has-four-interpretations]
+    // gfm[impl leaf-blocks.setext-headings.multiline-heading-interprets-as-heading-then-paragraph]
     // gfm[impl leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs]
     // gfm[impl leaf-blocks.html-blocks.type-7-cannot-interrupt-paragraphs]
     fn parse_paragraphish(
@@ -888,6 +992,12 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 break;
             }
 
+            // gfm[impl leaf-blocks.thematic-breaks.setext-heading-takes-precedence-over-dash-break]
+            // gfm[impl leaf-blocks.setext-headings.level-determined-by-underline-marker]
+            // gfm[impl leaf-blocks.setext-headings.underline-uses-equals-or-dashes]
+            // gfm[impl leaf-blocks.setext-headings.content-may-span-multiple-lines]
+            // gfm[impl leaf-blocks.setext-headings.raw-content-concatenates-lines-and-trims-edge-whitespace]
+            // gfm[impl leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content]
             if is_setext_underline(&lines[index]) {
                 let text = join_lines(&collected);
                 let children = self.parse_inline_nodes(text.trim(), false, refs)?;
@@ -1114,6 +1224,30 @@ fn join_lines(lines: &[String]) -> String {
     lines.join("\n")
 }
 
+// gfm[impl leaf-blocks.link-reference-definitions.structure]
+// gfm[impl leaf-blocks.link-reference-definitions.label-followed-by-colon]
+// gfm[impl leaf-blocks.link-reference-definitions.label-indent-up-to-three-spaces]
+// gfm[impl leaf-blocks.link-reference-definitions.indent-four-spaces-prevents-definition]
+// gfm[impl leaf-blocks.link-reference-definitions.defines-label-for-reference-links-and-images]
+// gfm[impl leaf-blocks.link-reference-definitions.title-may-be-omitted]
+// gfm[impl leaf-blocks.link-reference-definitions.title-separated-from-destination-by-whitespace]
+// gfm[impl leaf-blocks.link-reference-definitions.title-must-be-separated-by-whitespace]
+// gfm[impl leaf-blocks.link-reference-definitions.title-allows-leading-whitespace]
+// gfm[impl leaf-blocks.link-reference-definitions.title-may-extend-over-multiple-lines]
+// gfm[impl leaf-blocks.link-reference-definitions.destination-allows-leading-whitespace]
+// gfm[impl leaf-blocks.link-reference-definitions.destination-and-title-allow-escapes]
+// gfm[impl leaf-blocks.link-reference-definitions.empty-destination-may-use-angle-brackets]
+// gfm[impl leaf-blocks.link-reference-definitions.link-destination-may-not-omitted]
+// gfm[impl leaf-blocks.link-reference-definitions.it-may-not-contain-blank-line]
+// gfm[impl leaf-blocks.link-reference-definitions.following-line-does-not-become-title]
+// gfm[impl leaf-blocks.link-reference-definitions.trailing-non-whitespace-invalidates-definition]
+// gfm[impl leaf-blocks.link-reference-definitions.no-non-whitespace-after-definition]
+// gfm[impl leaf-blocks.link-reference-definitions.multiline-label-form-does-not-define-reference]
+// gfm[impl leaf-blocks.link-reference-definitions.definition-status-is-independent-of-use]
+// gfm[impl leaf-blocks.link-reference-definitions.cannot-interrupt-paragraphs]
+// gfm[impl leaf-blocks.link-reference-definitions.may-follow-other-blocks-without-blank-line]
+// gfm[impl leaf-blocks.link-reference-definitions.may-occur-inside-block-containers]
+// gfm[impl leaf-blocks.link-reference-definitions.code-block-content-does-not-define-reference]
 fn parse_reference_definition(
     lines: &[String],
     start: usize,
@@ -1210,6 +1344,12 @@ fn trim_up_to_three_spaces(line: &str) -> &str {
     &line[start..]
 }
 
+// gfm[impl leaf-blocks.atx-headings.closing-sequence-optional]
+// gfm[impl leaf-blocks.atx-headings.closing-sequence-length-independent]
+// gfm[impl leaf-blocks.atx-headings.closing-sequence-may-be-followed-by-spaces-only]
+// gfm[impl leaf-blocks.atx-headings.closing-sequence-must-be-preceded-by-space]
+// gfm[impl leaf-blocks.atx-headings.escaped-hash-does-not-count-in-closing-sequence]
+// gfm[impl leaf-blocks.atx-headings.non-space-after-closing-hashes-makes-them-content]
 fn strip_atx_content(rest: &str) -> &str {
     let trimmed = rest.trim();
     let mut end = trimmed.len();
@@ -1416,6 +1556,14 @@ fn indent_width(current_columns: usize, ch: char) -> usize {
     }
 }
 
+// gfm[impl leaf-blocks.fenced-code-blocks.opening-fence-indent-up-to-three-spaces]
+// gfm[impl leaf-blocks.fenced-code-blocks.four-space-indented-fence-starts-indented-code-block]
+// gfm[impl leaf-blocks.fenced-code-blocks.fewer-than-three-backticks-do-not-form-fence]
+// gfm[impl leaf-blocks.fenced-code-blocks.fence-marker-cannot-mix-backticks-and-tildes]
+// gfm[impl leaf-blocks.fenced-code-blocks.backtick-info-string-cannot-contain-backticks]
+// gfm[impl leaf-blocks.fenced-code-blocks.backtick-info-strings-cannot-contain-backticks]
+// gfm[impl leaf-blocks.fenced-code-blocks.tilde-info-strings-may-contain-backticks-and-tildes]
+// gfm[impl leaf-blocks.fenced-code-blocks.fence-lines-cannot-contain-internal-spaces]
 fn parse_fence_opener(line: &str) -> Option<FenceOpener> {
     let line = trim_up_to_three_spaces(line);
     let marker = line.chars().next()?;
@@ -1441,6 +1589,12 @@ fn parse_fence_opener(line: &str) -> Option<FenceOpener> {
     })
 }
 
+// gfm[impl leaf-blocks.fenced-code-blocks.closing-fence-length-at-least-opening-length]
+// gfm[impl leaf-blocks.fenced-code-blocks.closing-fence-must-use-same-marker-type]
+// gfm[impl leaf-blocks.fenced-code-blocks.closing-fences-cannot-have-info-strings]
+// gfm[impl leaf-blocks.fenced-code-blocks.closing-fence-indent-up-to-three-spaces]
+// gfm[impl leaf-blocks.fenced-code-blocks.closing-fence-indented-four-spaces-does-not-close]
+// gfm[impl leaf-blocks.fenced-code-blocks.closing-fence-indent-need-not-match-opening-indent]
 fn is_fence_closer(line: &str, marker: char, count: usize) -> bool {
     let line = trim_up_to_three_spaces(line);
     let chars = line.chars();
@@ -1448,6 +1602,16 @@ fn is_fence_closer(line: &str, marker: char, count: usize) -> bool {
     run >= count && line[run..].trim().is_empty()
 }
 
+// gfm[impl leaf-blocks.thematic-breaks.structure]
+// gfm[impl leaf-blocks.thematic-breaks.requires-dash-underscore-or-asterisk-markers]
+// gfm[impl leaf-blocks.thematic-breaks.requires-three-or-more-marker-characters]
+// gfm[impl leaf-blocks.thematic-breaks.all-marker-characters-must-match]
+// gfm[impl leaf-blocks.thematic-breaks.spaces-or-tabs-allowed-between-markers]
+// gfm[impl leaf-blocks.thematic-breaks.no-other-characters-allowed]
+// gfm[impl leaf-blocks.thematic-breaks.marker-sequence-may-be-longer-than-three]
+// gfm[impl leaf-blocks.thematic-breaks.trailing-spaces-allowed]
+// gfm[impl leaf-blocks.thematic-breaks.indent-up-to-three-spaces]
+// gfm[impl leaf-blocks.thematic-breaks.indent-four-spaces-not-allowed]
 fn is_thematic_break(line: &str) -> bool {
     let line = trim_up_to_three_spaces(line);
     let mut marker = None;
@@ -1471,6 +1635,11 @@ fn is_thematic_break(line: &str) -> bool {
     count >= 3
 }
 
+// gfm[impl leaf-blocks.setext-headings.underline-may-be-any-length]
+// gfm[impl leaf-blocks.setext-headings.underline-indent-up-to-three-spaces]
+// gfm[impl leaf-blocks.setext-headings.underline-indent-four-spaces-not-allowed]
+// gfm[impl leaf-blocks.setext-headings.setext-heading-underline-cannot-contain-internal-spaces]
+// gfm[impl leaf-blocks.setext-headings.underline-cannot-be-lazy-continuation-line]
 fn is_setext_underline(line: &str) -> bool {
     let line = trim_up_to_three_spaces(line).trim();
     if line.is_empty() {
@@ -2333,6 +2502,7 @@ fn split_destination_and_title(body: &str) -> Option<(String, Option<String>)> {
     None
 }
 
+// gfm[impl leaf-blocks.html-blocks.non-type-6-tag-must-be-complete-and-alone-on-first-line]
 fn classify_html_block_start(line: &str) -> Option<HtmlBlockStart> {
     let trimmed = trimmed_html_block_line(line)?;
     if starts_html_type_1(trimmed) {
@@ -2399,20 +2569,26 @@ fn trimmed_html_block_line(line: &str) -> Option<&str> {
     (indent.columns <= 3).then_some(&line[indent.bytes..])
 }
 
+// gfm[impl leaf-blocks.html-blocks.type-1-pre-example]
+// gfm[impl leaf-blocks.html-blocks.type-1-script-example]
+// gfm[impl leaf-blocks.html-blocks.type-1-style-example]
 fn starts_html_type_1(line: &str) -> bool {
     HTML_BLOCK_TYPE_1_TAGS
         .iter()
         .any(|tag| matches_html_tag_prefix(line, tag))
 }
 
+// gfm[impl leaf-blocks.html-blocks.type-2-comment-example]
 fn starts_html_type_2(line: &str) -> bool {
     line.starts_with("<!--")
 }
 
+// gfm[impl leaf-blocks.html-blocks.type-3-processing-instruction-example]
 fn starts_html_type_3(line: &str) -> bool {
     line.starts_with("<?")
 }
 
+// gfm[impl leaf-blocks.html-blocks.type-4-declaration-example]
 fn starts_html_type_4(line: &str) -> bool {
     line.starts_with("<!")
         && !line.starts_with("<!--")
@@ -2423,10 +2599,18 @@ fn starts_html_type_4(line: &str) -> bool {
             .is_some_and(|ch| ch.is_ascii_uppercase())
 }
 
+// gfm[impl leaf-blocks.html-blocks.type-5-cdata-example]
 fn starts_html_type_5(line: &str) -> bool {
     line.starts_with("<![CDATA[")
 }
 
+// gfm[impl leaf-blocks.html-blocks.type-6-examples]
+// gfm[impl leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-alone-on-line]
+// gfm[impl leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-valid]
+// gfm[impl leaf-blocks.html-blocks.type-6-may-start-with-closing-tag]
+// gfm[impl leaf-blocks.html-blocks.type-6-open-tag-need-not-be-closed]
+// gfm[impl leaf-blocks.html-blocks.type-6-opening-tag-may-be-partial-when-split-at-whitespace]
+// gfm[impl leaf-blocks.html-blocks.type-6-partial-tag-need-not-be-completed]
 fn starts_html_type_6(line: &str) -> bool {
     let Some(name) = parse_html_block_tag_start_name(line) else {
         return false;
@@ -2434,6 +2618,8 @@ fn starts_html_type_6(line: &str) -> bool {
     is_html_block_tag_name(name, HTML_BLOCK_TYPE_6_TAGS)
 }
 
+// gfm[impl leaf-blocks.html-blocks.type-7-example-cannot-interrupt-paragraph]
+// gfm[impl leaf-blocks.html-blocks.type-7-tag-name-may-be-anything]
 fn starts_html_type_7(line: &str) -> bool {
     looks_like_complete_html_tag_line(line)
 }
@@ -2824,6 +3010,7 @@ fn parse_table_delimiter(line: &str) -> Option<Vec<Option<TableAlignment>>> {
     Some(out)
 }
 
+// gfm[impl leaf-blocks.tables-extension.escaped-pipes-are-literal-cell-content]
 fn split_table_row(line: &str) -> Vec<String> {
     let trimmed = line.trim();
     let core = trimmed.strip_prefix('|').unwrap_or(trimmed);
@@ -2865,6 +3052,7 @@ fn plain_text<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> String {
     out
 }
 
+// gfm[impl leaf-blocks.link-reference-definitions.label-matching-is-case-insensitive]
 fn normalize_reference_label(label: &str) -> String {
     label
         .split_whitespace()
