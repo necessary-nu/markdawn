@@ -20,6 +20,11 @@ pub enum TableAlignment {
     Right,
 }
 
+// gfm[impl blocks-and-inlines.container-and-leaf-blocks-definition]
+// gfm[impl container-blocks.definition]
+// gfm[impl container-blocks.general-recursive-definition-form]
+// gfm[impl container-blocks.syntax-is-defined-recursively]
+// gfm[impl container-blocks.generated-from-contents-rather-than-parse-recipe]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Node<Ext = (), Meta = ()> {
     Document {
@@ -35,10 +40,12 @@ pub enum Node<Ext = (), Meta = ()> {
         children: Vec<Node<Ext, Meta>>,
         meta: Meta,
     },
+    // gfm[impl container-blocks.basic-kinds-are-block-quotes-and-list-items]
     BlockQuote {
         children: Vec<Node<Ext, Meta>>,
         meta: Meta,
     },
+    // gfm[impl container-blocks.lists-are-meta-containers-for-list-items]
     List {
         ordered: bool,
         start: Option<u64>,
@@ -50,6 +57,7 @@ pub enum Node<Ext = (), Meta = ()> {
         children: Vec<Node<Ext, Meta>>,
         meta: Meta,
     },
+    // gfm[impl container-blocks.task-list-items-extension.rendered-marker-becomes-semantic-checkbox]
     TaskItem {
         checked: bool,
         children: Vec<Node<Ext, Meta>>,

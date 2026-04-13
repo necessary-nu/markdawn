@@ -179,6 +179,10 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     }
 
     // gfm[impl blocks-and-inlines.precedence.two-phase-parsing]
+    // gfm[impl blocks-and-inlines.document-is-sequence-of-blocks]
+    // gfm[impl appendix-a-parsing-strategy.overview.document-is-represented-as-tree-of-blocks]
+    // gfm[impl appendix-a-parsing-strategy.overview.parsing-has-two-phases]
+    // gfm[impl appendix-a-parsing-strategy.reference-implementations-use-this-parsing-strategy]
     fn parse_blocks(&self, finalizing: bool) -> Result<Vec<ParsedBlock<Ext, Meta>>, Error>
     where
         Meta: Default + Clone + PartialEq,
@@ -264,6 +268,20 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
     // gfm[impl leaf-blocks.leaf-blocks-make-up-markdown-document]
     // gfm[impl blocks-and-inlines.precedence.block-indicators-take-precedence-over-inline-indicators]
+    // gfm[impl blocks-and-inlines.container-and-leaf-blocks-definition]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.phase-1-line-processing-procedure]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.each-line-may-close-open-or-append]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.initial-tree-is-just-document]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.lines-can-be-discarded-after-incorporation]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.four-line-example-shows-tree-evolution]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.first-example-line]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.first-line-opens-block-quote-and-paragraph]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.second-example-line]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.second-line-is-lazy-continuation]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.third-example-line]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.third-line-closes-paragraph-and-opens-list]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.fourth-example-line]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.fourth-line-opens-second-list-item]
     fn parse_block_lines(
         &self,
         lines: &[String],
@@ -373,6 +391,34 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     // gfm[impl container-blocks.block-quotes.marker-structure]
     // gfm[impl container-blocks.block-quotes.space-after-marker-is-optional]
     // gfm[impl container-blocks.block-quotes.can-have-initial-or-final-blank-lines]
+    // gfm[impl container-blocks.block-quotes.basic-case]
+    // gfm[impl container-blocks.block-quotes.adjacent-lines-form-single-block-quote]
+    // gfm[impl container-blocks.block-quotes.blank-line-required-before-following-paragraph]
+    // gfm[impl container-blocks.block-quotes.blank-line-separates-adjacent-block-quotes]
+    // gfm[impl container-blocks.block-quotes.blank-lines-generally-not-required-around-block-quotes]
+    // gfm[impl container-blocks.block-quotes.blank-quoted-line-creates-two-paragraphs]
+    // gfm[impl container-blocks.block-quotes.can-be-empty]
+    // gfm[impl container-blocks.block-quotes.can-interrupt-paragraphs]
+    // gfm[impl container-blocks.block-quotes.consecutiveness]
+    // gfm[impl container-blocks.block-quotes.consecutiveness-rationale]
+    // gfm[impl container-blocks.block-quotes.example]
+    // gfm[impl container-blocks.block-quotes.indented-code-needs-five-spaces-after-marker]
+    // gfm[impl container-blocks.block-quotes.indented-dash-remains-paragraph-continuation-text]
+    // gfm[impl container-blocks.block-quotes.laziness]
+    // gfm[impl container-blocks.block-quotes.laziness-allows-omitted-continuation-markers]
+    // gfm[impl container-blocks.block-quotes.laziness-applies-only-to-paragraph-continuation-lines]
+    // gfm[impl container-blocks.block-quotes.laziness-does-not-apply-to-code-block-lines]
+    // gfm[impl container-blocks.block-quotes.lazy-continuation-example]
+    // gfm[impl container-blocks.block-quotes.lazy-continuation-list-example-explanation]
+    // gfm[impl container-blocks.block-quotes.list-example-block-quote-ends-after-first-line]
+    // gfm[impl container-blocks.block-quotes.marker-indent-four-spaces-starts-code-block]
+    // gfm[impl container-blocks.block-quotes.marker-indent-up-to-three-spaces]
+    // gfm[impl container-blocks.block-quotes.may-mix-lazy-and-non-lazy-continuation-lines]
+    // gfm[impl container-blocks.block-quotes.nested-block-quotes-may-omit-continuation-markers]
+    // gfm[impl container-blocks.block-quotes.omitting-marker-before-list-item-ends-block-quote]
+    // gfm[impl container-blocks.block-quotes.omitting-marker-before-setext-underline-changes-meaning]
+    // gfm[impl container-blocks.block-quotes.only-defined-cases-count]
+    // gfm[impl container-blocks.block-quotes.paragraph-continuation-text-definition]
     fn parse_block_quote(
         &self,
         lines: &[String],
@@ -432,6 +478,42 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     // gfm[impl container-blocks.list-items.type-is-determined-by-marker]
     // gfm[impl container-blocks.lists.loose-list-definition]
     // gfm[impl container-blocks.lists.tight-list-definition]
+    // gfm[impl container-blocks.lists.definition]
+    // gfm[impl container-blocks.lists.ordered-and-bullet-list-definition]
+    // gfm[impl container-blocks.lists.same-marker-type-definition]
+    // gfm[impl container-blocks.lists.same-type-definition]
+    // gfm[impl container-blocks.lists.start-number-definition]
+    // gfm[impl container-blocks.lists.loose-vs-tight-html-difference]
+    // gfm[impl container-blocks.lists.changing-marker-type-or-delimiter-starts-new-list]
+    // gfm[impl container-blocks.lists.any-number-of-blank-lines-may-separate-items]
+    // gfm[impl container-blocks.lists.blank-html-comment-separates-lists]
+    // gfm[impl container-blocks.lists.blank-line-before-empty-item-still-makes-list-loose]
+    // gfm[impl container-blocks.lists.blank-line-between-block-elements-in-item-makes-list-loose]
+    // gfm[impl container-blocks.lists.blank-line-between-item-blocks-makes-list-loose]
+    // gfm[impl container-blocks.lists.blank-line-between-items-makes-list-loose]
+    // gfm[impl container-blocks.lists.blank-line-inside-block-quote-does-not-make-list-loose]
+    // gfm[impl container-blocks.lists.blank-lines-inside-code-block-do-not-make-list-loose]
+    // gfm[impl container-blocks.lists.commonmark-allows-list-interruption]
+    // gfm[impl container-blocks.lists.consecutive-block-elements-without-blank-line-keep-list-tight]
+    // gfm[impl container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
+    // gfm[impl container-blocks.lists.four-space-indented-marker-is-code-block]
+    // gfm[impl container-blocks.lists.items-may-be-separated-by-blank-lines]
+    // gfm[impl container-blocks.lists.items-need-not-use-uniform-indentation]
+    // gfm[impl container-blocks.lists.list-can-interrupt-paragraph-without-blank-line]
+    // gfm[impl container-blocks.lists.loose-sublist-does-not-necessarily-make-outer-list-loose]
+    // gfm[impl container-blocks.lists.markdown-pl-disallows-this-to-avoid-hard-wrapped-numeral-lists]
+    // gfm[impl container-blocks.lists.markdown-pl-still-allows-block-quotes-to-interrupt-paragraphs]
+    // gfm[impl container-blocks.lists.more-than-three-spaces-do-not-start-item]
+    // gfm[impl container-blocks.lists.nested-example-is-list-item-with-sublist]
+    // gfm[impl container-blocks.lists.only-lists-starting-with-one-may-interrupt-paragraphs]
+    // gfm[impl container-blocks.lists.outer-list-may-be-loose-while-inner-list-is-tight]
+    // gfm[impl container-blocks.lists.principle-of-uniformity-definition]
+    // gfm[impl container-blocks.lists.second-reason-is-principle-of-uniformity]
+    // gfm[impl container-blocks.lists.single-paragraph-list-is-tight]
+    // gfm[impl container-blocks.lists.starting-with-one-can-still-cause-unintended-list-capture]
+    // gfm[impl container-blocks.lists.starting-with-one-should-prevent-most-spurious-captures]
+    // gfm[impl container-blocks.lists.uniformity-preserves-nested-list-meaning]
+    // gfm[impl container-blocks.lists.uniformity-supports-list-interruption]
     fn parse_list(
         &self,
         lines: &[String],
@@ -484,6 +566,62 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     // gfm[impl container-blocks.list-items.sublists-follow-general-indentation-rules]
     // gfm[impl container-blocks.list-items.lazy-continuation-example]
     // gfm[impl container-blocks.list-items.item-blocks-may-be-separated-by-multiple-blank-lines]
+    // gfm[impl container-blocks.list-items.basic-case]
+    // gfm[impl container-blocks.list-items.basic-case-example-ordered-item]
+    // gfm[impl container-blocks.list-items.basic-case-example-source-blocks]
+    // gfm[impl container-blocks.list-items.basic-rules-apply-only-to-nonblank-or-code-start]
+    // gfm[impl container-blocks.list-items.blank-line-start-makes-post-marker-spacing-irrelevant]
+    // gfm[impl container-blocks.list-items.empty-bullet-item]
+    // gfm[impl container-blocks.list-items.empty-item-cannot-interrupt-paragraph]
+    // gfm[impl container-blocks.list-items.empty-lines-inside-list-item-need-not-be-indented]
+    // gfm[impl container-blocks.list-items.empty-ordered-item]
+    // gfm[impl container-blocks.list-items.examples-of-required-indentation]
+    // gfm[impl container-blocks.list-items.extra-indent-counts-as-code-content]
+    // gfm[impl container-blocks.list-items.far-right-text-may-still-be-outside-item]
+    // gfm[impl container-blocks.list-items.indented-code-example-with-wider-marker]
+    // gfm[impl container-blocks.list-items.indented-code-inside-item-preserves-empty-lines]
+    // gfm[impl container-blocks.list-items.indented-code-must-be-four-spaces-beyond-content-indent]
+    // gfm[impl container-blocks.list-items.indented-code-start-uses-one-space-after-marker]
+    // gfm[impl container-blocks.list-items.indenting-whole-item-four-spaces-produces-code-block]
+    // gfm[impl container-blocks.list-items.interrupting-first-item-cannot-begin-with-blank-line]
+    // gfm[impl container-blocks.list-items.interrupting-ordered-list-must-start-at-one]
+    // gfm[impl container-blocks.list-items.item-may-contain-heading]
+    // gfm[impl container-blocks.list-items.items-may-start-with-one-blank-line-and-still-be-nonempty]
+    // gfm[impl container-blocks.list-items.laziness-works-inside-nested-structures]
+    // gfm[impl container-blocks.list-items.lazy-continuation-may-delete-only-part-of-indent]
+    // gfm[impl container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
+    // gfm[impl container-blocks.list-items.list-may-be-first-block-in-item]
+    // gfm[impl container-blocks.list-items.list-may-start-or-end-with-empty-item]
+    // gfm[impl container-blocks.list-items.may-begin-with-at-most-one-blank-line]
+    // gfm[impl container-blocks.list-items.may-contain-any-kind-of-block]
+    // gfm[impl container-blocks.list-items.ordered-item-start-number-comes-from-marker]
+    // gfm[impl container-blocks.list-items.ordered-start-number-cannot-be-negative]
+    // gfm[impl container-blocks.list-items.required-indentation-is-relative-not-column-based]
+    // gfm[impl container-blocks.list-items.same-column-can-still-be-inside-item-in-nested-context]
+    // gfm[impl container-blocks.list-items.sublist-example-indent-increases-with-wider-marker]
+    // gfm[impl container-blocks.list-items.sublist-example-one-space-is-not-enough]
+    // gfm[impl container-blocks.list-items.sublist-example-three-spaces-not-enough-for-wider-marker]
+    // gfm[impl container-blocks.list-items.sublist-example-two-space-indent]
+    // gfm[impl container-blocks.list-items.thematic-break-line-is-not-a-list-item]
+    // gfm[impl container-blocks.list-items.motivation.extension-wrapper]
+    // gfm[impl container-blocks.list-items.motivation.fixed-indent-from-marker-is-an-alternative]
+    // gfm[impl container-blocks.list-items.motivation.fixed-margin-indentation-is-unintuitive]
+    // gfm[impl container-blocks.list-items.motivation.fixed-marker-indent-breaks-code-patterns]
+    // gfm[impl container-blocks.list-items.motivation.four-space-rule-is-arbitrary]
+    // gfm[impl container-blocks.list-items.motivation.four-space-rule-splits-list]
+    // gfm[impl container-blocks.list-items.motivation.indented-code-start-needs-special-treatment]
+    // gfm[impl container-blocks.list-items.motivation.markdown-pl-diverged-from-four-space-rule]
+    // gfm[impl container-blocks.list-items.motivation.marker-width-determines-indentation]
+    // gfm[impl container-blocks.list-items.motivation.no-rule-avoids-breaking-all-existing-documents]
+    // gfm[impl container-blocks.list-items.motivation.original-markdown-spec-quoted]
+    // gfm[impl container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
+    // gfm[impl container-blocks.list-items.motivation.preferred-parse-is-single-list]
+    // gfm[impl container-blocks.list-items.motivation.spec-preserves-eight-space-code-pattern]
+    // gfm[impl container-blocks.list-items.motivation.two-space-rule-allows-underindented-content]
+    // gfm[impl container-blocks.list-items.motivation.two-space-rule-block-quote-html]
+    // gfm[impl container-blocks.list-items.motivation.two-space-rule-example-inside-block-quote]
+    // gfm[impl container-blocks.list-items.motivation.two-space-rule-example-single-list-item]
+    // gfm[impl container-blocks.list-items.motivation.two-space-rule-is-extremely-unintuitive]
     fn parse_list_item(
         &self,
         lines: &[String],
@@ -972,6 +1110,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     // gfm[impl leaf-blocks.setext-headings.multiline-heading-interprets-as-heading-then-paragraph]
     // gfm[impl leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs]
     // gfm[impl leaf-blocks.html-blocks.type-7-cannot-interrupt-paragraphs]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.setext-underlines-convert-paragraphs]
+    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.reference-definitions-are-detected-at-paragraph-close]
     fn parse_paragraphish(
         &self,
         lines: &[String],
@@ -1052,6 +1192,9 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     }
 
     // gfm[impl blocks-and-inlines.precedence.two-phase-parsing]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.phase-2-parses-inline-content]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.open-blocks-close-at-end-of-input]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.example-produces-softbreak-and-emphasis]
     fn parse_inline_nodes(
         &self,
         text: &str,
@@ -1179,6 +1322,9 @@ const HTML_BLOCK_TYPE_6_TAGS: &[&str] = &[
 // gfm[impl preliminaries.characters-and-lines.line-ending-definition]
 // gfm[impl preliminaries.insecure-characters.null-character-is-replaced]
 // gfm[impl preliminaries.tabs.tabs-not-expanded-in-lines]
+// gfm[impl preliminaries.characters-and-lines.character-definition]
+// gfm[impl preliminaries.characters-and-lines.encoding-is-unspecified]
+// gfm[impl preliminaries.characters-and-lines.valid-commonmark-document]
 fn normalize_chunk(chunk: &str) -> String {
     let mut out = String::with_capacity(chunk.len());
     let mut chars = chunk.chars().peekable();
@@ -1204,6 +1350,8 @@ struct SplitLines {
     terminated: bool,
 }
 
+// gfm[impl preliminaries.characters-and-lines.line-definition]
+// gfm[impl preliminaries.characters-and-lines.blank-line-definition]
 fn split_lines(text: &str) -> SplitLines {
     if text.is_empty() {
         return SplitLines {
@@ -1678,6 +1826,8 @@ enum EmphasisMarker {
     Underscore,
 }
 
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.delimiter-stack-definition]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.stack-entries-point-to-text-nodes]
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum InlinePiece<Ext, Meta> {
     Text(String),
@@ -1731,6 +1881,7 @@ where
     // gfm[impl inlines.textual-content.uninterpreted-characters-are-parsed-as-text]
     // gfm[impl inlines.textual-content.internal-spaces-are-preserved]
     // gfm[impl inlines.textual-content.end-tests-marker]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.end-of-input-triggers-emphasis-processing]
     fn parse_until(&mut self, stop: Option<&str>) -> Result<Vec<Node<Ext, Meta>>, Error> {
         let mut pieces = Vec::new();
         let mut text = String::new();
@@ -1969,6 +2120,7 @@ where
     // gfm[impl inlines.emphasis-and-strong-emphasis.intraword-double-underscore-closing-is-forbidden]
     // gfm[impl inlines.emphasis-and-strong-emphasis.many-implementations-restrict-intraword-underscore]
     // gfm[impl inlines.emphasis-and-strong-emphasis.unicode-nonbreaking-space-counts-as-whitespace]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.push-delimiters-to-stack]
     fn parse_delimiter_run(&self) -> Option<DelimiterRun> {
         let remaining = self.remaining();
         let marker = match remaining.chars().next()? {
@@ -2123,6 +2275,14 @@ where
     // gfm[impl inlines.images.reference-image-labels-are-case-insensitive]
     // gfm[impl inlines.images.reference-image-labels-cannot-contain-unescaped-brackets]
     // gfm[impl inlines.images.shortcut-image-labels-are-case-insensitive]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.closing-bracket-triggers-link-search]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-scan-backward]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-failure-case]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-builds-node-children]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-deactivates-earlier-openers]
+    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-runs-emphasis-processing]
     fn try_link_or_image(&mut self) -> Result<Option<Node<Ext, Meta>>, Error> {
         let remaining = self.remaining();
         let image = remaining.starts_with("![");
@@ -2401,6 +2561,19 @@ fn flush_text_piece<Ext, Meta>(pieces: &mut Vec<InlinePiece<Ext, Meta>>, text: &
 // gfm[impl inlines.emphasis-and-strong-emphasis.extension-wrapper]
 // gfm[impl inlines.emphasis-and-strong-emphasis.literal-asterisk-cannot-edge-asterisk-emphasis]
 // gfm[impl inlines.emphasis-and-strong-emphasis.literal-underscore-cannot-edge-underscore-delimiters]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.trickiest-inline-case]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-initial-current-position]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-loop]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-stack-bottom-limits-scan]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-tracks-openers-bottom]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-updates-openers-bottom]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-consumes-delimiters]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-chooses-node-kind]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-inserts-node]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-interior-delimiters]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-advances]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-inactive-closer]
+// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-cleans-up-stack]
 fn resolve_emphasis<Ext, Meta>(
     mut pieces: Vec<InlinePiece<Ext, Meta>>,
     meta: &Meta,
@@ -2558,6 +2731,12 @@ fn char_after(input: &str, index: usize) -> Option<char> {
     input.get(index..)?.chars().next()
 }
 
+// gfm[impl preliminaries.characters-and-lines.unicode-whitespace-character-definition]
+// gfm[impl preliminaries.characters-and-lines.unicode-whitespace-definition]
+// gfm[impl preliminaries.characters-and-lines.whitespace-character-definition]
+// gfm[impl preliminaries.characters-and-lines.whitespace-definition]
+// gfm[impl preliminaries.characters-and-lines.non-whitespace-character-definition]
+// gfm[impl preliminaries.characters-and-lines.space-definition]
 fn is_left_flanking(prev: Option<char>, next: Option<char>) -> bool {
     let next_whitespace = next.is_none_or(char::is_whitespace);
     let next_punct = is_unicode_punctuation(next);
@@ -2576,6 +2755,8 @@ fn is_right_flanking(prev: Option<char>, next: Option<char>) -> bool {
     !prev_whitespace && (!prev_punct || next_whitespace || next_punct)
 }
 
+// gfm[impl preliminaries.characters-and-lines.punctuation-character-definition]
+// gfm[impl preliminaries.characters-and-lines.ascii-punctuation-character-definition]
 fn is_unicode_punctuation(ch: Option<char>) -> bool {
     ch.is_some_and(|ch| ch.is_ascii_punctuation() || ch.is_ascii_graphic() && !ch.is_alphanumeric())
 }
@@ -3157,6 +3338,10 @@ where
 // gfm[impl container-blocks.task-list-items-extension.definition]
 // gfm[impl container-blocks.task-list-items-extension.marker-structure]
 // gfm[impl container-blocks.task-list-items-extension.whitespace-marker-is-unchecked]
+// gfm[impl container-blocks.task-list-items-extension.checkbox-interaction-is-unspecified]
+// gfm[impl container-blocks.task-list-items-extension.extension-wrapper]
+// gfm[impl container-blocks.task-list-items-extension.gfm-enables-task-list-extension]
+// gfm[impl container-blocks.task-list-items-extension.task-lists-may-be-arbitrarily-nested]
 fn normalize_task_item<Ext, Meta>(
     mut children: Vec<ParsedBlock<Ext, Meta>>,
 ) -> Vec<ParsedBlock<Ext, Meta>>
@@ -3359,6 +3544,7 @@ fn looks_like_email(text: &str) -> bool {
     !local.is_empty() && domain.contains('.') && !domain.starts_with('.') && !domain.ends_with('.')
 }
 
+// gfm[impl preliminaries.characters-and-lines.character-class-definitions]
 fn is_escapable(ch: char) -> bool {
     matches!(
         ch,
