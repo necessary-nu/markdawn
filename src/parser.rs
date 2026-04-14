@@ -2471,6 +2471,23 @@ where
                 continue;
             }
 
+            // If `<` looked like a URI autolink attempt (e.g., `<http://...`)
+            // but failed (space inside, etc.), consume the whole `<...>` as
+            // literal text so a bare URL autolink doesn't grab content within.
+            if self.remaining().starts_with('<') {
+                let after_lt = &self.remaining()[1..];
+                if let Some(close) = after_lt.find('>') {
+                    let body = &after_lt[..close];
+                    if body.contains("://") || body.contains("http") {
+                        text.push('<');
+                        text.push_str(body);
+                        text.push('>');
+                        self.index += 1 + close + 1;
+                        continue;
+                    }
+                }
+            }
+
             if let Some(node) = self.try_link_or_image()? {
                 flush_text_piece(&mut pieces, &mut text);
                 pieces.push(InlinePiece::Node(node));

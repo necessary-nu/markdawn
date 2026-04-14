@@ -5322,11 +5322,11 @@ fn gfm_autolink_nonstandard_uris() {
 // gfm[verify inlines.autolinks.autolinks-cannot-contain-spaces]
 #[test]
 fn gfm_autolink_no_spaces() {
-    // Spaces prevent autolink; with strict HTML parsing, not a valid tag either
+    // Spaces prevent autolink; entire <...> consumed as literal
     let html = render_html(&parse_final_nodes("<http://foo.bar/baz bim>\n"));
     assert_eq!(
         html,
-        "<p>&lt;<a href=\"http://foo.bar/baz\">http://foo.bar/baz</a> bim&gt;</p>\n"
+        "<p>&lt;http://foo.bar/baz bim&gt;</p>\n"
     );
 }
 
@@ -5375,11 +5375,11 @@ fn gfm_invalid_autolinks() {
     let html = render_html(&parse_final_nodes("<>\n"));
     assert_eq!(html, "<p>&lt;&gt;</p>\n");
 
-    // Spaces inside: not autolink or valid HTML
+    // Spaces inside: not autolink, entire <...> consumed as literal
     let html = render_html(&parse_final_nodes("< http://foo.bar >\n"));
     assert_eq!(
         html,
-        "<p>&lt; <a href=\"http://foo.bar\">http://foo.bar</a> &gt;</p>\n"
+        "<p>&lt; http://foo.bar &gt;</p>\n"
     );
 
     // Single-char scheme: not a valid autolink
