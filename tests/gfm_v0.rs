@@ -672,7 +672,7 @@ fn gfm_tab_indentation_structural_cases() {
     let html = render_html(&parse_final_nodes("- foo\n\n\t\tbar\n"));
     assert_eq!(
         html,
-        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar
+        "<ul>\n<li>\n<p>foo</p>\n<pre><code>  bar
 </code></pre>\n</li>\n</ul>\n"
     );
 }

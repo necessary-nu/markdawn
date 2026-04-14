@@ -71,6 +71,7 @@ dependencies = [
  "dispatch2",
  "entities",
  "indexmap",
+ "libc",
  "objc2",
  "objc2-core-foundation",
  "objc2-foundation",

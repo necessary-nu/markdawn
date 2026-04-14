@@ -5,13 +5,17 @@ use objc2::rc::Retained;
 use objc2_foundation::{
     NSAttributedString, NSMutableAttributedString, NSNumber, NSRange, NSString, ns_string,
 };
-use objc2_ui_kit::{NSAttributedStringAttachmentConveniences, UIColor, UIFont, UIFontDescriptorSymbolicTraits};
+use objc2_ui_kit::{
+    NSAttributedStringAttachmentConveniences, NSTextAttachment, UIColor, UIFont,
+    UIFontDescriptorSymbolicTraits,
+};
 
 use crate::node::Node;
 
 use super::attachment::{BlockData, MarkdownBlockAttachment};
 use super::attrs;
 use super::style::TextKitStyle;
+use super::svg;
 
 pub struct RenderCtx {
     pub blockquote_depth: u32,
@@ -340,10 +344,16 @@ impl<R> TextKitAdapter<R> {
                 append_plain(&result, "\n", &base_font, &text_color);
             }
             Node::Html { html, .. } => {
-                let code_font = attrs::monospaced_font(&self.style, self.style.body_font_size);
-                append_plain(&result, html, &code_font, &text_color);
-                if !html.ends_with('\n') {
-                    append_plain(&result, "\n", &code_font, &text_color);
+                if let Some(svg_attachment) = try_render_svg_html(html) {
+                    result.appendAttributedString(&svg_attachment);
+                    append_plain(&result, "\n", &base_font, &text_color);
+                } else {
+                    let code_font =
+                        attrs::monospaced_font(&self.style, self.style.body_font_size);
+                    append_plain(&result, html, &code_font, &text_color);
+                    if !html.ends_with('\n') {
+                        append_plain(&result, "\n", &code_font, &text_color);
+                    }
                 }
             }
             Node::ThematicBreak { .. } => {
@@ -483,8 +493,15 @@ impl<R> TextKitAdapter<R> {
                 Ok(result)
             }
             Node::Html { html, .. } => {
-                let mono = attrs::monospaced_font(&self.style, unsafe { base_font.pointSize() });
-                Ok(attributed_string(html, &mono, base_color))
+                if let Some(svg_attachment) = try_render_svg_html(html) {
+                    let result = NSMutableAttributedString::new();
+                    result.appendAttributedString(&svg_attachment);
+                    Ok(result)
+                } else {
+                    let mono =
+                        attrs::monospaced_font(&self.style, unsafe { base_font.pointSize() });
+                    Ok(attributed_string(html, &mono, base_color))
+                }
             }
             Node::SoftBreak { .. } => Ok(attributed_string(" ", base_font, base_color)),
             Node::HardBreak { .. } => Ok(attributed_string("\n", base_font, base_color)),
@@ -569,6 +586,20 @@ fn attributed_string(
     let result = NSMutableAttributedString::new();
     append_plain(&result, text, font, color);
     result
+}
+
+/// Try to render an HTML chunk as an SVG `NSTextAttachment`.
+/// Returns `None` if the chunk doesn't look like SVG or rendering failed.
+fn try_render_svg_html(html: &str) -> Option<Retained<NSAttributedString>> {
+    if !svg::is_svg_data(html.as_bytes()) {
+        return None;
+    }
+    let image = svg::render_svg(html.as_bytes())?;
+    let attachment = NSTextAttachment::new();
+    unsafe {
+        attachment.setImage(Some(&image));
+    }
+    Some(NSAttributedString::attributedStringWithAttachment(&attachment))
 }
 
 fn append_plain(target: &NSMutableAttributedString, text: &str, font: &UIFont, color: &UIColor) {

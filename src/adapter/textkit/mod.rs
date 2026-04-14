@@ -4,6 +4,7 @@ mod content_storage;
 mod element_map;
 mod render;
 mod style;
+pub mod svg;
 mod views;
 
 pub use self::content_storage::MarkdownContentStorage;

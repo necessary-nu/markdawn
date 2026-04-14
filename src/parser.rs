@@ -274,6 +274,15 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
+            // ATX heading and thematic break also reset paragraph state
+            if self.parse_atx_heading(&lines[index], refs)?.is_some()
+                || is_thematic_break(&lines[index])
+            {
+                in_paragraph = false;
+                index += 1;
+                continue;
+            }
+
             // This line is paragraph text; the next non-blank line is a
             // paragraph continuation and must not be treated as a ref def.
             in_paragraph = true;
@@ -490,7 +499,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             if inner_lines
                 .last()
                 .is_some_and(|line| is_paragraph_continuation_candidate(line))
-                && is_lazy_list_continuation(&lines[index], lines, index)
+                && is_lazy_block_quote_continuation(&lines[index], lines, index)
             {
                 inner_lines.push(lines[index].clone());
                 lazy_flags.push(true);
@@ -990,7 +999,16 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         let mut rows = Vec::new();
         let mut index = start + 2;
         while index < lines.len() {
-            if lines[index].trim().is_empty() || !lines[index].contains('|') {
+            if lines[index].trim().is_empty() {
+                break;
+            }
+            // Stop at lines that start other block constructs
+            if is_thematic_break(&lines[index])
+                || parse_fence_opener(&lines[index]).is_some()
+                || strip_block_quote_marker(&lines[index]).is_some()
+                || classify_html_block_start(&lines[index])
+                    .is_some_and(|s| s.can_interrupt_paragraph)
+            {
                 break;
             }
             let mut cells = split_table_row(&lines[index]);
@@ -2027,12 +2045,34 @@ fn split_marker_content(after: &str, base_col: usize, empty_col: usize) -> (Stri
 
     let post_spaces = col - base_col;
 
+    // Expand the leading whitespace into spaces, accounting for tab stops
+    // relative to the marker's absolute column position. This preserves
+    // tab-stop alignment when subsequent code-block stripping happens.
+    let mut expanded_indent = String::new();
+    let mut col_walk = base_col;
+    for ch in after.chars() {
+        match ch {
+            ' ' => {
+                expanded_indent.push(' ');
+                col_walk += 1;
+            }
+            '\t' => {
+                let w = 4 - (col_walk % 4);
+                for _ in 0..w {
+                    expanded_indent.push(' ');
+                }
+                col_walk += w;
+            }
+            _ => break,
+        }
+    }
+
     // If indent after marker is 5+ spaces, treat as marker + 1 space + indented code
     if post_spaces >= 5 {
-        // content starts right after the first separator space
-        let first_sep_bytes = after.chars().next().map(char::len_utf8).unwrap_or(0);
-        let content = after[first_sep_bytes..].to_owned();
-        return (content, base_col + 1);
+        // Drop just the first separator space; the rest stays as code indent.
+        let mut rebuilt = String::from(&expanded_indent[1..]);
+        rebuilt.push_str(&after[bytes..]);
+        return (rebuilt, base_col + 1);
     }
 
     let content = after[bytes..].to_owned();
@@ -2076,31 +2116,34 @@ fn leading_indent(line: &str) -> IndentPrefix {
 }
 
 fn strip_indent_columns(line: &str, columns: usize) -> Option<String> {
-    let mut consumed_columns = 0;
-    let mut consumed_bytes = 0;
-
+    // Expand all leading tabs/spaces to spaces (tab stops at multiples of 4),
+    // then strip exactly `columns` leading spaces.
+    let mut expanded = String::new();
+    let mut col = 0;
+    let mut bytes_in = 0;
     for ch in line.chars() {
-        if consumed_columns >= columns {
-            break;
+        match ch {
+            ' ' => {
+                expanded.push(' ');
+                col += 1;
+                bytes_in += 1;
+            }
+            '\t' => {
+                let width = 4 - (col % 4);
+                for _ in 0..width {
+                    expanded.push(' ');
+                }
+                col += width;
+                bytes_in += 1;
+            }
+            _ => break,
         }
-        let width = match ch {
-            ' ' => 1,
-            '\t' => indent_width(consumed_columns, '\t'),
-            _ => return None,
-        };
-        consumed_columns += width;
-        consumed_bytes += ch.len_utf8();
     }
-
-    if consumed_columns < columns {
+    if col < columns {
         return None;
     }
-
-    let mut out = String::new();
-    if consumed_columns > columns {
-        out.push_str(&" ".repeat(consumed_columns - columns));
-    }
-    out.push_str(&line[consumed_bytes..]);
+    let mut out = expanded[columns..].to_string();
+    out.push_str(&line[bytes_in..]);
     Some(out)
 }
 
@@ -4169,6 +4212,23 @@ fn is_lazy_list_continuation(line: &str, lines: &[String], index: usize) -> bool
             && parse_table_delimiter(&lines[index + 1]).is_some())
 }
 
+/// Like `is_lazy_list_continuation` but for block quotes: indented code does
+/// NOT disqualify, because indented code cannot interrupt a paragraph.
+fn is_lazy_block_quote_continuation(line: &str, lines: &[String], index: usize) -> bool {
+    !line.trim().is_empty()
+        && parse_list_marker(line).is_none_or(|m| !can_interrupt_paragraph_with_list(m))
+        && strip_block_quote_marker(line).is_none()
+        && parse_fence_opener(line).is_none()
+        && !is_thematic_break(line)
+        && parse_reference_definition(lines, index).is_none()
+        && !matches!(parse_table_delimiter(line), Some(_))
+        && !classify_html_block_start(line).is_some_and(|start| start.can_interrupt_paragraph)
+        && !matches!(trim_up_to_three_spaces(line).chars().next(), Some('#'))
+        && !(line.contains('|')
+            && index + 1 < lines.len()
+            && parse_table_delimiter(&lines[index + 1]).is_some())
+}
+
 // gfm[impl leaf-blocks.tables-extension.delimiter-row-structure]
 fn parse_table_delimiter(line: &str) -> Option<Vec<Option<TableAlignment>>> {
     let cells = split_table_row(line);
@@ -4206,16 +4266,11 @@ fn split_table_row(line: &str) -> Vec<String> {
     let core = core.strip_suffix('|').unwrap_or(core);
     let mut cells = Vec::new();
     let mut current = String::new();
-    let mut escaped = false;
-    for ch in core.chars() {
-        if escaped {
-            current.push(ch);
-            escaped = false;
-            continue;
-        }
-        if ch == '\\' {
-            escaped = true;
-            current.push(ch);
+    let mut chars = core.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' && chars.peek() == Some(&'|') {
+            chars.next();
+            current.push('|');
             continue;
         }
         if ch == '|' {
