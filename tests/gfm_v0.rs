@@ -246,12 +246,24 @@ fn render_list_child(node: &Node<(), ()>, tight: bool, out: &mut String) {
             out.push_str("<li>");
             if children.is_empty() {
                 out.push_str("</li>\n");
-            } else if tight && matches!(children.first(), Some(Node::Paragraph { .. })) {
-                if let Node::Paragraph { children, .. } = &children[0] {
-                    render_inlines(children, out);
+            } else if tight {
+                // In tight items, unwrap all paragraphs (no <p> tags).
+                if !matches!(children.first(), Some(Node::Paragraph { .. })) {
+                    out.push('\n');
                 }
-                for child in &children[1..] {
-                    render_block(child, out);
+                for (i, child) in children.iter().enumerate() {
+                    if let Node::Paragraph { children: inlines, .. } = child {
+                        render_inlines(inlines, out);
+                        // Add newline only between two paragraphs/inlines,
+                        // not before a block (which has its own opening tag).
+                        if i + 1 < children.len()
+                            && matches!(children[i + 1], Node::Paragraph { .. })
+                        {
+                            out.push('\n');
+                        }
+                    } else {
+                        render_block(child, out);
+                    }
                 }
                 out.push_str("</li>\n");
             } else {
@@ -272,12 +284,21 @@ fn render_list_child(node: &Node<(), ()>, tight: bool, out: &mut String) {
             out.push_str("/> ");
             if children.is_empty() {
                 out.push_str("</li>\n");
-            } else if tight && matches!(children.first(), Some(Node::Paragraph { .. })) {
-                if let Node::Paragraph { children, .. } = &children[0] {
-                    render_inlines(children, out);
+            } else if tight {
+                if !matches!(children.first(), Some(Node::Paragraph { .. })) {
+                    out.push('\n');
                 }
-                for child in &children[1..] {
-                    render_block(child, out);
+                for (i, child) in children.iter().enumerate() {
+                    if let Node::Paragraph { children: inlines, .. } = child {
+                        render_inlines(inlines, out);
+                        if i + 1 < children.len()
+                            && matches!(children[i + 1], Node::Paragraph { .. })
+                        {
+                            out.push('\n');
+                        }
+                    } else {
+                        render_block(child, out);
+                    }
                 }
                 out.push_str("</li>\n");
             } else {

@@ -420,23 +420,7 @@ impl<R> HtmlAdapter<R> {
         match node {
             Node::Item { children, .. } => {
                 out.push_str("<li>");
-                if children.is_empty() {
-                    out.push_str("</li>\n");
-                } else if tight && matches!(children.first(), Some(Node::Paragraph { .. })) {
-                    if let Node::Paragraph { children, .. } = &children[0] {
-                        self.write_inlines(children, out)?;
-                    }
-                    for child in &children[1..] {
-                        self.write_block(child, out)?;
-                    }
-                    out.push_str("</li>\n");
-                } else {
-                    out.push('\n');
-                    for child in children {
-                        self.write_block(child, out)?;
-                    }
-                    out.push_str("</li>\n");
-                }
+                self.write_li_children(children, tight, out)?;
             }
             Node::TaskItem {
                 checked, children, ..
@@ -446,27 +430,51 @@ impl<R> HtmlAdapter<R> {
                     out.push_str("checked=\"\" ");
                 }
                 out.push_str("/> ");
-                if children.is_empty() {
-                    out.push_str("</li>\n");
-                } else if tight && matches!(children.first(), Some(Node::Paragraph { .. })) {
-                    if let Node::Paragraph { children, .. } = &children[0] {
-                        self.write_inlines(children, out)?;
-                    }
-                    for child in &children[1..] {
-                        self.write_block(child, out)?;
-                    }
-                    out.push_str("</li>\n");
-                } else {
-                    out.push('\n');
-                    for child in children {
-                        self.write_block(child, out)?;
-                    }
-                    out.push_str("</li>\n");
-                }
+                self.write_li_children(children, tight, out)?;
             }
             other => self.write_block(other, out)?,
         }
 
+        Ok(())
+    }
+
+    fn write_li_children<Ext, Meta>(
+        &self,
+        children: &[Node<Ext, Meta>],
+        tight: bool,
+        out: &mut String,
+    ) -> Result<(), HtmlError>
+    where
+        R: RenderHtmlCustom<Ext, Meta>,
+    {
+        if children.is_empty() {
+            out.push_str("</li>\n");
+            return Ok(());
+        }
+        if tight {
+            if !matches!(children.first(), Some(Node::Paragraph { .. })) {
+                out.push('\n');
+            }
+            for (i, child) in children.iter().enumerate() {
+                if let Node::Paragraph { children: inlines, .. } = child {
+                    self.write_inlines(inlines, out)?;
+                    if i + 1 < children.len()
+                        && matches!(children[i + 1], Node::Paragraph { .. })
+                    {
+                        out.push('\n');
+                    }
+                } else {
+                    self.write_block(child, out)?;
+                }
+            }
+            out.push_str("</li>\n");
+        } else {
+            out.push('\n');
+            for child in children {
+                self.write_block(child, out)?;
+            }
+            out.push_str("</li>\n");
+        }
         Ok(())
     }
 }

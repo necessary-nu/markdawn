@@ -64,18 +64,40 @@ unsafe fn resolve_symbol(b64: &str) -> Option<*const std::ffi::c_void> {
     }
 }
 
-/// Check if the given bytes look like SVG data (closing </svg> tag near the end).
+/// Check if the given bytes look like SVG data.
+///
+/// Requires both an opening `<svg` and a closing `</svg>` tag, case-insensitive.
+/// This is intentionally conservative: it rules out arbitrary XML/HTML that just
+/// happens to contain "svg" as a substring, and ignores trailing whitespace/junk
+/// after the closing tag.
 pub fn is_svg_data(data: &[u8]) -> bool {
-    let needle = b"</svg>";
-    let scan_start = data.len().saturating_sub(200);
-    data[scan_start..]
-        .windows(needle.len())
-        .any(|w| w.eq_ignore_ascii_case(needle))
+    let close = b"</svg>";
+    let open = b"<svg";
+
+    // Look for </svg> near the end (allow up to 1KB of trailing whitespace/junk).
+    let close_scan_start = data.len().saturating_sub(1024);
+    let has_close = data[close_scan_start..]
+        .windows(close.len())
+        .any(|w| w.eq_ignore_ascii_case(close));
+    if !has_close {
+        return false;
+    }
+
+    // Look for <svg near the start (allow up to 1KB of XML prolog/comments/doctype).
+    let open_scan_end = data.len().min(1024);
+    data[..open_scan_end]
+        .windows(open.len())
+        .any(|w| w.eq_ignore_ascii_case(open))
 }
+
+/// Maximum intrinsic dimension (in points) of a rendered SVG. SVGs whose canvas
+/// exceeds this in either axis are rejected to prevent runaway TextKit layout.
+const MAX_SVG_DIMENSION: f64 = 4096.0;
 
 /// Render SVG data to a vector `UIImage` via CoreSVG.
 ///
-/// Returns `None` if CoreSVG symbols are unavailable, or the data fails to parse.
+/// Returns `None` if CoreSVG symbols are unavailable, the data fails to parse,
+/// or the resulting image is too large (> [`MAX_SVG_DIMENSION`] in either axis).
 pub fn render_svg(data: &[u8]) -> Option<Retained<UIImage>> {
     let syms = ensure_loaded()?;
 
@@ -95,13 +117,33 @@ pub fn render_svg(data: &[u8]) -> Option<Retained<UIImage>> {
     // Release the document — UIImage retains internally
     unsafe { (syms.release)(doc) };
 
-    result
+    let image = result?;
+
+    // Reject pathological canvas sizes
+    let size = unsafe { image.size() };
+    if !size.width.is_finite()
+        || !size.height.is_finite()
+        || size.width <= 0.0
+        || size.height <= 0.0
+        || size.width > MAX_SVG_DIMENSION
+        || size.height > MAX_SVG_DIMENSION
+    {
+        return None;
+    }
+
+    Some(image)
 }
 
 /// Send `+[UIImage _imageWithCGSVGDocument:]` via raw `objc_msgSend`.
 ///
 /// We can't use `objc2::msg_send!` here because the selector is resolved at runtime
 /// and the argument is a raw `CGSVGDocumentRef` pointer.
+///
+/// # ABI assumptions
+///
+/// The selector is known to take a single `CGSVGDocumentRef` argument and return
+/// an autoreleased `id`. If Apple ever changes the calling convention, return type,
+/// or autorelease semantics of this private method, this transmute is unsound.
 unsafe fn msg_send_image_with_doc(sel: Sel, doc: CGSVGDocumentRef) -> Option<Retained<UIImage>> {
     unsafe extern "C" {
         fn objc_msgSend();
