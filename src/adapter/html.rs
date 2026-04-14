@@ -296,7 +296,7 @@ impl<R> HtmlAdapter<R> {
                 ..
             } => {
                 out.push_str("<a href=\"");
-                escape_html(destination, out);
+                escape_href(destination, out);
                 out.push('"');
                 if let Some(title) = title {
                     out.push_str(" title=\"");
@@ -314,7 +314,7 @@ impl<R> HtmlAdapter<R> {
                 ..
             } => {
                 out.push_str("<img src=\"");
-                escape_html(destination, out);
+                escape_href(destination, out);
                 out.push_str("\" alt=\"");
                 escape_html(alt, out);
                 out.push('"');
@@ -503,6 +503,38 @@ where
             .emit(rendered)
             .map_err(|error| HtmlError::Sink(error.to_string()))
     }
+}
+
+fn escape_href(url: &str, out: &mut String) {
+    use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
+
+    // Encode everything except URL-safe characters and already-encoded %XX
+    const URL_SAFE: &AsciiSet = &NON_ALPHANUMERIC
+        .remove(b'-')
+        .remove(b'.')
+        .remove(b'_')
+        .remove(b'~')
+        .remove(b':')
+        .remove(b'/')
+        .remove(b'?')
+        .remove(b'#')
+        .remove(b'[')
+        .remove(b']')
+        .remove(b'@')
+        .remove(b'!')
+        .remove(b'$')
+        .remove(b'&')
+        .remove(b'\'')
+        .remove(b'(')
+        .remove(b')')
+        .remove(b'*')
+        .remove(b'+')
+        .remove(b',')
+        .remove(b';')
+        .remove(b'=')
+        .remove(b'%');
+
+    out.push_str(&utf8_percent_encode(url, URL_SAFE).to_string());
 }
 
 fn escape_html(text: &str, out: &mut String) {

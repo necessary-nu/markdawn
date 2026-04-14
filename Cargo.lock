@@ -23,10 +23,12 @@ version = "0.1.0"
 dependencies = [
  "block2",
  "dispatch2",
+ "entities",
  "indexmap",
  "objc2",
  "objc2-foundation",
  "objc2-ui-kit",
+ "percent-encoding",
 ]
 
 [[package]]
@@ -40,6 +42,12 @@ dependencies = [
  "libc",
  "objc2",
 ]
+
+[[package]]
+name = "entities"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5320ae4c3782150d900b79807611a59a99fc9a1d61d686faafc24b93fc8d7ca"
 
 [[package]]
 name = "equivalent"
@@ -227,3 +235,9 @@ dependencies = [
  "objc2",
  "objc2-foundation",
 ]
+
+[[package]]
+name = "percent-encoding"
+version = "2.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"

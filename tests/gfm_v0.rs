@@ -161,7 +161,7 @@ fn render_inlines(nodes: &[Node<(), ()>], out: &mut String) {
                 ..
             } => {
                 out.push_str("<a href=\"");
-                escape_html(destination, out);
+                escape_href(destination, out);
                 out.push('"');
                 if let Some(title) = title {
                     out.push_str(" title=\"");
@@ -179,7 +179,7 @@ fn render_inlines(nodes: &[Node<(), ()>], out: &mut String) {
                 ..
             } => {
                 out.push_str("<img src=\"");
-                escape_html(destination, out);
+                escape_href(destination, out);
                 out.push_str("\" alt=\"");
                 escape_html(alt, out);
                 out.push('"');
@@ -302,6 +302,18 @@ fn escape_html(text: &str, out: &mut String) {
             _ => out.push(ch),
         }
     }
+}
+
+fn escape_href(url: &str, out: &mut String) {
+    use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
+    const URL_SAFE: &AsciiSet = &NON_ALPHANUMERIC
+        .remove(b'-').remove(b'.').remove(b'_').remove(b'~')
+        .remove(b':').remove(b'/').remove(b'?').remove(b'#')
+        .remove(b'[').remove(b']').remove(b'@').remove(b'!')
+        .remove(b'$').remove(b'&').remove(b'\'').remove(b'(')
+        .remove(b')').remove(b'*').remove(b'+').remove(b',')
+        .remove(b';').remove(b'=').remove(b'%');
+    out.push_str(&utf8_percent_encode(url, URL_SAFE).to_string());
 }
 
 // gfm[verify leaf-blocks.thematic-breaks.structure]
@@ -996,7 +1008,7 @@ fn gfm_code_span_autolink_wins_when_autolink_parses_first() {
     let html = render_html(&parse_final_nodes("<http://foo.bar.`baz>`\n"));
     assert_eq!(
         html,
-        "<p><a href=\"http://foo.bar.`baz\">http://foo.bar.`baz</a>`</p>\n"
+        "<p><a href=\"http://foo.bar.%60baz\">http://foo.bar.`baz</a>`</p>\n"
     );
 }
 
@@ -1154,7 +1166,7 @@ fn gfm_link_balanced_parens() {
 #[test]
 fn gfm_link_angle_bracket_dest() {
     let html = render_html(&parse_final_nodes("[link](<url with spaces>)\n"));
-    assert_eq!(html, "<p><a href=\"url with spaces\">link</a></p>\n");
+    assert_eq!(html, "<p><a href=\"url%20with%20spaces\">link</a></p>\n");
 }
 
 // gfm[verify inlines.links.destination-and-title-may-both-be-omitted]
@@ -2550,7 +2562,7 @@ fn gfm_link_ref_def_multiline_title() {
 fn gfm_link_ref_def_title_separated_by_whitespace() {
     // The parser treats the whole string as a destination without a title
     let html = render_html(&parse_final_nodes("[foo]: /url\"title\"\n\n[foo]\n"));
-    assert_eq!(html, "<p><a href=\"/url&quot;title&quot;\">foo</a></p>\n");
+    assert_eq!(html, "<p><a href=\"/url%22title%22\">foo</a></p>\n");
 }
 
 // gfm[verify leaf-blocks.link-reference-definitions.title-allows-leading-whitespace]
@@ -2624,7 +2636,7 @@ fn gfm_link_ref_def_escapes() {
     ));
     assert_eq!(
         html,
-        "<p><a href=\"/url\\bar*baz\" title=\"foo&quot;bar\\baz\">foo</a></p>\n"
+        "<p><a href=\"/url%5Cbar*baz\" title=\"foo&quot;bar\\baz\">foo</a></p>\n"
     );
 }
 
@@ -3453,7 +3465,7 @@ fn gfm_link_destination_parentheses() {
 fn gfm_link_angle_bracket_destination() {
     // Spaces in angle brackets
     let html = render_html(&parse_final_nodes("[link](<url with spaces>)\n"));
-    assert_eq!(html, "<p><a href=\"url with spaces\">link</a></p>\n");
+    assert_eq!(html, "<p><a href=\"url%20with%20spaces\">link</a></p>\n");
 
     // Right parenthesis in angle brackets
     let html = render_html(&parse_final_nodes("[a](<b)c>)\n"));
@@ -3518,7 +3530,7 @@ fn gfm_link_title_delimiters() {
 fn gfm_link_title_edge_cases() {
     // Title without destination is parsed as destination
     let html = render_html(&parse_final_nodes("[link](\"title\")\n"));
-    assert_eq!(html, "<p><a href=\"&quot;title&quot;\">link</a></p>\n");
+    assert_eq!(html, "<p><a href=\"%22title%22\">link</a></p>\n");
 }
 
 // gfm[verify inlines.links.whitespace-is-allowed-inside-inline-link-delimiters]
@@ -5267,7 +5279,7 @@ fn gfm_standard_uri_autolink() {
     ));
     assert_eq!(
         html,
-        "<p><a href=\"http://foo.bar.baz/test?q=hello&amp;id=22&amp;boolean\">http://foo.bar.baz/test?q=hello&amp;id=22&amp;boolean</a></p>\n"
+        "<p><a href=\"http://foo.bar.baz/test?q=hello&id=22&boolean\">http://foo.bar.baz/test?q=hello&amp;id=22&amp;boolean</a></p>\n"
     );
 
     let html = render_html(&parse_final_nodes("<irc://foo.bar:2233/baz>\n"));
@@ -5327,7 +5339,7 @@ fn gfm_autolink_no_backslash_escapes() {
     let html = render_html(&parse_final_nodes("<http://example.com/\\[\\>\n"));
     assert_eq!(
         html,
-        "<p><a href=\"http://example.com/\\[\\\">http://example.com/\\[\\</a></p>\n"
+        "<p><a href=\"http://example.com/%5C[%5C\">http://example.com/\\[\\</a></p>\n"
     );
 }
 
@@ -5444,7 +5456,7 @@ fn gfm_extended_autolink_entity_like_semicolon() {
     ));
     assert_eq!(
         html,
-        "<p><a href=\"http://www.google.com/search?q=commonmark&amp;hl=en\">www.google.com/search?q=commonmark&amp;hl=en</a></p>\n"
+        "<p><a href=\"http://www.google.com/search?q=commonmark&hl=en\">www.google.com/search?q=commonmark&amp;hl=en</a></p>\n"
     );
 
     // Trailing &hl; looks like entity; semicolon is excluded from autolink
@@ -5453,6 +5465,6 @@ fn gfm_extended_autolink_entity_like_semicolon() {
     ));
     assert_eq!(
         html,
-        "<p><a href=\"http://www.google.com/search?q=commonmark&amp;hl\">www.google.com/search?q=commonmark&amp;hl</a>;</p>\n"
+        "<p><a href=\"http://www.google.com/search?q=commonmark&hl\">www.google.com/search?q=commonmark&amp;hl</a>;</p>\n"
     );
 }

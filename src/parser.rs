@@ -4171,33 +4171,37 @@ fn parse_entity_reference(input: &str) -> Option<(usize, String)> {
     }
     let end = input.find(';')?;
     let entity = &input[1..end];
-    let decoded = if let Some(hex) = entity
+    if let Some(hex) = entity
         .strip_prefix("#x")
         .or_else(|| entity.strip_prefix("#X"))
     {
-        u32::from_str_radix(hex, 16).ok().and_then(|n| {
-            if n == 0 {
-                Some('\u{FFFD}')
-            } else {
-                char::from_u32(n)
-            }
-        })
+        let ch = u32::from_str_radix(hex, 16).ok().and_then(|n| {
+            if n == 0 { Some('\u{FFFD}') } else { char::from_u32(n) }
+        })?;
+        Some((end + 1, ch.to_string()))
     } else if let Some(num) = entity.strip_prefix('#') {
-        num.parse::<u32>().ok().and_then(|n| {
-            if n == 0 {
-                Some('\u{FFFD}')
-            } else {
-                char::from_u32(n)
-            }
-        })
+        let ch = num.parse::<u32>().ok().and_then(|n| {
+            if n == 0 { Some('\u{FFFD}') } else { char::from_u32(n) }
+        })?;
+        Some((end + 1, ch.to_string()))
     } else {
         // gfm[impl inlines.entity-and-numeric-character-references.entity-references-definition]
-        resolve_named_entity(entity)
-    }?;
-    Some((end + 1, decoded.to_string()))
+        let decoded = resolve_named_entity(entity)?;
+        Some((end + 1, decoded.to_string()))
+    }
 }
 
-fn resolve_named_entity(name: &str) -> Option<char> {
+fn resolve_named_entity(name: &str) -> Option<&'static str> {
+    use entities::ENTITIES;
+    let lookup = format!("&{name};");
+    ENTITIES
+        .iter()
+        .find(|e| e.entity == lookup)
+        .map(|e| e.characters)
+}
+
+#[allow(dead_code)]
+fn resolve_named_entity_old(name: &str) -> Option<char> {
     match name {
         "amp" => Some('&'),
         "AMP" => Some('&'),
