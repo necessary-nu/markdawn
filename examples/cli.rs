@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use darwin_markdown::{HtmlAdapter, Parser, StreamItem, VecSink};
+use markdawn::{HtmlAdapter, Parser, StreamItem, VecSink};
 
 fn main() {
     let mut input = String::new();

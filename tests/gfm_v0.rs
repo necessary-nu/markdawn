@@ -1,4 +1,4 @@
-use darwin_markdown::{Node, Parser, StreamItem, TableAlignment, VecSink};
+use markdawn::{Node, Parser, StreamItem, TableAlignment, VecSink};
 
 fn parse_final_nodes(input: &str) -> Vec<Node<(), ()>> {
     let mut parser = Parser::<(), ()>::new();

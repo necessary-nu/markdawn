@@ -6,7 +6,7 @@ use objc2_ui_kit::NSTextContentStorage;
 define_class!(
     #[unsafe(super(NSTextContentStorage))]
     #[thread_kind = MainThreadOnly]
-    #[name = "DarwinMarkdownContentStorage"]
+    #[name = "MarkdawnContentStorage"]
     pub struct MarkdownContentStorage;
 
     unsafe impl NSObjectProtocol for MarkdownContentStorage {}

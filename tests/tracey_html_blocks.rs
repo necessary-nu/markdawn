@@ -1,4 +1,4 @@
-use darwin_markdown::{HtmlAdapter, Parser, StreamItem, VecSink};
+use markdawn::{HtmlAdapter, Parser, StreamItem, VecSink};
 
 fn render_html(input: &str) -> String {
     let mut parser = Parser::<(), ()>::new();

@@ -1,5 +1,5 @@
 [package]
-name = "darwin-markdown"
+name = "markdawn"
 version = "0.1.0"
 edition = "2024"
 

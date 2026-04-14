@@ -1,9 +1,9 @@
-# darwin-markdown-rs
+# markdawn
 
 ## Overview
 
 > r[example.overview]
-> This specification defines the core behaviors for darwin-markdown-rs.
+> This specification defines the core behaviors for markdawn.
 >
 > Example code reference:
 >
