@@ -2,12 +2,16 @@
 fn parse_html_tag_name_prefix(line: &str) -> Option<(&str, usize)> {
     let mut chars = line.char_indices();
     let (_, first) = chars.next()?;
-    if !first.is_ascii_alphabetic() { return None; }
+    if !first.is_ascii_alphabetic() {
+        return None;
+    }
     let mut end = first.len_utf8();
     for (index, ch) in chars {
         if ch.is_ascii_alphanumeric() || ch == '-' {
             end = index + ch.len_utf8();
-        } else { break; }
+        } else {
+            break;
+        }
     }
     Some((&line[..end], end))
 }
@@ -15,17 +19,23 @@ fn parse_html_tag_name_prefix(line: &str) -> Option<(&str, usize)> {
 fn parse_html_attribute_name_prefix(line: &str) -> Option<usize> {
     let mut chars = line.char_indices();
     let (_, first) = chars.next()?;
-    if !(first.is_ascii_alphabetic() || matches!(first, '_' | ':')) { return None; }
+    if !(first.is_ascii_alphabetic() || matches!(first, '_' | ':')) {
+        return None;
+    }
     let mut end = first.len_utf8();
     for (index, ch) in chars {
         if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | ':' | '-') {
             end = index + ch.len_utf8();
-        } else { break; }
+        } else {
+            break;
+        }
     }
     Some(end)
 }
 
-fn is_html_whitespace(ch: char) -> bool { matches!(ch, ' ' | '\t' | '\n' | '\r') }
+fn is_html_whitespace(ch: char) -> bool {
+    matches!(ch, ' ' | '\t' | '\n' | '\r')
+}
 fn count_html_whitespace(s: &str) -> usize {
     s.chars().take_while(|c| is_html_whitespace(*c)).count()
 }
@@ -48,20 +58,33 @@ fn parse_html_attribute_value_prefix(line: &str) -> Option<usize> {
 
 fn parse_html_open_tag_prefix(line: &str) -> Option<(&str, usize)> {
     let rest = line.strip_prefix('<')?;
-    if rest.starts_with('/') { return None; }
+    if rest.starts_with('/') {
+        return None;
+    }
     let (name, name_len) = parse_html_tag_name_prefix(rest)?;
     let mut consumed = 1 + name_len;
     loop {
         let rest = &line[consumed..];
         eprintln!("  loop: consumed={}, rest={:?}", consumed, rest);
-        if rest.starts_with('>') { return Some((name, consumed + 1)); }
-        if rest.starts_with("/>") { return Some((name, consumed + 2)); }
+        if rest.starts_with('>') {
+            return Some((name, consumed + 1));
+        }
+        if rest.starts_with("/>") {
+            return Some((name, consumed + 2));
+        }
         let whitespace = count_html_whitespace(rest);
-        if whitespace == 0 { eprintln!("  NO WS"); return None; }
+        if whitespace == 0 {
+            eprintln!("  NO WS");
+            return None;
+        }
         consumed += whitespace;
         let rest = &line[consumed..];
-        if rest.starts_with('>') { return Some((name, consumed + 1)); }
-        if rest.starts_with("/>") { return Some((name, consumed + 2)); }
+        if rest.starts_with('>') {
+            return Some((name, consumed + 1));
+        }
+        if rest.starts_with("/>") {
+            return Some((name, consumed + 2));
+        }
         consumed += parse_html_attribute_name_prefix(rest)?;
         consumed += count_html_whitespace(&line[consumed..]);
         if line[consumed..].starts_with('=') {

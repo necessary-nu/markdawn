@@ -77,6 +77,25 @@ impl<R> TextKitSink<R> {
         if let Some(record) = self.element_map.get(&emission.id) {
             let old_range = record.range;
             let old_len = old_range.length;
+            let storage_len = text_storage.length();
+
+            // Bounds check: if the stored range is out of bounds, the element
+            // map is stale. Remove the stale entry and treat as a new insert.
+            if old_range.location + old_len > storage_len {
+                self.element_map.swap_remove(&emission.id);
+                let insert_loc = text_storage.length();
+                let block = block2::StackBlock::new(|| {
+                    text_storage.appendAttributedString(&new_str);
+                });
+                self.storage.performEditingTransactionUsingBlock(&block);
+                self.element_map.insert(
+                    emission.id,
+                    ElementRecord {
+                        range: NSRange::new(insert_loc, new_len),
+                    },
+                );
+                return Ok(());
+            }
 
             // Check if this is an append-only update (common in streaming):
             // the new content starts with the old content, so we only need

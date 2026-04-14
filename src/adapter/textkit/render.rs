@@ -180,7 +180,6 @@ impl<R> TextKitAdapter<R> {
                 attrs::apply_paragraph_style(&result, &ps);
             }
             Node::BlockQuote { children, .. } => {
-                let accent_color = self.style.blockquote_accent_color.clone();
                 let last_idx = children.len().saturating_sub(1);
                 for (i, child) in children.iter().enumerate() {
                     let inner_ctx = RenderCtx {
@@ -191,9 +190,6 @@ impl<R> TextKitAdapter<R> {
                         is_last_block: ctx.is_last_block && i == last_idx,
                     };
                     let child_str = self.render_block(child, &inner_ctx)?;
-                    // Insert accent bar ▎ at the start of each child paragraph
-                    let bar = attributed_string("\u{258E} ", &base_font, &accent_color);
-                    child_str.insertAttributedString_atIndex(&bar, 0);
                     result.appendAttributedString(&child_str);
                 }
             }
@@ -430,6 +426,46 @@ impl<R> TextKitAdapter<R> {
                 let inlines = self.render_inlines(children, &base_font, &text_color, ctx)?;
                 result.appendAttributedString(&inlines);
                 append_plain(&result, "\n", &base_font, &text_color);
+            }
+        }
+
+        // Prepend blockquote accent bar and ensure paragraph style covers it
+        if ctx.blockquote_depth > 0 && result.length() > 0 {
+            // Skip for container nodes (Document, BlockQuote, List) — their children
+            // already have the bar applied via their own render_block calls
+            let is_container = matches!(
+                node,
+                Node::Document { .. } | Node::BlockQuote { .. } | Node::List { .. }
+            );
+            if !is_container {
+                let accent = self.style.blockquote_accent_color.clone();
+                let bar_text = "\u{258E} ".repeat(ctx.blockquote_depth as usize);
+                let bar = attributed_string(&bar_text, &base_font, &accent);
+                let bar_len = bar.length();
+                result.insertAttributedString_atIndex(&bar, 0);
+
+                // Re-apply the paragraph style over the full range including the bar,
+                // so TextKit sees a consistent paragraph style from the first character
+                if result.length() > bar_len {
+                    // Read the paragraph style from the content (after the bar)
+                    let ps = unsafe {
+                        result.attribute_atIndex_effectiveRange(
+                            ns_string!("NSParagraphStyle"),
+                            bar_len,
+                            core::ptr::null_mut(),
+                        )
+                    };
+                    if let Some(ps) = ps {
+                        let full_range = NSRange::new(0, result.length());
+                        unsafe {
+                            result.addAttribute_value_range(
+                                ns_string!("NSParagraphStyle"),
+                                &ps,
+                                full_range,
+                            );
+                        }
+                    }
+                }
             }
         }
 

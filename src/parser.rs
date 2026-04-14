@@ -496,14 +496,20 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         };
         Some((
             index,
-            self.parse_block_lines_with_lazy(&inner_lines, finalizing, inner_terminated, refs, &lazy_flags)
-                .map(|children| ParsedBlock {
-                    provisional: children.iter().any(|child| child.provisional),
-                    node: Node::BlockQuote {
-                        children: children.into_iter().map(|child| child.node).collect(),
-                        meta: Meta::default(),
-                    },
-                }),
+            self.parse_block_lines_with_lazy(
+                &inner_lines,
+                finalizing,
+                inner_terminated,
+                refs,
+                &lazy_flags,
+            )
+            .map(|children| ParsedBlock {
+                provisional: children.iter().any(|child| child.provisional),
+                node: Node::BlockQuote {
+                    children: children.into_iter().map(|child| child.node).collect(),
+                    meta: Meta::default(),
+                },
+            }),
         ))
     }
 
@@ -1552,7 +1558,10 @@ fn parse_reference_definition(
         if consumed == 0 || depth != 0 {
             return None;
         }
-        (process_escapes_and_entities(&dest_text[..consumed]), consumed)
+        (
+            process_escapes_and_entities(&dest_text[..consumed]),
+            consumed,
+        )
     };
 
     let after_dest_abs = dest_abs + dest_consumed;
@@ -1627,7 +1636,8 @@ fn parse_reference_definition(
                 None => {
                     // Title didn't close; fall back to no title if dest line is clean
                     let trailing = &text[after_dest_abs..];
-                    let trailing_on_dest_line = trailing.find('\n').map_or(trailing, |nl| &trailing[..nl]);
+                    let trailing_on_dest_line =
+                        trailing.find('\n').map_or(trailing, |nl| &trailing[..nl]);
                     if !trailing_on_dest_line.trim().is_empty() {
                         return None;
                     }
@@ -1635,7 +1645,10 @@ fn parse_reference_definition(
                         dest_end_line_idx + 1,
                         (
                             normalize_reference_label(label),
-                            ReferenceDefinition { destination, title: None },
+                            ReferenceDefinition {
+                                destination,
+                                title: None,
+                            },
                         ),
                     ));
                 }
@@ -1667,13 +1680,18 @@ fn parse_reference_definition(
         if title.is_some() {
             // Try again without the title: destination only, on its own line
             let trailing_after_dest = &text[after_dest_abs..];
-            let nl = trailing_after_dest.find('\n').unwrap_or(trailing_after_dest.len());
+            let nl = trailing_after_dest
+                .find('\n')
+                .unwrap_or(trailing_after_dest.len());
             if trailing_after_dest[..nl].trim().is_empty() {
                 return Some((
                     dest_end_line_idx + 1,
                     (
                         normalize_reference_label(label),
-                        ReferenceDefinition { destination, title: None },
+                        ReferenceDefinition {
+                            destination,
+                            title: None,
+                        },
                     ),
                 ));
             }
@@ -1896,8 +1914,7 @@ fn parse_list_marker(line: &str) -> Option<ListMarker> {
             return None;
         }
         let base_col = indent.columns + marker_width;
-        let (content, content_indent) =
-            split_marker_content(rest, base_col, base_col + 1);
+        let (content, content_indent) = split_marker_content(rest, base_col, base_col + 1);
         return Some(ListMarker {
             ordered: false,
             start: None,
@@ -3077,7 +3094,52 @@ where
         }
     }
 
-    materialize_inline_pieces(pieces, meta)
+    let nodes = materialize_inline_pieces(pieces, meta);
+    collapse_nested_emphasis(nodes)
+}
+
+fn collapse_nested_emphasis<Ext, Meta>(nodes: Vec<Node<Ext, Meta>>) -> Vec<Node<Ext, Meta>>
+where
+    Ext: Clone + PartialEq,
+{
+    nodes
+        .into_iter()
+        .map(|node| match node {
+            Node::Strong { children, meta } => {
+                let children = flatten_same_type_children(collapse_nested_emphasis(children), true);
+                Node::Strong { children, meta }
+            }
+            Node::Emphasis { children, meta } => {
+                let children = collapse_nested_emphasis(children);
+                Node::Emphasis { children, meta }
+            }
+            other => other,
+        })
+        .collect()
+}
+
+fn flatten_same_type_children<Ext, Meta>(
+    children: Vec<Node<Ext, Meta>>,
+    is_strong: bool,
+) -> Vec<Node<Ext, Meta>> {
+    let mut out = Vec::with_capacity(children.len());
+    for child in children {
+        let is_same = if is_strong {
+            matches!(&child, Node::Strong { .. })
+        } else {
+            matches!(&child, Node::Emphasis { .. })
+        };
+        if is_same {
+            let inner = match child {
+                Node::Strong { children, .. } | Node::Emphasis { children, .. } => children,
+                _ => unreachable!(),
+            };
+            out.extend(inner);
+        } else {
+            out.push(child);
+        }
+    }
+    out
 }
 
 fn materialize_inline_pieces<Ext, Meta>(
@@ -3333,7 +3395,11 @@ fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>
         if destination.contains(|ch: char| ch.is_whitespace()) {
             return None;
         }
-        return Some((closing + 1, process_escapes_and_entities(&destination), title.map(|t| process_escapes_and_entities(&t))));
+        return Some((
+            closing + 1,
+            process_escapes_and_entities(&destination),
+            title.map(|t| process_escapes_and_entities(&t)),
+        ));
     }
 
     if body.contains(|ch: char| ch.is_whitespace()) {
@@ -4094,13 +4160,21 @@ fn parse_entity_reference(input: &str) -> Option<(usize, String)> {
         .strip_prefix("#x")
         .or_else(|| entity.strip_prefix("#X"))
     {
-        u32::from_str_radix(hex, 16)
-            .ok()
-            .and_then(|n| if n == 0 { Some('\u{FFFD}') } else { char::from_u32(n) })
+        u32::from_str_radix(hex, 16).ok().and_then(|n| {
+            if n == 0 {
+                Some('\u{FFFD}')
+            } else {
+                char::from_u32(n)
+            }
+        })
     } else if let Some(num) = entity.strip_prefix('#') {
-        num.parse::<u32>()
-            .ok()
-            .and_then(|n| if n == 0 { Some('\u{FFFD}') } else { char::from_u32(n) })
+        num.parse::<u32>().ok().and_then(|n| {
+            if n == 0 {
+                Some('\u{FFFD}')
+            } else {
+                char::from_u32(n)
+            }
+        })
     } else {
         // gfm[impl inlines.entity-and-numeric-character-references.entity-references-definition]
         resolve_named_entity(entity)
