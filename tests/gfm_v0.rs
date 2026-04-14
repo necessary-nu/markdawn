@@ -2217,9 +2217,8 @@ fn gfm_fenced_code_content_literal() {
 // gfm[verify leaf-blocks.fenced-code-blocks.content-may-consist-only-of-empty-lines]
 #[test]
 fn gfm_fenced_code_content_empty_lines() {
-    // The parser treats the closing fence as consuming the blank lines
     let html = render_html(&parse_final_nodes("```\n\n\n```\n"));
-    assert_eq!(html, "<pre><code></code></pre>\n");
+    assert_eq!(html, "<pre><code>\n\n</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.unclosed-block-continues-to-end-of-containing-block]
@@ -3576,16 +3575,15 @@ fn gfm_links_cannot_contain_links() {
     let html = render_html(&parse_final_nodes("[foo [bar](/uri)](/uri)\n"));
     assert_eq!(
         html,
-        "<p><a href=\"/uri\">foo <a href=\"/uri\">bar</a></a></p>\n"
+        "<p>[foo <a href=\"/uri\">bar</a>](/uri)</p>\n"
     );
 
-    // Deeper nesting (parser currently produces nested anchors)
     let html = render_html(&parse_final_nodes(
         "[foo *[bar [baz](/uri)](/uri)*](/uri)\n",
     ));
     assert_eq!(
         html,
-        "<p><a href=\"/uri\">foo <em><a href=\"/uri\">bar <a href=\"/uri\">baz</a></a></em></a></p>\n"
+        "<p>[foo <em>[bar <a href=\"/uri\">baz</a>](/uri)</em>](/uri)</p>\n"
     );
 }
 

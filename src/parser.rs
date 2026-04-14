@@ -960,10 +960,9 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             if lines[index].trim().is_empty() || !lines[index].contains('|') {
                 break;
             }
-            let cells = split_table_row(&lines[index]);
-            if cells.len() != alignments.len() {
-                break;
-            }
+            let mut cells = split_table_row(&lines[index]);
+            // Pad or truncate to match header column count
+            cells.resize(alignments.len(), String::new());
             rows.push(Node::TableRow {
                 cells: self.parse_table_cells(&cells, false, &alignments, refs)?,
                 meta: Meta::default(),
@@ -1044,10 +1043,11 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         let opener = parse_fence_opener(&lines[start])?;
         let mut literal = String::new();
         let mut index = start + 1;
+        let mut first_content = true;
 
         while index < lines.len() {
             if is_fence_closer(&lines[index], opener.marker, opener.count) {
-                if !literal.is_empty() {
+                if !first_content {
                     literal.push('\n');
                 }
                 return Some((
@@ -1063,14 +1063,15 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 ));
             }
 
-            if !literal.is_empty() {
+            if !first_content {
                 literal.push('\n');
             }
+            first_content = false;
             literal.push_str(&strip_up_to_n_leading_spaces(&lines[index], opener.indent));
             index += 1;
         }
 
-        if !literal.is_empty() {
+        if !first_content {
             literal.push('\n');
         }
         Some((
@@ -2329,12 +2330,21 @@ where
                 continue;
             }
 
-            if let Some(code) = self.try_code_span() {
-                flush_text_piece(&mut pieces, &mut text);
-                pieces.push(InlinePiece::Node(Node::CodeSpan {
-                    code,
-                    meta: self.meta.clone(),
-                }));
+            if self.remaining().starts_with('`') {
+                if let Some(code) = self.try_code_span() {
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(Node::CodeSpan {
+                        code,
+                        meta: self.meta.clone(),
+                    }));
+                    continue;
+                }
+                // No matching closer — consume entire backtick run as literal text
+                let run = self.remaining().chars().take_while(|ch| *ch == '`').count();
+                for _ in 0..run {
+                    text.push('`');
+                }
+                self.index += run;
                 continue;
             }
 
@@ -2720,6 +2730,10 @@ where
                 self.meta.clone(),
                 self.provisional,
             )?;
+            // Links cannot contain other links
+            if !image && contains_link(&children) {
+                return Ok(None);
+            }
             self.index = label_end + 2 + consumed;
             return Ok(Some(build_link_or_image(
                 image,
@@ -2757,6 +2771,9 @@ where
             self.meta.clone(),
             self.provisional,
         )?;
+        if !image && contains_link(&children) {
+            return Ok(None);
+        }
         self.index = label_end + 1 + consumed_after;
         Ok(Some(build_link_or_image(
             image,
@@ -2840,6 +2857,9 @@ where
         }
         let close = remaining.find('>')?;
         let body = &remaining[1..close];
+        if body.contains(' ') || body.contains('\n') {
+            return None;
+        }
         if looks_like_url(body) {
             self.index += close + 1;
             return Some(Node::Link {
@@ -3895,6 +3915,16 @@ where
 }
 
 // gfm[impl inlines.images.html-rendering-typically-uses-plain-description-as-alt]
+fn contains_link<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> bool {
+    nodes.iter().any(|node| match node {
+        Node::Link { .. } => true,
+        Node::Emphasis { children, .. }
+        | Node::Strong { children, .. }
+        | Node::Strikethrough { children, .. } => contains_link(children),
+        _ => false,
+    })
+}
+
 fn build_link_or_image<Ext, Meta>(
     image: bool,
     destination: String,
@@ -4103,7 +4133,29 @@ fn split_table_row(line: &str) -> Vec<String> {
     let trimmed = line.trim();
     let core = trimmed.strip_prefix('|').unwrap_or(trimmed);
     let core = core.strip_suffix('|').unwrap_or(core);
-    core.split('|').map(|cell| cell.trim().to_owned()).collect()
+    let mut cells = Vec::new();
+    let mut current = String::new();
+    let mut escaped = false;
+    for ch in core.chars() {
+        if escaped {
+            current.push(ch);
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            current.push(ch);
+            continue;
+        }
+        if ch == '|' {
+            cells.push(current.trim().to_owned());
+            current = String::new();
+        } else {
+            current.push(ch);
+        }
+    }
+    cells.push(current.trim().to_owned());
+    cells
 }
 
 fn plain_text<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> String {

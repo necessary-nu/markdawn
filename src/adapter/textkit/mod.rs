@@ -1,8 +1,10 @@
+pub mod attachment;
 mod attrs;
 mod content_storage;
 mod element_map;
 mod render;
 mod style;
+mod views;
 
 pub use self::content_storage::MarkdownContentStorage;
 pub use self::render::{RenderCtx, RenderTextKitCustom, TextKitAdapter, TextKitError};
@@ -35,7 +37,7 @@ impl TextKitSink<()> {
 
     pub fn with_style(mtm: MainThreadMarker, style: TextKitStyle) -> Self {
         Self {
-            adapter: TextKitAdapter::with_style(style),
+            adapter: TextKitAdapter::with_style(std::sync::Arc::new(style)),
             storage: MarkdownContentStorage::new(mtm),
             element_map: ElementMap::new(),
         }
@@ -45,7 +47,7 @@ impl TextKitSink<()> {
 impl<R> TextKitSink<R> {
     pub fn with_custom_renderer(mtm: MainThreadMarker, style: TextKitStyle, custom: R) -> Self {
         Self {
-            adapter: TextKitAdapter::with_custom_renderer(style, custom),
+            adapter: TextKitAdapter::with_custom_renderer(std::sync::Arc::new(style), custom),
             storage: MarkdownContentStorage::new(mtm),
             element_map: ElementMap::new(),
         }
@@ -318,7 +320,7 @@ mod tests {
     }
 
     #[test]
-    fn code_block_preserves_literal() {
+    fn code_block_renders_as_attachment() {
         let mut sink = TextKitSink::new(test_mtm());
         sink.emit(StreamItem::Upsert(Emission {
             id: 1,
@@ -330,7 +332,12 @@ mod tests {
             },
         }))
         .unwrap();
-        assert_eq!(text_of(&sink), "fn main() {}\n");
+        let text = text_of(&sink);
+        // Code blocks are now NSTextAttachment — text contains U+FFFC (object replacement char)
+        assert!(
+            text.contains('\u{FFFC}'),
+            "code block should be an attachment: {text:?}"
+        );
     }
 
     #[test]

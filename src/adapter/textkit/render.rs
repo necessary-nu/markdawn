@@ -1,10 +1,15 @@
+use std::sync::Arc;
+
 use objc2::AnyThread;
 use objc2::rc::Retained;
-use objc2_foundation::{NSMutableAttributedString, NSNumber, NSRange, NSString, ns_string};
-use objc2_ui_kit::{UIColor, UIFont, UIFontDescriptorSymbolicTraits};
+use objc2_foundation::{
+    NSAttributedString, NSMutableAttributedString, NSNumber, NSRange, NSString, ns_string,
+};
+use objc2_ui_kit::{NSAttributedStringAttachmentConveniences, UIColor, UIFont, UIFontDescriptorSymbolicTraits};
 
 use crate::node::Node;
 
+use super::attachment::{BlockData, MarkdownBlockAttachment};
 use super::attrs;
 use super::style::TextKitStyle;
 
@@ -74,7 +79,7 @@ impl core::fmt::Display for TextKitError {
 impl std::error::Error for TextKitError {}
 
 pub struct TextKitAdapter<R = ()> {
-    pub(crate) style: TextKitStyle,
+    pub(crate) style: Arc<TextKitStyle>,
     pub(crate) custom: R,
 }
 
@@ -87,18 +92,18 @@ impl Default for TextKitAdapter<()> {
 impl TextKitAdapter<()> {
     pub fn new() -> Self {
         Self {
-            style: TextKitStyle::default(),
+            style: Arc::new(TextKitStyle::default()),
             custom: (),
         }
     }
 
-    pub fn with_style(style: TextKitStyle) -> Self {
+    pub fn with_style(style: Arc<TextKitStyle>) -> Self {
         Self { style, custom: () }
     }
 }
 
 impl<R> TextKitAdapter<R> {
-    pub fn with_custom_renderer(style: TextKitStyle, custom: R) -> Self {
+    pub fn with_custom_renderer(style: Arc<TextKitStyle>, custom: R) -> Self {
         Self { style, custom }
     }
 
@@ -180,18 +185,28 @@ impl<R> TextKitAdapter<R> {
                 attrs::apply_paragraph_style(&result, &ps);
             }
             Node::BlockQuote { children, .. } => {
+                // Render children as attributed string, then wrap in an attachment view
+                let inner_content = NSMutableAttributedString::new();
                 let last_idx = children.len().saturating_sub(1);
                 for (i, child) in children.iter().enumerate() {
                     let inner_ctx = RenderCtx {
-                        blockquote_depth: ctx.blockquote_depth + 1,
+                        blockquote_depth: 0, // reset — the view handles visual treatment
                         list_stack: ctx.list_stack.clone(),
                         provisional: ctx.provisional,
                         is_last_list_item: false,
-                        is_last_block: ctx.is_last_block && i == last_idx,
+                        is_last_block: i == last_idx,
                     };
                     let child_str = self.render_block(child, &inner_ctx)?;
-                    result.appendAttributedString(&child_str);
+                    inner_content.appendAttributedString(&child_str);
                 }
+                let data = BlockData::BlockQuote {
+                    content: Retained::into_super(inner_content),
+                };
+                let attachment =
+                    MarkdownBlockAttachment::new_with_data(data, Arc::clone(&self.style));
+                let astr = NSAttributedString::attributedStringWithAttachment(&attachment);
+                result.appendAttributedString(&astr);
+                append_plain(&result, "\n", &base_font, &text_color);
             }
             Node::List {
                 ordered,
@@ -300,80 +315,29 @@ impl<R> TextKitAdapter<R> {
                 rows,
                 ..
             } => {
-                let mono_font = attrs::monospaced_font(&self.style, self.style.body_font_size);
-                let bold_mono =
-                    attrs::add_trait_to_font(&mono_font, UIFontDescriptorSymbolicTraits::TraitBold);
-
-                // Compute column widths from all rows
-                let all_rows: Vec<&Node<Ext, Meta>> = header.iter().chain(rows.iter()).collect();
-                let col_widths = self.compute_table_column_widths(&all_rows, ctx);
-
-                // ┌──────┬─────┬──────┐
-                append_plain(
-                    &result,
-                    &table_border_line(&col_widths, '\u{250C}', '\u{252C}', '\u{2510}'),
-                    &mono_font,
-                    &text_color,
-                );
-
-                // Header rows: │ Name │ Age │
-                for row in header {
-                    let row_str =
-                        self.render_table_grid_row(row, &col_widths, &bold_mono, &text_color, ctx)?;
-                    result.appendAttributedString(&row_str);
-                }
-
-                // ├──────┼─────┼──────┤
-                append_plain(
-                    &result,
-                    &table_border_line(&col_widths, '\u{251C}', '\u{253C}', '\u{2524}'),
-                    &mono_font,
-                    &text_color,
-                );
-
-                // Data rows: │ Alice │ 30  │
-                for row in rows {
-                    let row_str =
-                        self.render_table_grid_row(row, &col_widths, &mono_font, &text_color, ctx)?;
-                    result.appendAttributedString(&row_str);
-                }
-
-                // └──────┴─────┴──────┘
-                append_plain(
-                    &result,
-                    &table_border_line(&col_widths, '\u{2514}', '\u{2534}', '\u{2518}'),
-                    &mono_font,
-                    &text_color,
-                );
-
-                let ps = attrs::paragraph_style_body(
-                    &self.style,
-                    ctx.blockquote_depth,
-                    ctx.is_last_block,
-                );
-                attrs::apply_paragraph_style(&result, &ps);
-            }
-            Node::CodeBlock { literal, .. } => {
-                let code_font = attrs::monospaced_font(&self.style, self.style.body_font_size);
-                let code_color = if ctx.provisional {
-                    self.style
-                        .code_text_color
-                        .colorWithAlphaComponent(self.style.provisional_alpha as f64)
-                } else {
-                    self.style.code_text_color.clone()
+                let (header_cells, data_rows, col_widths) =
+                    self.extract_table_data(header, rows, ctx);
+                let data = BlockData::Table {
+                    header_cells,
+                    rows: data_rows,
+                    col_widths,
                 };
-                append_plain(&result, literal, &code_font, &code_color);
-                if !literal.ends_with('\n') {
-                    append_plain(&result, "\n", &code_font, &code_color);
-                }
-                let ps = attrs::paragraph_style_code(
-                    &self.style,
-                    ctx.blockquote_depth,
-                    ctx.is_last_block,
-                );
-                attrs::apply_paragraph_style(&result, &ps);
-                let bg = self.style.code_background_color.clone();
-                attrs::apply_background_color(&result, &bg);
+                let attachment =
+                    MarkdownBlockAttachment::new_with_data(data, Arc::clone(&self.style));
+                let astr = NSAttributedString::attributedStringWithAttachment(&attachment);
+                result.appendAttributedString(&astr);
+                append_plain(&result, "\n", &base_font, &text_color);
+            }
+            Node::CodeBlock { info, literal, .. } => {
+                let data = BlockData::CodeBlock {
+                    literal: literal.clone(),
+                    language: info.clone(),
+                };
+                let attachment =
+                    MarkdownBlockAttachment::new_with_data(data, Arc::clone(&self.style));
+                let astr = NSAttributedString::attributedStringWithAttachment(&attachment);
+                result.appendAttributedString(&astr);
+                append_plain(&result, "\n", &base_font, &text_color);
             }
             Node::Html { html, .. } => {
                 let code_font = attrs::monospaced_font(&self.style, self.style.body_font_size);
@@ -417,55 +381,24 @@ impl<R> TextKitAdapter<R> {
                 result.appendAttributedString(&inline);
                 append_plain(&result, "\n", &base_font, &text_color);
             }
-            Node::TableRow { .. } => {
-                let row_str =
-                    self.render_table_grid_row(node, &[], &base_font, &text_color, ctx)?;
-                result.appendAttributedString(&row_str);
+            Node::TableRow { cells, .. } => {
+                // Standalone table row outside a Table — render cells as text
+                for (i, cell) in cells.iter().enumerate() {
+                    if i > 0 {
+                        append_plain(&result, " | ", &base_font, &text_color);
+                    }
+                    if let Node::TableCell { children, .. } = cell {
+                        let rendered =
+                            self.render_inlines(children, &base_font, &text_color, ctx)?;
+                        result.appendAttributedString(&rendered);
+                    }
+                }
+                append_plain(&result, "\n", &base_font, &text_color);
             }
             Node::TableCell { children, .. } => {
                 let inlines = self.render_inlines(children, &base_font, &text_color, ctx)?;
                 result.appendAttributedString(&inlines);
                 append_plain(&result, "\n", &base_font, &text_color);
-            }
-        }
-
-        // Prepend blockquote accent bar and ensure paragraph style covers it
-        if ctx.blockquote_depth > 0 && result.length() > 0 {
-            // Skip for container nodes (Document, BlockQuote, List) — their children
-            // already have the bar applied via their own render_block calls
-            let is_container = matches!(
-                node,
-                Node::Document { .. } | Node::BlockQuote { .. } | Node::List { .. }
-            );
-            if !is_container {
-                let accent = self.style.blockquote_accent_color.clone();
-                let bar_text = "\u{258E} ".repeat(ctx.blockquote_depth as usize);
-                let bar = attributed_string(&bar_text, &base_font, &accent);
-                let bar_len = bar.length();
-                result.insertAttributedString_atIndex(&bar, 0);
-
-                // Re-apply the paragraph style over the full range including the bar,
-                // so TextKit sees a consistent paragraph style from the first character
-                if result.length() > bar_len {
-                    // Read the paragraph style from the content (after the bar)
-                    let ps = unsafe {
-                        result.attribute_atIndex_effectiveRange(
-                            ns_string!("NSParagraphStyle"),
-                            bar_len,
-                            core::ptr::null_mut(),
-                        )
-                    };
-                    if let Some(ps) = ps {
-                        let full_range = NSRange::new(0, result.length());
-                        unsafe {
-                            result.addAttribute_value_range(
-                                ns_string!("NSParagraphStyle"),
-                                &ps,
-                                full_range,
-                            );
-                        }
-                    }
-                }
             }
         }
 
@@ -564,95 +497,55 @@ impl<R> TextKitAdapter<R> {
         }
     }
 
-    fn render_table_grid_row<Ext, Meta>(
+    fn extract_table_data<Ext, Meta>(
         &self,
-        node: &Node<Ext, Meta>,
-        col_widths: &[usize],
-        font: &UIFont,
-        color: &UIColor,
+        header: &[Node<Ext, Meta>],
+        rows: &[Node<Ext, Meta>],
         ctx: &RenderCtx,
-    ) -> Result<Retained<NSMutableAttributedString>, TextKitError>
+    ) -> (Vec<String>, Vec<Vec<String>>, Vec<usize>)
     where
         R: RenderTextKitCustom<Ext, Meta>,
     {
-        let Node::TableRow { cells, .. } = node else {
-            return Ok(NSMutableAttributedString::new());
+        let base_font = attrs::body_font(&self.style);
+        let text_color = self.style.text_color.clone();
+
+        let extract_row = |row: &Node<Ext, Meta>| -> Vec<String> {
+            let Node::TableRow { cells, .. } = row else {
+                return Vec::new();
+            };
+            cells
+                .iter()
+                .map(|cell| {
+                    if let Node::TableCell { children, .. } = cell {
+                        if let Ok(rendered) =
+                            self.render_inlines(children, &base_font, &text_color, ctx)
+                        {
+                            return rendered.string().to_string();
+                        }
+                    }
+                    String::new()
+                })
+                .collect()
         };
 
-        // Render each cell's text content, then pad to column width
-        let mut cell_texts: Vec<String> = Vec::with_capacity(cells.len());
-        for cell in cells {
-            if let Node::TableCell { children, .. } = cell {
-                let rendered = self.render_inlines(children, font, color, ctx)?;
-                cell_texts.push(rendered.string().to_string());
-            } else {
-                cell_texts.push(String::new());
+        let header_cells: Vec<String> = header.first().map(extract_row).unwrap_or_default();
+        let data_rows: Vec<Vec<String>> = rows.iter().map(|r| extract_row(r)).collect();
+
+        // Compute column widths
+        let mut col_widths = vec![0usize; header_cells.len()];
+        for (i, text) in header_cells.iter().enumerate() {
+            col_widths[i] = col_widths[i].max(text.len());
+        }
+        for row in &data_rows {
+            if col_widths.len() < row.len() {
+                col_widths.resize(row.len(), 0);
+            }
+            for (i, text) in row.iter().enumerate() {
+                col_widths[i] = col_widths[i].max(text.len());
             }
         }
 
-        // Build: │ content │ content │ content │
-        let result = NSMutableAttributedString::new();
-        let mut row = String::new();
-        for (i, text) in cell_texts.iter().enumerate() {
-            row.push('\u{2502}');
-            let width = col_widths.get(i).copied().unwrap_or(text.len());
-            row.push(' ');
-            row.push_str(text);
-            let pad = width.saturating_sub(text.len());
-            for _ in 0..pad {
-                row.push(' ');
-            }
-            row.push(' ');
-        }
-        row.push('\u{2502}');
-        row.push('\n');
-        append_plain(&result, &row, font, color);
-        Ok(result)
-    }
-
-    fn compute_table_column_widths<Ext, Meta>(
-        &self,
-        rows: &[&Node<Ext, Meta>],
-        _ctx: &RenderCtx,
-    ) -> Vec<usize> {
-        let mut widths: Vec<usize> = Vec::new();
-
-        for row in rows {
-            let Node::TableRow { cells, .. } = row else {
-                continue;
-            };
-            if widths.len() < cells.len() {
-                widths.resize(cells.len(), 0);
-            }
-            for (i, cell) in cells.iter().enumerate() {
-                if let Node::TableCell { children, .. } = cell {
-                    let char_count = Self::estimate_text_len(children);
-                    if char_count > widths[i] {
-                        widths[i] = char_count;
-                    }
-                }
-            }
-        }
-
-        widths
-    }
-
-    fn estimate_text_len<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> usize {
-        let mut len = 0;
-        for node in nodes {
-            match node {
-                Node::Text { text, .. } => len += text.len(),
-                Node::CodeSpan { code, .. } => len += code.len(),
-                Node::Emphasis { children, .. }
-                | Node::Strong { children, .. }
-                | Node::Strikethrough { children, .. }
-                | Node::Link { children, .. } => len += Self::estimate_text_len(children),
-                Node::Image { alt, .. } => len += alt.len() + 2,
-                Node::SoftBreak { .. } | Node::HardBreak { .. } => len += 1,
-                _ => {}
-            }
-        }
-        len
+        (header_cells, data_rows, col_widths)
     }
 
     fn list_item_prefix(&self, ctx: &RenderCtx) -> String {
@@ -666,21 +559,6 @@ impl<R> TextKitAdapter<R> {
             String::new()
         }
     }
-}
-
-/// Build a horizontal border line like ┌──────┬─────┐ or ├──────┼─────┤
-fn table_border_line(col_widths: &[usize], left: char, mid: char, right: char) -> String {
-    let mut line = String::new();
-    for (i, &w) in col_widths.iter().enumerate() {
-        line.push(if i == 0 { left } else { mid });
-        // +2 for the space padding on each side of cell content
-        for _ in 0..w + 2 {
-            line.push('\u{2500}');
-        }
-    }
-    line.push(right);
-    line.push('\n');
-    line
 }
 
 fn attributed_string(

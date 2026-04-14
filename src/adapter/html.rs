@@ -200,11 +200,15 @@ impl<R> HtmlAdapter<R> {
                 for row in header {
                     self.write_table_row(row, alignments, out)?;
                 }
-                out.push_str("</thead>\n<tbody>\n");
-                for row in rows {
-                    self.write_table_row(row, alignments, out)?;
+                if rows.is_empty() {
+                    out.push_str("</thead>\n</table>\n");
+                } else {
+                    out.push_str("</thead>\n<tbody>\n");
+                    for row in rows {
+                        self.write_table_row(row, alignments, out)?;
+                    }
+                    out.push_str("</tbody>\n</table>\n");
                 }
-                out.push_str("</tbody>\n</table>\n");
             }
             Node::TableRow { .. } | Node::TableCell { .. } => {
                 self.write_table_row(node, &[], out)?;
