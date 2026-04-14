@@ -20,6 +20,7 @@ struct LiveBlock<Ext, Meta> {
 struct ParsedListItem<Ext, Meta> {
     block: ParsedBlock<Ext, Meta>,
     loose: bool,
+    trailing_blank: bool,
 }
 
 type ReferenceDefinitions = HashMap<String, ReferenceDefinition>;
@@ -569,7 +570,11 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 break;
             };
 
+            // Same list type: ordered must match, and marker char must match
             if marker.ordered != first_marker.ordered {
+                break;
+            }
+            if marker.marker_char != first_marker.marker_char {
                 break;
             }
 
@@ -723,6 +728,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             index,
             ParsedListItem {
                 loose,
+                trailing_blank: saw_blank_separator,
                 block: ParsedBlock {
                     provisional: children.iter().any(|child| child.provisional),
                     node: build_item_node(children),
@@ -1277,6 +1283,7 @@ struct FenceOpener {
 struct ListMarker {
     ordered: bool,
     start: Option<u64>,
+    marker_char: char,
     content: String,
     content_indent: usize,
 }
@@ -1894,6 +1901,7 @@ fn parse_list_marker(line: &str) -> Option<ListMarker> {
         return Some(ListMarker {
             ordered: false,
             start: None,
+            marker_char: first,
             content,
             content_indent,
         });
@@ -1926,6 +1934,7 @@ fn parse_list_marker(line: &str) -> Option<ListMarker> {
     Some(ListMarker {
         ordered: true,
         start: Some(start),
+        marker_char: marker,
         content,
         content_indent,
     })
@@ -3920,7 +3929,16 @@ fn parse_task_marker(text: &str) -> Option<(bool, &str)> {
 }
 
 fn is_tight_list<Ext, Meta>(items: &[ParsedListItem<Ext, Meta>]) -> bool {
-    !items.iter().any(|item| item.loose)
+    if items.iter().any(|item| item.loose) {
+        return false;
+    }
+    // A trailing blank on any item (except the last) means blank lines between items → loose
+    for (i, item) in items.iter().enumerate() {
+        if i < items.len() - 1 && item.trailing_blank {
+            return false;
+        }
+    }
+    true
 }
 
 fn is_paragraph_continuation_candidate(line: &str) -> bool {

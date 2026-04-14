@@ -4340,7 +4340,7 @@ fn gfm_list_loose_blank_between_items() {
     // Blank lines between items make the list loose (items wrapped in <p>)
     assert_eq!(
         html,
-        "<ul>\n<li>foo</li>\n<li>bar</li>\n<li>baz</li>\n</ul>\n"
+        "<ul>\n<li>\n<p>foo</p>\n</li>\n<li>\n<p>bar</p>\n</li>\n<li>\n<p>baz</p>\n</li>\n</ul>\n"
     );
 }
 
@@ -4362,7 +4362,7 @@ fn gfm_list_outer_loose_inner_tight() {
     let html = render_html(&parse_final_nodes("- a\n  - b\n  - c\n\n- d\n"));
     assert_eq!(
         html,
-        "<ul>\n<li>a<ul>\n<li>b</li>\n<li>c</li>\n</ul>\n</li>\n<li>d</li>\n</ul>\n"
+        "<ul>\n<li>\n<p>a</p>\n<ul>\n<li>b</li>\n<li>c</li>\n</ul>\n</li>\n<li>\n<p>d</p>\n</li>\n</ul>\n"
     );
 }
 
@@ -4371,7 +4371,7 @@ fn gfm_list_outer_loose_inner_tight() {
 #[test]
 fn gfm_list_items_separated_by_multiple_blank_lines() {
     let html = render_html(&parse_final_nodes("- a\n\n\n- b\n"));
-    assert_eq!(html, "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n");
+    assert_eq!(html, "<ul>\n<li>\n<p>a</p>\n</li>\n<li>\n<p>b</p>\n</li>\n</ul>\n");
 }
 
 // gfm[verify container-blocks.lists.changing-marker-type-or-delimiter-starts-new-list]
