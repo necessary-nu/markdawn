@@ -309,7 +309,7 @@ fn escape_href(url: &str, out: &mut String) {
     const URL_SAFE: &AsciiSet = &NON_ALPHANUMERIC
         .remove(b'-').remove(b'.').remove(b'_').remove(b'~')
         .remove(b':').remove(b'/').remove(b'?').remove(b'#')
-        .remove(b'[').remove(b']').remove(b'@').remove(b'!')
+        .remove(b'@').remove(b'!')
         .remove(b'$').remove(b'&').remove(b'\'').remove(b'(')
         .remove(b')').remove(b'*').remove(b'+').remove(b',')
         .remove(b';').remove(b'=').remove(b'%');
@@ -5337,7 +5337,7 @@ fn gfm_autolink_no_backslash_escapes() {
     let html = render_html(&parse_final_nodes("<http://example.com/\\[\\>\n"));
     assert_eq!(
         html,
-        "<p><a href=\"http://example.com/%5C[%5C\">http://example.com/\\[\\</a></p>\n"
+        "<p><a href=\"http://example.com/%5C%5B%5C\">http://example.com/\\[\\</a></p>\n"
     );
 }
 

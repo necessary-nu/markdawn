@@ -527,8 +527,6 @@ fn escape_href(url: &str, out: &mut String) {
         .remove(b'/')
         .remove(b'?')
         .remove(b'#')
-        .remove(b'[')
-        .remove(b']')
         .remove(b'@')
         .remove(b'!')
         .remove(b'$')
