@@ -3462,7 +3462,8 @@ fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>
         let title = if title_body.is_empty() {
             None
         } else {
-            parse_title(title_body).map(|t| process_escapes_and_entities(&t))
+            // Non-empty content after > must be a valid title, otherwise reject
+            Some(process_escapes_and_entities(&parse_title(title_body)?))
         };
         let paren_pos_in_rest = rest.len() - after_gt.len() + paren_in_after_gt;
         return Some((paren_pos_in_rest + 1, destination, title));
@@ -4484,6 +4485,7 @@ fn looks_like_email(text: &str) -> bool {
         || !domain.contains('.')
         || domain.starts_with('.')
         || domain.ends_with('.')
+        || domain.ends_with('-')
     {
         return false;
     }
