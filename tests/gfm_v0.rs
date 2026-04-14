@@ -2599,13 +2599,13 @@ fn gfm_link_ref_def_four_spaces_is_code() {
 // gfm[verify leaf-blocks.link-reference-definitions.cannot-interrupt-paragraphs]
 #[test]
 fn gfm_link_ref_def_cannot_interrupt_paragraph() {
-    // When the definition is on a new line after the paragraph text, the parser
-    // includes `[bar]: /baz` in the paragraph text (lazy continuation), then
-    // the inline parser resolves the [bar] shortcut link.
+    // A reference definition on a paragraph continuation line is not recognised
+    // as a definition; the text stays as paragraph content and [bar] does not
+    // resolve to a link.
     let html = render_html(&parse_final_nodes("Foo\n[bar]: /baz\n\n[bar]\n"));
     assert_eq!(
         html,
-        "<p>Foo\n<a href=\"/baz\">bar</a>: /baz</p>\n<p><a href=\"/baz\">bar</a></p>\n"
+        "<p>Foo\n[bar]: /baz</p>\n<p>[bar]</p>\n"
     );
 }
 

@@ -220,21 +220,30 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         Ext: Clone + PartialEq,
     {
         let mut index = 0;
+        // Track whether the previous non-blank line was plain paragraph text.
+        // A reference definition cannot appear on a paragraph continuation line.
+        let mut in_paragraph = false;
         while index < lines.len() {
             if lines[index].trim().is_empty() {
+                in_paragraph = false;
                 index += 1;
                 continue;
             }
 
-            if let Some((next, (label, def))) = parse_reference_definition(lines, index) {
-                refs.entry(label).or_insert(def);
-                index = next;
-                continue;
+            if !in_paragraph {
+                if let Some((next, (label, def))) = parse_reference_definition(lines, index) {
+                    refs.entry(label).or_insert(def);
+                    index = next;
+                    // After a ref def the next line starts fresh (not a paragraph continuation).
+                    in_paragraph = false;
+                    continue;
+                }
             }
 
             if let Some((next, inner_lines)) = collect_block_quote_lines(lines, index) {
                 self.collect_reference_definitions_in_lines(&inner_lines, refs)?;
                 index = next;
+                in_paragraph = false;
                 continue;
             }
 
@@ -243,24 +252,31 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                     self.collect_reference_definitions_in_lines(&item, refs)?;
                 }
                 index = next;
+                in_paragraph = false;
                 continue;
             }
 
             if let Some((next, _)) = self.parse_html_block(lines, index, true, true) {
                 index = next;
+                in_paragraph = false;
                 continue;
             }
 
             if let Some((next, _)) = self.parse_fenced_code(lines, index, true) {
                 index = next;
+                in_paragraph = false;
                 continue;
             }
 
             if let Some((next, _)) = self.parse_indented_code(lines, index, true, true) {
                 index = next;
+                in_paragraph = false;
                 continue;
             }
 
+            // This line is paragraph text; the next non-blank line is a
+            // paragraph continuation and must not be treated as a ref def.
+            in_paragraph = true;
             index += 1;
         }
 
@@ -572,6 +588,13 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         let mut index = start;
         let mut items: Vec<ParsedListItem<Ext, Meta>> = Vec::new();
         while index < lines.len() {
+            // A thematic break on a subsequent item line ends the list so the
+            // break can be parsed as a top-level block (e.g. `* * *` inside a
+            // bullet list started with `*`).
+            if !items.is_empty() && is_thematic_break(&lines[index]) {
+                break;
+            }
+
             let Some(marker) = parse_list_marker(&lines[index]) else {
                 break;
             };
@@ -702,6 +725,12 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
+            // A thematic break on a non-continuation line ends the list item
+            // (and the list) so it can be parsed as a top-level block.
+            if is_thematic_break(&lines[index]) {
+                break;
+            }
+
             if !inner_lines
                 .last()
                 .is_some_and(|line| line.trim().is_empty())
@@ -769,11 +798,14 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         let first = strip_indented_code_line(&lines[start])?;
         let mut literal = first;
         let mut index = start + 1;
-        let mut pending_blanks: usize = 0;
+        let mut pending_blanks: Vec<String> = Vec::new();
 
         while index < lines.len() {
             if lines[index].trim().is_empty() {
-                pending_blanks += 1;
+                // Preserve whitespace content beyond the 4-space indent
+                let blank_content = strip_indent_columns(&lines[index], 4)
+                    .unwrap_or_default();
+                pending_blanks.push(blank_content);
                 index += 1;
                 continue;
             }
@@ -781,17 +813,18 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             let Some(stripped) = strip_indented_code_line(&lines[index]) else {
                 break;
             };
-            for _ in 0..pending_blanks {
+            for blank in &pending_blanks {
                 literal.push('\n');
+                literal.push_str(blank);
             }
-            pending_blanks = 0;
+            pending_blanks.clear();
             literal.push('\n');
             literal.push_str(&stripped);
             index += 1;
         }
 
         // Trailing blank lines don't belong to the code block
-        index -= pending_blanks;
+        index -= pending_blanks.len();
         literal.push('\n');
         Some((
             index,
@@ -1581,7 +1614,10 @@ fn parse_reference_definition(
     let title: Option<String>;
     let end_abs: usize;
 
-    if newlines_to_title > 1 || maybe_title_start >= text.len() {
+    if newlines_to_title > 1
+        || maybe_title_start >= text.len()
+        || (title_start_rel == 0 && newlines_to_title == 0)
+    {
         title = None;
         end_abs = after_dest_abs;
     } else {
@@ -1849,7 +1885,10 @@ fn strip_atx_content(rest: &str) -> &str {
         end -= 1;
     }
 
-    if end < trimmed.len() && end > 0 && bytes[end - 1] == b' ' {
+    if end < trimmed.len() && end == 0 {
+        // Content was only hashes (e.g. "### ###" where rest is "###")
+        ""
+    } else if end < trimmed.len() && end > 0 && bytes[end - 1] == b' ' {
         trimmed[..end].trim_end()
     } else {
         trimmed
@@ -2719,29 +2758,28 @@ where
         let after = &self.input[label_end + 1..];
 
         if let Some(after_open) = after.strip_prefix('(') {
-            let Some((consumed, destination, title)) = parse_inline_link_target(after_open) else {
-                return Ok(None);
-            };
-
-            let children = parse_inline_children(
-                label,
-                self.inline_extensions,
-                self.refs,
-                self.meta.clone(),
-                self.provisional,
-            )?;
-            // Links cannot contain other links
-            if !image && contains_link(&children) {
-                return Ok(None);
+            if let Some((consumed, destination, title)) = parse_inline_link_target(after_open) {
+                let children = parse_inline_children(
+                    label,
+                    self.inline_extensions,
+                    self.refs,
+                    self.meta.clone(),
+                    self.provisional,
+                )?;
+                // Links cannot contain other links
+                if !image && contains_link(&children) {
+                    return Ok(None);
+                }
+                self.index = label_end + 2 + consumed;
+                return Ok(Some(build_link_or_image(
+                    image,
+                    destination,
+                    title,
+                    children,
+                    self.meta.clone(),
+                )));
             }
-            self.index = label_end + 2 + consumed;
-            return Ok(Some(build_link_or_image(
-                image,
-                destination,
-                title,
-                children,
-                self.meta.clone(),
-            )));
+            // Inline link failed; fall through to try reference link matching.
         }
 
         let mut consumed_after = 0;
@@ -3522,11 +3560,32 @@ fn parse_title(s: &str) -> Option<String> {
     if s.len() < 2 {
         return None;
     }
-    if s.ends_with(close) {
-        Some(s[1..s.len() - 1].to_owned())
-    } else {
-        None
+    // Find the first unescaped closing delimiter.
+    let body = &s[first.len_utf8()..];
+    let mut escaped = false;
+    for (i, ch) in body.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == close {
+            let after_close = &body[i + ch.len_utf8()..];
+            if after_close.is_empty() {
+                return Some(body[..i].to_owned());
+            }
+            // There is text after the closing delimiter -- invalid title.
+            return None;
+        }
+        // For parenthesized titles, nested open-parens are not allowed.
+        if first == '(' && ch == '(' {
+            return None;
+        }
     }
+    None
 }
 
 // gfm[impl inlines.links.link-title-definition]
@@ -4346,7 +4405,7 @@ const DISALLOWED_HTML_TAGS: &[&str] = &[
 // gfm[impl inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
 // gfm[impl inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
 // gfm[impl inlines.disallowed-raw-html-extension.extension-wrapper]
-fn filter_disallowed_html(html: &str) -> String {
+pub(crate) fn filter_disallowed_html(html: &str) -> String {
     let mut result = String::with_capacity(html.len());
     let mut i = 0;
     let bytes = html.as_bytes();
