@@ -1789,6 +1789,7 @@ fn find_unescaped_bracket(input: &str) -> Option<usize> {
         }
         match ch {
             '\\' => escaped = true,
+            '[' => return None,
             ']' => return Some(i),
             _ => {}
         }
@@ -2946,7 +2947,7 @@ where
     // gfm[impl inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
     fn try_autolink_literal(&mut self) -> Option<Node<Ext, Meta>> {
         let remaining = self.remaining();
-        for prefix in ["https://", "http://"] {
+        for prefix in ["https://", "http://", "ftp://"] {
             if let Some(rest) = remaining.strip_prefix(prefix) {
                 let end = rest
                     .find(|ch: char| ch.is_whitespace() || matches!(ch, '<'))
@@ -2989,13 +2990,15 @@ where
             .find(|ch: char| ch.is_whitespace() || matches!(ch, '<'))
             .unwrap_or(remaining.len());
         let candidate = &remaining[..end];
-        if looks_like_email(candidate) {
-            self.index += candidate.len();
+        // For emails, only strip trailing dots (not full URL trailing rules)
+        let trimmed_email = candidate.trim_end_matches('.');
+        if !trimmed_email.is_empty() && looks_like_email(trimmed_email) {
+            self.index += trimmed_email.len();
             return Some(Node::Link {
-                destination: format!("mailto:{candidate}"),
+                destination: format!("mailto:{trimmed_email}"),
                 title: None,
                 children: vec![Node::Text {
-                    text: candidate.to_owned(),
+                    text: trimmed_email.to_owned(),
                     meta: self.meta.clone(),
                 }],
                 meta: self.meta.clone(),
@@ -3405,6 +3408,14 @@ fn find_closing_bracket(input: &str, start: usize) -> Option<usize> {
                     i += 1;
                 }
             }
+            '<' => {
+                // HTML tags and autolinks bind tighter than link brackets
+                if let Some(close) = input[i..].find('>') {
+                    i += close + 1;
+                } else {
+                    i += 1;
+                }
+            }
             '[' => {
                 depth += 1;
                 i += 1;
@@ -3465,7 +3476,7 @@ fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>
     }
 
     if let Some((destination, title)) = split_destination_and_title(body) {
-        if destination.contains(|ch: char| ch.is_ascii_whitespace()) {
+        if destination.contains(|ch: char| ch.is_ascii_whitespace() || ch == '<' || ch == '>') {
             return None;
         }
         return Some((
@@ -3475,7 +3486,7 @@ fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>
         ));
     }
 
-    if body.contains(|ch: char| ch.is_ascii_whitespace()) {
+    if body.contains(|ch: char| ch.is_ascii_whitespace() || ch == '<' || ch == '>') {
         return None;
     }
     Some((closing + 1, process_escapes_and_entities(body), None))
