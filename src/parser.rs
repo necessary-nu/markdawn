@@ -293,6 +293,21 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
+        self.parse_block_lines_with_lazy(lines, finalizing, terminated, refs, &[])
+    }
+
+    fn parse_block_lines_with_lazy(
+        &self,
+        lines: &[String],
+        finalizing: bool,
+        terminated: bool,
+        refs: &ReferenceDefinitions,
+        lazy: &[bool],
+    ) -> Result<Vec<ParsedBlock<Ext, Meta>>, Error>
+    where
+        Meta: Default + Clone + PartialEq,
+        Ext: Clone + PartialEq,
+    {
         let mut blocks = Vec::new();
         let mut index = 0;
 
@@ -333,6 +348,21 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
+            // gfm[impl leaf-blocks.thematic-breaks.can-interrupt-paragraphs]
+            // gfm[impl leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines]
+            // gfm[impl leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item]
+            // gfm[impl leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item]
+            if is_thematic_break(&lines[index]) {
+                blocks.push(ParsedBlock {
+                    node: Node::ThematicBreak {
+                        meta: Meta::default(),
+                    },
+                    provisional: !finalizing && index + 1 == lines.len() && !terminated,
+                });
+                index += 1;
+                continue;
+            }
+
             if let Some((next, block)) =
                 self.parse_list(lines, index, finalizing, terminated, refs)?
             {
@@ -364,23 +394,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
-            // gfm[impl leaf-blocks.thematic-breaks.can-interrupt-paragraphs]
-            // gfm[impl leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines]
-            // gfm[impl leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item]
-            // gfm[impl leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item]
-            if is_thematic_break(&lines[index]) {
-                blocks.push(ParsedBlock {
-                    node: Node::ThematicBreak {
-                        meta: Meta::default(),
-                    },
-                    provisional: !finalizing && index + 1 == lines.len() && !terminated,
-                });
-                index += 1;
-                continue;
-            }
-
             let (next, block) =
-                self.parse_paragraphish(&lines, index, finalizing, terminated, refs)?;
+                self.parse_paragraphish(&lines, index, finalizing, terminated, refs, lazy)?;
             blocks.push(block);
             index = next;
         }
@@ -432,19 +447,36 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         Ext: Clone + PartialEq,
     {
         let mut inner_lines = Vec::new();
+        let mut lazy_flags: Vec<bool> = Vec::new();
         let mut index = start;
         let mut saw_marker = false;
 
         while index < lines.len() {
             if let Some(stripped) = strip_block_quote_marker(&lines[index]) {
                 inner_lines.push(stripped);
+                lazy_flags.push(false);
                 saw_marker = true;
                 index += 1;
                 continue;
             }
 
-            if saw_marker && lines[index].trim().is_empty() {
-                inner_lines.push(String::new());
+            if !saw_marker {
+                break;
+            }
+
+            if lines[index].trim().is_empty() {
+                break;
+            }
+
+            // Lazy continuation: the previous inner line must be non-blank paragraph text
+            // (we don't lazy-continue after blank lines or after code blocks / other block constructs).
+            if inner_lines
+                .last()
+                .is_some_and(|line| is_paragraph_continuation_candidate(line))
+                && is_lazy_list_continuation(&lines[index], lines, index)
+            {
+                inner_lines.push(lines[index].clone());
+                lazy_flags.push(true);
                 index += 1;
                 continue;
             }
@@ -463,7 +495,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         };
         Some((
             index,
-            self.parse_block_lines(&inner_lines, finalizing, inner_terminated, refs)
+            self.parse_block_lines_with_lazy(&inner_lines, finalizing, inner_terminated, refs, &lazy_flags)
                 .map(|children| ParsedBlock {
                     provisional: children.iter().any(|child| child.provisional),
                     node: Node::BlockQuote {
@@ -725,10 +757,11 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         let first = strip_indented_code_line(&lines[start])?;
         let mut literal = first;
         let mut index = start + 1;
+        let mut pending_blanks: usize = 0;
 
         while index < lines.len() {
             if lines[index].trim().is_empty() {
-                literal.push('\n');
+                pending_blanks += 1;
                 index += 1;
                 continue;
             }
@@ -736,11 +769,18 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             let Some(stripped) = strip_indented_code_line(&lines[index]) else {
                 break;
             };
+            for _ in 0..pending_blanks {
+                literal.push('\n');
+            }
+            pending_blanks = 0;
             literal.push('\n');
             literal.push_str(&stripped);
             index += 1;
         }
 
+        // Trailing blank lines don't belong to the code block
+        index -= pending_blanks;
+        literal.push('\n');
         Some((
             index,
             ParsedBlock {
@@ -995,6 +1035,9 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
         while index < lines.len() {
             if is_fence_closer(&lines[index], opener.marker, opener.count) {
+                if !literal.is_empty() {
+                    literal.push('\n');
+                }
                 return Some((
                     index + 1,
                     Ok(ParsedBlock {
@@ -1015,6 +1058,9 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             index += 1;
         }
 
+        if !literal.is_empty() {
+            literal.push('\n');
+        }
         Some((
             lines.len(),
             Ok(ParsedBlock {
@@ -1119,6 +1165,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         finalizing: bool,
         terminated: bool,
         refs: &ReferenceDefinitions,
+        lazy: &[bool],
     ) -> Result<(usize, ParsedBlock<Ext, Meta>), Error>
     where
         Meta: Default + Clone,
@@ -1132,13 +1179,16 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 break;
             }
 
+            let is_lazy = lazy.get(index).copied().unwrap_or(false);
+
             // gfm[impl leaf-blocks.thematic-breaks.setext-heading-takes-precedence-over-dash-break]
             // gfm[impl leaf-blocks.setext-headings.level-determined-by-underline-marker]
             // gfm[impl leaf-blocks.setext-headings.underline-uses-equals-or-dashes]
             // gfm[impl leaf-blocks.setext-headings.content-may-span-multiple-lines]
             // gfm[impl leaf-blocks.setext-headings.raw-content-concatenates-lines-and-trims-edge-whitespace]
             // gfm[impl leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content]
-            if is_setext_underline(&lines[index]) {
+            // Setext underline cannot be a lazy continuation line
+            if !is_lazy && is_setext_underline(&lines[index]) {
                 let text = join_lines(&collected);
                 let children = self.parse_inline_nodes(text.trim(), false, refs)?;
                 let level = if lines[index].trim_start().starts_with('=') {
@@ -1164,7 +1214,6 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 || is_thematic_break(&lines[index])
                 || strip_block_quote_marker(&lines[index]).is_some()
                 || parse_list_marker(&lines[index]).is_some_and(can_interrupt_paragraph_with_list)
-                || strip_indented_code_line(&lines[index]).is_some()
                 || classify_html_block_start(&lines[index])
                     .is_some_and(|start| start.can_interrupt_paragraph)
             {
@@ -1401,44 +1450,280 @@ fn parse_reference_definition(
     lines: &[String],
     start: usize,
 ) -> Option<(usize, (String, ReferenceDefinition))> {
-    let line = trim_up_to_three_spaces(&lines[start]);
-    let rest = line.strip_prefix('[')?;
-    let end = find_unescaped_bracket(rest)?;
-    let label = &rest[..end];
-    if label.trim().is_empty() {
-        return None;
-    }
-    let after = rest[end + 1..].strip_prefix(':')?.trim();
-    if after.is_empty() {
+    // Join lines from `start` with newlines to handle multi-line definitions.
+    // We stop at a blank line, which cannot appear inside a reference definition.
+    let first_line = trim_up_to_three_spaces(&lines[start]);
+    if !first_line.starts_with('[') {
         return None;
     }
 
-    let (destination, title) = if after.starts_with('<') {
-        let after_angle = &after[1..];
-        let angle_close = after_angle.find('>')?;
-        let dest = after_angle[..angle_close].to_owned();
-        let remainder = after_angle[angle_close + 1..].trim();
-        let title = if remainder.is_empty() {
-            None
-        } else {
-            parse_title(remainder)
-        };
-        (dest, title)
+    // Determine the text available for parsing: concatenate consecutive non-blank lines.
+    let mut end_line = start;
+    while end_line < lines.len() && !lines[end_line].trim().is_empty() {
+        end_line += 1;
+    }
+    if end_line == start {
+        return None;
+    }
+
+    // Build the joined text, tracking line boundaries to map back to `lines` index.
+    // We use the stripped first line (without leading spaces) but keep original subsequent lines.
+    let first_stripped_bytes = lines[start].len() - first_line.len();
+    let mut text = String::from(first_line);
+    let mut line_ends = vec![text.len()]; // byte position after each line (just before its \n)
+    for i in (start + 1)..end_line {
+        text.push('\n');
+        text.push_str(&lines[i]);
+        line_ends.push(text.len());
+    }
+
+    // Parse [label]
+    let after_bracket = text.strip_prefix('[')?;
+    let label_end = find_unescaped_bracket(after_bracket)?;
+    let label = &after_bracket[..label_end];
+    if label.trim().is_empty() || label.contains("\n\n") {
+        return None;
+    }
+    // Label may span lines but must contain at least one non-whitespace character
+    // `find_unescaped_bracket` already stopped at `]`; also disallow `[` inside
+    // (which it doesn't track but spec forbids unescaped `[`).
+
+    let after_label_abs = 1 + label_end + 1; // past the `]`
+    let after_colon = text[after_label_abs..].strip_prefix(':')?;
+
+    // Skip whitespace including up to one newline before destination.
+    let (dest_start_rel, newlines_before_dest) = skip_ws_one_line(after_colon);
+    if newlines_before_dest > 1 {
+        return None;
+    }
+    let dest_abs = after_label_abs + 1 + dest_start_rel;
+    let dest_text = &text[dest_abs..];
+    if dest_text.is_empty() || dest_text.starts_with('\n') {
+        return None;
+    }
+
+    // Parse destination
+    let (destination, dest_consumed) = if dest_text.starts_with('<') {
+        let body = &dest_text[1..];
+        let close = find_angle_close(body)?;
+        let dest = process_escapes_and_entities(&body[..close]);
+        (dest, 2 + close)
     } else {
-        split_destination_and_title(after).unwrap_or_else(|| (after.to_owned(), None))
+        // Bare destination: up to first whitespace/control, with balanced parens
+        let mut depth = 0usize;
+        let mut escaped = false;
+        let mut consumed = 0;
+        for (i, ch) in dest_text.char_indices() {
+            if escaped {
+                escaped = false;
+                consumed = i + ch.len_utf8();
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                consumed = i + 1;
+                continue;
+            }
+            if ch == '(' {
+                depth += 1;
+                consumed = i + 1;
+                continue;
+            }
+            if ch == ')' {
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+                consumed = i + 1;
+                continue;
+            }
+            if ch.is_whitespace() || ch.is_ascii() && (ch as u8).is_ascii_control() {
+                break;
+            }
+            consumed = i + ch.len_utf8();
+        }
+        if consumed == 0 || depth != 0 {
+            return None;
+        }
+        (process_escapes_and_entities(&dest_text[..consumed]), consumed)
     };
 
+    let after_dest_abs = dest_abs + dest_consumed;
+
+    // Look for a title. Skip whitespace including newlines (but not blank lines).
+    // If the current line after destination has only whitespace, try next line for title.
+    let remaining = &text[after_dest_abs..];
+    let (title_start_rel, newlines_to_title) = skip_ws_one_line(remaining);
+    let maybe_title_start = after_dest_abs + title_start_rel;
+
+    // Determine the line index of destination end (for fallback case where title fails)
+    let dest_end_line_idx = line_index_of(&line_ends, after_dest_abs);
+
+    // Parse optional title
+    let title: Option<String>;
+    let end_abs: usize;
+
+    if newlines_to_title > 1 || maybe_title_start >= text.len() {
+        title = None;
+        end_abs = after_dest_abs;
+    } else {
+        let title_text = &text[maybe_title_start..];
+        let first_char = title_text.chars().next().unwrap();
+        let close_char_opt = match first_char {
+            '"' => Some('"'),
+            '\'' => Some('\''),
+            '(' => Some(')'),
+            _ => None,
+        };
+
+        if let Some(close_char) = close_char_opt {
+            let body = &title_text[1..];
+            let mut escaped = false;
+            let mut close_at = None;
+            let mut prev_was_newline = false;
+            for (i, ch) in body.char_indices() {
+                if escaped {
+                    escaped = false;
+                    prev_was_newline = false;
+                    continue;
+                }
+                if ch == '\\' {
+                    escaped = true;
+                    prev_was_newline = false;
+                    continue;
+                }
+                if ch == '\n' {
+                    if prev_was_newline {
+                        return None;
+                    }
+                    prev_was_newline = true;
+                    continue;
+                }
+                if ch != ' ' && ch != '\t' {
+                    prev_was_newline = false;
+                }
+                if ch == close_char {
+                    close_at = Some(i);
+                    break;
+                }
+                if first_char == '(' && ch == '(' {
+                    return None;
+                }
+            }
+
+            match close_at {
+                Some(close_idx) => {
+                    let title_body = &body[..close_idx];
+                    title = Some(process_escapes_and_entities(title_body));
+                    end_abs = maybe_title_start + 1 + close_idx + 1;
+                }
+                None => {
+                    // Title didn't close; fall back to no title if dest line is clean
+                    let trailing = &text[after_dest_abs..];
+                    let trailing_on_dest_line = trailing.find('\n').map_or(trailing, |nl| &trailing[..nl]);
+                    if !trailing_on_dest_line.trim().is_empty() {
+                        return None;
+                    }
+                    return Some((
+                        dest_end_line_idx + 1,
+                        (
+                            normalize_reference_label(label),
+                            ReferenceDefinition { destination, title: None },
+                        ),
+                    ));
+                }
+            }
+        } else {
+            // No title character; must be whitespace to end of line
+            let trailing = &text[after_dest_abs..];
+            if let Some(nl) = trailing.find('\n') {
+                if !trailing[..nl].trim().is_empty() {
+                    return None;
+                }
+                title = None;
+                end_abs = after_dest_abs + nl;
+            } else if trailing.trim().is_empty() {
+                title = None;
+                end_abs = after_dest_abs + trailing.len();
+            } else {
+                return None;
+            }
+        }
+    }
+
+    // After end_abs, rest of the line must be only whitespace
+    let trailing = &text[end_abs..];
+    let line_end_in_trailing = trailing.find('\n').unwrap_or(trailing.len());
+    if !trailing[..line_end_in_trailing].trim().is_empty() {
+        // If we had a title, we can't fall back because destination already consumed.
+        // But if title was optional and we already committed, this is invalid.
+        if title.is_some() {
+            // Try again without the title: destination only, on its own line
+            let trailing_after_dest = &text[after_dest_abs..];
+            let nl = trailing_after_dest.find('\n').unwrap_or(trailing_after_dest.len());
+            if trailing_after_dest[..nl].trim().is_empty() {
+                return Some((
+                    dest_end_line_idx + 1,
+                    (
+                        normalize_reference_label(label),
+                        ReferenceDefinition { destination, title: None },
+                    ),
+                ));
+            }
+        }
+        return None;
+    }
+
+    // Determine how many source lines were consumed
+    let end_line_idx = line_index_of(&line_ends, end_abs);
+    let consumed_lines = end_line_idx + 1;
+
+    let _ = first_stripped_bytes; // unused
     let normalized = normalize_reference_label(label);
     Some((
-        start + 1,
+        start + consumed_lines,
         (normalized, ReferenceDefinition { destination, title }),
     ))
+}
+
+/// Skip spaces/tabs/newlines, but stop if more than one blank line.
+/// Returns (bytes consumed, number of newlines passed).
+fn skip_ws_one_line(s: &str) -> (usize, usize) {
+    let mut i = 0;
+    let mut newlines = 0usize;
+    let bytes = s.as_bytes();
+    while i < bytes.len() {
+        match bytes[i] {
+            b' ' | b'\t' => i += 1,
+            b'\n' => {
+                newlines += 1;
+                if newlines > 1 {
+                    break;
+                }
+                i += 1;
+            }
+            _ => break,
+        }
+    }
+    (i, newlines)
+}
+
+fn line_index_of(line_ends: &[usize], abs: usize) -> usize {
+    for (i, &end) in line_ends.iter().enumerate() {
+        if abs <= end {
+            return i;
+        }
+    }
+    line_ends.len().saturating_sub(1)
 }
 
 fn find_unescaped_bracket(input: &str) -> Option<usize> {
     let mut escaped = false;
     for (i, ch) in input.char_indices() {
-        if escaped { escaped = false; continue; }
+        if escaped {
+            escaped = false;
+            continue;
+        }
         match ch {
             '\\' => escaped = true,
             ']' => return Some(i),
@@ -1599,20 +1884,13 @@ fn parse_list_marker(line: &str) -> Option<ListMarker> {
 
     if matches!(first, '-' | '+' | '*') {
         let rest = &trimmed[first.len_utf8()..];
-        let separator = rest.chars().next();
-        if matches!(separator, Some(ch) if ch != ' ' && ch != '\t') {
+        let first_sep = rest.chars().next();
+        if matches!(first_sep, Some(ch) if ch != ' ' && ch != '\t') {
             return None;
         }
-        let separator_width = separator.map(char::len_utf8).unwrap_or(0);
-        let separator_columns = separator
-            .map(|ch| indent_width(marker_width, ch))
-            .unwrap_or(0);
-        let content = rest[separator_width..].to_owned();
-        let content_indent = if content.trim().is_empty() {
-            indent.columns + marker_width + 1
-        } else {
-            indent.columns + marker_width + separator_columns
-        };
+        let base_col = indent.columns + marker_width;
+        let (content, content_indent) =
+            split_marker_content(rest, base_col, base_col + 1);
         return Some(ListMarker {
             ordered: false,
             start: None,
@@ -1636,29 +1914,61 @@ fn parse_list_marker(line: &str) -> Option<ListMarker> {
     }
 
     let after_marker = &trimmed[marker_index + marker.len_utf8()..];
-    let separator = after_marker.chars().next();
-    if matches!(separator, Some(ch) if ch != ' ' && ch != '\t') {
+    let first_sep = after_marker.chars().next();
+    if matches!(first_sep, Some(ch) if ch != ' ' && ch != '\t') {
         return None;
     }
 
     let start = trimmed[..digit_count].parse().ok()?;
-    let separator_width = separator.map(char::len_utf8).unwrap_or(0);
     let base_columns = indent.columns + marker_index + marker.len_utf8();
-    let separator_columns = separator
-        .map(|ch| indent_width(base_columns, ch))
-        .unwrap_or(0);
-    let content = after_marker[separator_width..].to_owned();
-    let content_indent = if content.trim().is_empty() {
-        base_columns + 1
-    } else {
-        base_columns + separator_columns
-    };
+    let (content, content_indent) =
+        split_marker_content(after_marker, base_columns, base_columns + 1);
     Some(ListMarker {
         ordered: true,
         start: Some(start),
         content,
         content_indent,
     })
+}
+
+/// Given the text following a list marker (e.g., after `-` or `1.`), determine
+/// the content string and absolute content indent column. `base_col` is the
+/// column just after the marker. `empty_col` is the fallback content_indent when
+/// content is empty.
+fn split_marker_content(after: &str, base_col: usize, empty_col: usize) -> (String, usize) {
+    if after.is_empty() {
+        return (String::new(), empty_col);
+    }
+    // Count whitespace columns between marker and content
+    let mut col = base_col;
+    let mut bytes = 0;
+    for ch in after.chars() {
+        let width = match ch {
+            ' ' => 1,
+            '\t' => indent_width(col, '\t'),
+            _ => break,
+        };
+        col += width;
+        bytes += ch.len_utf8();
+    }
+
+    // No content on this line
+    if bytes == after.len() || after[bytes..].trim().is_empty() {
+        return (String::new(), empty_col);
+    }
+
+    let post_spaces = col - base_col;
+
+    // If indent after marker is 5+ spaces, treat as marker + 1 space + indented code
+    if post_spaces >= 5 {
+        // content starts right after the first separator space
+        let first_sep_bytes = after.chars().next().map(char::len_utf8).unwrap_or(0);
+        let content = after[first_sep_bytes..].to_owned();
+        return (content, base_col + 1);
+    }
+
+    let content = after[bytes..].to_owned();
+    (content, base_col + post_spaces)
 }
 
 fn can_interrupt_paragraph_with_list(marker: ListMarker) -> bool {
@@ -1771,7 +2081,7 @@ fn parse_fence_opener(line: &str) -> Option<FenceOpener> {
         return None;
     }
 
-    let info = (!rest.trim().is_empty()).then(|| rest.trim().to_owned());
+    let info = (!rest.trim().is_empty()).then(|| process_escapes_and_entities(rest.trim()));
     Some(FenceOpener {
         marker,
         count,
@@ -1804,7 +2114,11 @@ fn is_fence_closer(line: &str, marker: char, count: usize) -> bool {
 // gfm[impl leaf-blocks.thematic-breaks.indent-up-to-three-spaces]
 // gfm[impl leaf-blocks.thematic-breaks.indent-four-spaces-not-allowed]
 fn is_thematic_break(line: &str) -> bool {
-    let line = trim_up_to_three_spaces(line);
+    let indent = leading_indent(line);
+    if indent.columns > 3 {
+        return false;
+    }
+    let line = &line[indent.bytes..];
     let mut marker = None;
     let mut count = 0;
 
@@ -1832,26 +2146,21 @@ fn is_thematic_break(line: &str) -> bool {
 // gfm[impl leaf-blocks.setext-headings.setext-heading-underline-cannot-contain-internal-spaces]
 // gfm[impl leaf-blocks.setext-headings.underline-cannot-be-lazy-continuation-line]
 fn is_setext_underline(line: &str) -> bool {
-    let line = trim_up_to_three_spaces(line).trim();
-    if line.is_empty() {
+    let indent = leading_indent(line);
+    if indent.columns > 3 {
+        return false;
+    }
+    let trimmed = line[indent.bytes..].trim_end();
+    if trimmed.is_empty() {
         return false;
     }
 
-    let marker = line.chars().next().unwrap_or(' ');
+    let marker = trimmed.chars().next().unwrap_or(' ');
     if marker != '=' && marker != '-' {
         return false;
     }
 
-    let mut count = 0;
-    for ch in line.chars() {
-        if ch == marker {
-            count += 1;
-        } else if ch != ' ' && ch != '\t' {
-            return false;
-        }
-    }
-
-    count >= 1
+    trimmed.chars().all(|ch| ch == marker)
 }
 
 struct InlineParser<'a, Ext, Meta> {
@@ -2108,14 +2417,28 @@ where
         }
 
         let run = remaining.chars().take_while(|ch| *ch == '`').count();
-        let closer = "`".repeat(run);
         let search_start = self.index + run;
         let rest = &self.input[search_start..];
-        let offset = rest.find(&closer)?;
-        let end = search_start + offset;
-        let code = self.input[search_start..end].replace('\n', " ");
-        self.index = end + closer.len();
-        Some(normalize_code_span(&code))
+
+        // Find a run of backticks of EXACTLY `run` length
+        let bytes = rest.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'`' {
+                let j = i + bytes[i..].iter().take_while(|&&b| b == b'`').count();
+                if j - i == run {
+                    let end = search_start + i;
+                    let code = self.input[search_start..end].replace('\n', " ");
+                    self.index = end + run;
+                    return Some(normalize_code_span(&code));
+                }
+                i = j;
+            } else {
+                i += 1;
+            }
+        }
+
+        None
     }
 
     // gfm[impl inlines.emphasis-and-strong-emphasis.delimiter-run-definition]
@@ -2436,15 +2759,16 @@ where
             remaining.find("-->").map(|idx| idx + 3)?
         } else if remaining.starts_with("<?") {
             remaining.find("?>").map(|idx| idx + 2)?
+        } else if remaining.starts_with("<![CDATA[") {
+            remaining.find("]]>").map(|idx| idx + 3)?
         } else if remaining.starts_with("<!") {
             remaining.find('>').map(|idx| idx + 1)?
+        } else if let Some((_, len)) = parse_html_open_tag_prefix(remaining) {
+            len
+        } else if let Some((_, len)) = parse_html_closing_tag_prefix(remaining) {
+            len
         } else {
-            let close = remaining.find('>')?;
-            let body = &remaining[1..close];
-            if body.is_empty() || !looks_like_inline_tag(body) {
-                return None;
-            }
-            close + 1
+            return None;
         };
 
         let html = filter_disallowed_html(&remaining[..end]);
@@ -2841,7 +3165,9 @@ fn multiple_of_three_blocked(
 // gfm[impl inlines.code-spans.all-space-content-is-not-trimmed]
 // gfm[impl inlines.code-spans.only-ascii-space-is-trimmed]
 fn normalize_code_span(code: &str) -> String {
-    if code.starts_with(' ') && code.ends_with(' ') && code.len() > 1
+    if code.starts_with(' ')
+        && code.ends_with(' ')
+        && code.len() > 1
         && !code.chars().all(|ch| ch == ' ')
     {
         code[1..code.len() - 1].to_owned()
@@ -2865,11 +3191,22 @@ fn code_span_end_at(input: &str, index: usize) -> Option<usize> {
     }
 
     let run = remaining.chars().take_while(|ch| *ch == '`').count();
-    let closer = "`".repeat(run);
     let search_start = index + run;
     let rest = input.get(search_start..)?;
-    let offset = rest.find(&closer)?;
-    Some(search_start + offset + closer.len())
+    let bytes = rest.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'`' {
+            let j = i + bytes[i..].iter().take_while(|&&b| b == b'`').count();
+            if j - i == run {
+                return Some(search_start + i + run);
+            }
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    None
 }
 
 fn find_delimited_closer(input: &str, mut index: usize, delim: &str) -> Option<usize> {
@@ -2904,21 +3241,38 @@ fn find_delimited_closer(input: &str, mut index: usize, delim: &str) -> Option<u
 fn find_closing_bracket(input: &str, start: usize) -> Option<usize> {
     let mut depth = 0usize;
     let mut escaped = false;
-    for (offset, ch) in input[start..].char_indices() {
+    let mut i = start;
+    while i < input.len() {
         if escaped {
             escaped = false;
+            i += input[i..].chars().next()?.len_utf8();
             continue;
         }
+        let ch = input[i..].chars().next()?;
         match ch {
-            '\\' => escaped = true,
-            '[' => depth += 1,
+            '\\' => {
+                escaped = true;
+                i += 1;
+            }
+            '`' => {
+                if let Some(end) = code_span_end_at(input, i) {
+                    i = end;
+                } else {
+                    i += 1;
+                }
+            }
+            '[' => {
+                depth += 1;
+                i += 1;
+            }
             ']' => {
                 if depth == 0 {
-                    return Some(start + offset);
+                    return Some(i);
                 }
                 depth -= 1;
+                i += 1;
             }
-            _ => {}
+            _ => i += ch.len_utf8(),
         }
     }
     None
@@ -2945,50 +3299,106 @@ fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>
 
     if trimmed.starts_with('<') {
         let after_angle = &trimmed[1..];
-        let angle_close = after_angle.find('>')?;
-        let destination = after_angle[..angle_close].to_owned();
+        let angle_close = find_angle_close(after_angle)?;
+        let destination = process_escapes_and_entities(&after_angle[..angle_close]);
         let after_gt = &after_angle[angle_close + 1..];
         let paren_in_after_gt = find_closing_paren(after_gt)?;
         let title_body = after_gt[..paren_in_after_gt].trim();
         let title = if title_body.is_empty() {
             None
         } else {
-            parse_title(title_body)
+            parse_title(title_body).map(|t| process_escapes_and_entities(&t))
         };
         let paren_pos_in_rest = rest.len() - after_gt.len() + paren_in_after_gt;
-        return Some((paren_pos_in_rest + 2, destination, title));
+        return Some((paren_pos_in_rest + 1, destination, title));
     }
 
     let closing = find_closing_paren(rest)?;
     let body = rest[..closing].trim();
 
     if body.is_empty() {
-        return Some((closing + 2, String::new(), None));
+        return Some((closing + 1, String::new(), None));
     }
 
     if let Some((destination, title)) = split_destination_and_title(body) {
-        return Some((closing + 2, destination, title));
+        if destination.contains(|ch: char| ch.is_whitespace()) {
+            return None;
+        }
+        return Some((closing + 1, process_escapes_and_entities(&destination), title.map(|t| process_escapes_and_entities(&t))));
     }
 
-    Some((closing + 2, body.to_owned(), None))
+    if body.contains(|ch: char| ch.is_whitespace()) {
+        return None;
+    }
+    Some((closing + 1, process_escapes_and_entities(body), None))
 }
 
 fn find_closing_paren(input: &str) -> Option<usize> {
     let mut depth = 0usize;
     let mut escaped = false;
     for (i, ch) in input.char_indices() {
-        if escaped { escaped = false; continue; }
+        if escaped {
+            escaped = false;
+            continue;
+        }
         match ch {
             '\\' => escaped = true,
             '(' => depth += 1,
             ')' => {
-                if depth == 0 { return Some(i); }
+                if depth == 0 {
+                    return Some(i);
+                }
                 depth -= 1;
             }
             _ => {}
         }
     }
     None
+}
+
+fn find_angle_close(input: &str) -> Option<usize> {
+    let mut escaped = false;
+    for (i, ch) in input.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' => escaped = true,
+            '>' => return Some(i),
+            '\n' => return None,
+            '<' => return None,
+            _ => {}
+        }
+    }
+    None
+}
+
+fn process_escapes_and_entities(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+    let bytes = input.as_bytes();
+    while i < input.len() {
+        if bytes[i] == b'\\' && i + 1 < input.len() {
+            let next = input[i + 1..].chars().next().unwrap();
+            if is_escapable(next) {
+                out.push(next);
+                i += 1 + next.len_utf8();
+                continue;
+            }
+        }
+        if bytes[i] == b'&' {
+            if let Some((consumed, decoded)) = parse_entity_reference(&input[i..]) {
+                out.push_str(&decoded);
+                i += consumed;
+                continue;
+            }
+        }
+        let ch = input[i..].chars().next().unwrap();
+        out.push(ch);
+        i += ch.len_utf8();
+    }
+    out
 }
 
 fn parse_title(s: &str) -> Option<String> {
@@ -3278,6 +3688,7 @@ fn parse_html_open_tag_prefix(line: &str) -> Option<(&str, usize)> {
 
     let (name, name_len) = parse_html_tag_name_prefix(rest)?;
     let mut consumed = 1 + name_len;
+    let mut saw_whitespace = false;
 
     loop {
         let rest = &line[consumed..];
@@ -3289,24 +3700,25 @@ fn parse_html_open_tag_prefix(line: &str) -> Option<(&str, usize)> {
         }
 
         let whitespace = count_html_whitespace(rest);
-        if whitespace == 0 {
+        if whitespace > 0 {
+            consumed += whitespace;
+            saw_whitespace = true;
+            continue;
+        }
+
+        // Non-whitespace, non-`>` — must be an attribute name, which requires
+        // at least one whitespace character before it.
+        if !saw_whitespace {
             return None;
         }
-        consumed += whitespace;
+        saw_whitespace = false;
 
-        let rest = &line[consumed..];
-        if rest.starts_with('>') {
-            return Some((name, consumed + 1));
-        }
-        if rest.starts_with("/>") {
-            return Some((name, consumed + 2));
-        }
+        consumed += parse_html_attribute_name_prefix(&line[consumed..])?;
 
-        consumed += parse_html_attribute_name_prefix(rest)?;
-        consumed += count_html_whitespace(&line[consumed..]);
-
-        if line[consumed..].starts_with('=') {
-            consumed += 1;
+        // Skip optional whitespace around `=`
+        let before_eq = consumed + count_html_whitespace(&line[consumed..]);
+        if line[before_eq..].starts_with('=') {
+            consumed = before_eq + 1;
             consumed += count_html_whitespace(&line[consumed..]);
             consumed += parse_html_attribute_value_prefix(&line[consumed..])?;
         }
@@ -3511,6 +3923,36 @@ fn is_tight_list<Ext, Meta>(items: &[ParsedListItem<Ext, Meta>]) -> bool {
     !items.iter().any(|item| item.loose)
 }
 
+fn is_paragraph_continuation_candidate(line: &str) -> bool {
+    // Returns true if the given line COULD be an open paragraph that accepts
+    // lazy continuation. Excludes blank lines and lines that start non-paragraph
+    // block constructs (code, thematic breaks, headings, HTML blocks, etc.).
+    if line.trim().is_empty() {
+        return false;
+    }
+    if parse_fence_opener(line).is_some() {
+        return false;
+    }
+    if is_thematic_break(line) {
+        return false;
+    }
+    if strip_indented_code_line(line).is_some() {
+        return false;
+    }
+    if classify_html_block_start(line).is_some() {
+        return false;
+    }
+    let trimmed = trim_up_to_three_spaces(line);
+    if trimmed.starts_with('#') {
+        let hashes = trimmed.chars().take_while(|c| *c == '#').count();
+        let after = &trimmed[hashes..];
+        if hashes >= 1 && hashes <= 6 && (after.is_empty() || after.starts_with([' ', '\t'])) {
+            return false;
+        }
+    }
+    true
+}
+
 fn is_lazy_list_continuation(line: &str, lines: &[String], index: usize) -> bool {
     !line.trim().is_empty()
         && parse_list_marker(line).is_none()
@@ -3634,9 +4076,13 @@ fn parse_entity_reference(input: &str) -> Option<(usize, String)> {
         .strip_prefix("#x")
         .or_else(|| entity.strip_prefix("#X"))
     {
-        u32::from_str_radix(hex, 16).ok().and_then(char::from_u32)
+        u32::from_str_radix(hex, 16)
+            .ok()
+            .and_then(|n| if n == 0 { Some('\u{FFFD}') } else { char::from_u32(n) })
     } else if let Some(num) = entity.strip_prefix('#') {
-        num.parse::<u32>().ok().and_then(char::from_u32)
+        num.parse::<u32>()
+            .ok()
+            .and_then(|n| if n == 0 { Some('\u{FFFD}') } else { char::from_u32(n) })
     } else {
         // gfm[impl inlines.entity-and-numeric-character-references.entity-references-definition]
         resolve_named_entity(entity)
@@ -3929,7 +4375,9 @@ fn looks_like_url(text: &str) -> bool {
         return false;
     }
     let after_scheme = &text[colon_pos + 1..];
-    !after_scheme.chars().any(|ch| ch.is_whitespace() || ch == '<' || ch == '>')
+    !after_scheme
+        .chars()
+        .any(|ch| ch.is_whitespace() || ch == '<' || ch == '>')
 }
 
 // gfm[impl inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
@@ -4020,10 +4468,7 @@ fn filter_disallowed_html(html: &str) -> String {
                     let candidate = &html[tag_name_start..tag_end];
                     if candidate.eq_ignore_ascii_case(tag) {
                         let boundary_ok = tag_end >= bytes.len()
-                            || matches!(
-                                bytes[tag_end],
-                                b' ' | b'\t' | b'\n' | b'>' | b'/'
-                            );
+                            || matches!(bytes[tag_end], b' ' | b'\t' | b'\n' | b'>' | b'/');
                         if boundary_ok {
                             result.push_str("&lt;");
                             i += 1;
@@ -4238,7 +4683,7 @@ mod tests {
         assert!(matches!(
             &second.node,
             Node::CodeBlock { info, literal, .. }
-                if info.as_deref() == Some("rust") && literal == "fn main() {}"
+                if info.as_deref() == Some("rust") && literal == "fn main() {}\n"
         ));
     }
 
@@ -4320,7 +4765,7 @@ mod tests {
 
         assert!(matches!(
             final_node,
-            Node::CodeBlock { info: None, literal, .. } if literal == "foo\nbar"
+            Node::CodeBlock { info: None, literal, .. } if literal == "foo\nbar\n"
         ));
     }
 
@@ -4515,7 +4960,7 @@ mod tests {
         assert!(matches!(
             finals.as_slice(),
             [Node::Html { html: first, .. }, Node::CodeBlock { literal, .. }]
-                if first == "   <div>" && literal == "<div>"
+                if first == "   <div>" && literal == "<div>\n"
         ));
     }
 
@@ -4879,7 +5324,7 @@ mod tests {
             final_node,
             Node::List { children, .. }
                 if matches!(children.as_slice(), [Node::Item { children, .. }]
-                    if matches!(children.as_slice(), [Node::Paragraph { .. }, Node::CodeBlock { literal, .. }] if literal == "bar"))
+                    if matches!(children.as_slice(), [Node::Paragraph { .. }, Node::CodeBlock { literal, .. }] if literal == "bar\n"))
         ));
     }
 

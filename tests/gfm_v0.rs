@@ -638,7 +638,8 @@ fn gfm_indented_code_inside_list_item() {
     let html = render_html(&parse_final_nodes("- foo\n\n      bar\n"));
     assert_eq!(
         html,
-        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar</code></pre>\n</li>\n</ul>\n"
+        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar
+</code></pre>\n</li>\n</ul>\n"
     );
 }
 
@@ -647,7 +648,8 @@ fn gfm_indented_code_inside_list_item() {
 #[test]
 fn gfm_tab_indentation_structural_cases() {
     let html = render_html(&parse_final_nodes("\tcode\n"));
-    assert_eq!(html, "<pre><code>code</code></pre>\n");
+    assert_eq!(html, "<pre><code>code
+</code></pre>\n");
 
     let html = render_html(&parse_final_nodes("-\tfoo\n\tbar\n"));
     assert_eq!(html, "<ul>\n<li>foo\nbar</li>\n</ul>\n");
@@ -655,7 +657,8 @@ fn gfm_tab_indentation_structural_cases() {
     let html = render_html(&parse_final_nodes("- foo\n\n\t\tbar\n"));
     assert_eq!(
         html,
-        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar</code></pre>\n</li>\n</ul>\n"
+        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar
+</code></pre>\n</li>\n</ul>\n"
     );
 }
 
@@ -665,7 +668,8 @@ fn gfm_tab_after_block_quote_marker_counts_toward_indent() {
     let html = render_html(&parse_final_nodes(">\t\tfoo\n"));
     assert_eq!(
         html,
-        "<blockquote>\n<pre><code>  foo</code></pre>\n</blockquote>\n"
+        "<blockquote>\n<pre><code>  foo
+</code></pre>\n</blockquote>\n"
     );
 }
 
@@ -849,7 +853,8 @@ fn gfm_example_107_indented_code() {
     ));
     assert_eq!(
         html,
-        "<pre><code>a simple\n  indented code block</code></pre>\n"
+        "<pre><code>a simple\n  indented code block
+</code></pre>\n"
     );
 }
 
@@ -964,10 +969,7 @@ fn gfm_code_span_prevents_link_parse() {
 #[test]
 fn gfm_code_span_shares_precedence_with_html_tags() {
     let html = render_html(&parse_final_nodes("`<a href=\"`\">`\n"));
-    assert_eq!(
-        html,
-        "<p><code>&lt;a href=&quot;</code>&quot;&gt;`</p>\n"
-    );
+    assert_eq!(html, "<p><code>&lt;a href=&quot;</code>&quot;&gt;`</p>\n");
 }
 
 // gfm[verify inlines.code-spans.html-tag-wins-when-tag-parses-first]
@@ -981,10 +983,7 @@ fn gfm_code_span_html_tag_wins_when_tag_parses_first() {
 #[test]
 fn gfm_code_span_wins_in_ambiguous_autolink_like_text() {
     let html = render_html(&parse_final_nodes("`<http://foo.bar.`baz>`\n"));
-    assert_eq!(
-        html,
-        "<p><code>&lt;http://foo.bar.</code>baz&gt;`</p>\n"
-    );
+    assert_eq!(html, "<p><code>&lt;http://foo.bar.</code>baz&gt;`</p>\n");
 }
 
 // gfm[verify inlines.code-spans.autolink-wins-when-autolink-parses-first]
@@ -1029,10 +1028,7 @@ fn gfm_entity_references() {
     let html = render_html(&parse_final_nodes(
         "&nbsp; &amp; &copy; &AElig;\n&frac34;\n",
     ));
-    assert_eq!(
-        html,
-        "<p>\u{00a0} &amp; \u{00a9} \u{00c6}\n\u{00be}</p>\n"
-    );
+    assert_eq!(html, "<p>\u{00a0} &amp; \u{00a9} \u{00c6}\n\u{00be}</p>\n");
 }
 
 // gfm[verify inlines.entity-and-numeric-character-references.decimal-numeric-reference-definition]
@@ -1097,7 +1093,8 @@ fn gfm_references_are_literal_in_code() {
 
     // In indented code block, entity references are literal text
     let html = render_html(&parse_final_nodes("    f&ouml;f&ouml;\n"));
-    assert_eq!(html, "<pre><code>f&amp;ouml;f&amp;ouml;</code></pre>\n");
+    assert_eq!(html, "<pre><code>f&amp;ouml;f&amp;ouml;
+</code></pre>\n");
 }
 
 // gfm[verify inlines.entity-and-numeric-character-references.references-cannot-replace-structure-symbols]
@@ -1133,7 +1130,8 @@ fn gfm_parsers_need_not_preserve_source_form() {
 #[test]
 fn gfm_fenced_code_deindent() {
     let html = render_html(&parse_final_nodes("  ```\n  aaa\n aaa\naaa\n  ```\n"));
-    assert_eq!(html, "<pre><code>aaa\naaa\naaa</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa\naaa\naaa
+</code></pre>\n");
 }
 
 // gfm[verify inlines.links.balanced-parentheses-are-allowed-in-destination]
@@ -1250,13 +1248,13 @@ fn gfm_raw_html_simple_open_tags() {
 // gfm[verify inlines.raw-html.unquoted-attribute-value-definition]
 #[test]
 fn gfm_raw_html_attributes() {
-    // Double-quoted, single-quoted, unquoted, and boolean attributes
+    // Inline HTML with attributes inside a paragraph
     let html = render_html(&parse_final_nodes(
-        "<a foo=\"bar\" bam='baz' _boolean zoop:33=zoop:33 />\n",
+        "foo <a foo=\"bar\" bam='baz' _boolean zoop:33=zoop:33 /> bar\n",
     ));
     assert_eq!(
         html,
-        "<p><a foo=\"bar\" bam='baz' _boolean zoop:33=zoop:33 /></p>\n"
+        "<p>foo <a foo=\"bar\" bam='baz' _boolean zoop:33=zoop:33 /> bar</p>\n"
     );
 }
 
@@ -1265,11 +1263,10 @@ fn gfm_raw_html_attributes() {
 #[test]
 fn gfm_raw_html_custom_tags() {
     // Example 640: custom tag names
-    let html = render_html(&parse_final_nodes("Foo <responsive-image src=\"foo.jpg\" />\n"));
-    assert_eq!(
-        html,
-        "<p>Foo <responsive-image src=\"foo.jpg\" /></p>\n"
-    );
+    let html = render_html(&parse_final_nodes(
+        "Foo <responsive-image src=\"foo.jpg\" />\n",
+    ));
+    assert_eq!(html, "<p>Foo <responsive-image src=\"foo.jpg\" /></p>\n");
 }
 
 // gfm[verify inlines.raw-html.illegal-tag-and-attribute-syntax-is-not-parsed-as-html]
@@ -1287,16 +1284,18 @@ fn gfm_raw_html_closing_tags() {
     let html = render_html(&parse_final_nodes("</a></foo >\n"));
     assert_eq!(html, "<p></a></foo ></p>\n");
 
-    // Closing tags with attributes: parser accepts them (lenient)
+    // Closing tags with attributes are NOT valid HTML - treated as text
     let html = render_html(&parse_final_nodes("</a href=\"foo\">\n"));
-    assert_eq!(html, "<p></a href=\"foo\"></p>\n");
+    assert_eq!(html, "<p>&lt;/a href=&quot;foo&quot;&gt;</p>\n");
 }
 
 // gfm[verify inlines.raw-html.html-comment-definition]
 #[test]
 fn gfm_raw_html_comments() {
     // Example 648: valid comment
-    let html = render_html(&parse_final_nodes("foo <!-- this is a\ncomment - with hyphen -->\n"));
+    let html = render_html(&parse_final_nodes(
+        "foo <!-- this is a\ncomment - with hyphen -->\n",
+    ));
     assert_eq!(
         html,
         "<p>foo <!-- this is a\ncomment - with hyphen --></p>\n"
@@ -1405,7 +1404,8 @@ fn gfm_backslash_escapes_not_in_code_or_html() {
 
     // Example 315: backslash escapes do not work in fenced code blocks
     let html = render_html(&parse_final_nodes("~~~\n\\[\\]\n~~~\n"));
-    assert_eq!(html, "<pre><code>\\[\\]</code></pre>\n");
+    assert_eq!(html, "<pre><code>\\[\\]
+</code></pre>\n");
 
     // Example 317: backslash escapes do not work in raw HTML inline
     let html = render_html(&parse_final_nodes("foo <a href=\"/bar\\/)\"> bar\n"));
@@ -1415,20 +1415,18 @@ fn gfm_backslash_escapes_not_in_code_or_html() {
 // gfm[verify inlines.backslash-escapes.work-in-urls-titles-references-and-info-strings]
 #[test]
 fn gfm_backslash_escapes_in_urls_titles_info_strings() {
-    // Backslash escapes work in link URLs and titles
-    // The parser preserves backslashes in destinations and titles in the Node,
-    // so the test renderer (which HTML-escapes) shows them preserved.
     let html = render_html(&parse_final_nodes("[foo](/bar\\* \"ti\\*tle\")\n"));
     assert_eq!(
         html,
-        "<p><a href=\"/bar\\*\" title=\"ti\\*tle\">foo</a></p>\n"
+        "<p><a href=\"/bar*\" title=\"ti*tle\">foo</a></p>\n"
     );
 
     // Backslash escapes work in info strings
     let html = render_html(&parse_final_nodes("``` foo\\+bar\nfoo\n```\n"));
     assert_eq!(
         html,
-        "<pre><code class=\"language-foo\\+bar\">foo</code></pre>\n"
+        "<pre><code class=\"language-foo+bar\">foo
+</code></pre>\n"
     );
 }
 
@@ -1567,7 +1565,8 @@ fn gfm_thematic_break_indent_up_to_three() {
 #[test]
 fn gfm_thematic_break_four_spaces_is_code() {
     let html = render_html(&parse_final_nodes("    ***\n"));
-    assert_eq!(html, "<pre><code>***</code></pre>\n");
+    assert_eq!(html, "<pre><code>***
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.thematic-breaks.no-other-characters-allowed]
@@ -1666,7 +1665,9 @@ fn gfm_atx_heading_inline_content() {
 // gfm[verify leaf-blocks.atx-headings.trim-leading-and-trailing-whitespace-before-inline-parse]
 #[test]
 fn gfm_atx_heading_trim_whitespace() {
-    let html = render_html(&parse_final_nodes("#                  foo                     \n"));
+    let html = render_html(&parse_final_nodes(
+        "#                  foo                     \n",
+    ));
     assert_eq!(html, "<h1>foo</h1>\n");
 }
 
@@ -1681,7 +1682,8 @@ fn gfm_atx_heading_indent_up_to_three() {
 #[test]
 fn gfm_atx_heading_four_spaces_is_code() {
     let html = render_html(&parse_final_nodes("    # foo\n"));
-    assert_eq!(html, "<pre><code># foo</code></pre>\n");
+    assert_eq!(html, "<pre><code># foo
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.atx-headings.closing-sequence-optional]
@@ -1692,7 +1694,9 @@ fn gfm_atx_heading_closing_sequence() {
     assert_eq!(html, "<h2>foo</h2>\n<h3>bar</h3>\n");
 
     // Closing sequence length need not match opening
-    let html = render_html(&parse_final_nodes("# foo ##################################\n"));
+    let html = render_html(&parse_final_nodes(
+        "# foo ##################################\n",
+    ));
     assert_eq!(html, "<h1>foo</h1>\n");
 }
 
@@ -1759,7 +1763,9 @@ fn gfm_setext_heading_underline_any_length() {
 // gfm[verify leaf-blocks.setext-headings.text-lines-indent-up-to-three-spaces]
 #[test]
 fn gfm_setext_heading_content_indent() {
-    let html = render_html(&parse_final_nodes("   Foo\n---\n\n  Foo\n-----\n\n  Foo\n  ===\n"));
+    let html = render_html(&parse_final_nodes(
+        "   Foo\n---\n\n  Foo\n-----\n\n  Foo\n  ===\n",
+    ));
     assert_eq!(html, "<h2>Foo</h2>\n<h2>Foo</h2>\n<h1>Foo</h1>\n");
 }
 
@@ -1767,7 +1773,8 @@ fn gfm_setext_heading_content_indent() {
 #[test]
 fn gfm_setext_heading_content_four_spaces_not_allowed() {
     let html = render_html(&parse_final_nodes("    Foo\n---\n"));
-    assert_eq!(html, "<pre><code>Foo</code></pre>\n<hr />\n");
+    assert_eq!(html, "<pre><code>Foo
+</code></pre>\n<hr />\n");
 }
 
 // gfm[verify leaf-blocks.setext-headings.underline-indent-up-to-three-spaces]
@@ -1780,21 +1787,18 @@ fn gfm_setext_heading_underline_indent() {
 // gfm[verify leaf-blocks.setext-headings.underline-indent-four-spaces-not-allowed]
 #[test]
 fn gfm_setext_heading_underline_four_spaces() {
-    // The parser still interprets the indented underline as a setext heading
     let html = render_html(&parse_final_nodes("Foo\n    ---\n"));
-    assert_eq!(html, "<h2>Foo</h2>\n");
+    assert_eq!(html, "<p>Foo\n    ---</p>\n");
 }
 
 // gfm[verify leaf-blocks.setext-headings.setext-heading-underline-cannot-contain-internal-spaces]
 #[test]
 fn gfm_setext_heading_underline_no_internal_spaces() {
-    // The parser treats "= =" as a valid setext underline, producing an h1
     let html = render_html(&parse_final_nodes("Foo\n= =\n"));
-    assert_eq!(html, "<h1>Foo</h1>\n");
+    assert_eq!(html, "<p>Foo\n= =</p>\n");
 
-    // "--- -" with spaces: the parser treats this as a setext underline for "Foo"
     let html = render_html(&parse_final_nodes("Foo\n--- -\n"));
-    assert_eq!(html, "<h2>Foo</h2>\n");
+    assert_eq!(html, "<p>Foo</p>\n<hr />\n");
 }
 
 // gfm[verify leaf-blocks.setext-headings.trailing-spaces-in-content-do-not-create-line-break]
@@ -1892,11 +1896,11 @@ fn gfm_setext_heading_underline_not_lazy_continuation() {
 // gfm[verify leaf-blocks.setext-headings.block-indicators-take-precedence-over-inline-indicators]
 #[test]
 fn gfm_setext_heading_block_precedence() {
-    // "bar" is a lazy continuation, then "===" forms a setext underline for "bar"
+    // Per spec: "===" in lazy continuation position is literal text, not a setext underline
     let html = render_html(&parse_final_nodes("> foo\nbar\n===\n"));
     assert_eq!(
         html,
-        "<blockquote>\n<p>foo</p>\n</blockquote>\n<h1>bar</h1>\n"
+        "<blockquote>\n<p>foo\nbar\n===</p>\n</blockquote>\n"
     );
 }
 
@@ -1999,10 +2003,12 @@ fn gfm_blank_lines_at_doc_boundaries() {
 #[test]
 fn gfm_fenced_code_backtick_and_tilde() {
     let html = render_html(&parse_final_nodes("```\naaa\n```\n"));
-    assert_eq!(html, "<pre><code>aaa</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa
+</code></pre>\n");
 
     let html = render_html(&parse_final_nodes("~~~\naaa\n~~~\n"));
-    assert_eq!(html, "<pre><code>aaa</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.fewer-than-three-backticks-do-not-form-fence]
@@ -2016,7 +2022,8 @@ fn gfm_fenced_code_fewer_than_three() {
 #[test]
 fn gfm_fenced_code_closing_must_be_at_least_opening_length() {
     let html = render_html(&parse_final_nodes("````\naaa\n```\n````\n"));
-    assert_eq!(html, "<pre><code>aaa\n```</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa\n```
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-must-use-same-marker-type]
@@ -2024,17 +2031,20 @@ fn gfm_fenced_code_closing_must_be_at_least_opening_length() {
 #[test]
 fn gfm_fenced_code_closing_must_match_marker() {
     let html = render_html(&parse_final_nodes("```\naaa\n~~~\n```\n"));
-    assert_eq!(html, "<pre><code>aaa\n~~~</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa\n~~~
+</code></pre>\n");
 
     let html = render_html(&parse_final_nodes("~~~\naaa\n```\n~~~\n"));
-    assert_eq!(html, "<pre><code>aaa\n```</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa\n```
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.closing-fences-cannot-have-info-strings]
 #[test]
 fn gfm_fenced_code_closing_no_info_string() {
     let html = render_html(&parse_final_nodes("```\naaa\n``` aaa\n```\n"));
-    assert_eq!(html, "<pre><code>aaa\n``` aaa</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa\n``` aaa
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.info-string-may-be-provided-after-opening-fence]
@@ -2043,10 +2053,13 @@ fn gfm_fenced_code_closing_no_info_string() {
 // gfm[verify leaf-blocks.fenced-code-blocks.info-string-treatment-is-not-mandated]
 #[test]
 fn gfm_fenced_code_info_string() {
-    let html = render_html(&parse_final_nodes("```ruby\ndef foo(x)\n  return 3\nend\n```\n"));
+    let html = render_html(&parse_final_nodes(
+        "```ruby\ndef foo(x)\n  return 3\nend\n```\n",
+    ));
     assert_eq!(
         html,
-        "<pre><code class=\"language-ruby\">def foo(x)\n  return 3\nend</code></pre>\n"
+        "<pre><code class=\"language-ruby\">def foo(x)\n  return 3\nend
+</code></pre>\n"
     );
 }
 
@@ -2065,7 +2078,8 @@ fn gfm_fenced_code_tilde_info_with_backticks() {
     let html = render_html(&parse_final_nodes("~~~ aa ``` ~~~\nfoo\n~~~\n"));
     assert_eq!(
         html,
-        "<pre><code class=\"language-aa ``` ~~~\">foo</code></pre>\n"
+        "<pre><code class=\"language-aa ``` ~~~\">foo
+</code></pre>\n"
     );
 }
 
@@ -2073,20 +2087,26 @@ fn gfm_fenced_code_tilde_info_with_backticks() {
 #[test]
 fn gfm_fenced_code_opening_indent() {
     let html = render_html(&parse_final_nodes(" ```\n aaa\n\naaa\n```\n"));
-    assert_eq!(html, "<pre><code>aaa\n\naaa</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa\n\naaa
+</code></pre>\n");
 
     let html = render_html(&parse_final_nodes("  ```\naaa\n  aaa\naaa\n  ```\n"));
-    assert_eq!(html, "<pre><code>aaa\naaa\naaa</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa\naaa\naaa
+</code></pre>\n");
 
-    let html = render_html(&parse_final_nodes("   ```\n   aaa\n    aaa\n  aaa\n   ```\n"));
-    assert_eq!(html, "<pre><code>aaa\n aaa\naaa</code></pre>\n");
+    let html = render_html(&parse_final_nodes(
+        "   ```\n   aaa\n    aaa\n  aaa\n   ```\n",
+    ));
+    assert_eq!(html, "<pre><code>aaa\n aaa\naaa
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.four-space-indented-fence-starts-indented-code-block]
 #[test]
 fn gfm_fenced_code_four_space_indent_is_code() {
     let html = render_html(&parse_final_nodes("    ```\n    aaa\n    ```\n"));
-    assert_eq!(html, "<pre><code>```\naaa\n```</code></pre>\n");
+    assert_eq!(html, "<pre><code>```\naaa\n```
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-indent-up-to-three-spaces]
@@ -2094,17 +2114,20 @@ fn gfm_fenced_code_four_space_indent_is_code() {
 #[test]
 fn gfm_fenced_code_closing_indent() {
     let html = render_html(&parse_final_nodes("```\naaa\n  ```\n"));
-    assert_eq!(html, "<pre><code>aaa</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa
+</code></pre>\n");
 
     let html = render_html(&parse_final_nodes("   ```\naaa\n  ```\n"));
-    assert_eq!(html, "<pre><code>aaa</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-indented-four-spaces-does-not-close]
 #[test]
 fn gfm_fenced_code_closing_four_spaces_no_close() {
     let html = render_html(&parse_final_nodes("```\naaa\n    ```\n\n```\n"));
-    assert_eq!(html, "<pre><code>aaa\n    ```\n</code></pre>\n");
+    assert_eq!(html, "<pre><code>aaa\n    ```\n
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.fence-lines-cannot-contain-internal-spaces]
@@ -2121,7 +2144,8 @@ fn gfm_fenced_code_content_literal() {
     let html = render_html(&parse_final_nodes("```\n<div>\n  *hello*\n</div>\n```\n"));
     assert_eq!(
         html,
-        "<pre><code>&lt;div&gt;\n  *hello*\n&lt;/div&gt;</code></pre>\n"
+        "<pre><code>&lt;div&gt;\n  *hello*\n&lt;/div&gt;
+</code></pre>\n"
     );
 }
 
@@ -2137,14 +2161,16 @@ fn gfm_fenced_code_content_empty_lines() {
 #[test]
 fn gfm_fenced_code_unclosed_continues_to_end() {
     let html = render_html(&parse_final_nodes("```\nfoo\n---\n"));
-    assert_eq!(html, "<pre><code>foo\n---</code></pre>\n");
+    assert_eq!(html, "<pre><code>foo\n---
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.can-interrupt-paragraphs]
 #[test]
 fn gfm_fenced_code_interrupts_paragraph() {
     let html = render_html(&parse_final_nodes("para\n```\ncode\n```\n"));
-    assert_eq!(html, "<p>para</p>\n<pre><code>code</code></pre>\n");
+    assert_eq!(html, "<p>para</p>\n<pre><code>code
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.fenced-code-blocks.other-blocks-can-appear-adjacent-without-blank-lines]
@@ -2152,7 +2178,8 @@ fn gfm_fenced_code_interrupts_paragraph() {
 #[test]
 fn gfm_fenced_code_adjacent_blocks() {
     let html = render_html(&parse_final_nodes("```\ncode\n```\nparagraph\n"));
-    assert_eq!(html, "<pre><code>code</code></pre>\n<p>paragraph</p>\n");
+    assert_eq!(html, "<pre><code>code
+</code></pre>\n<p>paragraph</p>\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -2163,50 +2190,59 @@ fn gfm_fenced_code_adjacent_blocks() {
 #[test]
 fn gfm_indented_code_literal() {
     let html = render_html(&parse_final_nodes("    <a/>\n    *hi*\n\n    - one\n"));
-    assert_eq!(
-        html,
-        "<pre><code>&lt;a/&gt;\n*hi*\n\n- one</code></pre>\n"
-    );
+    assert_eq!(html, "<pre><code>&lt;a/&gt;\n*hi*\n\n- one
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.indented-code-blocks.first-line-can-indented-more-than-four-spaces]
 #[test]
 fn gfm_indented_code_more_than_four() {
     let html = render_html(&parse_final_nodes("        foo\n    bar\n"));
-    assert_eq!(html, "<pre><code>    foo\nbar</code></pre>\n");
+    assert_eq!(html, "<pre><code>    foo\nbar
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.indented-code-blocks.blank-lines-separate-chunks]
 // gfm[verify leaf-blocks.indented-code-blocks.surrounding-blank-lines-are-excluded]
 #[test]
 fn gfm_indented_code_blank_lines() {
-    let html = render_html(&parse_final_nodes("    chunk1\n\n    chunk2\n  \n \n \n    chunk3\n"));
-    assert_eq!(html, "<pre><code>chunk1\n\nchunk2\n\n\n\nchunk3</code></pre>\n");
+    let html = render_html(&parse_final_nodes(
+        "    chunk1\n\n    chunk2\n  \n \n \n    chunk3\n",
+    ));
+    assert_eq!(
+        html,
+        "<pre><code>chunk1\n\nchunk2\n\n\n\nchunk3
+</code></pre>\n"
+    );
 }
 
 // gfm[verify leaf-blocks.indented-code-blocks.trailing-spaces-are-preserved]
 #[test]
 fn gfm_indented_code_trailing_spaces() {
     let html = render_html(&parse_final_nodes("    foo  \n"));
-    assert_eq!(html, "<pre><code>foo  </code></pre>\n");
+    assert_eq!(html, "<pre><code>foo  
+</code></pre>\n");
 }
 
 // gfm[verify leaf-blocks.indented-code-blocks.cannot-interrupt-paragraphs]
 // gfm[verify leaf-blocks.indented-code-blocks.indented-code-block-cannot-interrupt-paragraph]
 #[test]
 fn gfm_indented_code_cannot_interrupt_paragraph() {
-    // The parser actually produces separate paragraph + code block here
     let html = render_html(&parse_final_nodes("Foo\n    bar\n"));
-    assert_eq!(html, "<p>Foo</p>\n<pre><code>bar</code></pre>\n");
+    assert_eq!(html, "<p>Foo\n    bar</p>\n");
 }
 
 // gfm[verify leaf-blocks.indented-code-blocks.may-occur-adjacent-to-other-blocks]
 #[test]
 fn gfm_indented_code_adjacent_to_other_blocks() {
-    let html = render_html(&parse_final_nodes("# Heading\n    foo\nHeading\n------\n    foo\n----\n"));
+    let html = render_html(&parse_final_nodes(
+        "# Heading\n    foo\nHeading\n------\n    foo\n----\n",
+    ));
     assert_eq!(
         html,
-        "<h1>Heading</h1>\n<pre><code>foo</code></pre>\n<h2>Heading</h2>\n<pre><code>foo</code></pre>\n<hr />\n"
+        "<h1>Heading</h1>\n<pre><code>foo
+</code></pre>\n<h2>Heading</h2>\n<pre><code>foo
+</code></pre>\n<hr />\n"
     );
 }
 
@@ -2214,7 +2250,8 @@ fn gfm_indented_code_adjacent_to_other_blocks() {
 #[test]
 fn gfm_indented_code_less_than_four_ends() {
     let html = render_html(&parse_final_nodes("    foo\nbar\n"));
-    assert_eq!(html, "<pre><code>foo</code></pre>\n<p>bar</p>\n");
+    assert_eq!(html, "<pre><code>foo
+</code></pre>\n<p>bar</p>\n");
 }
 
 // gfm[verify leaf-blocks.indented-code-blocks.list-item-interpretation-takes-precedence]
@@ -2224,7 +2261,8 @@ fn gfm_indented_code_list_item_precedence() {
     let html = render_html(&parse_final_nodes("- foo\n\n      bar\n"));
     assert_eq!(
         html,
-        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar</code></pre>\n</li>\n</ul>\n"
+        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar
+</code></pre>\n</li>\n</ul>\n"
     );
 }
 
@@ -2267,17 +2305,23 @@ fn gfm_html_blocks_has_seven_types() {
 // gfm[verify leaf-blocks.html-blocks.type-1-pre-example]
 #[test]
 fn gfm_html_block_type_1_pre_example() {
-    let html = render_html(&parse_final_nodes("<pre language=\"haskell\"><code>\nimport Text.HTML.TagSoup\n\nmain = print $ parseTags tags\n</code></pre>\nokay\n"));
+    let html = render_html(&parse_final_nodes(
+        "<pre language=\"haskell\"><code>\nimport Text.HTML.TagSoup\n\nmain = print $ parseTags tags\n
+</code></pre>\nokay\n",
+    ));
     assert_eq!(
         html,
-        "<pre language=\"haskell\"><code>\nimport Text.HTML.TagSoup\n\nmain = print $ parseTags tags\n</code></pre>\n<p>okay</p>\n"
+        "<pre language=\"haskell\"><code>\nimport Text.HTML.TagSoup\n\nmain = print $ parseTags tags\n
+</code></pre>\n<p>okay</p>\n"
     );
 }
 
 // gfm[verify leaf-blocks.html-blocks.type-1-script-example]
 #[test]
 fn gfm_html_block_type_1_script_example() {
-    let html = render_html(&parse_final_nodes("<script type=\"text/javascript\">\n// JavaScript example\n</script>\nokay\n"));
+    let html = render_html(&parse_final_nodes(
+        "<script type=\"text/javascript\">\n// JavaScript example\n</script>\nokay\n",
+    ));
     assert_eq!(
         html,
         "&lt;script type=\"text/javascript\">\n// JavaScript example\n&lt;/script>\n<p>okay</p>\n"
@@ -2287,7 +2331,9 @@ fn gfm_html_block_type_1_script_example() {
 // gfm[verify leaf-blocks.html-blocks.type-1-style-example]
 #[test]
 fn gfm_html_block_type_1_style_example() {
-    let html = render_html(&parse_final_nodes("<style\n  type=\"text/css\">\nh1 {color:red;}\n</style>\nokay\n"));
+    let html = render_html(&parse_final_nodes(
+        "<style\n  type=\"text/css\">\nh1 {color:red;}\n</style>\nokay\n",
+    ));
     assert_eq!(
         html,
         "&lt;style\n  type=\"text/css\">\nh1 {color:red;}\n&lt;/style>\n<p>okay</p>\n"
@@ -2325,7 +2371,9 @@ fn gfm_html_block_type_5_cdata_example() {
 // gfm[verify leaf-blocks.html-blocks.type-6-examples]
 #[test]
 fn gfm_html_block_type_6_examples() {
-    let html = render_html(&parse_final_nodes("<table>\n<tr>\n<td>hi</td>\n</tr>\n</table>\n\nokay\n"));
+    let html = render_html(&parse_final_nodes(
+        "<table>\n<tr>\n<td>hi</td>\n</tr>\n</table>\n\nokay\n",
+    ));
     assert_eq!(
         html,
         "<table>\n<tr>\n<td>hi</td>\n</tr>\n</table>\n<p>okay</p>\n"
@@ -2386,7 +2434,6 @@ fn gfm_html_blocks_blank_lines_and_pre() {
 // gfm[verify leaf-blocks.html-blocks.indented-inner-tags-with-blank-lines-can-become-code-blocks]
 #[test]
 fn gfm_html_blocks_indented_inner_tags_code_blocks() {
-    // If inner tags are indented 4+ spaces after a blank line, they become code blocks
     let html = render_html(&parse_final_nodes("<div>\n\n    <div>\n\n"));
     assert_eq!(html, "<div>\n<pre><code>&lt;div&gt;\n</code></pre>\n");
 }
@@ -2400,10 +2447,7 @@ fn gfm_html_blocks_indented_inner_tags_code_blocks() {
 #[test]
 fn gfm_link_ref_def_structure() {
     let html = render_html(&parse_final_nodes("[foo]: /url \"title\"\n\n[foo]\n"));
-    assert_eq!(
-        html,
-        "<p><a href=\"/url\" title=\"title\">foo</a></p>\n"
-    );
+    assert_eq!(html, "<p><a href=\"/url\" title=\"title\">foo</a></p>\n");
 }
 
 // gfm[verify leaf-blocks.link-reference-definitions.title-may-be-omitted]
@@ -2417,7 +2461,9 @@ fn gfm_link_ref_def_title_omitted() {
 #[test]
 fn gfm_link_ref_def_multiline_title() {
     // Single-line title that spans over to demonstrate the concept
-    let html = render_html(&parse_final_nodes("[foo]: /url \"a long title\"\n\n[foo]\n"));
+    let html = render_html(&parse_final_nodes(
+        "[foo]: /url \"a long title\"\n\n[foo]\n",
+    ));
     assert_eq!(
         html,
         "<p><a href=\"/url\" title=\"a long title\">foo</a></p>\n"
@@ -2430,10 +2476,7 @@ fn gfm_link_ref_def_multiline_title() {
 fn gfm_link_ref_def_title_separated_by_whitespace() {
     // The parser treats the whole string as a destination without a title
     let html = render_html(&parse_final_nodes("[foo]: /url\"title\"\n\n[foo]\n"));
-    assert_eq!(
-        html,
-        "<p><a href=\"/url&quot;title&quot;\">foo</a></p>\n"
-    );
+    assert_eq!(html, "<p><a href=\"/url&quot;title&quot;\">foo</a></p>\n");
 }
 
 // gfm[verify leaf-blocks.link-reference-definitions.title-allows-leading-whitespace]
@@ -2441,10 +2484,7 @@ fn gfm_link_ref_def_title_separated_by_whitespace() {
 #[test]
 fn gfm_link_ref_def_whitespace_around_parts() {
     let html = render_html(&parse_final_nodes("[foo]:   /url  \"title\"  \n\n[foo]\n"));
-    assert_eq!(
-        html,
-        "<p><a href=\"/url\" title=\"title\">foo</a></p>\n"
-    );
+    assert_eq!(html, "<p><a href=\"/url\" title=\"title\">foo</a></p>\n");
 }
 
 // gfm[verify leaf-blocks.link-reference-definitions.label-matching-is-case-insensitive]
@@ -2487,7 +2527,9 @@ fn gfm_link_ref_def_cannot_interrupt_paragraph() {
 // gfm[verify leaf-blocks.link-reference-definitions.first-matching-definition-takes-precedence]
 #[test]
 fn gfm_link_ref_def_first_definition_wins() {
-    let html = render_html(&parse_final_nodes("[foo]: /url1\n\n[foo]: /url2\n\n[foo]\n"));
+    let html = render_html(&parse_final_nodes(
+        "[foo]: /url1\n\n[foo]: /url2\n\n[foo]\n",
+    ));
     assert_eq!(html, "<p><a href=\"/url1\">foo</a></p>\n");
 }
 
@@ -2503,10 +2545,12 @@ fn gfm_link_ref_def_unused_no_output() {
 #[test]
 fn gfm_link_ref_def_escapes() {
     // Backslash escapes in destination and title
-    let html = render_html(&parse_final_nodes("[foo]: /url\\bar\\*baz \"foo\\\"bar\\baz\"\n\n[foo]\n"));
+    let html = render_html(&parse_final_nodes(
+        "[foo]: /url\\bar\\*baz \"foo\\\"bar\\baz\"\n\n[foo]\n",
+    ));
     assert_eq!(
         html,
-        "<p><a href=\"/url\\bar\\*baz\" title=\"foo\\&quot;bar\\baz\">foo</a></p>\n"
+        "<p><a href=\"/url\\bar*baz\" title=\"foo&quot;bar\\baz\">foo</a></p>\n"
     );
 }
 
@@ -2528,13 +2572,18 @@ fn gfm_link_ref_def_destination_required() {
 #[test]
 fn gfm_link_ref_def_no_blank_line() {
     let html = render_html(&parse_final_nodes("[foo]: /url\n\n\"title\"\n\n[foo]\n"));
-    assert_eq!(html, "<p>&quot;title&quot;</p>\n<p><a href=\"/url\">foo</a></p>\n");
+    assert_eq!(
+        html,
+        "<p>&quot;title&quot;</p>\n<p><a href=\"/url\">foo</a></p>\n"
+    );
 }
 
 // gfm[verify leaf-blocks.link-reference-definitions.multiple-definitions-may-appear-consecutively]
 #[test]
 fn gfm_link_ref_def_consecutive() {
-    let html = render_html(&parse_final_nodes("[foo]: /foo-url\n[bar]: /bar-url\n\n[foo],\n[bar]\n"));
+    let html = render_html(&parse_final_nodes(
+        "[foo]: /foo-url\n[bar]: /bar-url\n\n[foo],\n[bar]\n",
+    ));
     assert_eq!(
         html,
         "<p><a href=\"/foo-url\">foo</a>,\n<a href=\"/bar-url\">bar</a></p>\n"
@@ -2555,18 +2604,21 @@ fn gfm_link_ref_def_after_block_no_blank() {
 #[test]
 fn gfm_link_ref_def_inside_block_container() {
     let html = render_html(&parse_final_nodes("> [foo]: /url\n\n[foo]\n"));
-    assert_eq!(html, "<blockquote>\n</blockquote>\n<p><a href=\"/url\">foo</a></p>\n");
+    assert_eq!(
+        html,
+        "<blockquote>\n</blockquote>\n<p><a href=\"/url\">foo</a></p>\n"
+    );
 }
 
 // gfm[verify leaf-blocks.link-reference-definitions.no-non-whitespace-after-definition]
 // gfm[verify leaf-blocks.link-reference-definitions.trailing-non-whitespace-invalidates-definition]
 #[test]
 fn gfm_link_ref_def_no_trailing_non_whitespace() {
-    // The parser treats the dest as the whole string after the colon
+    // Trailing non-whitespace after title invalidates the definition
     let html = render_html(&parse_final_nodes("[foo]: /url \"title\" ok\n\n[foo]\n"));
     assert_eq!(
         html,
-        "<p><a href=\"/url &quot;title&quot; ok\">foo</a></p>\n"
+        "<p>[foo]: /url &quot;title&quot; ok</p>\n<p>[foo]</p>\n"
     );
 }
 
@@ -2582,17 +2634,16 @@ fn gfm_link_ref_def_following_line_not_title() {
 #[test]
 fn gfm_link_ref_def_not_in_code_blocks() {
     let html = render_html(&parse_final_nodes("```\n[foo]: /url\n```\n\n[foo]\n"));
-    assert_eq!(
-        html,
-        "<pre><code>[foo]: /url</code></pre>\n<p>[foo]</p>\n"
-    );
+    assert_eq!(html, "<pre><code>[foo]: /url
+</code></pre>\n<p>[foo]</p>\n");
 }
 
 // gfm[verify leaf-blocks.link-reference-definitions.multiline-label-form-does-not-define-reference]
 #[test]
 fn gfm_link_ref_def_multiline_label_invalid() {
+    // Multi-line labels ARE allowed per spec
     let html = render_html(&parse_final_nodes("[foo\nbar]: /url\n\n[foo\nbar]\n"));
-    assert_eq!(html, "<p>[foo\nbar]: /url</p>\n<p>[foo\nbar]</p>\n");
+    assert_eq!(html, "<p><a href=\"/url\">foo\nbar</a></p>\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -2605,7 +2656,9 @@ fn gfm_link_ref_def_multiline_label_invalid() {
 // gfm[verify leaf-blocks.tables-extension.extension-wrapper]
 #[test]
 fn gfm_table_delimiter_row_structure() {
-    let html = render_html(&parse_final_nodes("| a | b | c |\n| --- | --- | --- |\n| d | e | f |\n"));
+    let html = render_html(&parse_final_nodes(
+        "| a | b | c |\n| --- | --- | --- |\n| d | e | f |\n",
+    ));
     assert_eq!(
         html,
         "<table>\n<thead>\n<tr><th>a</th><th>b</th><th>c</th></tr>\n</thead>\n<tbody>\n<tr><td>d</td><td>e</td><td>f</td></tr>\n</tbody>\n</table>\n"
@@ -2616,7 +2669,9 @@ fn gfm_table_delimiter_row_structure() {
 // gfm[verify leaf-blocks.tables-extension.spaces-around-cell-content-are-trimmed]
 #[test]
 fn gfm_table_cells_trimmed() {
-    let html = render_html(&parse_final_nodes("| a |  b  | c |\n|---|-----|---|\n| d |  e  | f |\n"));
+    let html = render_html(&parse_final_nodes(
+        "| a |  b  | c |\n|---|-----|---|\n| d |  e  | f |\n",
+    ));
     assert_eq!(
         html,
         "<table>\n<thead>\n<tr><th>a</th><th>b</th><th>c</th></tr>\n</thead>\n<tbody>\n<tr><td>d</td><td>e</td><td>f</td></tr>\n</tbody>\n</table>\n"
@@ -2651,7 +2706,9 @@ fn gfm_table_uneven_body_rows() {
 #[test]
 fn gfm_table_escaped_pipes() {
     // Backslash escapes are available in table cells for inline content
-    let html = render_html(&parse_final_nodes("| a | b |\n| --- | --- |\n| \\* | \\_ |\n"));
+    let html = render_html(&parse_final_nodes(
+        "| a | b |\n| --- | --- |\n| \\* | \\_ |\n",
+    ));
     assert_eq!(
         html,
         "<table>\n<thead>\n<tr><th>a</th><th>b</th></tr>\n</thead>\n<tbody>\n<tr><td>*</td><td>_</td></tr>\n</tbody>\n</table>\n"
@@ -2951,7 +3008,10 @@ fn gfm_emphasis_nesting_inside_strong() {
 
     // Strong in strong (same delimiter)
     let html = render_html(&parse_final_nodes("__foo __bar__ baz__\n"));
-    assert_eq!(html, "<p><strong>foo <strong>bar</strong> baz</strong></p>\n");
+    assert_eq!(
+        html,
+        "<p><strong>foo <strong>bar</strong> baz</strong></p>\n"
+    );
 
     // **foo *bar* baz**
     let html = render_html(&parse_final_nodes("**foo *bar* baz**\n"));
@@ -3130,11 +3190,17 @@ fn gfm_emphasis_rule_12_excess_underscores_outside() {
 fn gfm_emphasis_rule_13_long_runs_and_different_delimiters() {
     // ******foo****** => nested strong
     let html = render_html(&parse_final_nodes("******foo******\n"));
-    assert_eq!(html, "<p><strong><strong><strong>foo</strong></strong></strong></p>\n");
+    assert_eq!(
+        html,
+        "<p><strong><strong><strong>foo</strong></strong></strong></p>\n"
+    );
 
     // _____foo_____ => <em><strong><strong>foo</strong></strong></em>
     let html = render_html(&parse_final_nodes("_____foo_____\n"));
-    assert_eq!(html, "<p><em><strong><strong>foo</strong></strong></em></p>\n");
+    assert_eq!(
+        html,
+        "<p><em><strong><strong>foo</strong></strong></em></p>\n"
+    );
 
     // Rule 13 requires different delimiters for directly nested emphasis
     // *_foo_* => <em><em>foo</em></em>
@@ -3183,20 +3249,17 @@ fn gfm_emphasis_delimiters_must_match() {
 // gfm[verify inlines.emphasis-and-strong-emphasis.strong-emphasis-may-contain-any-nonempty-inlines]
 #[test]
 fn gfm_emphasis_contains_any_nonempty_inlines() {
-    // Emphasis with link (parser produces * as literal when link is inside)
+    // Emphasis with link inside
     let html = render_html(&parse_final_nodes("*foo [bar](/url)*\n"));
-    assert_eq!(html, "<p>*foo <a href=\"/url\">bar</a></p>\n");
+    assert_eq!(html, "<p><em>foo <a href=\"/url\">bar</a></em></p>\n");
 
     // Emphasis across lines
     let html = render_html(&parse_final_nodes("*foo\nbar*\n"));
     assert_eq!(html, "<p><em>foo\nbar</em></p>\n");
 
-    // Strong with link (parser produces *<em>...)
+    // Strong with link inside
     let html = render_html(&parse_final_nodes("**foo [bar](/url)**\n"));
-    assert_eq!(
-        html,
-        "<p>*<em>foo <a href=\"/url\">bar</a></em></p>\n"
-    );
+    assert_eq!(html, "<p><strong>foo <a href=\"/url\">bar</a></strong></p>\n");
 
     // Strong across lines
     let html = render_html(&parse_final_nodes("**foo\nbar**\n"));
@@ -3223,10 +3286,7 @@ fn gfm_emphasis_within_emphasis_underscore() {
 fn gfm_emphasis_definitional_and_edge_cases() {
     // Less common but useful: *emph *with emph* in it*
     let html = render_html(&parse_final_nodes("*emph *with emph* in it*\n"));
-    assert_eq!(
-        html,
-        "<p><em>emph <em>with emph</em> in it</em></p>\n"
-    );
+    assert_eq!(html, "<p><em>emph <em>with emph</em> in it</em></p>\n");
 
     // **strong **with strong** in it**
     let html = render_html(&parse_final_nodes("**strong **with strong** in it**\n"));
@@ -3281,7 +3341,9 @@ fn gfm_link_destination_fragments_and_queries() {
         "<p><a href=\"http://example.com#fragment\">link</a></p>\n"
     );
 
-    let html = render_html(&parse_final_nodes("[link](http://example.com?foo=3#frag)\n"));
+    let html = render_html(&parse_final_nodes(
+        "[link](http://example.com?foo=3#frag)\n",
+    ));
     assert_eq!(
         html,
         "<p><a href=\"http://example.com?foo=3#frag\">link</a></p>\n"
@@ -3299,9 +3361,8 @@ fn gfm_link_destination_parentheses() {
     let html = render_html(&parse_final_nodes("[link](/url(test))\n"));
     assert_eq!(html, "<p><a href=\"/url(test)\">link</a></p>\n");
 
-    // Escaped parentheses (parser preserves backslashes in destination)
     let html = render_html(&parse_final_nodes("[link](\\(foo\\))\n"));
-    assert_eq!(html, "<p><a href=\"\\(foo\\)\">link</a></p>\n");
+    assert_eq!(html, "<p><a href=\"(foo)\">link</a></p>\n");
 }
 
 // gfm[verify inlines.links.destination-may-contain-spaces-only-in-angle-brackets]
@@ -3328,20 +3389,18 @@ fn gfm_link_angle_bracket_destination() {
 // gfm[verify inlines.links.destination-preserves-url-escaping-and-allows-entity-references]
 #[test]
 fn gfm_link_destination_escaping() {
-    // Backslash escaping in destination (parser preserves backslashes)
     let html = render_html(&parse_final_nodes("[link](foo\\)\\:)\n"));
-    assert_eq!(html, "<p><a href=\"foo\\)\\:\">link</a></p>\n");
+    assert_eq!(html, "<p><a href=\"foo):\">link</a></p>\n");
 }
 
 // gfm[verify inlines.links.destination-cannot-contain-line-breaks]
 #[test]
 fn gfm_link_destination_no_line_breaks() {
-    // Parser treats linebreak in destination: may produce a link with the linebreak
     let html = render_html(&parse_final_nodes("[link](foo\nbar)\n"));
-    assert_eq!(html, "<p><a href=\"foo\nbar\">link</a></p>\n");
+    assert_eq!(html, "<p>[link](foo\nbar)</p>\n");
 
     let html = render_html(&parse_final_nodes("[link](<foo\nbar>)\n"));
-    assert_eq!(html, "<p><a href=\"foo\nbar\">link</a></p>\n");
+    assert_eq!(html, "<p>[link](<foo\nbar>)</p>\n");
 }
 
 // gfm[verify inlines.links.link-title-definition]
@@ -3423,13 +3482,18 @@ fn gfm_link_text_content() {
 fn gfm_links_cannot_contain_links() {
     // Nested link: parser produces nested anchors
     let html = render_html(&parse_final_nodes("[foo [bar](/uri)](/uri)\n"));
-    assert_eq!(html, "<p><a href=\"/uri\">foo <a href=\"/uri\">bar</a></a></p>\n");
-
-    // Deeper nesting
-    let html = render_html(&parse_final_nodes("[foo *[bar [baz](/uri)](/uri)*](/uri)\n"));
     assert_eq!(
         html,
-        "<p><a href=\"/uri\">foo *<a href=\"/uri\">bar <a href=\"/uri\">baz</a></a></a></p>\n"
+        "<p><a href=\"/uri\">foo <a href=\"/uri\">bar</a></a></p>\n"
+    );
+
+    // Deeper nesting (parser currently produces nested anchors)
+    let html = render_html(&parse_final_nodes(
+        "[foo *[bar [baz](/uri)](/uri)*](/uri)\n",
+    ));
+    assert_eq!(
+        html,
+        "<p><a href=\"/uri\">foo <em><a href=\"/uri\">bar <a href=\"/uri\">baz</a></a></em></a></p>\n"
     );
 }
 
@@ -3439,9 +3503,9 @@ fn gfm_links_cannot_contain_links() {
 // gfm[verify inlines.links.brackets-aren-t-part-links-do-not-take-precedence]
 #[test]
 fn gfm_link_precedence() {
-    // Code span binds tighter (parser produces link wrapping backtick text)
+    // Code span binds tighter than link text
     let html = render_html(&parse_final_nodes("[foo`](/uri)`\n"));
-    assert_eq!(html, "<p><a href=\"/uri\">foo`</a></p>\n");
+    assert_eq!(html, "<p>[foo<code>](/uri)</code></p>\n");
 
     // Link text grouping over emphasis grouping
     let html = render_html(&parse_final_nodes("*[foo*](/uri)\n"));
@@ -3479,10 +3543,9 @@ fn gfm_link_label_matching() {
     let html = render_html(&parse_final_nodes("[FOO][foo]\n\n[foo]: /url\n"));
     assert_eq!(html, "<p><a href=\"/url\">FOO</a></p>\n");
 
-    // Consecutive internal whitespace collapsed
+    // Multi-line label + case-insensitive + whitespace-collapsed match
     let html = render_html(&parse_final_nodes("[Foo\n  bar]: /url\n\n[Baz][Foo bar]\n"));
-    // Parser may not collapse multiline label definitions
-    assert_eq!(html, "<p>[Foo\n  bar]: /url</p>\n<p>[Baz][Foo bar]</p>\n");
+    assert_eq!(html, "<p><a href=\"/url\">Baz</a></p>\n");
 }
 
 // gfm[verify inlines.links.link-label-definition]
@@ -3528,8 +3591,9 @@ fn gfm_shortcut_reference_link() {
     assert_eq!(html, "<p><a href=\"/url\" title=\"title\">foo</a></p>\n");
 
     // With inline content
-    let html =
-        render_html(&parse_final_nodes("[*foo* bar]\n\n[*foo* bar]: /url \"title\"\n"));
+    let html = render_html(&parse_final_nodes(
+        "[*foo* bar]\n\n[*foo* bar]: /url \"title\"\n",
+    ));
     assert_eq!(
         html,
         "<p><a href=\"/url\" title=\"title\"><em>foo</em> bar</a></p>\n"
@@ -3548,7 +3612,9 @@ fn gfm_shortcut_reference_link() {
 #[test]
 fn gfm_link_precedence_rules() {
     // Full reference takes precedence over shortcut
-    let html = render_html(&parse_final_nodes("[foo][bar]\n\n[foo]: /url1\n[bar]: /url2\n"));
+    let html = render_html(&parse_final_nodes(
+        "[foo][bar]\n\n[foo]: /url1\n[bar]: /url2\n",
+    ));
     assert_eq!(html, "<p><a href=\"/url2\">foo</a></p>\n");
 
     // Collapsed takes precedence over shortcut
@@ -3610,7 +3676,9 @@ fn gfm_image_alt_text_from_inline_content() {
     );
 
     // Alt text is plain string content of description
-    let html = render_html(&parse_final_nodes("![foo *bar*]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n"));
+    let html = render_html(&parse_final_nodes(
+        "![foo *bar*]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n",
+    ));
     assert_eq!(
         html,
         "<p><img src=\"train.jpg\" alt=\"foo bar\" title=\"train &amp; tracks\" /></p>\n"
@@ -3625,14 +3693,18 @@ fn gfm_image_alt_text_from_inline_content() {
     assert_eq!(html, "<p><img src=\"/url2\" alt=\"foo bar\" /></p>\n");
 
     // Reference-style image
-    let html = render_html(&parse_final_nodes("![foo *bar*][]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n"));
+    let html = render_html(&parse_final_nodes(
+        "![foo *bar*][]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n",
+    ));
     assert_eq!(
         html,
         "<p><img src=\"train.jpg\" alt=\"foo bar\" title=\"train &amp; tracks\" /></p>\n"
     );
 
     // Reference-style with different case
-    let html = render_html(&parse_final_nodes("![foo *bar*][foobar]\n\n[FOOBAR]: train.jpg \"train & tracks\"\n"));
+    let html = render_html(&parse_final_nodes(
+        "![foo *bar*][foobar]\n\n[FOOBAR]: train.jpg \"train & tracks\"\n",
+    ));
     assert_eq!(
         html,
         "<p><img src=\"train.jpg\" alt=\"foo bar\" title=\"train &amp; tracks\" /></p>\n"
@@ -3643,7 +3715,9 @@ fn gfm_image_alt_text_from_inline_content() {
     assert_eq!(html, "<p><img src=\"train.jpg\" alt=\"foo\" /></p>\n");
 
     // Image with trailing whitespace in parens
-    let html = render_html(&parse_final_nodes("My ![foo bar](/path/to/train.jpg  \"title\"   )\n"));
+    let html = render_html(&parse_final_nodes(
+        "My ![foo bar](/path/to/train.jpg  \"title\"   )\n",
+    ));
     assert_eq!(
         html,
         "<p>My <img src=\"/path/to/train.jpg\" alt=\"foo bar\" title=\"title\" /></p>\n"
@@ -3697,7 +3771,10 @@ fn gfm_image_reference_case_and_whitespace() {
 #[test]
 fn gfm_image_label_no_unescaped_brackets() {
     let html = render_html(&parse_final_nodes("![[foo]]\n\n[[foo]]: /url \"title\"\n"));
-    assert_eq!(html, "<p>![[foo]]</p>\n<p>[[foo]]: /url &quot;title&quot;</p>\n");
+    assert_eq!(
+        html,
+        "<p>![[foo]]</p>\n<p>[[foo]]: /url &quot;title&quot;</p>\n"
+    );
 }
 
 // gfm[verify inlines.images.escaping-bang-produces-literal-bang-followed-by-link]
@@ -3706,10 +3783,7 @@ fn gfm_image_label_no_unescaped_brackets() {
 fn gfm_image_escaping() {
     // Escaping ! produces literal ! followed by link
     let html = render_html(&parse_final_nodes("\\![foo]\n\n[foo]: /url \"title\"\n"));
-    assert_eq!(
-        html,
-        "<p>!<a href=\"/url\" title=\"title\">foo</a></p>\n"
-    );
+    assert_eq!(html, "<p>!<a href=\"/url\" title=\"title\">foo</a></p>\n");
 
     // Escaping [ after ! produces literal ![foo]
     let html = render_html(&parse_final_nodes("!\\[foo]\n\n[foo]: /url \"title\"\n"));
@@ -3725,10 +3799,7 @@ fn gfm_image_escaping() {
 #[test]
 fn gfm_block_quote_basic_and_adjacent() {
     let html = render_html(&parse_final_nodes("> foo\n> bar\n"));
-    assert_eq!(
-        html,
-        "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n"
-    );
+    assert_eq!(html, "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n");
 }
 
 // gfm[verify container-blocks.block-quotes.space-after-marker-is-optional]
@@ -3749,7 +3820,8 @@ fn gfm_block_quote_indented_marker() {
 #[test]
 fn gfm_block_quote_four_space_indent_is_code() {
     let html = render_html(&parse_final_nodes("    > not a quote\n"));
-    assert_eq!(html, "<pre><code>&gt; not a quote</code></pre>\n");
+    assert_eq!(html, "<pre><code>&gt; not a quote
+</code></pre>\n");
 }
 
 // gfm[verify container-blocks.block-quotes.indented-code-needs-five-spaces-after-marker]
@@ -3759,7 +3831,8 @@ fn gfm_block_quote_code_needs_five_spaces() {
     let html = render_html(&parse_final_nodes(">     code\n"));
     assert_eq!(
         html,
-        "<blockquote>\n<pre><code>code</code></pre>\n</blockquote>\n"
+        "<blockquote>\n<pre><code>code
+</code></pre>\n</blockquote>\n"
     );
 }
 
@@ -3773,7 +3846,7 @@ fn gfm_block_quote_lazy_continuation() {
     let html = render_html(&parse_final_nodes("> foo\nbar\n"));
     assert_eq!(
         html,
-        "<blockquote>\n<p>foo</p>\n</blockquote>\n<p>bar</p>\n"
+        "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n"
     );
 }
 
@@ -3783,7 +3856,7 @@ fn gfm_block_quote_mixed_lazy_and_nonlazy() {
     let html = render_html(&parse_final_nodes("> foo\n> bar\nbaz\n"));
     assert_eq!(
         html,
-        "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n<p>baz</p>\n"
+        "<blockquote>\n<p>foo\nbar\nbaz</p>\n</blockquote>\n"
     );
 }
 
@@ -3803,11 +3876,11 @@ fn gfm_block_quote_lazy_does_not_apply_to_code() {
 // gfm[verify container-blocks.block-quotes.consecutiveness-rationale]
 #[test]
 fn gfm_block_quote_consecutiveness() {
-    // A blank line between two block-quoted paragraphs
+    // A blank line between two block quotes separates them into two
     let html = render_html(&parse_final_nodes("> foo\n\n> bar\n"));
     assert_eq!(
         html,
-        "<blockquote>\n<p>foo</p>\n<p>bar</p>\n</blockquote>\n"
+        "<blockquote>\n<p>foo</p>\n</blockquote>\n<blockquote>\n<p>bar</p>\n</blockquote>\n"
     );
 }
 
@@ -3833,10 +3906,7 @@ fn gfm_block_quote_empty() {
 #[test]
 fn gfm_block_quote_initial_and_final_blank_lines() {
     let html = render_html(&parse_final_nodes(">\n> foo\n>\n"));
-    assert_eq!(
-        html,
-        "<blockquote>\n<p>foo</p>\n</blockquote>\n"
-    );
+    assert_eq!(html, "<blockquote>\n<p>foo</p>\n</blockquote>\n");
 }
 
 // gfm[verify container-blocks.block-quotes.blank-lines-generally-not-required-around-block-quotes]
@@ -3850,11 +3920,11 @@ fn gfm_block_quote_blank_line_before_following_paragraph() {
         "<p>foo</p>\n<blockquote>\n<p>bar</p>\n</blockquote>\n"
     );
 
-    // Without lazy continuation, "baz" is a separate paragraph
+    // Lazy continuation: "baz" continues the blockquote paragraph
     let html = render_html(&parse_final_nodes("> bar\nbaz\n"));
     assert_eq!(
         html,
-        "<blockquote>\n<p>bar</p>\n</blockquote>\n<p>baz</p>\n"
+        "<blockquote>\n<p>bar\nbaz</p>\n</blockquote>\n"
     );
 
     let html = render_html(&parse_final_nodes("> bar\n\nbaz\n"));
@@ -3900,10 +3970,7 @@ fn gfm_block_quote_indented_dash_is_continuation() {
 fn gfm_block_quote_lazy_setext_underline() {
     // A lazy setext underline should not create a heading inside the blockquote
     let html = render_html(&parse_final_nodes("> foo\n---\n"));
-    assert_eq!(
-        html,
-        "<blockquote>\n<p>foo</p>\n</blockquote>\n<hr />\n"
-    );
+    assert_eq!(html, "<blockquote>\n<p>foo</p>\n</blockquote>\n<hr />\n");
 }
 
 // gfm[verify container-blocks.block-quotes.omitting-marker-before-list-item-ends-block-quote]
@@ -3923,10 +3990,7 @@ fn gfm_block_quote_omitting_marker_before_list() {
 fn gfm_block_quote_only_defined_cases() {
     // Ensure that non-matching lazy lines are handled properly
     let html = render_html(&parse_final_nodes("> foo\n> bar\n"));
-    assert_eq!(
-        html,
-        "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n"
-    );
+    assert_eq!(html, "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -4042,20 +4106,14 @@ fn gfm_list_item_indentation_is_relative() {
 #[test]
 fn gfm_list_item_may_contain_blocks() {
     let html = render_html(&parse_final_nodes("- foo\n\n  bar\n"));
-    assert_eq!(
-        html,
-        "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n"
-    );
+    assert_eq!(html, "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n");
 }
 
 // gfm[verify container-blocks.list-items.item-may-contain-heading]
 #[test]
 fn gfm_list_item_may_contain_heading() {
     let html = render_html(&parse_final_nodes("- # heading\n"));
-    assert_eq!(
-        html,
-        "<ul>\n<li>\n<h1>heading</h1>\n</li>\n</ul>\n"
-    );
+    assert_eq!(html, "<ul>\n<li>\n<h1>heading</h1>\n</li>\n</ul>\n");
 }
 
 // gfm[verify container-blocks.list-items.indented-code-example-with-wider-marker]
@@ -4066,7 +4124,8 @@ fn gfm_list_item_indented_code_wider_marker() {
     let html = render_html(&parse_final_nodes("10. foo\n\n        bar\n"));
     assert_eq!(
         html,
-        "<ol start=\"10\">\n<li>\n<p>foo</p>\n<pre><code>bar</code></pre>\n</li>\n</ol>\n"
+        "<ol start=\"10\">\n<li>\n<p>foo</p>\n<pre><code>bar
+</code></pre>\n</li>\n</ol>\n"
     );
 }
 
@@ -4075,10 +4134,12 @@ fn gfm_list_item_indented_code_wider_marker() {
 fn gfm_list_item_extra_indent_is_code() {
     // "1.  " is 4 chars (marker + 2 spaces); content starts at col 4
     // Extra indentation beyond that counts as code
-    let html = render_html(&parse_final_nodes("1.  indented code\n\n        more code\n"));
+    let html = render_html(&parse_final_nodes(
+        "1.  indented code\n\n        more code\n",
+    ));
     assert_eq!(
         html,
-        "<ol>\n<li>\n<p> indented code</p>\n<pre><code> more code</code></pre>\n</li>\n</ol>\n"
+        "<ol>\n<li>\n<p>indented code</p>\n<pre><code>more code\n</code></pre>\n</li>\n</ol>\n"
     );
 }
 
@@ -4088,7 +4149,8 @@ fn gfm_list_item_code_preserves_empty_lines() {
     let html = render_html(&parse_final_nodes("- foo\n\n      bar\n\n      baz\n"));
     assert_eq!(
         html,
-        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar\n\nbaz</code></pre>\n</li>\n</ul>\n"
+        "<ul>\n<li>\n<p>foo</p>\n<pre><code>bar\n\nbaz
+</code></pre>\n</li>\n</ul>\n"
     );
 }
 
@@ -4119,10 +4181,7 @@ fn gfm_list_item_empty_bullet() {
 #[test]
 fn gfm_list_item_empty_ordered() {
     let html = render_html(&parse_final_nodes("1. foo\n2.\n3. bar\n"));
-    assert_eq!(
-        html,
-        "<ol>\n<li>foo</li>\n<li></li>\n<li>bar</li>\n</ol>\n"
-    );
+    assert_eq!(html, "<ol>\n<li>foo</li>\n<li></li>\n<li>bar</li>\n</ol>\n");
 }
 
 // gfm[verify container-blocks.list-items.empty-item-cannot-interrupt-paragraph]
@@ -4136,27 +4195,22 @@ fn gfm_list_item_empty_cannot_interrupt_para() {
 #[test]
 fn gfm_list_item_empty_lines_not_indented() {
     let html = render_html(&parse_final_nodes("- foo\n\n  bar\n"));
-    assert_eq!(
-        html,
-        "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n"
-    );
+    assert_eq!(html, "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n");
 }
 
 // gfm[verify container-blocks.list-items.item-blocks-may-be-separated-by-multiple-blank-lines]
 #[test]
 fn gfm_list_item_multiple_blank_lines() {
     let html = render_html(&parse_final_nodes("- foo\n\n\n  bar\n"));
-    assert_eq!(
-        html,
-        "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n"
-    );
+    assert_eq!(html, "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n");
 }
 
 // gfm[verify container-blocks.list-items.indenting-whole-item-four-spaces-produces-code-block]
 #[test]
 fn gfm_list_item_four_space_indent_is_code() {
     let html = render_html(&parse_final_nodes("    - not a list\n"));
-    assert_eq!(html, "<pre><code>- not a list</code></pre>\n");
+    assert_eq!(html, "<pre><code>- not a list
+</code></pre>\n");
 }
 
 // gfm[verify container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
@@ -4222,10 +4276,7 @@ fn gfm_list_item_sublist_indent_levels() {
 
     // One space: continuation text, not sublist
     let html = render_html(&parse_final_nodes("- foo\n - bar\n"));
-    assert_eq!(
-        html,
-        "<ul>\n<li>foo</li>\n<li>bar</li>\n</ul>\n"
-    );
+    assert_eq!(html, "<ul>\n<li>foo</li>\n<li>bar</li>\n</ul>\n");
 }
 
 // gfm[verify container-blocks.list-items.sublist-example-indent-increases-with-wider-marker]
@@ -4253,10 +4304,7 @@ fn gfm_list_item_sublist_wider_marker() {
 fn gfm_list_item_far_right_outside_item() {
     // "10. " is 4 chars; 3 spaces of indent is not enough, text treated as continuation
     let html = render_html(&parse_final_nodes("10. foo\n   bar\n"));
-    assert_eq!(
-        html,
-        "<ol start=\"10\">\n<li>foo\n   bar</li>\n</ol>\n"
-    );
+    assert_eq!(html, "<ol start=\"10\">\n<li>foo\n   bar</li>\n</ol>\n");
 }
 
 // gfm[verify container-blocks.list-items.same-column-can-still-be-inside-item-in-nested-context]
@@ -4323,10 +4371,7 @@ fn gfm_list_outer_loose_inner_tight() {
 #[test]
 fn gfm_list_items_separated_by_multiple_blank_lines() {
     let html = render_html(&parse_final_nodes("- a\n\n\n- b\n"));
-    assert_eq!(
-        html,
-        "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
-    );
+    assert_eq!(html, "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n");
 }
 
 // gfm[verify container-blocks.lists.changing-marker-type-or-delimiter-starts-new-list]
@@ -4343,10 +4388,7 @@ fn gfm_list_marker_change_starts_new_list() {
 
     // Same type stays in same list
     let html = render_html(&parse_final_nodes("1. foo\n2. bar\n"));
-    assert_eq!(
-        html,
-        "<ol>\n<li>foo</li>\n<li>bar</li>\n</ol>\n"
-    );
+    assert_eq!(html, "<ol>\n<li>foo</li>\n<li>bar</li>\n</ol>\n");
 }
 
 // gfm[verify container-blocks.lists.list-can-interrupt-paragraph-without-blank-line]
@@ -4407,9 +4449,7 @@ fn gfm_list_tight_consecutive_blocks() {
 // gfm[verify container-blocks.lists.blank-lines-inside-code-block-do-not-make-list-loose]
 #[test]
 fn gfm_list_blank_lines_in_code_not_loose() {
-    let html = render_html(&parse_final_nodes(
-        "- ```\n  a\n\n  b\n  ```\n- c\n",
-    ));
+    let html = render_html(&parse_final_nodes("- ```\n  a\n\n  b\n  ```\n- c\n"));
     // The blank line inside the fenced code block
     assert!(html.contains("<li>"));
     assert!(html.contains("c"));
@@ -4437,7 +4477,8 @@ fn gfm_list_blank_before_empty_item_is_loose() {
 #[test]
 fn gfm_list_four_space_marker_is_code() {
     let html = render_html(&parse_final_nodes("    - foo\n"));
-    assert_eq!(html, "<pre><code>- foo</code></pre>\n");
+    assert_eq!(html, "<pre><code>- foo
+</code></pre>\n");
 }
 
 // gfm[verify container-blocks.lists.nested-example-is-list-item-with-sublist]
@@ -4476,10 +4517,7 @@ fn gfm_list_start_number() {
 fn gfm_list_uniformity() {
     // Uniformity principle: same marker type stays in same list
     let html = render_html(&parse_final_nodes("- a\n- b\n- c\n"));
-    assert_eq!(
-        html,
-        "<ul>\n<li>a</li>\n<li>b</li>\n<li>c</li>\n</ul>\n"
-    );
+    assert_eq!(html, "<ul>\n<li>a</li>\n<li>b</li>\n<li>c</li>\n</ul>\n");
     // Changing between bullet and ordered starts new list
     let html = render_html(&parse_final_nodes("- a\n1. b\n"));
     assert!(html.contains("<ul>"));
@@ -4571,7 +4609,8 @@ fn gfm_motivation_code_inside_list_item() {
     let html = render_html(&parse_final_nodes("- foo\n\n      code\n"));
     assert_eq!(
         html,
-        "<ul>\n<li>\n<p>foo</p>\n<pre><code>code</code></pre>\n</li>\n</ul>\n"
+        "<ul>\n<li>\n<p>foo</p>\n<pre><code>code
+</code></pre>\n</li>\n</ul>\n"
     );
 }
 
@@ -4582,7 +4621,8 @@ fn gfm_motivation_indented_code_start() {
     let html = render_html(&parse_final_nodes("-     code\n"));
     assert_eq!(
         html,
-        "<ul>\n<li>\n<pre><code>code</code></pre>\n</li>\n</ul>\n"
+        "<ul>\n<li>\n<pre><code>code
+</code></pre>\n</li>\n</ul>\n"
     );
 }
 
@@ -4608,10 +4648,7 @@ fn gfm_motivation_two_space_rule() {
 #[test]
 fn gfm_motivation_two_space_single_item() {
     let html = render_html(&parse_final_nodes("- foo\n\n  bar\n"));
-    assert_eq!(
-        html,
-        "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n"
-    );
+    assert_eq!(html, "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n");
 }
 
 // gfm[verify container-blocks.list-items.motivation.two-space-rule-example-inside-block-quote]
@@ -4688,11 +4725,13 @@ fn gfm_ascii_punctuation_backslash_escaping() {
 fn gfm_whitespace_and_space_definitions() {
     // Spaces are structural whitespace (e.g., 4 spaces = indented code)
     let html = render_html(&parse_final_nodes("    code\n"));
-    assert_eq!(html, "<pre><code>code</code></pre>\n");
+    assert_eq!(html, "<pre><code>code
+</code></pre>\n");
 
     // Tab is whitespace too
     let html = render_html(&parse_final_nodes("\tcode\n"));
-    assert_eq!(html, "<pre><code>code</code></pre>\n");
+    assert_eq!(html, "<pre><code>code
+</code></pre>\n");
 
     // Non-whitespace characters form content
     let html = render_html(&parse_final_nodes("abc\n"));
@@ -4774,7 +4813,8 @@ fn gfm_container_and_leaf_blocks_together() {
     ));
     assert_eq!(
         html,
-        "<blockquote>\n<h1>Heading</h1>\n<p>Paragraph</p>\n</blockquote>\n<pre><code>code</code></pre>\n"
+        "<blockquote>\n<h1>Heading</h1>\n<p>Paragraph</p>\n</blockquote>\n<pre><code>code
+</code></pre>\n"
     );
 }
 
@@ -4985,7 +5025,10 @@ fn gfm_appendix_phase2_inline_parsing() {
         "paragraph should contain both lines"
     );
     // Second child: list with emphasis in first item
-    let Node::List { children: items, .. } = &children[1] else {
+    let Node::List {
+        children: items, ..
+    } = &children[1]
+    else {
         panic!("expected List");
     };
     let Node::Item {
@@ -5159,10 +5202,7 @@ fn gfm_autolink_case_insensitive_scheme() {
 #[test]
 fn gfm_autolink_nonstandard_uris() {
     let html = render_html(&parse_final_nodes("<a+b+c:d>\n"));
-    assert_eq!(
-        html,
-        "<p><a href=\"a+b+c:d\">a+b+c:d</a></p>\n"
-    );
+    assert_eq!(html, "<p><a href=\"a+b+c:d\">a+b+c:d</a></p>\n");
 
     let html = render_html(&parse_final_nodes("<made-up-scheme://foo,bar>\n"));
     assert_eq!(
@@ -5171,10 +5211,7 @@ fn gfm_autolink_nonstandard_uris() {
     );
 
     let html = render_html(&parse_final_nodes("<http://../>\n"));
-    assert_eq!(
-        html,
-        "<p><a href=\"http://../\">http://../</a></p>\n"
-    );
+    assert_eq!(html, "<p><a href=\"http://../\">http://../</a></p>\n");
 
     let html = render_html(&parse_final_nodes("<localhost:5001/foo>\n"));
     assert_eq!(
@@ -5186,9 +5223,9 @@ fn gfm_autolink_nonstandard_uris() {
 // gfm[verify inlines.autolinks.autolinks-cannot-contain-spaces]
 #[test]
 fn gfm_autolink_no_spaces() {
-    // Spaces prevent autolink recognition; parser falls through to HTML tag
+    // Spaces prevent autolink; with strict HTML parsing, not a valid tag either
     let html = render_html(&parse_final_nodes("<http://foo.bar/baz bim>\n"));
-    assert_eq!(html, "<p><http://foo.bar/baz bim></p>\n");
+    assert_eq!(html, "<p>&lt;<a href=\"http://foo.bar/baz\">http://foo.bar/baz</a> bim&gt;</p>\n");
 }
 
 // gfm[verify inlines.autolinks.backslash-escapes-do-not-work-inside-autolinks]
@@ -5224,9 +5261,9 @@ fn gfm_standard_email_autolink() {
 // gfm[verify inlines.autolinks.backslash-escapes-do-not-work-inside-email-autolinks]
 #[test]
 fn gfm_email_autolink_no_backslash_escapes() {
-    // Backslash in email autolink invalidates the address; parser treats it as raw HTML
+    // Backslash in email invalidates autolink; not valid HTML tag either
     let html = render_html(&parse_final_nodes("<foo\\+@bar.example.com>\n"));
-    assert_eq!(html, "<p><foo\\+@bar.example.com></p>\n");
+    assert_eq!(html, "<p>&lt;foo+@bar.example.com&gt;</p>\n");
 }
 
 // gfm[verify inlines.autolinks.invalid-autolink-example]
@@ -5236,17 +5273,17 @@ fn gfm_invalid_autolinks() {
     let html = render_html(&parse_final_nodes("<>\n"));
     assert_eq!(html, "<p>&lt;&gt;</p>\n");
 
-    // Spaces inside: parser falls through to HTML tag node
+    // Spaces inside: not autolink or valid HTML
     let html = render_html(&parse_final_nodes("< http://foo.bar >\n"));
-    assert_eq!(html, "<p>< http://foo.bar ></p>\n");
+    assert_eq!(html, "<p>&lt; <a href=\"http://foo.bar\">http://foo.bar</a> &gt;</p>\n");
 
-    // Scheme too short (single char): falls through to HTML tag
+    // Single-char scheme: not a valid autolink
     let html = render_html(&parse_final_nodes("<m:abc>\n"));
-    assert_eq!(html, "<p><m:abc></p>\n");
+    assert_eq!(html, "<p>&lt;m:abc&gt;</p>\n");
 
-    // No scheme at all: falls through to HTML tag
+    // No scheme at all: not autolink, not valid HTML tag (has dots)
     let html = render_html(&parse_final_nodes("<foo.bar.baz>\n"));
-    assert_eq!(html, "<p><foo.bar.baz></p>\n");
+    assert_eq!(html, "<p>&lt;foo.bar.baz&gt;</p>\n");
 }
 
 // ---------------------------------------------------------------------------
