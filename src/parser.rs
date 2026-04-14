@@ -711,6 +711,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         Ext: Clone + PartialEq,
     {
         let mut inner_lines = Vec::new();
+        let starts_empty = marker.content.trim().is_empty();
         inner_lines.push(marker.content);
         let mut index = start + 1;
         let mut saw_blank_separator = false;
@@ -718,6 +719,24 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
         while index < lines.len() {
             if lines[index].trim().is_empty() {
+                // An item that started with a blank line cannot absorb later
+                // content. If the next non-blank line is another list marker,
+                // we advance past the blank to let the outer loop consume it;
+                // otherwise the item ends here.
+                if starts_empty {
+                    let mut peek = index;
+                    while peek < lines.len() && lines[peek].trim().is_empty() {
+                        peek += 1;
+                    }
+                    let next_is_marker = peek < lines.len()
+                        && parse_list_marker(&lines[peek])
+                            .is_some_and(|m| m.ordered == marker.ordered);
+                    if next_is_marker {
+                        index = peek;
+                        loose = true;
+                    }
+                    break;
+                }
                 inner_lines.push(String::new());
                 saw_blank_separator = true;
                 index += 1;
@@ -4442,7 +4461,8 @@ fn trim_autolink_trailing(url: &str) -> &str {
             if let Some(amp) = url[..end].rfind('&') {
                 let entity = &url[amp + 1..end - 1];
                 if !entity.is_empty() && entity.chars().all(|c| c.is_ascii_alphanumeric()) {
-                    end -= 1;
+                    // Strip the entire &...; entity-like sequence
+                    end = amp;
                     continue;
                 }
             }

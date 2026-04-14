@@ -5457,12 +5457,12 @@ fn gfm_extended_autolink_entity_like_semicolon() {
         "<p><a href=\"http://www.google.com/search?q=commonmark&hl=en\">www.google.com/search?q=commonmark&amp;hl=en</a></p>\n"
     );
 
-    // Trailing &hl; looks like entity; semicolon is excluded from autolink
+    // Trailing &hl; looks like entity; entire &...; sequence is excluded
     let html = render_html(&parse_final_nodes(
         "www.google.com/search?q=commonmark&hl;\n",
     ));
     assert_eq!(
         html,
-        "<p><a href=\"http://www.google.com/search?q=commonmark&hl\">www.google.com/search?q=commonmark&amp;hl</a>;</p>\n"
+        "<p><a href=\"http://www.google.com/search?q=commonmark\">www.google.com/search?q=commonmark</a>&amp;hl;</p>\n"
     );
 }

@@ -3,11 +3,12 @@ pub(crate) mod code_block;
 pub(crate) mod table;
 
 use objc2::rc::Retained;
-use objc2::{define_class, msg_send, MainThreadMarker, MainThreadOnly};
+use objc2::runtime::{AnyObject, ProtocolObject};
+use objc2::{define_class, msg_send, AnyThread, MainThreadMarker, MainThreadOnly};
 use objc2_core_foundation::{CGPoint, CGRect, CGSize};
-use objc2_foundation::NSObjectProtocol;
+use objc2_foundation::{NSAttributedStringKey, NSDictionary, NSObjectProtocol};
 use objc2_ui_kit::{
-    NSTextAttachmentViewProvider, NSTextLayoutManager, NSTextLocation, UIView,
+    NSTextAttachmentViewProvider, NSTextContainer, NSTextLayoutManager, NSTextLocation, UIView,
 };
 
 use super::attachment::{BlockData, MarkdownBlockAttachment};
@@ -19,6 +20,25 @@ define_class!(
     pub struct MarkdownAttachmentViewProvider;
 
     unsafe impl NSObjectProtocol for MarkdownAttachmentViewProvider {}
+
+    impl MarkdownAttachmentViewProvider {
+        #[unsafe(method(loadView))]
+        fn __load_view(&self) {
+            self.do_load_view();
+        }
+
+        #[unsafe(method(attachmentBoundsForAttributes:location:textContainer:proposedLineFragment:position:))]
+        fn __attachment_bounds(
+            &self,
+            _attributes: &NSDictionary<NSAttributedStringKey, AnyObject>,
+            _location: &ProtocolObject<dyn NSTextLocation>,
+            _text_container: Option<&NSTextContainer>,
+            proposed_line_fragment: CGRect,
+            _position: CGPoint,
+        ) -> CGRect {
+            self.do_compute_bounds(proposed_line_fragment)
+        }
+    }
 );
 
 impl MarkdownAttachmentViewProvider {
@@ -26,7 +46,7 @@ impl MarkdownAttachmentViewProvider {
         attachment: &MarkdownBlockAttachment,
         parent_view: Option<&UIView>,
         layout_manager: Option<&NSTextLayoutManager>,
-        location: &objc2::runtime::ProtocolObject<dyn NSTextLocation>,
+        location: &ProtocolObject<dyn NSTextLocation>,
         mtm: MainThreadMarker,
     ) -> Retained<Self> {
         unsafe {
@@ -40,7 +60,7 @@ impl MarkdownAttachmentViewProvider {
         }
     }
 
-    pub fn load_view_for_attachment(&self, proposed_width: f64) {
+    fn do_load_view(&self) {
         let mtm = MainThreadMarker::from(self);
 
         let Some(attachment) = self.textAttachment() else {
@@ -49,6 +69,15 @@ impl MarkdownAttachmentViewProvider {
         let Some(attachment) = attachment.downcast_ref::<MarkdownBlockAttachment>() else {
             return;
         };
+
+        // Get the available width from the text layout manager's primary container,
+        // falling back to a sensible default.
+        let proposed_width = self
+            .textLayoutManager()
+            .and_then(|lm| unsafe { lm.textContainer() })
+            .map(|tc| unsafe { tc.size() }.width)
+            .filter(|w| *w > 0.0)
+            .unwrap_or(320.0);
 
         let style = attachment.block_style();
         let data = attachment.block_data();
@@ -66,29 +95,23 @@ impl MarkdownAttachmentViewProvider {
                 proposed_width,
                 mtm,
             ),
-            BlockData::CodeBlock {
-                literal,
-                language,
-            } => code_block::build_code_block_view(
+            BlockData::CodeBlock { literal, language } => code_block::build_code_block_view(
                 literal,
                 language.as_deref(),
                 style,
                 proposed_width,
                 mtm,
             ),
-            BlockData::BlockQuote { content } => blockquote::build_blockquote_view(
-                content,
-                style,
-                proposed_width,
-                mtm,
-            ),
+            BlockData::BlockQuote { content } => {
+                blockquote::build_blockquote_view(content, style, proposed_width, mtm)
+            }
         };
 
         self.setView(Some(&view));
         self.setTracksTextAttachmentViewBounds(true);
     }
 
-    pub fn compute_bounds(&self, proposed_line_fragment: CGRect) -> CGRect {
+    fn do_compute_bounds(&self, proposed_line_fragment: CGRect) -> CGRect {
         let width = proposed_line_fragment.size.width;
 
         let Some(attachment) = self.textAttachment() else {
