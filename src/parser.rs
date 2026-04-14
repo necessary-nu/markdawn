@@ -759,6 +759,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 break;
             }
 
+            // Standard lazy continuation (line wouldn't start a new block)
             if !inner_lines
                 .last()
                 .is_some_and(|line| line.trim().is_empty())
@@ -769,6 +770,21 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 }
                 inner_lines.push(lines[index].clone());
                 saw_blank_separator = false;
+                index += 1;
+                continue;
+            }
+
+            // Indented-code-looking line as lazy continuation: only if the
+            // previous inner line is open paragraph text (since indented code
+            // cannot interrupt an open paragraph).
+            if !saw_blank_separator
+                && inner_lines
+                    .last()
+                    .is_some_and(|line| is_paragraph_continuation_candidate(line))
+                && strip_indented_code_line(&lines[index]).is_some()
+                && is_lazy_block_quote_continuation(&lines[index], lines, index)
+            {
+                inner_lines.push(lines[index].clone());
                 index += 1;
                 continue;
             }

@@ -200,8 +200,16 @@ mod tests {
     fn detects_svg_data() {
         assert!(is_svg_data(b"<svg width=\"10\"></svg>"));
         assert!(is_svg_data(b"<?xml version=\"1.0\"?><svg></svg>\n"));
+        assert!(is_svg_data(b"<SVG></SVG>"));
+        assert!(is_svg_data(
+            b"<svg xmlns=\"http://www.w3.org/2000/svg\"><rect/></svg>\n  \n"
+        ));
         assert!(!is_svg_data(b"<html><body>hello</body></html>"));
         assert!(!is_svg_data(b""));
+        // Closing tag only, no opening — should not match
+        assert!(!is_svg_data(b"random text </svg> trailing"));
+        // Opening tag only, no closing — should not match
+        assert!(!is_svg_data(b"<svg starts but never ends"));
     }
 
     #[test]
