@@ -685,7 +685,7 @@ fn gfm_html_block_type_1_interrupts_paragraph_and_closes_on_end_tag() {
     ));
     assert_eq!(
         html,
-        "<p>before</p>\n&lt;script>\n*not emphasis*\n&lt;/script>\n<p>after</p>\n"
+        "<p>before</p>\n<script>\n*not emphasis*\n</script>\n<p>after</p>\n"
     );
 }
 
@@ -704,7 +704,7 @@ fn gfm_html_block_type_1_keeps_trailing_text_on_end_marker_line_inside_block() {
     ));
     assert_eq!(
         html,
-        "&lt;script>\nfoo\n&lt;/script>1. *bar*\n<p>after</p>\n"
+        "<script>\nfoo\n</script>1. *bar*\n<p>after</p>\n"
     );
 }
 
@@ -821,7 +821,7 @@ fn gfm_html_block_same_line_end_markers_keep_their_line_inside_the_block() {
     let html = render_html(&parse_final_nodes("<style>p{color:red;}</style>\n*foo*\n"));
     assert_eq!(
         html,
-        "&lt;style>p{color:red;}&lt;/style>\n<p><em>foo</em></p>\n"
+        "<style>p{color:red;}</style>\n<p><em>foo</em></p>\n"
     );
 
     let html = render_html(&parse_final_nodes("<!-- foo -->*bar*\n*baz*\n"));
@@ -1456,7 +1456,7 @@ fn gfm_hard_line_break_two_spaces() {
 fn gfm_hard_line_break_many_spaces() {
     // More than two trailing spaces also produce a hard line break
     let html = render_html(&parse_final_nodes("foo       \nbaz\n"));
-    assert_eq!(html, "<p>foo     <br />\nbaz</p>\n");
+    assert_eq!(html, "<p>foo<br />\nbaz</p>\n");
 }
 
 // gfm[verify inlines.hard-line-breaks.leading-spaces-on-next-line-are-ignored]
@@ -1464,10 +1464,10 @@ fn gfm_hard_line_break_many_spaces() {
 fn gfm_hard_line_break_leading_spaces_ignored() {
     // Leading spaces on the next line after a hard break
     let html = render_html(&parse_final_nodes("foo\\\n   bar\n"));
-    assert_eq!(html, "<p>foo<br />\n   bar</p>\n");
+    assert_eq!(html, "<p>foo<br />\nbar</p>\n");
 
     let html = render_html(&parse_final_nodes("foo  \n   bar\n"));
-    assert_eq!(html, "<p>foo<br />\n   bar</p>\n");
+    assert_eq!(html, "<p>foo<br />\nbar</p>\n");
 }
 
 // gfm[verify inlines.hard-line-breaks.hard-line-breaks-can-occur-inside-inline-constructs]
@@ -1509,9 +1509,9 @@ fn gfm_hard_line_break_not_at_end_of_block() {
     let html = render_html(&parse_final_nodes("foo\\\n"));
     assert_eq!(html, "<p>foo\\</p>\n");
 
-    // Example 670: trailing spaces at end of paragraph
+    // Example 670: trailing spaces at end of paragraph are stripped
     let html = render_html(&parse_final_nodes("foo  \n"));
-    assert_eq!(html, "<p>foo  </p>\n");
+    assert_eq!(html, "<p>foo</p>\n");
 
     // Example 671: backslash at end of heading is literal
     let html = render_html(&parse_final_nodes("### foo\\\n"));
@@ -1967,9 +1967,9 @@ fn gfm_paragraph_blank_lines() {
 // gfm[verify leaf-blocks.paragraphs.leading-spaces-are-ignored]
 #[test]
 fn gfm_paragraph_leading_spaces() {
-    // The parser preserves leading spaces in paragraph content
+    // Leading spaces on first line are stripped
     let html = render_html(&parse_final_nodes("  aaa\n bbb\n"));
-    assert_eq!(html, "<p>  aaa\n bbb</p>\n");
+    assert_eq!(html, "<p>aaa\n bbb</p>\n");
 }
 
 // gfm[verify leaf-blocks.paragraphs.lines-after-first-may-be-indented-arbitrarily]
@@ -1985,9 +1985,8 @@ fn gfm_paragraph_lines_after_first_indented() {
 // gfm[verify leaf-blocks.paragraphs.raw-content-concatenates-lines-and-trims-edge-whitespace]
 #[test]
 fn gfm_paragraph_trailing_spaces_stripped() {
-    // The parser preserves trailing spaces; 2+ trailing spaces create hard break
     let html = render_html(&parse_final_nodes("aaa   \nbbb     \n"));
-    assert_eq!(html, "<p>aaa <br />\nbbb     </p>\n");
+    assert_eq!(html, "<p>aaa<br />\nbbb</p>\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -2111,7 +2110,7 @@ fn gfm_fenced_code_tilde_info_with_backticks() {
     let html = render_html(&parse_final_nodes("~~~ aa ``` ~~~\nfoo\n~~~\n"));
     assert_eq!(
         html,
-        "<pre><code class=\"language-aa ``` ~~~\">foo
+        "<pre><code class=\"language-aa\">foo
 </code></pre>\n"
     );
 }
@@ -2399,7 +2398,7 @@ fn gfm_html_block_type_1_script_example() {
     ));
     assert_eq!(
         html,
-        "&lt;script type=\"text/javascript\">\n// JavaScript example\n&lt;/script>\n<p>okay</p>\n"
+        "<script type=\"text/javascript\">\n// JavaScript example\n</script>\n<p>okay</p>\n"
     );
 }
 
@@ -2411,7 +2410,7 @@ fn gfm_html_block_type_1_style_example() {
     ));
     assert_eq!(
         html,
-        "&lt;style\n  type=\"text/css\">\nh1 {color:red;}\n&lt;/style>\n<p>okay</p>\n"
+        "<style\n  type=\"text/css\">\nh1 {color:red;}\n</style>\n<p>okay</p>\n"
     );
 }
 

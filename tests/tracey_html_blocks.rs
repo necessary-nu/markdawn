@@ -98,7 +98,7 @@ fn gfm_html_block_inner_start_conditions_do_not_change_type_6_state() {
 #[test]
 fn gfm_html_block_type_1_without_end_marker_closes_at_document_end() {
     let html = render_html("<style\n  type=\"text/css\">\n\nfoo\n");
-    assert_eq!(html, "&lt;style\n  type=\"text/css\">\n\nfoo\n");
+    assert_eq!(html, "<style\n  type=\"text/css\">\n\nfoo\n");
 }
 
 // gfm[verify leaf-blocks.html-blocks.single-line-block-when-start-and-end-both-match]
@@ -108,7 +108,7 @@ fn gfm_html_block_end_marker_may_share_the_start_line() {
     let html = render_html("<style>p{color:red;}</style>\n*foo*\n");
     assert_eq!(
         html,
-        "&lt;style>p{color:red;}&lt;/style>\n<p><em>foo</em></p>\n"
+        "<style>p{color:red;}</style>\n<p><em>foo</em></p>\n"
     );
 }
 

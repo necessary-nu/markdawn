@@ -865,7 +865,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 start + 1,
                 ParsedBlock {
                     node: Node::Html {
-                        html: filter_disallowed_html(&lines[start]),
+                        html: lines[start].clone(),
                         meta: Meta::default(),
                     },
                     provisional: false,
@@ -907,7 +907,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             index,
             ParsedBlock {
                 node: Node::Html {
-                    html: filter_disallowed_html(&html),
+                    html,
                     meta: Meta::default(),
                 },
                 provisional: !closed && !finalizing,
@@ -1237,8 +1237,9 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         }
 
         let text = join_lines(&collected);
-        let provisional = index == lines.len() && !finalizing && (terminated || !text.is_empty());
-        let children = self.parse_inline_nodes(&text, provisional, refs)?;
+        let trimmed = text.trim_ascii();
+        let provisional = index == lines.len() && !finalizing && (terminated || !trimmed.is_empty());
+        let children = self.parse_inline_nodes(trimmed, provisional, refs)?;
 
         Ok((
             index,
@@ -2107,7 +2108,8 @@ fn parse_fence_opener(line: &str) -> Option<FenceOpener> {
         return None;
     }
 
-    let info = (!rest.trim().is_empty()).then(|| process_escapes_and_entities(rest.trim()));
+    let first_word = rest.trim().split_whitespace().next().unwrap_or("");
+    let info = (!first_word.is_empty()).then(|| process_escapes_and_entities(first_word));
     Some(FenceOpener {
         marker,
         count,
@@ -2291,13 +2293,19 @@ where
                     meta: self.meta.clone(),
                 }));
                 self.index += 2;
+                while self.index < self.input.len()
+                    && self.input.as_bytes().get(self.index) == Some(&b' ')
+                {
+                    self.index += 1;
+                }
                 continue;
             }
 
             if self.remaining().starts_with('\n') {
                 let trailing_spaces = text.chars().rev().take_while(|ch| *ch == ' ').count();
-                if trailing_spaces >= 2 {
-                    for _ in 0..2 {
+                let is_hard = trailing_spaces >= 2;
+                if is_hard {
+                    while text.ends_with(' ') {
                         text.pop();
                     }
                     flush_text_piece(&mut pieces, &mut text);
@@ -2311,6 +2319,13 @@ where
                     }));
                 }
                 self.index += 1;
+                if is_hard {
+                    while self.index < self.input.len()
+                        && self.input.as_bytes().get(self.index) == Some(&b' ')
+                    {
+                        self.index += 1;
+                    }
+                }
                 continue;
             }
 
@@ -3392,7 +3407,7 @@ fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>
     }
 
     if let Some((destination, title)) = split_destination_and_title(body) {
-        if destination.contains(|ch: char| ch.is_whitespace()) {
+        if destination.contains(|ch: char| ch.is_ascii_whitespace()) {
             return None;
         }
         return Some((
@@ -3402,7 +3417,7 @@ fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>
         ));
     }
 
-    if body.contains(|ch: char| ch.is_whitespace()) {
+    if body.contains(|ch: char| ch.is_ascii_whitespace()) {
         return None;
     }
     Some((closing + 1, process_escapes_and_entities(body), None))
@@ -3506,7 +3521,7 @@ fn parse_title(s: &str) -> Option<String> {
 fn split_destination_and_title(body: &str) -> Option<(String, Option<String>)> {
     let body_trimmed = body.trim();
     for (i, ch) in body_trimmed.char_indices() {
-        if !ch.is_whitespace() {
+        if !ch.is_ascii_whitespace() {
             continue;
         }
         let after = body_trimmed[i..].trim_start();
