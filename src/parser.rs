@@ -4198,15 +4198,20 @@ where
             node:
                 Node::TaskItem {
                     checked,
-                    children,
+                    children: task_children,
                     meta,
                 },
             ..
-        }) if iter.next().is_none() => Node::TaskItem {
-            checked,
-            children,
-            meta,
-        },
+        }) => {
+            // Append any subsequent siblings as additional children of the task item.
+            let mut all = task_children;
+            all.extend(iter.map(|child| child.node));
+            Node::TaskItem {
+                checked,
+                children: all,
+                meta,
+            }
+        }
         first => {
             let mut all = Vec::new();
             if let Some(first) = first {
