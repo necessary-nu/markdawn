@@ -14,7 +14,7 @@ fn main() {
     #[cfg(feature = "pikchr")]
     let pikchr = args.iter().any(|a| a == "--pikchr");
 
-    let mut builder = Parser::<(), ()>::builder();
+    let mut builder = Parser::<()>::builder();
     if gfm {
         builder = builder.with_gfm();
     }

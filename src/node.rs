@@ -29,172 +29,246 @@ pub enum AlertKind {
     Caution,
 }
 
+/// Byte range of a node in the original markdown source.
+///
+/// `start..end` is half-open. `start` points at the first byte of the
+/// construct (including any leading marker like `#`, `>`, or `\``); `end` is
+/// exclusive and includes any trailing newline that belongs to the block.
+/// For inline nodes, the span includes the delimiters (e.g. `**bold**` spans
+/// both pairs of asterisks).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SourceSpan {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl SourceSpan {
+    pub const fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+
+    pub const fn len(&self) -> usize {
+        self.end - self.start
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.start == self.end
+    }
+
+    pub fn contains(&self, offset: usize) -> bool {
+        offset >= self.start && offset < self.end
+    }
+}
+
 // gfm[impl blocks-and-inlines.container-and-leaf-blocks-definition]
 // gfm[impl container-blocks.definition]
 // gfm[impl container-blocks.general-recursive-definition-form]
 // gfm[impl container-blocks.syntax-is-defined-recursively]
 // gfm[impl container-blocks.generated-from-contents-rather-than-parse-recipe]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Node<Ext = (), Meta = ()> {
+pub enum Node<Ext = ()> {
     Document {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Paragraph {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Heading {
         level: u8,
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     // gfm[impl container-blocks.basic-kinds-are-block-quotes-and-list-items]
     BlockQuote {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     // gfm[impl container-blocks.lists-are-meta-containers-for-list-items]
     List {
         ordered: bool,
         start: Option<u64>,
         tight: Option<bool>,
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Item {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     // gfm[impl container-blocks.task-list-items-extension.rendered-marker-becomes-semantic-checkbox]
     TaskItem {
         checked: bool,
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Table {
         alignments: Vec<Option<TableAlignment>>,
-        header: Vec<Node<Ext, Meta>>,
-        rows: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        header: Vec<Node<Ext>>,
+        rows: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     TableRow {
-        cells: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        cells: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     TableCell {
-        children: Vec<Node<Ext, Meta>>,
+        children: Vec<Node<Ext>>,
         header: bool,
         alignment: Option<TableAlignment>,
-        meta: Meta,
+        source: SourceSpan,
     },
     Text {
         text: String,
-        meta: Meta,
+        source: SourceSpan,
     },
     Emphasis {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Strong {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Strikethrough {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Subscript {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Superscript {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Highlight {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Link {
         destination: String,
         title: Option<String>,
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Image {
         destination: String,
         title: Option<String>,
         alt: String,
-        meta: Meta,
+        source: SourceSpan,
     },
     CodeSpan {
         code: String,
-        meta: Meta,
+        source: SourceSpan,
     },
     CodeBlock {
         info: Option<String>,
         literal: String,
-        meta: Meta,
+        source: SourceSpan,
     },
     MathInline {
         math: String,
-        meta: Meta,
+        source: SourceSpan,
     },
     MathBlock {
         math: String,
-        meta: Meta,
+        source: SourceSpan,
     },
     Html {
         html: String,
-        meta: Meta,
+        source: SourceSpan,
     },
     SoftBreak {
-        meta: Meta,
+        source: SourceSpan,
     },
     HardBreak {
-        meta: Meta,
+        source: SourceSpan,
     },
     ThematicBreak {
-        meta: Meta,
+        source: SourceSpan,
     },
     FootnoteRef {
         label: String,
         number: u32,
         ref_num: u32,
-        meta: Meta,
+        source: SourceSpan,
     },
     FootnoteDefinition {
         label: String,
         number: u32,
         backref_count: u32,
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     FootnoteSection {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Alert {
         kind: AlertKind,
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     DefinitionList {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     DefinitionTerm {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     DefinitionDescription {
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
     Custom {
         payload: Ext,
-        children: Vec<Node<Ext, Meta>>,
-        meta: Meta,
+        children: Vec<Node<Ext>>,
+        source: SourceSpan,
     },
+}
+
+impl<Ext> Node<Ext> {
+    /// Returns the source span of this node.
+    pub fn source(&self) -> SourceSpan {
+        match self {
+            Node::Document { source, .. }
+            | Node::Paragraph { source, .. }
+            | Node::Heading { source, .. }
+            | Node::BlockQuote { source, .. }
+            | Node::List { source, .. }
+            | Node::Item { source, .. }
+            | Node::TaskItem { source, .. }
+            | Node::Table { source, .. }
+            | Node::TableRow { source, .. }
+            | Node::TableCell { source, .. }
+            | Node::Text { source, .. }
+            | Node::Emphasis { source, .. }
+            | Node::Strong { source, .. }
+            | Node::Strikethrough { source, .. }
+            | Node::Subscript { source, .. }
+            | Node::Superscript { source, .. }
+            | Node::Highlight { source, .. }
+            | Node::Link { source, .. }
+            | Node::Image { source, .. }
+            | Node::CodeSpan { source, .. }
+            | Node::CodeBlock { source, .. }
+            | Node::MathInline { source, .. }
+            | Node::MathBlock { source, .. }
+            | Node::Html { source, .. }
+            | Node::SoftBreak { source, .. }
+            | Node::HardBreak { source, .. }
+            | Node::ThematicBreak { source, .. }
+            | Node::FootnoteRef { source, .. }
+            | Node::FootnoteDefinition { source, .. }
+            | Node::FootnoteSection { source, .. }
+            | Node::Alert { source, .. }
+            | Node::DefinitionList { source, .. }
+            | Node::DefinitionTerm { source, .. }
+            | Node::DefinitionDescription { source, .. }
+            | Node::Custom { source, .. } => *source,
+        }
+    }
 }

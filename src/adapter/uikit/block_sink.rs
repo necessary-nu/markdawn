@@ -165,12 +165,9 @@ impl<R> BlockSink<R> {
         NSAttributedString::initWithAttributedString(NSAttributedString::alloc(), result.as_super())
     }
 
-    fn apply_upsert<Ext, Meta>(
-        &mut self,
-        emission: Emission<Node<Ext, Meta>>,
-    ) -> Result<(), UIKitError>
+    fn apply_upsert<Ext>(&mut self, emission: Emission<Node<Ext>>) -> Result<(), UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         let id = emission.id;
         let provisional = emission.provisional;
@@ -189,14 +186,14 @@ impl<R> BlockSink<R> {
         }
     }
 
-    fn append_text_block<Ext, Meta>(
+    fn append_text_block<Ext>(
         &mut self,
         id: CorrelationId,
-        node: &Node<Ext, Meta>,
+        node: &Node<Ext>,
         provisional: bool,
     ) -> Result<(), UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         let ctx = RenderCtx {
             provisional,
@@ -270,14 +267,14 @@ impl<R> BlockSink<R> {
         Ok(())
     }
 
-    fn append_block_view<Ext, Meta>(
+    fn append_block_view<Ext>(
         &mut self,
         id: CorrelationId,
-        node: &Node<Ext, Meta>,
+        node: &Node<Ext>,
         provisional: bool,
     ) -> Result<(), UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         let (view, table_handles) = self.build_block_view(node, provisional)?;
         self.stack_view.addArrangedSubview(&view);
@@ -297,13 +294,13 @@ impl<R> BlockSink<R> {
         Ok(())
     }
 
-    fn build_block_view<Ext, Meta>(
+    fn build_block_view<Ext>(
         &mut self,
-        node: &Node<Ext, Meta>,
+        node: &Node<Ext>,
         provisional: bool,
     ) -> Result<(Retained<UIView>, Option<table::TableHandles>), UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         let ctx = RenderCtx {
             provisional,
@@ -374,15 +371,15 @@ impl<R> BlockSink<R> {
         Ok((view, handles))
     }
 
-    fn replace_existing<Ext, Meta>(
+    fn replace_existing<Ext>(
         &mut self,
         id: CorrelationId,
         loc: ElementLocation,
-        node: &Node<Ext, Meta>,
+        node: &Node<Ext>,
         provisional: bool,
     ) -> Result<(), UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         let new_is_text = is_text_block(node);
         let was_text = matches!(loc, ElementLocation::TextRun { .. });
@@ -453,15 +450,15 @@ impl<R> BlockSink<R> {
         }
     }
 
-    fn replace_text_block<Ext, Meta>(
+    fn replace_text_block<Ext>(
         &mut self,
         id: CorrelationId,
         compartment_index: usize,
-        node: &Node<Ext, Meta>,
+        node: &Node<Ext>,
         provisional: bool,
     ) -> Result<(), UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         let ctx = RenderCtx {
             provisional,
@@ -603,13 +600,13 @@ impl<R> BlockSink<R> {
     }
 }
 
-impl<R, Ext, Meta> Sink<Node<Ext, Meta>> for BlockSink<R>
+impl<R, Ext> Sink<Node<Ext>> for BlockSink<R>
 where
-    R: RenderUIKitCustom<Ext, Meta>,
+    R: RenderUIKitCustom<Ext>,
 {
     type Error = UIKitError;
 
-    fn emit(&mut self, item: StreamItem<Node<Ext, Meta>>) -> Result<(), Self::Error> {
+    fn emit(&mut self, item: StreamItem<Node<Ext>>) -> Result<(), Self::Error> {
         match item {
             StreamItem::Upsert(emission) => self.apply_upsert(emission),
             StreamItem::Delete { id } => {
@@ -620,7 +617,7 @@ where
     }
 }
 
-fn is_text_block<E, M>(node: &Node<E, M>) -> bool {
+fn is_text_block<E>(node: &Node<E>) -> bool {
     matches!(
         node,
         Node::Paragraph { .. }
@@ -682,7 +679,7 @@ mod tests {
     use objc2::MainThreadMarker;
     use objc2_ui_kit::NSTextStorageObserving;
 
-    use crate::node::{Emission, Node, StreamItem};
+    use crate::node::{Emission, Node, SourceSpan, StreamItem};
     use crate::sink::Sink;
 
     use super::{BlockSink, Compartment};
@@ -693,21 +690,21 @@ mod tests {
         unsafe { MainThreadMarker::new_unchecked() }
     }
 
-    fn paragraph(id: u64, text: &str) -> StreamItem<Node<(), ()>> {
+    fn paragraph(id: u64, text: &str) -> StreamItem<Node<()>> {
         StreamItem::Upsert(Emission {
             id,
             provisional: false,
             node: Node::Paragraph {
                 children: vec![Node::Text {
                     text: text.into(),
-                    meta: (),
+                    source: SourceSpan::default(),
                 }],
-                meta: (),
+                source: SourceSpan::default(),
             },
         })
     }
 
-    fn table(id: u64) -> StreamItem<Node<(), ()>> {
+    fn table(id: u64) -> StreamItem<Node<()>> {
         StreamItem::Upsert(Emission {
             id,
             provisional: false,
@@ -718,48 +715,48 @@ mod tests {
                         Node::TableCell {
                             children: vec![Node::Text {
                                 text: "A".into(),
-                                meta: (),
+                                source: SourceSpan::default(),
                             }],
                             header: true,
                             alignment: None,
-                            meta: (),
+                            source: SourceSpan::default(),
                         },
                         Node::TableCell {
                             children: vec![Node::Text {
                                 text: "B".into(),
-                                meta: (),
+                                source: SourceSpan::default(),
                             }],
                             header: true,
                             alignment: None,
-                            meta: (),
+                            source: SourceSpan::default(),
                         },
                     ],
-                    meta: (),
+                    source: SourceSpan::default(),
                 }],
                 rows: vec![Node::TableRow {
                     cells: vec![
                         Node::TableCell {
                             children: vec![Node::Text {
                                 text: "1".into(),
-                                meta: (),
+                                source: SourceSpan::default(),
                             }],
                             header: false,
                             alignment: None,
-                            meta: (),
+                            source: SourceSpan::default(),
                         },
                         Node::TableCell {
                             children: vec![Node::Text {
                                 text: "2".into(),
-                                meta: (),
+                                source: SourceSpan::default(),
                             }],
                             header: false,
                             alignment: None,
-                            meta: (),
+                            source: SourceSpan::default(),
                         },
                     ],
-                    meta: (),
+                    source: SourceSpan::default(),
                 }],
-                meta: (),
+                source: SourceSpan::default(),
             },
         })
     }
@@ -775,11 +772,13 @@ mod tests {
         }
     }
 
-    fn thematic_break(id: u64) -> StreamItem<Node<(), ()>> {
+    fn thematic_break(id: u64) -> StreamItem<Node<()>> {
         StreamItem::Upsert(Emission {
             id,
             provisional: false,
-            node: Node::ThematicBreak { meta: () },
+            node: Node::ThematicBreak {
+                source: SourceSpan::default(),
+            },
         })
     }
 
@@ -842,8 +841,7 @@ mod tests {
         let mut sink = BlockSink::new(test_mtm());
         sink.emit(paragraph(1, "lonely")).unwrap();
         assert_eq!(sink.compartments.len(), 1);
-        sink.emit(StreamItem::<Node<(), ()>>::Delete { id: 1 })
-            .unwrap();
+        sink.emit(StreamItem::<Node<()>>::Delete { id: 1 }).unwrap();
         assert_eq!(sink.compartments.len(), 0);
     }
 
@@ -857,8 +855,7 @@ mod tests {
         let before = text_run_text(&sink, 0).unwrap();
         assert!(before.contains("aaa") && before.contains("bbb") && before.contains("ccc"));
 
-        sink.emit(StreamItem::<Node<(), ()>>::Delete { id: 2 })
-            .unwrap();
+        sink.emit(StreamItem::<Node<()>>::Delete { id: 2 }).unwrap();
         assert_eq!(sink.compartments.len(), 1);
         let after = text_run_text(&sink, 0).unwrap();
         assert!(after.contains("aaa") && after.contains("ccc") && !after.contains("bbb"));
@@ -879,12 +876,12 @@ mod tests {
             sink.emit(StreamItem::Upsert(Emission {
                 id: 1,
                 provisional: true,
-                node: Node::<(), ()>::Paragraph {
+                node: Node::<()>::Paragraph {
                     children: vec![Node::Text {
                         text: (*text).into(),
-                        meta: (),
+                        source: SourceSpan::default(),
                     }],
-                    meta: (),
+                    source: SourceSpan::default(),
                 },
             }))
             .unwrap();

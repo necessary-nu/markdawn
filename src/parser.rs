@@ -1,24 +1,77 @@
 use crate::error::{Error, StreamError};
 use crate::ext::{BlockMatch, Extension, InlineMatch};
-use crate::node::{CorrelationId, Emission, Node, StreamItem, TableAlignment};
+use crate::node::{CorrelationId, Emission, Node, SourceSpan, StreamItem, TableAlignment};
 use crate::sink::Sink;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ParsedBlock<Ext, Meta> {
-    node: Node<Ext, Meta>,
-    provisional: bool,
+pub(crate) struct ParsedBlock<Ext> {
+    pub(crate) node: Node<Ext>,
+    pub(crate) provisional: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct LiveBlock<Ext, Meta> {
-    id: CorrelationId,
-    node: Node<Ext, Meta>,
-    provisional: bool,
+pub struct LiveBlock<Ext> {
+    pub id: CorrelationId,
+    pub node: Node<Ext>,
+    pub provisional: bool,
 }
 
-struct ParsedListItem<Ext, Meta> {
-    block: ParsedBlock<Ext, Meta>,
+/// Diff a previous list of live blocks against a freshly-parsed block list,
+/// reusing IDs by position. Returns the new live-block list and the events
+/// (Upsert / Delete) the consumer should emit to keep its rendered tree in
+/// sync. Allocates new IDs from `next_id` for any blocks beyond the previous
+/// list's length.
+///
+/// Used by both `Parser::push_str` (streaming append) and `EditableDocument`
+/// (editor edits) — same protocol, two producers.
+pub(crate) fn reconcile_blocks<Ext>(
+    previous: Vec<LiveBlock<Ext>>,
+    blocks: Vec<ParsedBlock<Ext>>,
+    next_id: &mut CorrelationId,
+) -> (Vec<LiveBlock<Ext>>, Vec<StreamItem<Node<Ext>>>)
+where
+    Ext: Clone + PartialEq,
+{
+    let mut next_live = Vec::with_capacity(blocks.len());
+    let mut events = Vec::new();
+
+    for (index, block) in blocks.into_iter().enumerate() {
+        let id = previous.get(index).map(|live| live.id).unwrap_or_else(|| {
+            let id = *next_id;
+            *next_id += 1;
+            id
+        });
+
+        let should_emit = match previous.get(index) {
+            Some(live) => live.node != block.node || live.provisional != block.provisional,
+            None => true,
+        };
+
+        if should_emit {
+            events.push(StreamItem::Upsert(Emission {
+                id,
+                provisional: block.provisional,
+                node: block.node.clone(),
+            }));
+        }
+
+        next_live.push(LiveBlock {
+            id,
+            node: block.node,
+            provisional: block.provisional,
+        });
+    }
+
+    for stale in previous.iter().skip(next_live.len()) {
+        events.push(StreamItem::Delete { id: stale.id });
+    }
+
+    (next_live, events)
+}
+
+struct ParsedListItem<Ext> {
+    block: ParsedBlock<Ext>,
     loose: bool,
     trailing_blank: bool,
 }
@@ -40,8 +93,8 @@ struct RawFootnoteDef {
 
 type RawFootnoteDefs = HashMap<String, RawFootnoteDef>;
 
-pub struct ParserBuilder<Ext = (), Meta = ()> {
-    extensions: Vec<Box<dyn Extension<Ext, Meta>>>,
+pub struct ParserBuilder<Ext = ()> {
+    extensions: Vec<Box<dyn Extension<Ext>>>,
     gfm: bool,
     math: bool,
     alerts: bool,
@@ -49,7 +102,7 @@ pub struct ParserBuilder<Ext = (), Meta = ()> {
     definition_lists: bool,
 }
 
-impl<Ext, Meta> Default for ParserBuilder<Ext, Meta> {
+impl<Ext> Default for ParserBuilder<Ext> {
     fn default() -> Self {
         Self {
             extensions: Vec::new(),
@@ -62,12 +115,12 @@ impl<Ext, Meta> Default for ParserBuilder<Ext, Meta> {
     }
 }
 
-impl<Ext, Meta> ParserBuilder<Ext, Meta> {
+impl<Ext> ParserBuilder<Ext> {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn with_extension(mut self, extension: impl Extension<Ext, Meta> + 'static) -> Self {
+    pub fn with_extension(mut self, extension: impl Extension<Ext> + 'static) -> Self {
         self.extensions.push(Box::new(extension));
         self
     }
@@ -112,7 +165,7 @@ impl<Ext, Meta> ParserBuilder<Ext, Meta> {
             .with_definition_lists()
     }
 
-    pub fn build(self) -> Parser<Ext, Meta> {
+    pub fn build(self) -> Parser<Ext> {
         Parser {
             buffer: String::new(),
             finished: false,
@@ -128,38 +181,37 @@ impl<Ext, Meta> ParserBuilder<Ext, Meta> {
     }
 }
 
-pub struct Parser<Ext = (), Meta = ()> {
+pub struct Parser<Ext = ()> {
     buffer: String,
     finished: bool,
-    extensions: Vec<Box<dyn Extension<Ext, Meta>>>,
+    extensions: Vec<Box<dyn Extension<Ext>>>,
     gfm: bool,
     math: bool,
     alerts: bool,
     highlights: bool,
     definition_lists: bool,
-    live_blocks: Vec<LiveBlock<Ext, Meta>>,
+    live_blocks: Vec<LiveBlock<Ext>>,
     next_id: CorrelationId,
 }
 
-impl<Ext, Meta> Default for Parser<Ext, Meta> {
+impl<Ext> Default for Parser<Ext> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<Ext, Meta> Parser<Ext, Meta> {
+impl<Ext> Parser<Ext> {
     pub fn new() -> Self {
         Self::builder().build()
     }
 
-    pub fn builder() -> ParserBuilder<Ext, Meta> {
+    pub fn builder() -> ParserBuilder<Ext> {
         ParserBuilder::new()
     }
 
     pub fn push_str<S>(&mut self, chunk: &str, sink: &mut S) -> Result<(), StreamError<S::Error>>
     where
-        S: Sink<Node<Ext, Meta>>,
-        Meta: Default + Clone + PartialEq,
+        S: Sink<Node<Ext>>,
         Ext: Clone + PartialEq,
     {
         if self.finished {
@@ -177,8 +229,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
     pub fn finish<S>(&mut self, sink: &mut S) -> Result<(), StreamError<S::Error>>
     where
-        S: Sink<Node<Ext, Meta>>,
-        Meta: Default + Clone + PartialEq,
+        S: Sink<Node<Ext>>,
         Ext: Clone + PartialEq,
     {
         if self.finished {
@@ -190,59 +241,78 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         self.emit_blocks(blocks, sink)
     }
 
+    /// Parse a complete source string in one shot, bypassing the streaming
+    /// state machine. Returns the parsed top-level blocks with their
+    /// `source` spans populated to byte ranges in the normalized source.
+    /// Used by `EditableDocument` to reparse on each edit.
+    pub(crate) fn parse_full(&mut self, source: &str) -> Result<Vec<ParsedBlock<Ext>>, Error>
+    where
+        Ext: Clone + PartialEq,
+    {
+        self.buffer.clear();
+        self.live_blocks.clear();
+        self.finished = false;
+        self.buffer.push_str(&normalize_chunk(source));
+        self.finished = true;
+
+        let split = split_lines(&self.buffer);
+        let line_offsets = compute_line_offsets(&self.buffer);
+
+        let refs = self.collect_reference_definitions(&split.lines)?;
+        let raw_footnotes = if self.gfm {
+            collect_raw_footnote_definitions(&split.lines)
+        } else {
+            HashMap::new()
+        };
+        let footnote_labels: FootnoteLabels = raw_footnotes.keys().cloned().collect();
+
+        let mut ranges = Vec::new();
+        let mut blocks = self.parse_block_lines_with_lazy(
+            &split.lines,
+            true,
+            split.terminated,
+            &refs,
+            &footnote_labels,
+            &[],
+            Some(&mut ranges),
+        )?;
+
+        // Assign byte spans to top-level blocks based on captured line ranges.
+        for (block, range) in blocks.iter_mut().zip(ranges.iter()) {
+            let start = line_offsets
+                .get(range.start)
+                .copied()
+                .unwrap_or(self.buffer.len());
+            let end = line_offsets
+                .get(range.end)
+                .copied()
+                .unwrap_or(self.buffer.len());
+            set_top_level_span(&mut block.node, SourceSpan::new(start, end));
+        }
+
+        if self.gfm {
+            self.finalize_footnotes(&mut blocks, &raw_footnotes, &refs, &footnote_labels, true)?;
+        }
+
+        Ok(blocks)
+    }
+
     fn emit_blocks<S>(
         &mut self,
-        blocks: Vec<ParsedBlock<Ext, Meta>>,
+        blocks: Vec<ParsedBlock<Ext>>,
         sink: &mut S,
     ) -> Result<(), StreamError<S::Error>>
     where
-        S: Sink<Node<Ext, Meta>>,
-        Meta: Default + Clone + PartialEq,
+        S: Sink<Node<Ext>>,
         Ext: Clone + PartialEq,
     {
         let previous = core::mem::take(&mut self.live_blocks);
-        let mut next_live = Vec::with_capacity(blocks.len());
-
-        for (index, block) in blocks.into_iter().enumerate() {
-            let id = previous
-                .get(index)
-                .map(|live| live.id)
-                .unwrap_or_else(|| self.allocate_id());
-
-            let should_emit = match previous.get(index) {
-                Some(live) => live.node != block.node || live.provisional != block.provisional,
-                None => true,
-            };
-
-            if should_emit {
-                sink.emit(StreamItem::Upsert(Emission {
-                    id,
-                    provisional: block.provisional,
-                    node: block.node.clone(),
-                }))
-                .map_err(StreamError::Sink)?;
-            }
-
-            next_live.push(LiveBlock {
-                id,
-                node: block.node,
-                provisional: block.provisional,
-            });
+        let (next_live, events) = reconcile_blocks(previous, blocks, &mut self.next_id);
+        for event in events {
+            sink.emit(event).map_err(StreamError::Sink)?;
         }
-
-        for stale in previous.iter().skip(next_live.len()) {
-            sink.emit(StreamItem::Delete { id: stale.id })
-                .map_err(StreamError::Sink)?;
-        }
-
         self.live_blocks = next_live;
         Ok(())
-    }
-
-    fn allocate_id(&mut self) -> CorrelationId {
-        let id = self.next_id;
-        self.next_id += 1;
-        id
     }
 
     // gfm[impl blocks-and-inlines.precedence.two-phase-parsing]
@@ -250,9 +320,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     // gfm[impl appendix-a-parsing-strategy.overview.document-is-represented-as-tree-of-blocks]
     // gfm[impl appendix-a-parsing-strategy.overview.parsing-has-two-phases]
     // gfm[impl appendix-a-parsing-strategy.reference-implementations-use-this-parsing-strategy]
-    fn parse_blocks(&self, finalizing: bool) -> Result<Vec<ParsedBlock<Ext, Meta>>, Error>
+    fn parse_blocks(&self, finalizing: bool) -> Result<Vec<ParsedBlock<Ext>>, Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         let split = split_lines(&self.buffer);
@@ -282,11 +351,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         Ok(blocks)
     }
 
-    fn try_block_extension(
-        &self,
-        lines: &[String],
-        start: usize,
-    ) -> Option<(usize, Node<Ext, Meta>)> {
+    fn try_block_extension(&self, lines: &[String], start: usize) -> Option<(usize, Node<Ext>)> {
         for extension in &self.extensions {
             if let Some(BlockMatch {
                 consumed_lines,
@@ -304,14 +369,13 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
     fn finalize_footnotes(
         &self,
-        blocks: &mut Vec<ParsedBlock<Ext, Meta>>,
+        blocks: &mut Vec<ParsedBlock<Ext>>,
         raw_footnotes: &RawFootnoteDefs,
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
         finalizing: bool,
     ) -> Result<(), Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         if raw_footnotes.is_empty() {
@@ -338,7 +402,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             assign_footnote_ref_numbers(&mut block.node, &label_numbers, &mut counters);
         }
 
-        let mut section_children: Vec<Node<Ext, Meta>> = Vec::with_capacity(ordered_labels.len());
+        let mut section_children: Vec<Node<Ext>> = Vec::with_capacity(ordered_labels.len());
         for label in ordered_labels.iter() {
             let number = label_numbers[label];
             let backref_count = *occurrences.get(label).unwrap_or(&0);
@@ -347,14 +411,13 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 .expect("ordered label must have a definition");
             let children_blocks =
                 self.parse_block_lines(&raw.lines, finalizing, true, refs, footnote_labels)?;
-            let children: Vec<Node<Ext, Meta>> =
-                children_blocks.into_iter().map(|b| b.node).collect();
+            let children: Vec<Node<Ext>> = children_blocks.into_iter().map(|b| b.node).collect();
             section_children.push(Node::FootnoteDefinition {
                 label: label.clone(),
                 number,
                 backref_count,
                 children,
-                meta: Meta::default(),
+                source: SourceSpan::default(),
             });
         }
 
@@ -362,7 +425,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         blocks.push(ParsedBlock {
             node: Node::FootnoteSection {
                 children: section_children,
-                meta: Meta::default(),
+                source: SourceSpan::default(),
             },
             provisional,
         });
@@ -378,7 +441,6 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     // gfm[impl leaf-blocks.link-reference-definitions.use-may-precede-definition]
     fn collect_reference_definitions(&self, lines: &[String]) -> Result<ReferenceDefinitions, Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         let mut refs = HashMap::new();
@@ -392,7 +454,6 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         refs: &mut ReferenceDefinitions,
     ) -> Result<(), Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         let mut index = 0;
@@ -455,7 +516,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             }
 
             if self.math {
-                if let Some((next, _)) = parse_math_block::<Ext, Meta>(lines, index, true) {
+                if let Some((next, _)) = parse_math_block::<Ext>(lines, index, true) {
                     index = next;
                     in_paragraph = false;
                     continue;
@@ -518,12 +579,19 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         terminated: bool,
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
-    ) -> Result<Vec<ParsedBlock<Ext, Meta>>, Error>
+    ) -> Result<Vec<ParsedBlock<Ext>>, Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
-        self.parse_block_lines_with_lazy(lines, finalizing, terminated, refs, footnote_labels, &[])
+        self.parse_block_lines_with_lazy(
+            lines,
+            finalizing,
+            terminated,
+            refs,
+            footnote_labels,
+            &[],
+            None,
+        )
     }
 
     fn parse_block_lines_with_lazy(
@@ -534,148 +602,170 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
         lazy: &[bool],
-    ) -> Result<Vec<ParsedBlock<Ext, Meta>>, Error>
+        mut ranges_out: Option<&mut Vec<core::ops::Range<usize>>>,
+    ) -> Result<Vec<ParsedBlock<Ext>>, Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         let mut blocks = Vec::new();
         let mut index = 0;
 
         while index < lines.len() {
-            // gfm[impl leaf-blocks.blank-lines.blank-lines-definition]
-            // gfm[impl leaf-blocks.blank-lines.blank-lines-at-beginning-end-document-are-also-ignored]
-            // gfm[impl leaf-blocks.blank-lines.extension-wrapper]
-            if lines[index].trim().is_empty() {
-                index += 1;
-                continue;
-            }
+            let block_start = index;
+            let blocks_len_before = blocks.len();
 
-            // Skip footnote definitions — they are collected separately and rendered
-            // in a synthetic footnote section at the end of the document.
-            if self.gfm {
-                if let Some((next, _, _)) = collect_footnote_def_lines(lines, index) {
-                    index = next;
-                    continue;
+            'block: {
+                // gfm[impl leaf-blocks.blank-lines.blank-lines-definition]
+                // gfm[impl leaf-blocks.blank-lines.blank-lines-at-beginning-end-document-are-also-ignored]
+                // gfm[impl leaf-blocks.blank-lines.extension-wrapper]
+                if lines[index].trim().is_empty() {
+                    index += 1;
+                    break 'block;
                 }
-            }
 
-            if let Some((next, _)) = parse_reference_definition(lines, index) {
-                index = next;
-                continue;
-            }
+                // Skip footnote definitions — they are collected separately and rendered
+                // in a synthetic footnote section at the end of the document.
+                if self.gfm {
+                    if let Some((next, _, _)) = collect_footnote_def_lines(lines, index) {
+                        index = next;
+                        break 'block;
+                    }
+                }
 
-            // User-provided block extensions run before all built-in block
-            // parsers so they can shadow any syntax.
-            if let Some((consumed, node)) = self.try_block_extension(lines, index) {
-                blocks.push(ParsedBlock {
-                    node,
-                    provisional: false,
-                });
-                index += consumed;
-                continue;
-            }
+                if let Some((next, _)) = parse_reference_definition(lines, index) {
+                    index = next;
+                    break 'block;
+                }
 
-            if let Some((next, block)) = self.parse_html_block(lines, index, finalizing, terminated)
-            {
-                blocks.push(block);
-                index = next;
-                continue;
-            }
+                // User-provided block extensions run before all built-in block
+                // parsers so they can shadow any syntax.
+                if let Some((consumed, node)) = self.try_block_extension(lines, index) {
+                    blocks.push(ParsedBlock {
+                        node,
+                        provisional: false,
+                    });
+                    index += consumed;
+                    break 'block;
+                }
 
-            if self.gfm {
                 if let Some((next, block)) =
-                    self.parse_table(lines, index, finalizing, terminated, refs, footnote_labels)?
+                    self.parse_html_block(lines, index, finalizing, terminated)
                 {
                     blocks.push(block);
                     index = next;
-                    continue;
+                    break 'block;
                 }
-            }
 
-            if let Some((next, block)) =
-                self.parse_block_quote(lines, index, finalizing, terminated, refs, footnote_labels)
-            {
-                blocks.push(block?);
-                index = next;
-                continue;
-            }
+                if self.gfm {
+                    if let Some((next, block)) = self.parse_table(
+                        lines,
+                        index,
+                        finalizing,
+                        terminated,
+                        refs,
+                        footnote_labels,
+                    )? {
+                        blocks.push(block);
+                        index = next;
+                        break 'block;
+                    }
+                }
 
-            // gfm[impl leaf-blocks.thematic-breaks.can-interrupt-paragraphs]
-            // gfm[impl leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines]
-            // gfm[impl leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item]
-            // gfm[impl leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item]
-            if is_thematic_break(&lines[index]) {
-                blocks.push(ParsedBlock {
-                    node: Node::ThematicBreak {
-                        meta: Meta::default(),
-                    },
-                    provisional: !finalizing && index + 1 == lines.len() && !terminated,
-                });
-                index += 1;
-                continue;
-            }
-
-            if let Some((next, block)) =
-                self.parse_list(lines, index, finalizing, terminated, refs, footnote_labels)?
-            {
-                blocks.push(block);
-                index = next;
-                continue;
-            }
-
-            if self.math {
-                if let Some((next, block)) = parse_math_block(lines, index, finalizing) {
-                    blocks.push(block);
+                if let Some((next, block)) = self.parse_block_quote(
+                    lines,
+                    index,
+                    finalizing,
+                    terminated,
+                    refs,
+                    footnote_labels,
+                ) {
+                    blocks.push(block?);
                     index = next;
-                    continue;
+                    break 'block;
                 }
-            }
 
-            if let Some((next, block)) = self.parse_fenced_code(&lines, index, finalizing) {
-                blocks.push(block?);
-                index = next;
-                continue;
-            }
+                // gfm[impl leaf-blocks.thematic-breaks.can-interrupt-paragraphs]
+                // gfm[impl leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines]
+                // gfm[impl leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item]
+                // gfm[impl leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item]
+                if is_thematic_break(&lines[index]) {
+                    blocks.push(ParsedBlock {
+                        node: Node::ThematicBreak {
+                            source: SourceSpan::default(),
+                        },
+                        provisional: !finalizing && index + 1 == lines.len() && !terminated,
+                    });
+                    index += 1;
+                    break 'block;
+                }
 
-            if let Some((next, block)) =
-                self.parse_indented_code(lines, index, finalizing, terminated)
-            {
-                blocks.push(block);
-                index = next;
-                continue;
-            }
-
-            if let Some(block) = self.parse_atx_heading(&lines[index], refs, footnote_labels)? {
-                blocks.push(ParsedBlock {
-                    node: block,
-                    provisional: !finalizing && index + 1 == lines.len() && !terminated,
-                });
-                index += 1;
-                continue;
-            }
-
-            if self.definition_lists {
                 if let Some((next, block)) =
-                    self.parse_definition_list(lines, index, refs, footnote_labels)?
+                    self.parse_list(lines, index, finalizing, terminated, refs, footnote_labels)?
                 {
                     blocks.push(block);
                     index = next;
-                    continue;
+                    break 'block;
                 }
+
+                if self.math {
+                    if let Some((next, block)) = parse_math_block(lines, index, finalizing) {
+                        blocks.push(block);
+                        index = next;
+                        break 'block;
+                    }
+                }
+
+                if let Some((next, block)) = self.parse_fenced_code(&lines, index, finalizing) {
+                    blocks.push(block?);
+                    index = next;
+                    break 'block;
+                }
+
+                if let Some((next, block)) =
+                    self.parse_indented_code(lines, index, finalizing, terminated)
+                {
+                    blocks.push(block);
+                    index = next;
+                    break 'block;
+                }
+
+                if let Some(block) = self.parse_atx_heading(&lines[index], refs, footnote_labels)? {
+                    blocks.push(ParsedBlock {
+                        node: block,
+                        provisional: !finalizing && index + 1 == lines.len() && !terminated,
+                    });
+                    index += 1;
+                    break 'block;
+                }
+
+                if self.definition_lists {
+                    if let Some((next, block)) =
+                        self.parse_definition_list(lines, index, refs, footnote_labels)?
+                    {
+                        blocks.push(block);
+                        index = next;
+                        break 'block;
+                    }
+                }
+
+                let (next, block) = self.parse_paragraphish(
+                    &lines,
+                    index,
+                    finalizing,
+                    terminated,
+                    refs,
+                    footnote_labels,
+                    lazy,
+                )?;
+                blocks.push(block);
+                index = next;
             }
 
-            let (next, block) = self.parse_paragraphish(
-                &lines,
-                index,
-                finalizing,
-                terminated,
-                refs,
-                footnote_labels,
-                lazy,
-            )?;
-            blocks.push(block);
-            index = next;
+            if blocks.len() > blocks_len_before {
+                if let Some(out) = ranges_out.as_deref_mut() {
+                    out.push(block_start..index);
+                }
+            }
         }
 
         Ok(blocks)
@@ -720,9 +810,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         terminated: bool,
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
-    ) -> Option<(usize, Result<ParsedBlock<Ext, Meta>, Error>)>
+    ) -> Option<(usize, Result<ParsedBlock<Ext>, Error>)>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         let mut inner_lines = Vec::new();
@@ -781,20 +870,21 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 refs,
                 footnote_labels,
                 &lazy_flags,
+                None,
             )
             .map(|children| {
                 let provisional = children.iter().any(|child| child.provisional);
-                let mut children: Vec<Node<Ext, Meta>> =
+                let mut children: Vec<Node<Ext>> =
                     children.into_iter().map(|child| child.node).collect();
                 let node = if self.alerts {
                     try_promote_alert(&mut children).unwrap_or(Node::BlockQuote {
                         children,
-                        meta: Meta::default(),
+                        source: SourceSpan::default(),
                     })
                 } else {
                     Node::BlockQuote {
                         children,
-                        meta: Meta::default(),
+                        source: SourceSpan::default(),
                     }
                 };
                 ParsedBlock { provisional, node }
@@ -808,9 +898,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         start: usize,
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
-    ) -> Result<Option<(usize, ParsedBlock<Ext, Meta>)>, Error>
+    ) -> Result<Option<(usize, ParsedBlock<Ext>)>, Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         if start + 1 >= lines.len() {
@@ -820,7 +909,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             return Ok(None);
         }
 
-        let mut children: Vec<Node<Ext, Meta>> = Vec::new();
+        let mut children: Vec<Node<Ext>> = Vec::new();
         let mut index = start;
 
         while index < lines.len() {
@@ -847,9 +936,9 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 children.push(Node::DefinitionDescription {
                     children: vec![Node::Paragraph {
                         children: inlines,
-                        meta: Meta::default(),
+                        source: SourceSpan::default(),
                     }],
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 });
             } else {
                 if index > start
@@ -861,7 +950,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                     self.parse_inline_nodes(lines[index].trim(), false, refs, footnote_labels)?;
                 children.push(Node::DefinitionTerm {
                     children: term_inlines,
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 });
                 index += 1;
             }
@@ -877,7 +966,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 provisional: false,
                 node: Node::DefinitionList {
                     children,
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 },
             },
         )))
@@ -931,9 +1020,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         terminated: bool,
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
-    ) -> Result<Option<(usize, ParsedBlock<Ext, Meta>)>, Error>
+    ) -> Result<Option<(usize, ParsedBlock<Ext>)>, Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         let Some(first_marker) = parse_list_marker(&lines[start]) else {
@@ -941,7 +1029,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         };
 
         let mut index = start;
-        let mut items: Vec<ParsedListItem<Ext, Meta>> = Vec::new();
+        let mut items: Vec<ParsedListItem<Ext>> = Vec::new();
         while index < lines.len() {
             // A thematic break on a subsequent item line ends the list so the
             // break can be parsed as a top-level block (e.g. `* * *` inside a
@@ -984,7 +1072,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                     start: first_marker.start,
                     tight: Some(is_tight_list(&items)),
                     children: items.into_iter().map(|item| item.block.node).collect(),
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 },
             },
         )))
@@ -1059,9 +1147,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         terminated: bool,
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
-    ) -> Result<(usize, ParsedListItem<Ext, Meta>), Error>
+    ) -> Result<(usize, ParsedListItem<Ext>), Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         let mut inner_lines = Vec::new();
@@ -1232,9 +1319,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         start: usize,
         finalizing: bool,
         terminated: bool,
-    ) -> Option<(usize, ParsedBlock<Ext, Meta>)>
+    ) -> Option<(usize, ParsedBlock<Ext>)>
     where
-        Meta: Default + Clone,
         Ext: Clone + PartialEq,
     {
         let first = strip_indented_code_line(&lines[start])?;
@@ -1273,7 +1359,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 node: Node::CodeBlock {
                     info: None,
                     literal,
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 },
                 provisional: index == lines.len() && !finalizing && !terminated,
             },
@@ -1321,9 +1407,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         start: usize,
         finalizing: bool,
         terminated: bool,
-    ) -> Option<(usize, ParsedBlock<Ext, Meta>)>
+    ) -> Option<(usize, ParsedBlock<Ext>)>
     where
-        Meta: Default + Clone,
         Ext: Clone + PartialEq,
     {
         let start_info = classify_html_block_start(&lines[start])?;
@@ -1340,7 +1425,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 ParsedBlock {
                     node: Node::Html {
                         html: lines[start].clone(),
-                        meta: Meta::default(),
+                        source: SourceSpan::default(),
                     },
                     provisional: false,
                 },
@@ -1382,7 +1467,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             ParsedBlock {
                 node: Node::Html {
                     html,
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 },
                 provisional: !closed && !finalizing,
             },
@@ -1409,9 +1494,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         terminated: bool,
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
-    ) -> Result<Option<(usize, ParsedBlock<Ext, Meta>)>, Error>
+    ) -> Result<Option<(usize, ParsedBlock<Ext>)>, Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         if start + 1 >= lines.len() {
@@ -1449,7 +1533,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             cells.resize(alignments.len(), String::new());
             rows.push(Node::TableRow {
                 cells: self.parse_table_cells(&cells, false, &alignments, refs, footnote_labels)?,
-                meta: Meta::default(),
+                source: SourceSpan::default(),
             });
             index += 1;
         }
@@ -1467,10 +1551,10 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                             refs,
                             footnote_labels,
                         )?,
-                        meta: Meta::default(),
+                        source: SourceSpan::default(),
                     }],
                     rows,
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 },
                 provisional: index == lines.len() && !finalizing && !terminated,
             },
@@ -1485,9 +1569,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         alignments: &[Option<TableAlignment>],
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
-    ) -> Result<Vec<Node<Ext, Meta>>, Error>
+    ) -> Result<Vec<Node<Ext>>, Error>
     where
-        Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
         let mut out = Vec::with_capacity(cells.len());
@@ -1496,7 +1579,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 children: self.parse_inline_nodes(cell.trim(), false, refs, footnote_labels)?,
                 header,
                 alignment: alignments.get(index).copied().flatten(),
-                meta: Meta::default(),
+                source: SourceSpan::default(),
             });
         }
         Ok(out)
@@ -1526,9 +1609,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         lines: &[String],
         start: usize,
         finalizing: bool,
-    ) -> Option<(usize, Result<ParsedBlock<Ext, Meta>, Error>)>
+    ) -> Option<(usize, Result<ParsedBlock<Ext>, Error>)>
     where
-        Meta: Default + Clone,
         Ext: Clone + PartialEq,
     {
         let opener = parse_fence_opener(&lines[start])?;
@@ -1547,7 +1629,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                         node: Node::CodeBlock {
                             info: opener.info,
                             literal,
-                            meta: Meta::default(),
+                            source: SourceSpan::default(),
                         },
                         provisional: false,
                     }),
@@ -1571,7 +1653,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 node: Node::CodeBlock {
                     info: opener.info,
                     literal,
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 },
                 provisional: !finalizing,
             }),
@@ -1594,9 +1676,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         line: &str,
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
-    ) -> Result<Option<Node<Ext, Meta>>, Error>
+    ) -> Result<Option<Node<Ext>>, Error>
     where
-        Meta: Default + Clone,
         Ext: Clone + PartialEq,
     {
         let line = trim_up_to_three_spaces(line);
@@ -1623,7 +1704,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         Ok(Some(Node::Heading {
             level: count as u8,
             children,
-            meta: Meta::default(),
+            source: SourceSpan::default(),
         }))
     }
 
@@ -1672,9 +1753,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
         lazy: &[bool],
-    ) -> Result<(usize, ParsedBlock<Ext, Meta>), Error>
+    ) -> Result<(usize, ParsedBlock<Ext>), Error>
     where
-        Meta: Default + Clone,
         Ext: Clone + PartialEq,
     {
         let mut collected = vec![lines[start].clone()];
@@ -1709,7 +1789,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                         node: Node::Heading {
                             level,
                             children,
-                            meta: Meta::default(),
+                            source: SourceSpan::default(),
                         },
                         provisional: false,
                     },
@@ -1754,7 +1834,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             ParsedBlock {
                 node: Node::Paragraph {
                     children,
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 },
                 provisional,
             },
@@ -1771,16 +1851,14 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         provisional: bool,
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
-    ) -> Result<Vec<Node<Ext, Meta>>, Error>
+    ) -> Result<Vec<Node<Ext>>, Error>
     where
-        Meta: Default + Clone,
         Ext: Clone + PartialEq,
     {
         let mut parser = InlineParser {
             input: text,
             index: 0,
             extensions: &self.extensions,
-            meta: Meta::default(),
             provisional,
             refs,
             footnote_labels,
@@ -1793,10 +1871,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     }
 }
 
-fn promote_semantic_html<Ext, Meta>(nodes: Vec<Node<Ext, Meta>>) -> Vec<Node<Ext, Meta>>
-where
-    Meta: Default + Clone,
-{
+fn promote_semantic_html<Ext>(nodes: Vec<Node<Ext>>) -> Vec<Node<Ext>> {
     let mut result = Vec::with_capacity(nodes.len());
     let mut iter = nodes.into_iter().peekable();
 
@@ -1816,12 +1891,12 @@ where
 
             if found_close {
                 let children = promote_semantic_html(children);
-                let meta = Meta::default();
+                let source = SourceSpan::default();
                 let wrapped = match tag {
-                    "sub" => Node::Subscript { children, meta },
-                    "sup" => Node::Superscript { children, meta },
-                    "mark" => Node::Highlight { children, meta },
-                    "del" => Node::Strikethrough { children, meta },
+                    "sub" => Node::Subscript { children, source },
+                    "sup" => Node::Superscript { children, source },
+                    "mark" => Node::Highlight { children, source },
+                    "del" => Node::Strikethrough { children, source },
                     _ => unreachable!(),
                 };
                 result.push(wrapped);
@@ -1837,7 +1912,7 @@ where
     result
 }
 
-fn semantic_open_tag<Ext, Meta>(node: &Node<Ext, Meta>) -> Option<&'static str> {
+fn semantic_open_tag<Ext>(node: &Node<Ext>) -> Option<&'static str> {
     let Node::Html { html, .. } = node else {
         return None;
     };
@@ -1851,7 +1926,7 @@ fn semantic_open_tag<Ext, Meta>(node: &Node<Ext, Meta>) -> Option<&'static str> 
     None
 }
 
-fn matches_html_close<Ext, Meta>(node: &Node<Ext, Meta>, close: &str) -> bool {
+fn matches_html_close<Ext>(node: &Node<Ext>, close: &str) -> bool {
     matches!(node, Node::Html { html, .. } if html.trim().eq_ignore_ascii_case(close))
 }
 
@@ -1863,9 +1938,8 @@ fn is_definition_line(line: &str) -> Option<&str> {
     Some(rest)
 }
 
-fn try_promote_alert<Ext, Meta>(children: &mut Vec<Node<Ext, Meta>>) -> Option<Node<Ext, Meta>>
+fn try_promote_alert<Ext>(children: &mut Vec<Node<Ext>>) -> Option<Node<Ext>>
 where
-    Meta: Default,
 {
     use crate::node::AlertKind;
 
@@ -1929,7 +2003,7 @@ where
     Some(Node::Alert {
         kind,
         children,
-        meta: Meta::default(),
+        source: SourceSpan::default(),
     })
 }
 
@@ -2070,6 +2144,64 @@ struct SplitLines {
 
 // gfm[impl preliminaries.characters-and-lines.line-definition]
 // gfm[impl preliminaries.characters-and-lines.blank-line-definition]
+/// Compute byte offsets where each line starts in `text`. Result has
+/// `lines + 1` entries: the last is `text.len()` (exclusive end of the last
+/// line). Line index `i`'s byte range is `result[i]..result[i+1]`.
+fn compute_line_offsets(text: &str) -> Vec<usize> {
+    let mut offsets = vec![0];
+    for (i, b) in text.bytes().enumerate() {
+        if b == b'\n' {
+            offsets.push(i + 1);
+        }
+    }
+    if *offsets.last().unwrap() != text.len() {
+        offsets.push(text.len());
+    }
+    offsets
+}
+
+/// Set `source` on a top-level block node. Used by `parse_full` to assign
+/// byte spans after parsing.
+fn set_top_level_span<Ext>(node: &mut Node<Ext>, span: SourceSpan) {
+    match node {
+        Node::Document { source, .. }
+        | Node::Paragraph { source, .. }
+        | Node::Heading { source, .. }
+        | Node::BlockQuote { source, .. }
+        | Node::List { source, .. }
+        | Node::Item { source, .. }
+        | Node::TaskItem { source, .. }
+        | Node::Table { source, .. }
+        | Node::TableRow { source, .. }
+        | Node::TableCell { source, .. }
+        | Node::Text { source, .. }
+        | Node::Emphasis { source, .. }
+        | Node::Strong { source, .. }
+        | Node::Strikethrough { source, .. }
+        | Node::Subscript { source, .. }
+        | Node::Superscript { source, .. }
+        | Node::Highlight { source, .. }
+        | Node::Link { source, .. }
+        | Node::Image { source, .. }
+        | Node::CodeSpan { source, .. }
+        | Node::CodeBlock { source, .. }
+        | Node::MathInline { source, .. }
+        | Node::MathBlock { source, .. }
+        | Node::Html { source, .. }
+        | Node::SoftBreak { source, .. }
+        | Node::HardBreak { source, .. }
+        | Node::ThematicBreak { source, .. }
+        | Node::FootnoteRef { source, .. }
+        | Node::FootnoteDefinition { source, .. }
+        | Node::FootnoteSection { source, .. }
+        | Node::Alert { source, .. }
+        | Node::DefinitionList { source, .. }
+        | Node::DefinitionTerm { source, .. }
+        | Node::DefinitionDescription { source, .. }
+        | Node::Custom { source, .. } => *source = span,
+    }
+}
+
 fn split_lines(text: &str) -> SplitLines {
     if text.is_empty() {
         return SplitLines {
@@ -2580,13 +2712,12 @@ fn math_block_closer(line: &str, opener: &MathFence) -> bool {
     }
 }
 
-fn parse_math_block<Ext, Meta>(
+fn parse_math_block<Ext>(
     lines: &[String],
     start: usize,
     finalizing: bool,
-) -> Option<(usize, ParsedBlock<Ext, Meta>)>
+) -> Option<(usize, ParsedBlock<Ext>)>
 where
-    Meta: Default,
 {
     let opener = math_block_opener(&lines[start])?;
 
@@ -2601,7 +2732,7 @@ where
                 ParsedBlock {
                     node: Node::MathBlock {
                         math,
-                        meta: Meta::default(),
+                        source: SourceSpan::default(),
                     },
                     provisional: false,
                 },
@@ -2619,7 +2750,7 @@ where
             ParsedBlock {
                 node: Node::MathBlock {
                     math,
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 },
                 provisional: false,
             },
@@ -2632,7 +2763,7 @@ where
             ParsedBlock {
                 node: Node::MathBlock {
                     math,
-                    meta: Meta::default(),
+                    source: SourceSpan::default(),
                 },
                 provisional: true,
             },
@@ -3070,13 +3201,12 @@ fn is_setext_underline(line: &str) -> bool {
     trimmed.chars().all(|ch| ch == marker)
 }
 
-struct InlineParser<'a, Ext, Meta> {
+struct InlineParser<'a, Ext> {
     input: &'a str,
     index: usize,
-    extensions: &'a [Box<dyn Extension<Ext, Meta>>],
+    extensions: &'a [Box<dyn Extension<Ext>>],
     refs: &'a ReferenceDefinitions,
     footnote_labels: &'a FootnoteLabels,
-    meta: Meta,
     provisional: bool,
     gfm: bool,
     math: bool,
@@ -3092,9 +3222,9 @@ enum EmphasisMarker {
 // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.delimiter-stack-definition]
 // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.stack-entries-point-to-text-nodes]
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum InlinePiece<Ext, Meta> {
+enum InlinePiece<Ext> {
     Text(String),
-    Node(Node<Ext, Meta>),
+    Node(Node<Ext>),
     Delimiter {
         marker: EmphasisMarker,
         count: usize,
@@ -3111,9 +3241,8 @@ struct DelimiterRun {
     can_close: bool,
 }
 
-impl<'a, Ext, Meta> InlineParser<'a, Ext, Meta>
+impl<'a, Ext> InlineParser<'a, Ext>
 where
-    Meta: Default + Clone,
     Ext: Clone + PartialEq,
 {
     // gfm[impl inlines.inline-parsing-is-sequential]
@@ -3145,7 +3274,7 @@ where
     // gfm[impl inlines.textual-content.internal-spaces-are-preserved]
     // gfm[impl inlines.textual-content.end-tests-marker]
     // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.end-of-input-triggers-emphasis-processing]
-    fn parse_until(&mut self, stop: Option<&str>) -> Result<Vec<Node<Ext, Meta>>, Error> {
+    fn parse_until(&mut self, stop: Option<&str>) -> Result<Vec<Node<Ext>>, Error> {
         let mut pieces = Vec::new();
         let mut text = String::new();
 
@@ -3181,12 +3310,12 @@ where
                     pieces.push(InlinePiece::Node(if display {
                         Node::MathBlock {
                             math,
-                            meta: self.meta.clone(),
+                            source: SourceSpan::default(),
                         }
                     } else {
                         Node::MathInline {
                             math,
-                            meta: self.meta.clone(),
+                            source: SourceSpan::default(),
                         }
                     }));
                     continue;
@@ -3196,7 +3325,7 @@ where
             if self.remaining().starts_with("\\\n") {
                 flush_text_piece(&mut pieces, &mut text);
                 pieces.push(InlinePiece::Node(Node::HardBreak {
-                    meta: self.meta.clone(),
+                    source: SourceSpan::default(),
                 }));
                 self.index += 2;
                 while self.index < self.input.len()
@@ -3216,12 +3345,12 @@ where
                     }
                     flush_text_piece(&mut pieces, &mut text);
                     pieces.push(InlinePiece::Node(Node::HardBreak {
-                        meta: self.meta.clone(),
+                        source: SourceSpan::default(),
                     }));
                 } else {
                     flush_text_piece(&mut pieces, &mut text);
                     pieces.push(InlinePiece::Node(Node::SoftBreak {
-                        meta: self.meta.clone(),
+                        source: SourceSpan::default(),
                     }));
                 }
                 self.index += 1;
@@ -3240,7 +3369,7 @@ where
                     flush_text_piece(&mut pieces, &mut text);
                     pieces.push(InlinePiece::Node(Node::CodeSpan {
                         code,
-                        meta: self.meta.clone(),
+                        source: SourceSpan::default(),
                     }));
                     continue;
                 }
@@ -3259,12 +3388,12 @@ where
                     pieces.push(InlinePiece::Node(if display {
                         Node::MathBlock {
                             math,
-                            meta: self.meta.clone(),
+                            source: SourceSpan::default(),
                         }
                     } else {
                         Node::MathInline {
                             math,
-                            meta: self.meta.clone(),
+                            source: SourceSpan::default(),
                         }
                     }));
                     continue;
@@ -3289,7 +3418,7 @@ where
                 flush_text_piece(&mut pieces, &mut text);
                 pieces.push(InlinePiece::Node(Node::Html {
                     html,
-                    meta: self.meta.clone(),
+                    source: SourceSpan::default(),
                 }));
                 continue;
             }
@@ -3337,7 +3466,7 @@ where
                         };
                         pieces.push(InlinePiece::Node(Node::Strikethrough {
                             children,
-                            meta: self.meta.clone(),
+                            source: SourceSpan::default(),
                         }));
                         continue;
                     }
@@ -3352,7 +3481,7 @@ where
                     };
                     pieces.push(InlinePiece::Node(Node::Highlight {
                         children,
-                        meta: self.meta.clone(),
+                        source: SourceSpan::default(),
                     }));
                     continue;
                 }
@@ -3398,10 +3527,10 @@ where
         }
 
         flush_text_piece(&mut pieces, &mut text);
-        Ok(resolve_emphasis(pieces, &self.meta))
+        Ok(resolve_emphasis(pieces))
     }
 
-    fn try_extension(&self) -> Option<InlineMatch<Ext, Meta>> {
+    fn try_extension(&self) -> Option<InlineMatch<Ext>> {
         for extension in self.extensions {
             if let Some(candidate) = extension.try_inline(self.remaining()) {
                 return Some(candidate);
@@ -3631,11 +3760,7 @@ where
     // gfm[impl inlines.strikethrough-extension.new-paragraph-ends-strikethrough-parse]
     // gfm[impl inlines.strikethrough-extension.extension-wrapper]
     // gfm[impl inlines.strikethrough-extension.gfm-enables-strikethrough-extension]
-    fn try_delimited(
-        &mut self,
-        delim: &str,
-        strong: bool,
-    ) -> Result<Option<Node<Ext, Meta>>, Error> {
+    fn try_delimited(&mut self, delim: &str, strong: bool) -> Result<Option<Node<Ext>>, Error> {
         let remaining = self.remaining();
         if !remaining.starts_with(delim) {
             return Ok(None);
@@ -3659,7 +3784,6 @@ where
             extensions: self.extensions,
             refs: self.refs,
             footnote_labels: self.footnote_labels,
-            meta: self.meta.clone(),
             provisional: self.provisional,
             gfm: self.gfm,
             math: self.math,
@@ -3671,12 +3795,12 @@ where
         if strong {
             Ok(Some(Node::Strong {
                 children,
-                meta: self.meta.clone(),
+                source: SourceSpan::default(),
             }))
         } else if self.index != saved + delim.len() {
             Ok(Some(Node::Emphasis {
                 children,
-                meta: self.meta.clone(),
+                source: SourceSpan::default(),
             }))
         } else {
             Ok(None)
@@ -3755,7 +3879,7 @@ where
     // GFM footnotes: [^label] references a footnote definition collected earlier.
     // Only emit a FootnoteRef if a matching definition exists; otherwise fall
     // through so the text becomes literal (matching cmark-gfm behaviour).
-    fn try_footnote_ref(&mut self) -> Option<Node<Ext, Meta>> {
+    fn try_footnote_ref(&mut self) -> Option<Node<Ext>> {
         let remaining = self.remaining();
         if !remaining.starts_with("[^") {
             return None;
@@ -3774,7 +3898,7 @@ where
             label: label.to_string(),
             number: 0,
             ref_num: 0,
-            meta: self.meta.clone(),
+            source: SourceSpan::default(),
         })
     }
 
@@ -3786,7 +3910,7 @@ where
     // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener]
     // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-deactivates-earlier-openers]
     // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-runs-emphasis-processing]
-    fn try_link_or_image(&mut self) -> Result<Option<Node<Ext, Meta>>, Error> {
+    fn try_link_or_image(&mut self) -> Result<Option<Node<Ext>>, Error> {
         let remaining = self.remaining();
         let image = remaining.starts_with("![");
         let start_len = if image {
@@ -3811,7 +3935,6 @@ where
                     self.extensions,
                     self.refs,
                     self.footnote_labels,
-                    self.meta.clone(),
                     self.provisional,
                     self.gfm,
                     self.math,
@@ -3827,7 +3950,7 @@ where
                     destination,
                     title,
                     children,
-                    self.meta.clone(),
+                    SourceSpan::default(),
                 )));
             }
             // Inline link failed; fall through to try reference link matching.
@@ -3858,7 +3981,6 @@ where
             self.extensions,
             self.refs,
             self.footnote_labels,
-            self.meta.clone(),
             self.provisional,
             self.gfm,
             self.math,
@@ -3873,7 +3995,7 @@ where
             def.destination.clone(),
             def.title.clone(),
             children,
-            self.meta.clone(),
+            SourceSpan::default(),
         )))
     }
 
@@ -3952,7 +4074,7 @@ where
     // gfm[impl inlines.autolinks.spec-accepts-some-absolute-uris-that-are-not-valid-uris]
     // gfm[impl inlines.autolinks.valid-email-autolink-example]
     // gfm[impl inlines.autolinks.valid-uri-autolink-example]
-    fn try_autolink(&mut self) -> Option<Node<Ext, Meta>> {
+    fn try_autolink(&mut self) -> Option<Node<Ext>> {
         let remaining = self.remaining();
         if !remaining.starts_with('<') {
             return None;
@@ -3969,9 +4091,9 @@ where
                 title: None,
                 children: vec![Node::Text {
                     text: body.to_owned(),
-                    meta: self.meta.clone(),
+                    source: SourceSpan::default(),
                 }],
-                meta: self.meta.clone(),
+                source: SourceSpan::default(),
             });
         }
         if looks_like_email(body) {
@@ -3982,9 +4104,9 @@ where
                 title: None,
                 children: vec![Node::Text {
                     text: body.to_owned(),
-                    meta: self.meta.clone(),
+                    source: SourceSpan::default(),
                 }],
-                meta: self.meta.clone(),
+                source: SourceSpan::default(),
             });
         }
         None
@@ -4008,7 +4130,7 @@ where
     // gfm[impl inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
     // gfm[impl inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign]
     // gfm[impl inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
-    fn try_autolink_literal(&mut self) -> Option<Node<Ext, Meta>> {
+    fn try_autolink_literal(&mut self) -> Option<Node<Ext>> {
         let remaining = self.remaining();
 
         // GFM extended autolinks for `mailto:` and `xmpp:` schemes.
@@ -4052,9 +4174,9 @@ where
                     title: None,
                     children: vec![Node::Text {
                         text: trimmed_full.to_owned(),
-                        meta: self.meta.clone(),
+                        source: SourceSpan::default(),
                     }],
-                    meta: self.meta.clone(),
+                    source: SourceSpan::default(),
                 });
             }
         }
@@ -4072,9 +4194,9 @@ where
                     title: None,
                     children: vec![Node::Text {
                         text: trimmed.to_owned(),
-                        meta: self.meta.clone(),
+                        source: SourceSpan::default(),
                     }],
-                    meta: self.meta.clone(),
+                    source: SourceSpan::default(),
                 });
             }
         }
@@ -4096,9 +4218,9 @@ where
                 title: None,
                 children: vec![Node::Text {
                     text: trimmed.to_owned(),
-                    meta: self.meta.clone(),
+                    source: SourceSpan::default(),
                 }],
-                meta: self.meta.clone(),
+                source: SourceSpan::default(),
             });
         }
 
@@ -4117,9 +4239,9 @@ where
                 title: None,
                 children: vec![Node::Text {
                     text: trimmed_email.to_owned(),
-                    meta: self.meta.clone(),
+                    source: SourceSpan::default(),
                 }],
-                meta: self.meta.clone(),
+                source: SourceSpan::default(),
             });
         }
 
@@ -4127,7 +4249,7 @@ where
     }
 }
 
-fn flush_text_piece<Ext, Meta>(pieces: &mut Vec<InlinePiece<Ext, Meta>>, text: &mut String) {
+fn flush_text_piece<Ext>(pieces: &mut Vec<InlinePiece<Ext>>, text: &mut String) {
     if text.is_empty() {
         return;
     }
@@ -4181,12 +4303,8 @@ fn flush_text_piece<Ext, Meta>(pieces: &mut Vec<InlinePiece<Ext, Meta>>, text: &
 // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-advances]
 // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-inactive-closer]
 // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-cleans-up-stack]
-fn resolve_emphasis<Ext, Meta>(
-    mut pieces: Vec<InlinePiece<Ext, Meta>>,
-    meta: &Meta,
-) -> Vec<Node<Ext, Meta>>
+fn resolve_emphasis<Ext>(mut pieces: Vec<InlinePiece<Ext>>) -> Vec<Node<Ext>>
 where
-    Meta: Clone,
     Ext: Clone + PartialEq,
 {
     loop {
@@ -4245,16 +4363,16 @@ where
                     _ => unreachable!(),
                 };
 
-                let children = materialize_inline_pieces(inner, meta);
+                let children = materialize_inline_pieces(inner);
                 let wrapped = if used == 2 {
                     Node::Strong {
                         children,
-                        meta: meta.clone(),
+                        source: SourceSpan::default(),
                     }
                 } else {
                     Node::Emphasis {
                         children,
-                        meta: meta.clone(),
+                        source: SourceSpan::default(),
                     }
                 };
 
@@ -4288,34 +4406,31 @@ where
         }
     }
 
-    let nodes = materialize_inline_pieces(pieces, meta);
+    let nodes = materialize_inline_pieces(pieces);
     collapse_nested_emphasis(nodes)
 }
 
-fn collapse_nested_emphasis<Ext, Meta>(nodes: Vec<Node<Ext, Meta>>) -> Vec<Node<Ext, Meta>>
+fn collapse_nested_emphasis<Ext>(nodes: Vec<Node<Ext>>) -> Vec<Node<Ext>>
 where
     Ext: Clone + PartialEq,
 {
     nodes
         .into_iter()
         .map(|node| match node {
-            Node::Strong { children, meta } => {
+            Node::Strong { children, source } => {
                 let children = flatten_same_type_children(collapse_nested_emphasis(children), true);
-                Node::Strong { children, meta }
+                Node::Strong { children, source }
             }
-            Node::Emphasis { children, meta } => {
+            Node::Emphasis { children, source } => {
                 let children = collapse_nested_emphasis(children);
-                Node::Emphasis { children, meta }
+                Node::Emphasis { children, source }
             }
             other => other,
         })
         .collect()
 }
 
-fn flatten_same_type_children<Ext, Meta>(
-    children: Vec<Node<Ext, Meta>>,
-    is_strong: bool,
-) -> Vec<Node<Ext, Meta>> {
+fn flatten_same_type_children<Ext>(children: Vec<Node<Ext>>, is_strong: bool) -> Vec<Node<Ext>> {
     let mut out = Vec::with_capacity(children.len());
     for child in children {
         let is_same = if is_strong {
@@ -4336,24 +4451,18 @@ fn flatten_same_type_children<Ext, Meta>(
     out
 }
 
-fn materialize_inline_pieces<Ext, Meta>(
-    pieces: Vec<InlinePiece<Ext, Meta>>,
-    meta: &Meta,
-) -> Vec<Node<Ext, Meta>>
-where
-    Meta: Clone,
-{
+fn materialize_inline_pieces<Ext>(pieces: Vec<InlinePiece<Ext>>) -> Vec<Node<Ext>> {
     let mut out = Vec::new();
     for piece in pieces {
         match piece {
-            InlinePiece::Text(text) if !text.is_empty() => push_or_merge_text(&mut out, text, meta),
+            InlinePiece::Text(text) if !text.is_empty() => push_or_merge_text(&mut out, text),
             InlinePiece::Node(node) => out.push(node),
             InlinePiece::Delimiter { marker, count, .. } if count > 0 => {
                 let ch = match marker {
                     EmphasisMarker::Asterisk => '*',
                     EmphasisMarker::Underscore => '_',
                 };
-                push_or_merge_text(&mut out, ch.to_string().repeat(count), meta);
+                push_or_merge_text(&mut out, ch.to_string().repeat(count));
             }
             _ => {}
         }
@@ -4361,16 +4470,13 @@ where
     out
 }
 
-fn push_or_merge_text<Ext, Meta>(out: &mut Vec<Node<Ext, Meta>>, text: String, meta: &Meta)
-where
-    Meta: Clone,
-{
+fn push_or_merge_text<Ext>(out: &mut Vec<Node<Ext>>, text: String) {
     if let Some(Node::Text { text: existing, .. }) = out.last_mut() {
         existing.push_str(&text);
     } else {
         out.push(Node::Text {
             text,
-            meta: meta.clone(),
+            source: SourceSpan::default(),
         });
     }
 }
@@ -5086,19 +5192,17 @@ fn is_html_whitespace(ch: char) -> bool {
     matches!(ch, ' ' | '\t' | '\n' | '\u{000B}' | '\u{000C}' | '\r')
 }
 
-fn parse_inline_children<Ext, Meta>(
+fn parse_inline_children<Ext>(
     text: &str,
-    extensions: &[Box<dyn Extension<Ext, Meta>>],
+    extensions: &[Box<dyn Extension<Ext>>],
     refs: &ReferenceDefinitions,
     footnote_labels: &FootnoteLabels,
-    meta: Meta,
     provisional: bool,
     gfm: bool,
     math: bool,
     highlights: bool,
-) -> Result<Vec<Node<Ext, Meta>>, Error>
+) -> Result<Vec<Node<Ext>>, Error>
 where
-    Meta: Default + Clone,
     Ext: Clone + PartialEq,
 {
     let mut parser = InlineParser {
@@ -5107,7 +5211,6 @@ where
         extensions,
         refs,
         footnote_labels,
-        meta,
         provisional,
         gfm,
         math,
@@ -5117,7 +5220,7 @@ where
 }
 
 // gfm[impl inlines.images.html-rendering-typically-uses-plain-description-as-alt]
-fn contains_link<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> bool {
+fn contains_link<Ext>(nodes: &[Node<Ext>]) -> bool {
     nodes.iter().any(|node| match node {
         Node::Link { .. } => true,
         Node::Emphasis { children, .. }
@@ -5127,36 +5230,32 @@ fn contains_link<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> bool {
     })
 }
 
-fn build_link_or_image<Ext, Meta>(
+fn build_link_or_image<Ext>(
     image: bool,
     destination: String,
     title: Option<String>,
-    children: Vec<Node<Ext, Meta>>,
-    meta: Meta,
-) -> Node<Ext, Meta>
-where
-    Meta: Clone,
-{
+    children: Vec<Node<Ext>>,
+    source: SourceSpan,
+) -> Node<Ext> {
     if image {
         Node::Image {
             destination,
             title,
             alt: plain_text(&children),
-            meta,
+            source,
         }
     } else {
         Node::Link {
             destination,
             title,
             children,
-            meta,
+            source,
         }
     }
 }
 
-fn build_item_node<Ext, Meta>(children: Vec<ParsedBlock<Ext, Meta>>) -> Node<Ext, Meta>
+fn build_item_node<Ext>(children: Vec<ParsedBlock<Ext>>) -> Node<Ext>
 where
-    Meta: Default,
 {
     let mut iter = children.into_iter();
     match iter.next() {
@@ -5165,7 +5264,7 @@ where
                 Node::TaskItem {
                     checked,
                     children: task_children,
-                    meta,
+                    source,
                 },
             ..
         }) => {
@@ -5175,7 +5274,7 @@ where
             Node::TaskItem {
                 checked,
                 children: all,
-                meta,
+                source,
             }
         }
         first => {
@@ -5186,7 +5285,7 @@ where
             all.extend(iter.map(|child| child.node));
             Node::Item {
                 children: all,
-                meta: Meta::default(),
+                source: SourceSpan::default(),
             }
         }
     }
@@ -5199,11 +5298,8 @@ where
 // gfm[impl container-blocks.task-list-items-extension.extension-wrapper]
 // gfm[impl container-blocks.task-list-items-extension.gfm-enables-task-list-extension]
 // gfm[impl container-blocks.task-list-items-extension.task-lists-may-be-arbitrarily-nested]
-fn normalize_task_item<Ext, Meta>(
-    mut children: Vec<ParsedBlock<Ext, Meta>>,
-) -> Vec<ParsedBlock<Ext, Meta>>
+fn normalize_task_item<Ext>(mut children: Vec<ParsedBlock<Ext>>) -> Vec<ParsedBlock<Ext>>
 where
-    Meta: Default,
 {
     let Some(first) = children.first_mut() else {
         return children;
@@ -5226,9 +5322,9 @@ where
         checked,
         children: vec![Node::Paragraph {
             children: paragraph_children,
-            meta: Meta::default(),
+            source: SourceSpan::default(),
         }],
-        meta: Meta::default(),
+        source: SourceSpan::default(),
     };
     children
 }
@@ -5246,7 +5342,7 @@ fn parse_task_marker(text: &str) -> Option<(bool, &str)> {
     None
 }
 
-fn is_tight_list<Ext, Meta>(items: &[ParsedListItem<Ext, Meta>]) -> bool {
+fn is_tight_list<Ext>(items: &[ParsedListItem<Ext>]) -> bool {
     if items.iter().any(|item| item.loose) {
         return false;
     }
@@ -5383,8 +5479,8 @@ fn split_table_row(line: &str) -> Vec<String> {
     cells
 }
 
-fn collect_footnote_refs<Ext, Meta>(
-    node: &Node<Ext, Meta>,
+fn collect_footnote_refs<Ext>(
+    node: &Node<Ext>,
     ordered_labels: &mut Vec<String>,
     occurrences: &mut HashMap<String, u32>,
 ) {
@@ -5442,8 +5538,8 @@ fn collect_footnote_refs<Ext, Meta>(
     }
 }
 
-fn assign_footnote_ref_numbers<Ext, Meta>(
-    node: &mut Node<Ext, Meta>,
+fn assign_footnote_ref_numbers<Ext>(
+    node: &mut Node<Ext>,
     label_numbers: &HashMap<String, u32>,
     counters: &mut HashMap<String, u32>,
 ) {
@@ -5501,7 +5597,7 @@ fn assign_footnote_ref_numbers<Ext, Meta>(
     }
 }
 
-fn plain_text<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> String {
+fn plain_text<Ext>(nodes: &[Node<Ext>]) -> String {
     let mut out = String::new();
     for node in nodes {
         match node {
@@ -5853,7 +5949,7 @@ fn is_escapable(ch: char) -> bool {
 mod tests {
     use super::Parser;
     use crate::ext::{BlockMatch, Extension, InlineMatch};
-    use crate::node::{Node, StreamItem};
+    use crate::node::{Node, SourceSpan, StreamItem};
     use crate::sink::VecSink;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -5864,8 +5960,8 @@ mod tests {
 
     struct MathExtension;
 
-    impl Extension<TestExt, ()> for MathExtension {
-        fn try_inline(&self, input: &str) -> Option<InlineMatch<TestExt, ()>> {
+    impl Extension<TestExt> for MathExtension {
+        fn try_inline(&self, input: &str) -> Option<InlineMatch<TestExt>> {
             let rest = input.strip_prefix('$')?;
             let end = rest.find('$')?;
             Some(InlineMatch {
@@ -5873,7 +5969,7 @@ mod tests {
                 node: Node::Custom {
                     payload: TestExt::Math(rest[..end].to_owned()),
                     children: Vec::new(),
-                    meta: (),
+                    source: SourceSpan::default(),
                 },
             })
         }
@@ -5883,8 +5979,8 @@ mod tests {
     /// the enclosed body as a single Note payload.
     struct NoteBlockExtension;
 
-    impl Extension<TestExt, ()> for NoteBlockExtension {
-        fn try_block(&self, lines: &[String], start: usize) -> Option<BlockMatch<TestExt, ()>> {
+    impl Extension<TestExt> for NoteBlockExtension {
+        fn try_block(&self, lines: &[String], start: usize) -> Option<BlockMatch<TestExt>> {
             if lines[start].trim() != ":::note" {
                 return None;
             }
@@ -5897,7 +5993,7 @@ mod tests {
                         node: Node::Custom {
                             payload: TestExt::Note(body.join("\n")),
                             children: Vec::new(),
-                            meta: (),
+                            source: SourceSpan::default(),
                         },
                     });
                 }
@@ -5910,7 +6006,7 @@ mod tests {
 
     #[test]
     fn emits_stable_ids_for_provisional_emphasis_upgrade() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("*hello", &mut sink).unwrap();
@@ -5948,7 +6044,7 @@ mod tests {
     // gfm[verify leaf-blocks.setext-headings.structure]
     #[test]
     fn upgrades_setext_heading() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("Title\n", &mut sink).unwrap();
@@ -5975,7 +6071,7 @@ mod tests {
     // gfm[verify leaf-blocks.fenced-code-blocks.content-continues-until-matching-closing-fence]
     #[test]
     fn supports_fenced_code_blocks() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("```rust\nfn main() {}", &mut sink).unwrap();
@@ -6004,7 +6100,7 @@ mod tests {
 
     #[test]
     fn supports_block_quotes() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser
@@ -6033,7 +6129,7 @@ mod tests {
 
     #[test]
     fn supports_simple_lists() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("- one\n- two\n", &mut sink).unwrap();
@@ -6060,7 +6156,7 @@ mod tests {
 
     #[test]
     fn supports_indented_code_blocks() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("    foo\n    bar\n", &mut sink).unwrap();
@@ -6141,7 +6237,7 @@ mod tests {
     // gfm[verify inlines.images.definition]
     #[test]
     fn supports_inline_links_and_images() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser
@@ -6186,7 +6282,7 @@ mod tests {
     // gfm[verify inlines.links.shortcut-reference-link-definition]
     #[test]
     fn resolves_reference_links_from_later_definitions() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("[foo]\n", &mut sink).unwrap();
@@ -6217,7 +6313,7 @@ mod tests {
     // gfm[verify inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html]
     #[test]
     fn supports_inline_raw_html() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser
@@ -6254,7 +6350,7 @@ mod tests {
     // gfm[verify leaf-blocks.html-blocks.definition]
     #[test]
     fn supports_html_blocks() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("<div>\nfoo\n</div>\n", &mut sink).unwrap();
@@ -6281,7 +6377,7 @@ mod tests {
     // gfm[verify leaf-blocks.html-blocks.opening-tag-indent-up-to-three-spaces]
     #[test]
     fn html_blocks_only_start_with_up_to_three_spaces_of_indent() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser
@@ -6310,7 +6406,7 @@ mod tests {
     // gfm[verify leaf-blocks.html-blocks.type-7-example-cannot-interrupt-paragraph]
     #[test]
     fn type_7_html_blocks_do_not_interrupt_paragraphs() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser
@@ -6348,7 +6444,7 @@ mod tests {
     // gfm[verify inlines.autolinks-extension.extended-url-autolink-definition]
     #[test]
     fn supports_strikethrough_and_autolinks() {
-        let mut parser = Parser::<(), ()>::builder().with_gfm().build();
+        let mut parser = Parser::<()>::builder().with_gfm().build();
         let mut sink = VecSink::new();
 
         parser
@@ -6392,7 +6488,7 @@ mod tests {
     // gfm[verify leaf-blocks.tables-extension.table-definition]
     #[test]
     fn supports_task_list_items_and_tables() {
-        let mut parser = Parser::<(), ()>::builder().with_gfm().build();
+        let mut parser = Parser::<()>::builder().with_gfm().build();
         let mut sink = VecSink::new();
 
         parser
@@ -6422,7 +6518,7 @@ mod tests {
     // gfm[verify container-blocks.lists.loose-list-definition]
     #[test]
     fn detects_loose_lists_and_lazy_continuation() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser
@@ -6455,7 +6551,7 @@ mod tests {
     // gfm[verify container-blocks.list-items.ordered-start-number-may-have-leading-zeroes]
     #[test]
     fn enforces_ordered_list_marker_width_rules() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser
@@ -6490,7 +6586,7 @@ mod tests {
     // gfm[verify container-blocks.list-items.interrupting-ordered-list-must-start-at-one]
     #[test]
     fn ordered_lists_only_interrupt_paragraphs_at_one() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser
@@ -6520,7 +6616,7 @@ mod tests {
     // gfm[verify container-blocks.list-items.empty-item-does-not-require-post-marker-spaces]
     #[test]
     fn supports_empty_list_items_without_post_marker_space() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("*\n* next\n", &mut sink).unwrap();
@@ -6551,7 +6647,7 @@ mod tests {
     // gfm[verify container-blocks.list-items.blank-line-start-makes-post-marker-spacing-irrelevant]
     #[test]
     fn blank_start_list_item_does_not_interrupt_paragraph_and_uses_normalized_indent() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("para\n+\n  foo\n", &mut sink).unwrap();
@@ -6576,12 +6672,12 @@ mod tests {
     fn preserves_chunk_invariant_for_nested_delimiters() {
         let input = "foo***bar***baz\n";
 
-        let mut one = Parser::<(), ()>::new();
+        let mut one = Parser::<()>::new();
         let mut one_sink = VecSink::new();
         one.push_str(input, &mut one_sink).unwrap();
         one.finish(&mut one_sink).unwrap();
 
-        let mut chunked = Parser::<(), ()>::new();
+        let mut chunked = Parser::<()>::new();
         let mut chunked_sink = VecSink::new();
         for chunk in ["foo*", "**bar", "***baz\n"] {
             chunked.push_str(chunk, &mut chunked_sink).unwrap();
@@ -6615,7 +6711,7 @@ mod tests {
     // gfm[verify container-blocks.list-items.sublists-follow-general-indentation-rules]
     #[test]
     fn supports_nested_sublists() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("- one\n  - two\n", &mut sink).unwrap();
@@ -6645,7 +6741,7 @@ mod tests {
     // gfm[verify container-blocks.list-items.indented-code-must-be-four-spaces-beyond-content-indent]
     #[test]
     fn supports_indented_code_inside_list_items() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("- foo\n\n      bar\n", &mut sink).unwrap();
@@ -6674,7 +6770,7 @@ mod tests {
     // gfm[verify preliminaries.tabs.tabs-not-expanded-in-lines]
     #[test]
     fn preserves_tabs_in_non_structural_text() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("a\tb\n", &mut sink).unwrap();
@@ -6701,7 +6797,7 @@ mod tests {
 
     #[test]
     fn deletes_blocks_that_turn_into_reference_definitions() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("[foo]", &mut sink).unwrap();
@@ -6720,12 +6816,12 @@ mod tests {
     fn preserves_chunk_invariant_for_supported_syntax() {
         let input = "# hello\n\nparagraph with *em* and `code`\n\n---\n";
 
-        let mut one = Parser::<(), ()>::new();
+        let mut one = Parser::<()>::new();
         let mut one_sink = VecSink::new();
         one.push_str(input, &mut one_sink).unwrap();
         one.finish(&mut one_sink).unwrap();
 
-        let mut chunked = Parser::<(), ()>::new();
+        let mut chunked = Parser::<()>::new();
         let mut chunked_sink = VecSink::new();
         for chunk in [
             "# he",
@@ -6763,7 +6859,7 @@ mod tests {
 
     #[test]
     fn defaults_to_pure_commonmark() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         // GFM table syntax → stays as paragraphs (pipe-separated text)
@@ -6798,7 +6894,7 @@ mod tests {
 
     #[test]
     fn rejects_new_input_after_finish() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<()>::new();
         let mut sink = VecSink::new();
 
         parser.push_str("hello", &mut sink).unwrap();

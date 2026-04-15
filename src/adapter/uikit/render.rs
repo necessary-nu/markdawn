@@ -63,21 +63,21 @@ pub struct ListFrame {
     pub tight: bool,
 }
 
-pub trait RenderUIKitCustom<Ext, Meta> {
+pub trait RenderUIKitCustom<Ext> {
     fn render_custom(
         &self,
         payload: &Ext,
-        children: &[Node<Ext, Meta>],
+        children: &[Node<Ext>],
         style: &UIKitStyle,
         ctx: &RenderCtx,
     ) -> Result<Retained<NSMutableAttributedString>, UIKitError>;
 }
 
-impl<Ext, Meta> RenderUIKitCustom<Ext, Meta> for () {
+impl<Ext> RenderUIKitCustom<Ext> for () {
     fn render_custom(
         &self,
         _payload: &Ext,
-        _children: &[Node<Ext, Meta>],
+        _children: &[Node<Ext>],
         _style: &UIKitStyle,
         _ctx: &RenderCtx,
     ) -> Result<Retained<NSMutableAttributedString>, UIKitError> {
@@ -132,13 +132,13 @@ impl<R> TextRenderer<R> {
         &self.style
     }
 
-    pub fn render_text_block<Ext, Meta>(
+    pub fn render_text_block<Ext>(
         &self,
-        node: &Node<Ext, Meta>,
+        node: &Node<Ext>,
         ctx: &RenderCtx,
     ) -> Result<Retained<NSMutableAttributedString>, UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         // In streaming mode every block is rendered independently and there is
         // always more content (or the document genuinely ends, in which case a
@@ -155,13 +155,13 @@ impl<R> TextRenderer<R> {
         self.render_block_inner(node, &root_ctx)
     }
 
-    fn render_block_inner<Ext, Meta>(
+    fn render_block_inner<Ext>(
         &self,
-        node: &Node<Ext, Meta>,
+        node: &Node<Ext>,
         ctx: &RenderCtx,
     ) -> Result<Retained<NSMutableAttributedString>, UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         let result = NSMutableAttributedString::new();
         let base_font = attrs::body_font(&self.style);
@@ -493,15 +493,15 @@ impl<R> TextRenderer<R> {
         Ok(result)
     }
 
-    pub(crate) fn render_inlines<Ext, Meta>(
+    pub(crate) fn render_inlines<Ext>(
         &self,
-        nodes: &[Node<Ext, Meta>],
+        nodes: &[Node<Ext>],
         base_font: &UIFont,
         base_color: &UIColor,
         ctx: &RenderCtx,
     ) -> Result<Retained<NSMutableAttributedString>, UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         let result = NSMutableAttributedString::new();
         for node in nodes {
@@ -511,15 +511,15 @@ impl<R> TextRenderer<R> {
         Ok(result)
     }
 
-    fn render_inline<Ext, Meta>(
+    fn render_inline<Ext>(
         &self,
-        node: &Node<Ext, Meta>,
+        node: &Node<Ext>,
         base_font: &UIFont,
         base_color: &UIColor,
         ctx: &RenderCtx,
     ) -> Result<Retained<NSMutableAttributedString>, UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         match node {
             Node::Text { text, .. } => Ok(attributed_string(text, base_font, base_color)),
@@ -669,24 +669,24 @@ impl<R> TextRenderer<R> {
     /// Extract attributed-string cells for a table, preserving inline formatting
     /// (bold, italic, links, code spans). Header cells use a bold font; data
     /// cells use the body font.
-    pub(crate) fn extract_table_data_attributed<Ext, Meta>(
+    pub(crate) fn extract_table_data_attributed<Ext>(
         &self,
-        header: &[Node<Ext, Meta>],
-        rows: &[Node<Ext, Meta>],
+        header: &[Node<Ext>],
+        rows: &[Node<Ext>],
         ctx: &RenderCtx,
     ) -> (
         Vec<Retained<NSMutableAttributedString>>,
         Vec<Vec<Retained<NSMutableAttributedString>>>,
     )
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         let base_font = attrs::body_font(&self.style);
         let bold_font =
             attrs::add_trait_to_font(&base_font, UIFontDescriptorSymbolicTraits::TraitBold);
         let text_color = self.style.text_color.clone();
 
-        let render_row = |row: &Node<Ext, Meta>,
+        let render_row = |row: &Node<Ext>,
                           font: &UIFont|
          -> Vec<Retained<NSMutableAttributedString>> {
             let Node::TableRow { cells, .. } = row else {
@@ -717,13 +717,13 @@ impl<R> TextRenderer<R> {
 
     /// Render the inner content of a blockquote as an attributed string suitable
     /// for embedding in a UITextView inside the blockquote view.
-    pub(crate) fn render_blockquote_content<Ext, Meta>(
+    pub(crate) fn render_blockquote_content<Ext>(
         &self,
-        children: &[Node<Ext, Meta>],
+        children: &[Node<Ext>],
         ctx: &RenderCtx,
     ) -> Result<Retained<NSMutableAttributedString>, UIKitError>
     where
-        R: RenderUIKitCustom<Ext, Meta>,
+        R: RenderUIKitCustom<Ext>,
     {
         let inner_ctx = RenderCtx {
             blockquote_depth: 0, // view handles visual treatment

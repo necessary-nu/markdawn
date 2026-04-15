@@ -1,7 +1,7 @@
 use markdawn::{HtmlAdapter, Parser, StreamItem, VecSink};
 
 fn render_html(input: &str) -> String {
-    let mut parser = Parser::<(), ()>::builder().with_gfm().with_math().build();
+    let mut parser = Parser::<()>::builder().with_gfm().with_math().build();
     let mut sink = VecSink::new();
     parser.push_str(input, &mut sink).unwrap();
     parser.finish(&mut sink).unwrap();

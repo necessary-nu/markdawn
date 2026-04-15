@@ -21,20 +21,20 @@ impl fmt::Display for HtmlError {
 
 impl std::error::Error for HtmlError {}
 
-pub trait RenderHtmlCustom<Ext, Meta> {
+pub trait RenderHtmlCustom<Ext> {
     fn render_custom(
         &self,
         payload: &Ext,
-        children: &[Node<Ext, Meta>],
+        children: &[Node<Ext>],
         out: &mut String,
     ) -> Result<(), HtmlError>;
 }
 
-impl<Ext, Meta> RenderHtmlCustom<Ext, Meta> for () {
+impl<Ext> RenderHtmlCustom<Ext> for () {
     fn render_custom(
         &self,
         _payload: &Ext,
-        _children: &[Node<Ext, Meta>],
+        _children: &[Node<Ext>],
         _out: &mut String,
     ) -> Result<(), HtmlError> {
         Err(HtmlError::UnsupportedCustomNode)
@@ -102,12 +102,9 @@ impl<R> HtmlAdapter<R> {
 }
 
 impl<R> HtmlAdapter<R> {
-    pub fn render<Ext, Meta>(
-        &self,
-        item: StreamItem<Node<Ext, Meta>>,
-    ) -> Result<StreamItem<String>, HtmlError>
+    pub fn render<Ext>(&self, item: StreamItem<Node<Ext>>) -> Result<StreamItem<String>, HtmlError>
     where
-        R: RenderHtmlCustom<Ext, Meta>,
+        R: RenderHtmlCustom<Ext>,
     {
         match item {
             StreamItem::Upsert(emission) => Ok(StreamItem::Upsert(Emission {
@@ -119,9 +116,9 @@ impl<R> HtmlAdapter<R> {
         }
     }
 
-    fn render_node<Ext, Meta>(&self, node: &Node<Ext, Meta>) -> Result<String, HtmlError>
+    fn render_node<Ext>(&self, node: &Node<Ext>) -> Result<String, HtmlError>
     where
-        R: RenderHtmlCustom<Ext, Meta>,
+        R: RenderHtmlCustom<Ext>,
     {
         let mut out = String::new();
         self.write_block(node, &mut out)?;
@@ -198,13 +195,9 @@ impl<R> HtmlAdapter<R> {
         false
     }
 
-    fn write_block<Ext, Meta>(
-        &self,
-        node: &Node<Ext, Meta>,
-        out: &mut String,
-    ) -> Result<(), HtmlError>
+    fn write_block<Ext>(&self, node: &Node<Ext>, out: &mut String) -> Result<(), HtmlError>
     where
-        R: RenderHtmlCustom<Ext, Meta>,
+        R: RenderHtmlCustom<Ext>,
     {
         match node {
             Node::Document { children, .. } => {
@@ -468,13 +461,9 @@ impl<R> HtmlAdapter<R> {
         Ok(())
     }
 
-    fn write_inlines<Ext, Meta>(
-        &self,
-        nodes: &[Node<Ext, Meta>],
-        out: &mut String,
-    ) -> Result<(), HtmlError>
+    fn write_inlines<Ext>(&self, nodes: &[Node<Ext>], out: &mut String) -> Result<(), HtmlError>
     where
-        R: RenderHtmlCustom<Ext, Meta>,
+        R: RenderHtmlCustom<Ext>,
     {
         for node in nodes {
             self.write_inline(node, out)?;
@@ -482,13 +471,9 @@ impl<R> HtmlAdapter<R> {
         Ok(())
     }
 
-    fn write_inline<Ext, Meta>(
-        &self,
-        node: &Node<Ext, Meta>,
-        out: &mut String,
-    ) -> Result<(), HtmlError>
+    fn write_inline<Ext>(&self, node: &Node<Ext>, out: &mut String) -> Result<(), HtmlError>
     where
-        R: RenderHtmlCustom<Ext, Meta>,
+        R: RenderHtmlCustom<Ext>,
     {
         match node {
             Node::Text { text, .. } => escape_html(text, out),
@@ -623,14 +608,14 @@ impl<R> HtmlAdapter<R> {
         Ok(())
     }
 
-    fn write_table_row<Ext, Meta>(
+    fn write_table_row<Ext>(
         &self,
-        node: &Node<Ext, Meta>,
+        node: &Node<Ext>,
         alignments: &[Option<TableAlignment>],
         out: &mut String,
     ) -> Result<(), HtmlError>
     where
-        R: RenderHtmlCustom<Ext, Meta>,
+        R: RenderHtmlCustom<Ext>,
     {
         let Node::TableRow { cells, .. } = node else {
             return Ok(());
@@ -669,14 +654,14 @@ impl<R> HtmlAdapter<R> {
         Ok(())
     }
 
-    fn write_list_child<Ext, Meta>(
+    fn write_list_child<Ext>(
         &self,
-        node: &Node<Ext, Meta>,
+        node: &Node<Ext>,
         tight: bool,
         out: &mut String,
     ) -> Result<(), HtmlError>
     where
-        R: RenderHtmlCustom<Ext, Meta>,
+        R: RenderHtmlCustom<Ext>,
     {
         match node {
             Node::Item { children, .. } => {
@@ -699,14 +684,14 @@ impl<R> HtmlAdapter<R> {
         Ok(())
     }
 
-    fn write_li_children<Ext, Meta>(
+    fn write_li_children<Ext>(
         &self,
-        children: &[Node<Ext, Meta>],
+        children: &[Node<Ext>],
         tight: bool,
         out: &mut String,
     ) -> Result<(), HtmlError>
     where
-        R: RenderHtmlCustom<Ext, Meta>,
+        R: RenderHtmlCustom<Ext>,
     {
         if children.is_empty() {
             out.push_str("</li>\n");
@@ -810,15 +795,15 @@ impl<S, R> HtmlSink<S, R> {
     }
 }
 
-impl<S, R, Ext, Meta> Sink<Node<Ext, Meta>> for HtmlSink<S, R>
+impl<S, R, Ext> Sink<Node<Ext>> for HtmlSink<S, R>
 where
     S: Sink<String>,
     S::Error: fmt::Display,
-    R: RenderHtmlCustom<Ext, Meta>,
+    R: RenderHtmlCustom<Ext>,
 {
     type Error = HtmlError;
 
-    fn emit(&mut self, item: StreamItem<Node<Ext, Meta>>) -> Result<(), Self::Error> {
+    fn emit(&mut self, item: StreamItem<Node<Ext>>) -> Result<(), Self::Error> {
         let rendered = self.adapter.render(item)?;
         self.inner
             .emit(rendered)
@@ -889,7 +874,7 @@ fn is_type1_html_block(html: &str) -> bool {
     false
 }
 
-fn is_block_like<Ext, Meta>(children: &[Node<Ext, Meta>]) -> bool {
+fn is_block_like<Ext>(children: &[Node<Ext>]) -> bool {
     children.iter().any(|child| {
         matches!(
             child,
@@ -914,7 +899,7 @@ fn is_block_like<Ext, Meta>(children: &[Node<Ext, Meta>]) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::adapter::html::{HtmlAdapter, HtmlSink, RenderHtmlCustom};
-    use crate::node::{Emission, Node, StreamItem};
+    use crate::node::{Emission, Node, SourceSpan, StreamItem};
     use crate::sink::{Sink, VecSink};
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -924,11 +909,11 @@ mod tests {
 
     struct MathRenderer;
 
-    impl RenderHtmlCustom<TestExt, ()> for MathRenderer {
+    impl RenderHtmlCustom<TestExt> for MathRenderer {
         fn render_custom(
             &self,
             payload: &TestExt,
-            _children: &[Node<TestExt, ()>],
+            _children: &[Node<TestExt>],
             out: &mut String,
         ) -> Result<(), super::HtmlError> {
             match payload {
@@ -949,12 +934,12 @@ mod tests {
             .render(StreamItem::Upsert(Emission {
                 id: 7,
                 provisional: true,
-                node: Node::<(), ()>::Paragraph {
+                node: Node::<()>::Paragraph {
                     children: vec![Node::Text {
                         text: "hello".to_owned(),
-                        meta: (),
+                        source: SourceSpan::default(),
                     }],
-                    meta: (),
+                    source: SourceSpan::default(),
                 },
             }))
             .unwrap();
@@ -973,7 +958,7 @@ mod tests {
     fn passes_delete_through_unchanged() {
         let adapter = HtmlAdapter::new();
         let rendered = adapter
-            .render(StreamItem::<Node<(), ()>>::Delete { id: 9 })
+            .render(StreamItem::<Node<()>>::Delete { id: 9 })
             .unwrap();
         assert_eq!(rendered, StreamItem::Delete { id: 9 });
     }
@@ -985,7 +970,7 @@ mod tests {
             .render(StreamItem::Upsert(Emission {
                 id: 1,
                 provisional: false,
-                node: Node::<(), ()>::BlockQuote {
+                node: Node::<()>::BlockQuote {
                     children: vec![Node::List {
                         ordered: false,
                         start: None,
@@ -994,15 +979,15 @@ mod tests {
                             children: vec![Node::Paragraph {
                                 children: vec![Node::Text {
                                     text: "item".to_owned(),
-                                    meta: (),
+                                    source: SourceSpan::default(),
                                 }],
-                                meta: (),
+                                source: SourceSpan::default(),
                             }],
-                            meta: (),
+                            source: SourceSpan::default(),
                         }],
-                        meta: (),
+                        source: SourceSpan::default(),
                     }],
-                    meta: (),
+                    source: SourceSpan::default(),
                 },
             }))
             .unwrap();
@@ -1024,7 +1009,9 @@ mod tests {
         sink.emit(StreamItem::Upsert(Emission {
             id: 11,
             provisional: false,
-            node: Node::<(), ()>::ThematicBreak { meta: () },
+            node: Node::<()>::ThematicBreak {
+                source: SourceSpan::default(),
+            },
         }))
         .unwrap();
 
@@ -1046,13 +1033,13 @@ mod tests {
             .render(StreamItem::Upsert(Emission {
                 id: 3,
                 provisional: false,
-                node: Node::<TestExt, ()>::Paragraph {
+                node: Node::<TestExt>::Paragraph {
                     children: vec![Node::Custom {
                         payload: TestExt::Math("x^2".to_owned()),
                         children: Vec::new(),
-                        meta: (),
+                        source: SourceSpan::default(),
                     }],
-                    meta: (),
+                    source: SourceSpan::default(),
                 },
             }))
             .unwrap();

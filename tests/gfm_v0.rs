@@ -1,13 +1,13 @@
 use markdawn::{Node, Parser, StreamItem, TableAlignment, VecSink};
 
-fn parse_final_nodes(input: &str) -> Vec<Node<(), ()>> {
-    let mut parser = Parser::<(), ()>::builder().with_gfm().with_math().build();
+fn parse_final_nodes(input: &str) -> Vec<Node<()>> {
+    let mut parser = Parser::<()>::builder().with_gfm().with_math().build();
     let mut sink = VecSink::new();
     parser.push_str(input, &mut sink).unwrap();
     parser.finish(&mut sink).unwrap();
 
     let mut order = Vec::new();
-    let mut values = Vec::<(u64, Node<(), ()>)>::new();
+    let mut values = Vec::<(u64, Node<()>)>::new();
 
     for item in sink.items() {
         match item {
@@ -33,7 +33,7 @@ fn parse_final_nodes(input: &str) -> Vec<Node<(), ()>> {
         .collect()
 }
 
-fn render_html(nodes: &[Node<(), ()>]) -> String {
+fn render_html(nodes: &[Node<()>]) -> String {
     let mut out = String::new();
     for node in nodes {
         render_block(node, &mut out);
@@ -41,7 +41,7 @@ fn render_html(nodes: &[Node<(), ()>]) -> String {
     out
 }
 
-fn render_block(node: &Node<(), ()>, out: &mut String) {
+fn render_block(node: &Node<()>, out: &mut String) {
     match node {
         Node::Paragraph { children, .. } => {
             out.push_str("<p>");
@@ -140,7 +140,7 @@ fn render_block(node: &Node<(), ()>, out: &mut String) {
     }
 }
 
-fn render_inlines(nodes: &[Node<(), ()>], out: &mut String) {
+fn render_inlines(nodes: &[Node<()>], out: &mut String) {
     for node in nodes {
         match node {
             Node::Text { text, .. } => escape_html(text, out),
@@ -218,7 +218,7 @@ fn render_inlines(nodes: &[Node<(), ()>], out: &mut String) {
     }
 }
 
-fn render_table_row(node: &Node<(), ()>, alignments: &[Option<TableAlignment>], out: &mut String) {
+fn render_table_row(node: &Node<()>, alignments: &[Option<TableAlignment>], out: &mut String) {
     let Node::TableRow { cells, .. } = node else {
         return;
     };
@@ -255,7 +255,7 @@ fn render_table_row(node: &Node<(), ()>, alignments: &[Option<TableAlignment>], 
     out.push_str("</tr>\n");
 }
 
-fn render_list_child(node: &Node<(), ()>, tight: bool, out: &mut String) {
+fn render_list_child(node: &Node<()>, tight: bool, out: &mut String) {
     match node {
         Node::Item { children, .. } => {
             out.push_str("<li>");
