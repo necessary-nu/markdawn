@@ -2545,16 +2545,23 @@ where
                 continue;
             }
 
-            if let Some(node) = self.try_delimited("~~", false)? {
-                flush_text_piece(&mut pieces, &mut text);
-                let Node::Emphasis { children, .. } = node else {
-                    unreachable!()
-                };
-                pieces.push(InlinePiece::Node(Node::Strikethrough {
-                    children,
-                    meta: self.meta.clone(),
-                }));
-                continue;
+            // GFM strikethrough: runs of 1 or 2 tildes (3+ are literal).
+            if self.remaining().starts_with('~') {
+                let run = self.remaining().chars().take_while(|c| *c == '~').count();
+                if run <= 2 {
+                    let delim: &str = if run == 2 { "~~" } else { "~" };
+                    if let Some(node) = self.try_delimited(delim, false)? {
+                        flush_text_piece(&mut pieces, &mut text);
+                        let Node::Emphasis { children, .. } = node else {
+                            unreachable!()
+                        };
+                        pieces.push(InlinePiece::Node(Node::Strikethrough {
+                            children,
+                            meta: self.meta.clone(),
+                        }));
+                        continue;
+                    }
+                }
             }
 
             if let Some(run) = self.parse_delimiter_run() {
@@ -2757,7 +2764,9 @@ where
             return Ok(None);
         }
 
-        if delim == "~~" && !is_valid_tilde_opener(self.input, self.index, delim.len()) {
+        if (delim == "~~" || delim == "~")
+            && !is_valid_tilde_opener(self.input, self.index, delim.len())
+        {
             return Ok(None);
         }
 
@@ -2988,7 +2997,12 @@ where
             remaining.find("?>").map(|idx| idx + 2)?
         } else if remaining.starts_with("<![CDATA[") {
             remaining.find("]]>").map(|idx| idx + 3)?
-        } else if remaining.starts_with("<!") {
+        } else if remaining.starts_with("<!")
+            && remaining
+                .as_bytes()
+                .get(2)
+                .is_some_and(|b| b.is_ascii_uppercase())
+        {
             remaining.find('>').map(|idx| idx + 1)?
         } else if let Some((_, len)) = parse_html_open_tag_prefix(remaining) {
             len
@@ -3494,10 +3508,31 @@ fn find_delimited_closer(input: &str, mut index: usize, delim: &str) -> Option<u
         }
 
         if input[index..].starts_with(delim) {
-            if delim != "~~" || is_valid_tilde_closer(input, index) {
+            // For tilde strikethrough, the closer must be a run of EXACTLY
+            // delim.len() tildes (not part of a longer run).
+            let is_tilde = delim == "~~" || delim == "~";
+            let exact_run_ok = if is_tilde {
+                let run = input[index..]
+                    .chars()
+                    .take_while(|c| *c == '~')
+                    .count();
+                run == delim.len()
+            } else {
+                true
+            };
+            if exact_run_ok && (!is_tilde || is_valid_tilde_closer(input, index)) {
                 return Some(index);
             }
-            index += delim.len();
+            // Skip past this whole tilde run if it's the wrong length
+            if is_tilde {
+                let run = input[index..]
+                    .chars()
+                    .take_while(|c| *c == '~')
+                    .count();
+                index += run;
+            } else {
+                index += delim.len();
+            }
             continue;
         }
 
