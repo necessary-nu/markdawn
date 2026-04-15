@@ -1354,6 +1354,15 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 break;
             }
 
+            // GFM tables can interrupt a paragraph: current line is potential
+            // header, next line is a delimiter row.
+            if lines[index].contains('|')
+                && index + 1 < lines.len()
+                && parse_table_delimiter(&lines[index + 1]).is_some()
+            {
+                break;
+            }
+
             collected.push(lines[index].clone());
             index += 1;
         }
@@ -4365,7 +4374,11 @@ fn parse_table_delimiter(line: &str) -> Option<Vec<Option<TableAlignment>>> {
     let mut out = Vec::with_capacity(cells.len());
     for cell in cells {
         let trimmed = cell.trim();
-        if trimmed.len() < 3 || !trimmed.chars().all(|ch| matches!(ch, '-' | ':')) {
+        // A delimiter cell needs at least one `-` and may have leading/trailing `:`.
+        if trimmed.is_empty()
+            || !trimmed.chars().all(|ch| matches!(ch, '-' | ':'))
+            || !trimmed.contains('-')
+        {
             return None;
         }
         let alignment = if trimmed.starts_with(':') && trimmed.ends_with(':') {
