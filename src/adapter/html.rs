@@ -45,6 +45,8 @@ pub struct HtmlAdapter<R = ()> {
     custom: R,
     #[cfg(feature = "highlight")]
     highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SpanHighlighter>>>,
+    #[cfg(feature = "pikchr")]
+    pikchr: bool,
 }
 
 impl Default for HtmlAdapter<()> {
@@ -59,6 +61,8 @@ impl HtmlAdapter<()> {
             custom: (),
             #[cfg(feature = "highlight")]
             highlighter: core::cell::RefCell::new(None),
+            #[cfg(feature = "pikchr")]
+            pikchr: false,
         }
     }
 
@@ -67,6 +71,8 @@ impl HtmlAdapter<()> {
             custom,
             #[cfg(feature = "highlight")]
             highlighter: core::cell::RefCell::new(None),
+            #[cfg(feature = "pikchr")]
+            pikchr: false,
         }
     }
 }
@@ -81,6 +87,16 @@ impl<R> HtmlAdapter<R> {
         H: arborium::advanced::HighlightSpans + 'static,
     {
         self.highlighter = core::cell::RefCell::new(Some(Box::new(highlighter)));
+        self
+    }
+}
+
+#[cfg(feature = "pikchr")]
+impl<R> HtmlAdapter<R> {
+    /// Render fenced code blocks tagged with the `pikchr` info string as
+    /// inline SVG diagrams. Parse failures fall back to plain `<pre><code>`.
+    pub fn with_pikchr(mut self) -> Self {
+        self.pikchr = true;
         self
     }
 }
@@ -151,6 +167,35 @@ impl<R> HtmlAdapter<R> {
         _out: &mut String,
     ) -> Result<bool, HtmlError> {
         Ok(false)
+    }
+
+    /// Returns `true` if the block was rendered as a pikchr SVG diagram.
+    #[cfg(feature = "pikchr")]
+    fn try_pikchr_code_block(&self, info: Option<&str>, literal: &str, out: &mut String) -> bool {
+        if !self.pikchr || info != Some("pikchr") {
+            return false;
+        }
+        let options = pikru::RenderOptions {
+            css_variables: true,
+        };
+        let Ok(svg) = pikru::pikchr_with_options(literal, &options) else {
+            return false;
+        };
+        out.push_str(&svg);
+        if !svg.ends_with('\n') {
+            out.push('\n');
+        }
+        true
+    }
+
+    #[cfg(not(feature = "pikchr"))]
+    fn try_pikchr_code_block(
+        &self,
+        _info: Option<&str>,
+        _literal: &str,
+        _out: &mut String,
+    ) -> bool {
+        false
     }
 
     fn write_block<Ext, Meta>(
@@ -328,7 +373,9 @@ impl<R> HtmlAdapter<R> {
                 self.write_table_row(node, &[], out)?;
             }
             Node::CodeBlock { info, literal, .. } => {
-                if !self.try_highlight_code_block(info.as_deref(), literal, out)? {
+                if !self.try_pikchr_code_block(info.as_deref(), literal, out)
+                    && !self.try_highlight_code_block(info.as_deref(), literal, out)?
+                {
                     match info {
                         Some(info) => {
                             out.push_str("<pre><code class=\"language-");
@@ -752,6 +799,8 @@ impl<S, R> HtmlSink<S, R> {
                 custom,
                 #[cfg(feature = "highlight")]
                 highlighter: core::cell::RefCell::new(None),
+                #[cfg(feature = "pikchr")]
+                pikchr: false,
             },
         }
     }

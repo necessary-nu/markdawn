@@ -11,6 +11,8 @@ fn main() {
     let math = args.iter().any(|a| a == "--math");
     #[cfg(feature = "highlight")]
     let highlight = args.iter().any(|a| a == "--highlight");
+    #[cfg(feature = "pikchr")]
+    let pikchr = args.iter().any(|a| a == "--pikchr");
 
     let mut builder = Parser::<(), ()>::builder();
     if gfm {
@@ -24,14 +26,19 @@ fn main() {
     parser.push_str(&input, &mut sink).unwrap();
     parser.finish(&mut sink).unwrap();
 
+    let adapter = HtmlAdapter::new();
     #[cfg(feature = "highlight")]
     let adapter = if highlight {
-        HtmlAdapter::new().with_highlighter(markdawn::arborium::Highlighter::new())
+        adapter.with_highlighter(markdawn::arborium::Highlighter::new())
     } else {
-        HtmlAdapter::new()
+        adapter
     };
-    #[cfg(not(feature = "highlight"))]
-    let adapter = HtmlAdapter::new();
+    #[cfg(feature = "pikchr")]
+    let adapter = if pikchr {
+        adapter.with_pikchr()
+    } else {
+        adapter
+    };
     let mut order = Vec::new();
     let mut values = Vec::<(u64, String)>::new();
 

@@ -24,6 +24,8 @@ use crate::sink::Sink;
 use super::element_map::{ElementLocation, ElementMap, shift_compartment_indices};
 use super::render::{RenderCtx, RenderUIKitCustom, TextRenderer, UIKitError};
 use super::style::UIKitStyle;
+#[cfg(feature = "pikchr")]
+use super::views::pikchr;
 use super::views::{blockquote, code_block, table, thematic_break};
 
 pub struct BlockSink<R = ()> {
@@ -34,6 +36,8 @@ pub struct BlockSink<R = ()> {
     mtm: MainThreadMarker,
     #[cfg(feature = "highlight")]
     highlighter: Option<Box<dyn crate::highlight::SpanHighlighter>>,
+    #[cfg(feature = "pikchr")]
+    pikchr: bool,
 }
 
 enum Compartment {
@@ -77,6 +81,8 @@ impl BlockSink<()> {
             mtm,
             #[cfg(feature = "highlight")]
             highlighter: None,
+            #[cfg(feature = "pikchr")]
+            pikchr: false,
         }
     }
 }
@@ -93,6 +99,8 @@ impl<R> BlockSink<R> {
             mtm,
             #[cfg(feature = "highlight")]
             highlighter: None,
+            #[cfg(feature = "pikchr")]
+            pikchr: false,
         }
     }
 
@@ -105,6 +113,15 @@ impl<R> BlockSink<R> {
         H: arborium::advanced::HighlightSpans + 'static,
     {
         self.highlighter = Some(Box::new(highlighter));
+        self
+    }
+
+    /// Render fenced code blocks tagged with the `pikchr` info string as
+    /// vector image diagrams via `pikru`. Parse failures fall back to the
+    /// regular code-block view.
+    #[cfg(feature = "pikchr")]
+    pub fn with_pikchr(mut self) -> Self {
+        self.pikchr = true;
         self
     }
 
@@ -308,6 +325,12 @@ impl<R> BlockSink<R> {
                 (v, Some(h))
             }
             Node::CodeBlock { info, literal, .. } => {
+                #[cfg(feature = "pikchr")]
+                if self.pikchr && info.as_deref() == Some("pikchr") {
+                    if let Some(view) = pikchr::try_build_pikchr_view(literal, self.mtm) {
+                        return Ok((view, None));
+                    }
+                }
                 #[cfg(feature = "highlight")]
                 let highlighted = info.as_deref().and_then(|lang| {
                     let spans = self.highlighter.as_mut()?.spans(lang, literal)?;

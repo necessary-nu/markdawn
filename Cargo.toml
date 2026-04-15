@@ -5,14 +5,23 @@ edition = "2024"
 
 [features]
 highlight = ["dep:arborium"]
+pikchr = ["dep:pikru", "dep:facet-dessert", "dep:facet-reflect", "dep:facet-path"]
 
 [dependencies]
 arborium = { path = "../arborium/crates/arborium", optional = true, features = ["all-languages"] }
 base64 = "0.22"
 entities = "1.0"
+# pikru 1.2.0 → facet-dom → facet-dessert / facet-reflect / facet-path; cargo
+# picks the latest patches in the ^0.44 range but the 0.44.6 versions secretly
+# bumped to facet-core 0.45, which gives an incompatible Facet trait. Pin the
+# whole facet stack to the last 0.44.5 patches that still use facet-core ^0.44.
+facet-dessert = { version = "=0.44.5", optional = true }
+facet-reflect = { version = "=0.44.5", optional = true }
+facet-path = { version = "=0.44.4", optional = true }
 indexmap = "2"
 mathml-core = { path = "../mathml-rs" }
 percent-encoding = "2.3"
+pikru = { version = "1", optional = true }
 
 [target.'cfg(target_os = "ios")'.dependencies]
 objc2 = "0.6"
@@ -54,3 +63,4 @@ objc2-ui-kit = { version = "0.3", features = [
 block2 = "0.6"
 dispatch2 = "0.3"
 libc = "0.2"
+
