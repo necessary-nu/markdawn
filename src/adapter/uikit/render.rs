@@ -372,10 +372,65 @@ impl<R> TextRenderer<R> {
             | Node::MathInline { .. }
             | Node::FootnoteRef { .. }
             | Node::SoftBreak { .. }
-            | Node::HardBreak { .. } => {
+            | Node::HardBreak { .. }
+            | Node::Subscript { .. }
+            | Node::Superscript { .. }
+            | Node::Highlight { .. } => {
                 let inline = self.render_inline(node, &base_font, &text_color, ctx)?;
                 result.appendAttributedString(&inline);
                 append_plain(&result, "\n", &base_font, &text_color);
+            }
+            Node::Alert { children, .. } => {
+                let last_idx = children.len().saturating_sub(1);
+                for (i, child) in children.iter().enumerate() {
+                    let child_ctx = RenderCtx {
+                        blockquote_depth: ctx.blockquote_depth + 1,
+                        list_stack: ctx.list_stack.clone(),
+                        provisional: ctx.provisional,
+                        is_last_list_item: false,
+                        is_last_block: i == last_idx,
+                        pending_images: ctx.pending_images.clone(),
+                    };
+                    let child_str = self.render_block_inner(child, &child_ctx)?;
+                    result.appendAttributedString(&child_str);
+                }
+            }
+            Node::DefinitionList { children, .. } => {
+                let last_idx = children.len().saturating_sub(1);
+                for (i, child) in children.iter().enumerate() {
+                    let child_ctx = RenderCtx {
+                        blockquote_depth: ctx.blockquote_depth,
+                        list_stack: ctx.list_stack.clone(),
+                        provisional: ctx.provisional,
+                        is_last_list_item: false,
+                        is_last_block: i == last_idx,
+                        pending_images: ctx.pending_images.clone(),
+                    };
+                    let child_str = self.render_block_inner(child, &child_ctx)?;
+                    result.appendAttributedString(&child_str);
+                }
+            }
+            Node::DefinitionTerm { children, .. } => {
+                let bold =
+                    attrs::add_trait_to_font(&base_font, UIFontDescriptorSymbolicTraits::TraitBold);
+                let inlines = self.render_inlines(children, &bold, &text_color, ctx)?;
+                result.appendAttributedString(&inlines);
+                append_plain(&result, "\n", &base_font, &text_color);
+            }
+            Node::DefinitionDescription { children, .. } => {
+                let last_idx = children.len().saturating_sub(1);
+                for (i, child) in children.iter().enumerate() {
+                    let child_ctx = RenderCtx {
+                        blockquote_depth: ctx.blockquote_depth + 1,
+                        list_stack: ctx.list_stack.clone(),
+                        provisional: ctx.provisional,
+                        is_last_list_item: false,
+                        is_last_block: i == last_idx,
+                        pending_images: ctx.pending_images.clone(),
+                    };
+                    let child_str = self.render_block_inner(child, &child_ctx)?;
+                    result.appendAttributedString(&child_str);
+                }
             }
             Node::Html { html, .. } => {
                 if let Some(svg_attachment) = try_render_svg_html(html) {
@@ -562,6 +617,42 @@ impl<R> TextRenderer<R> {
                     );
                     result.addAttribute_value_range(ns_string!("NSLink"), &url_str, range);
                 }
+                Ok(result)
+            }
+            Node::Subscript { children, .. } => {
+                let small_size = (unsafe { base_font.pointSize() } * 0.7).max(9.0);
+                let small_font = UIFont::systemFontOfSize(small_size);
+                let result = self.render_inlines(children, &small_font, base_color, ctx)?;
+                let range = NSRange::new(0, result.length());
+                let offset = -(unsafe { base_font.pointSize() } * 0.2);
+                unsafe {
+                    result.addAttribute_value_range(
+                        ns_string!("NSBaselineOffset"),
+                        &NSNumber::new_f64(offset),
+                        range,
+                    );
+                }
+                Ok(result)
+            }
+            Node::Superscript { children, .. } => {
+                let small_size = (unsafe { base_font.pointSize() } * 0.7).max(9.0);
+                let small_font = UIFont::systemFontOfSize(small_size);
+                let result = self.render_inlines(children, &small_font, base_color, ctx)?;
+                let range = NSRange::new(0, result.length());
+                let offset = unsafe { base_font.pointSize() } * 0.3;
+                unsafe {
+                    result.addAttribute_value_range(
+                        ns_string!("NSBaselineOffset"),
+                        &NSNumber::new_f64(offset),
+                        range,
+                    );
+                }
+                Ok(result)
+            }
+            Node::Highlight { children, .. } => {
+                let result = self.render_inlines(children, base_font, base_color, ctx)?;
+                let highlight_color = unsafe { UIColor::systemYellowColor() };
+                attrs::apply_background_color(&result, &highlight_color);
                 Ok(result)
             }
             Node::SoftBreak { .. } => Ok(attributed_string(" ", base_font, base_color)),

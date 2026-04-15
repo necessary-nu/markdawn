@@ -20,6 +20,15 @@ pub enum TableAlignment {
     Right,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AlertKind {
+    Note,
+    Tip,
+    Important,
+    Warning,
+    Caution,
+}
+
 // gfm[impl blocks-and-inlines.container-and-leaf-blocks-definition]
 // gfm[impl container-blocks.definition]
 // gfm[impl container-blocks.general-recursive-definition-form]
@@ -95,6 +104,18 @@ pub enum Node<Ext = (), Meta = ()> {
         children: Vec<Node<Ext, Meta>>,
         meta: Meta,
     },
+    Subscript {
+        children: Vec<Node<Ext, Meta>>,
+        meta: Meta,
+    },
+    Superscript {
+        children: Vec<Node<Ext, Meta>>,
+        meta: Meta,
+    },
+    Highlight {
+        children: Vec<Node<Ext, Meta>>,
+        meta: Meta,
+    },
     Link {
         destination: String,
         title: Option<String>,
@@ -151,6 +172,23 @@ pub enum Node<Ext = (), Meta = ()> {
         meta: Meta,
     },
     FootnoteSection {
+        children: Vec<Node<Ext, Meta>>,
+        meta: Meta,
+    },
+    Alert {
+        kind: AlertKind,
+        children: Vec<Node<Ext, Meta>>,
+        meta: Meta,
+    },
+    DefinitionList {
+        children: Vec<Node<Ext, Meta>>,
+        meta: Meta,
+    },
+    DefinitionTerm {
+        children: Vec<Node<Ext, Meta>>,
+        meta: Meta,
+    },
+    DefinitionDescription {
         children: Vec<Node<Ext, Meta>>,
         meta: Meta,
     },

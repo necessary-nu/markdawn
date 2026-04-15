@@ -104,7 +104,7 @@ fn start_fetch(url: &str) {
         },
     );
 
-    let task = session.dataTaskWithURL_completionHandler(&ns_url, &block);
+    let task = unsafe { session.dataTaskWithURL_completionHandler(&ns_url, &block) };
     task.resume();
 }
 
@@ -193,8 +193,9 @@ fn invalidate_layout(content_storage: &NSTextContentStorage) {
         let len = storage.length();
         if len > 0 {
             storage.beginEditing();
-            let attrs = storage.attributesAtIndex_effectiveRange(0, core::ptr::null_mut());
-            storage.setAttributes_range(Some(&attrs), NSRange::new(0, 1));
+            let attrs =
+                unsafe { storage.attributesAtIndex_effectiveRange(0, core::ptr::null_mut()) };
+            unsafe { storage.setAttributes_range(Some(&attrs), NSRange::new(0, 1)) };
             storage.endEditing();
         }
     }

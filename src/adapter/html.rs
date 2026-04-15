@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::node::{Emission, Node, StreamItem, TableAlignment};
+use crate::node::{AlertKind, Emission, Node, StreamItem, TableAlignment};
 use crate::parser::filter_disallowed_html;
 use crate::sink::Sink;
 
@@ -298,12 +298,52 @@ impl<R> HtmlAdapter<R> {
                     out.push('\n');
                 }
             }
+            Node::Alert { kind, children, .. } => {
+                let (slug, title) = match kind {
+                    AlertKind::Note => ("note", "Note"),
+                    AlertKind::Tip => ("tip", "Tip"),
+                    AlertKind::Important => ("important", "Important"),
+                    AlertKind::Warning => ("warning", "Warning"),
+                    AlertKind::Caution => ("caution", "Caution"),
+                };
+                out.push_str("<div class=\"markdown-alert markdown-alert-");
+                out.push_str(slug);
+                out.push_str("\">\n<p class=\"markdown-alert-title\">");
+                out.push_str(title);
+                out.push_str("</p>\n");
+                for child in children {
+                    self.write_block(child, out)?;
+                }
+                out.push_str("</div>\n");
+            }
+            Node::DefinitionList { children, .. } => {
+                out.push_str("<dl>\n");
+                for child in children {
+                    self.write_block(child, out)?;
+                }
+                out.push_str("</dl>\n");
+            }
+            Node::DefinitionTerm { children, .. } => {
+                out.push_str("<dt>");
+                self.write_inlines(children, out)?;
+                out.push_str("</dt>\n");
+            }
+            Node::DefinitionDescription { children, .. } => {
+                out.push_str("<dd>");
+                for child in children {
+                    self.write_block(child, out)?;
+                }
+                out.push_str("</dd>\n");
+            }
             Node::FootnoteRef { .. } => self.write_inline(node, out)?,
             Node::MathInline { .. } => self.write_inline(node, out)?,
             Node::Text { .. }
             | Node::Emphasis { .. }
             | Node::Strong { .. }
             | Node::Strikethrough { .. }
+            | Node::Subscript { .. }
+            | Node::Superscript { .. }
+            | Node::Highlight { .. }
             | Node::Link { .. }
             | Node::Image { .. }
             | Node::CodeSpan { .. }
@@ -370,6 +410,21 @@ impl<R> HtmlAdapter<R> {
                 out.push_str("<del>");
                 self.write_inlines(children, out)?;
                 out.push_str("</del>");
+            }
+            Node::Subscript { children, .. } => {
+                out.push_str("<sub>");
+                self.write_inlines(children, out)?;
+                out.push_str("</sub>");
+            }
+            Node::Superscript { children, .. } => {
+                out.push_str("<sup>");
+                self.write_inlines(children, out)?;
+                out.push_str("</sup>");
+            }
+            Node::Highlight { children, .. } => {
+                out.push_str("<mark>");
+                self.write_inlines(children, out)?;
+                out.push_str("</mark>");
             }
             Node::Link {
                 destination,
@@ -444,6 +499,10 @@ impl<R> HtmlAdapter<R> {
             | Node::ThematicBreak { .. }
             | Node::FootnoteDefinition { .. }
             | Node::FootnoteSection { .. }
+            | Node::Alert { .. }
+            | Node::DefinitionList { .. }
+            | Node::DefinitionTerm { .. }
+            | Node::DefinitionDescription { .. }
             | Node::Document { .. } => self.write_block(node, out)?,
         }
 

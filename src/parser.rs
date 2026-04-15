@@ -44,6 +44,9 @@ pub struct ParserBuilder<Ext = (), Meta = ()> {
     extensions: Vec<Box<dyn Extension<Ext, Meta>>>,
     gfm: bool,
     math: bool,
+    alerts: bool,
+    highlights: bool,
+    definition_lists: bool,
 }
 
 impl<Ext, Meta> Default for ParserBuilder<Ext, Meta> {
@@ -52,6 +55,9 @@ impl<Ext, Meta> Default for ParserBuilder<Ext, Meta> {
             extensions: Vec::new(),
             gfm: false,
             math: false,
+            alerts: false,
+            highlights: false,
+            definition_lists: false,
         }
     }
 }
@@ -79,6 +85,33 @@ impl<Ext, Meta> ParserBuilder<Ext, Meta> {
         self
     }
 
+    /// Enable GitHub-style alert admonitions: `> [!NOTE]`, `> [!WARNING]`, etc.
+    pub fn with_alerts(mut self) -> Self {
+        self.alerts = true;
+        self
+    }
+
+    /// Enable `==highlight==` inline syntax.
+    pub fn with_highlights(mut self) -> Self {
+        self.highlights = true;
+        self
+    }
+
+    /// Enable definition list block syntax (`Term` followed by `: Definition`).
+    pub fn with_definition_lists(mut self) -> Self {
+        self.definition_lists = true;
+        self
+    }
+
+    /// Enable all built-in extensions: GFM, math, alerts, highlights, and definition lists.
+    pub fn with_all(self) -> Self {
+        self.with_gfm()
+            .with_math()
+            .with_alerts()
+            .with_highlights()
+            .with_definition_lists()
+    }
+
     pub fn build(self) -> Parser<Ext, Meta> {
         Parser {
             buffer: String::new(),
@@ -86,6 +119,9 @@ impl<Ext, Meta> ParserBuilder<Ext, Meta> {
             extensions: self.extensions,
             gfm: self.gfm,
             math: self.math,
+            alerts: self.alerts,
+            highlights: self.highlights,
+            definition_lists: self.definition_lists,
             live_blocks: Vec::new(),
             next_id: 1,
         }
@@ -98,6 +134,9 @@ pub struct Parser<Ext = (), Meta = ()> {
     extensions: Vec<Box<dyn Extension<Ext, Meta>>>,
     gfm: bool,
     math: bool,
+    alerts: bool,
+    highlights: bool,
+    definition_lists: bool,
     live_blocks: Vec<LiveBlock<Ext, Meta>>,
     next_id: CorrelationId,
 }
@@ -616,6 +655,16 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
+            if self.definition_lists {
+                if let Some((next, block)) =
+                    self.parse_definition_list(lines, index, refs, footnote_labels)?
+                {
+                    blocks.push(block);
+                    index = next;
+                    continue;
+                }
+            }
+
             let (next, block) = self.parse_paragraphish(
                 &lines,
                 index,
@@ -733,14 +782,105 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 footnote_labels,
                 &lazy_flags,
             )
-            .map(|children| ParsedBlock {
-                provisional: children.iter().any(|child| child.provisional),
-                node: Node::BlockQuote {
-                    children: children.into_iter().map(|child| child.node).collect(),
-                    meta: Meta::default(),
-                },
+            .map(|children| {
+                let provisional = children.iter().any(|child| child.provisional);
+                let mut children: Vec<Node<Ext, Meta>> =
+                    children.into_iter().map(|child| child.node).collect();
+                let node = if self.alerts {
+                    try_promote_alert(&mut children).unwrap_or(Node::BlockQuote {
+                        children,
+                        meta: Meta::default(),
+                    })
+                } else {
+                    Node::BlockQuote {
+                        children,
+                        meta: Meta::default(),
+                    }
+                };
+                ParsedBlock { provisional, node }
             }),
         ))
+    }
+
+    fn parse_definition_list(
+        &self,
+        lines: &[String],
+        start: usize,
+        refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
+    ) -> Result<Option<(usize, ParsedBlock<Ext, Meta>)>, Error>
+    where
+        Meta: Default + Clone + PartialEq,
+        Ext: Clone + PartialEq,
+    {
+        if start + 1 >= lines.len() {
+            return Ok(None);
+        }
+        if lines[start].trim().is_empty() || is_definition_line(&lines[start + 1]).is_none() {
+            return Ok(None);
+        }
+
+        let mut children: Vec<Node<Ext, Meta>> = Vec::new();
+        let mut index = start;
+
+        while index < lines.len() {
+            if lines[index].trim().is_empty() {
+                index += 1;
+                if index >= lines.len() || is_definition_line(&lines[index]).is_none() {
+                    break;
+                }
+                continue;
+            }
+
+            if is_definition_line(&lines[index]).is_some() {
+                let mut def_lines = Vec::new();
+                while index < lines.len() {
+                    if let Some(content) = is_definition_line(&lines[index]) {
+                        def_lines.push(content.to_string());
+                        index += 1;
+                    } else {
+                        break;
+                    }
+                }
+                let text = def_lines.join("\n");
+                let inlines = self.parse_inline_nodes(&text, false, refs, footnote_labels)?;
+                children.push(Node::DefinitionDescription {
+                    children: vec![Node::Paragraph {
+                        children: inlines,
+                        meta: Meta::default(),
+                    }],
+                    meta: Meta::default(),
+                });
+            } else {
+                if index > start
+                    && (index + 1 >= lines.len() || is_definition_line(&lines[index + 1]).is_none())
+                {
+                    break;
+                }
+                let term_inlines =
+                    self.parse_inline_nodes(lines[index].trim(), false, refs, footnote_labels)?;
+                children.push(Node::DefinitionTerm {
+                    children: term_inlines,
+                    meta: Meta::default(),
+                });
+                index += 1;
+            }
+        }
+
+        if children.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some((
+            index,
+            ParsedBlock {
+                provisional: false,
+                node: Node::DefinitionList {
+                    children,
+                    meta: Meta::default(),
+                },
+            },
+        )))
     }
 
     // gfm[impl container-blocks.list-items.marker-definition]
@@ -1646,9 +1786,151 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             footnote_labels,
             gfm: self.gfm,
             math: self.math,
+            highlights: self.highlights,
         };
-        parser.parse_until(None)
+        let nodes = parser.parse_until(None)?;
+        Ok(promote_semantic_html(nodes))
     }
+}
+
+fn promote_semantic_html<Ext, Meta>(nodes: Vec<Node<Ext, Meta>>) -> Vec<Node<Ext, Meta>>
+where
+    Meta: Default + Clone,
+{
+    let mut result = Vec::with_capacity(nodes.len());
+    let mut iter = nodes.into_iter().peekable();
+
+    while let Some(node) = iter.next() {
+        if let Some(tag) = semantic_open_tag(&node) {
+            let close = format!("</{tag}>");
+            let mut children = Vec::new();
+            let mut found_close = false;
+
+            while let Some(next) = iter.next() {
+                if matches_html_close(&next, &close) {
+                    found_close = true;
+                    break;
+                }
+                children.push(next);
+            }
+
+            if found_close {
+                let children = promote_semantic_html(children);
+                let meta = Meta::default();
+                let wrapped = match tag {
+                    "sub" => Node::Subscript { children, meta },
+                    "sup" => Node::Superscript { children, meta },
+                    "mark" => Node::Highlight { children, meta },
+                    "del" => Node::Strikethrough { children, meta },
+                    _ => unreachable!(),
+                };
+                result.push(wrapped);
+            } else {
+                result.push(node);
+                result.extend(children);
+            }
+        } else {
+            result.push(node);
+        }
+    }
+
+    result
+}
+
+fn semantic_open_tag<Ext, Meta>(node: &Node<Ext, Meta>) -> Option<&'static str> {
+    let Node::Html { html, .. } = node else {
+        return None;
+    };
+    let html = html.trim();
+    for tag in &["sub", "sup", "mark", "del"] {
+        let open = format!("<{tag}>");
+        if html.eq_ignore_ascii_case(&open) {
+            return Some(tag);
+        }
+    }
+    None
+}
+
+fn matches_html_close<Ext, Meta>(node: &Node<Ext, Meta>, close: &str) -> bool {
+    matches!(node, Node::Html { html, .. } if html.trim().eq_ignore_ascii_case(close))
+}
+
+fn is_definition_line(line: &str) -> Option<&str> {
+    let trimmed = line.strip_prefix(':')?;
+    let rest = trimmed
+        .strip_prefix(' ')
+        .or_else(|| trimmed.strip_prefix('\t'))?;
+    Some(rest)
+}
+
+fn try_promote_alert<Ext, Meta>(children: &mut Vec<Node<Ext, Meta>>) -> Option<Node<Ext, Meta>>
+where
+    Meta: Default,
+{
+    use crate::node::AlertKind;
+
+    let first = children.first()?;
+    let Node::Paragraph {
+        children: inlines, ..
+    } = first
+    else {
+        return None;
+    };
+
+    let first_inline = inlines.first()?;
+    let Node::Text { text, .. } = first_inline else {
+        return None;
+    };
+
+    let kind = if text.starts_with("[!NOTE]") {
+        AlertKind::Note
+    } else if text.starts_with("[!TIP]") {
+        AlertKind::Tip
+    } else if text.starts_with("[!IMPORTANT]") {
+        AlertKind::Important
+    } else if text.starts_with("[!WARNING]") {
+        AlertKind::Warning
+    } else if text.starts_with("[!CAUTION]") {
+        AlertKind::Caution
+    } else {
+        return None;
+    };
+
+    let tag_len = match kind {
+        AlertKind::Note => "[!NOTE]".len(),
+        AlertKind::Tip => "[!TIP]".len(),
+        AlertKind::Important => "[!IMPORTANT]".len(),
+        AlertKind::Warning => "[!WARNING]".len(),
+        AlertKind::Caution => "[!CAUTION]".len(),
+    };
+
+    let mut children = std::mem::take(children);
+
+    if let Some(Node::Paragraph {
+        children: inlines, ..
+    }) = children.first_mut()
+    {
+        if let Some(Node::Text { text, .. }) = inlines.first_mut() {
+            let rest = text[tag_len..].trim_start_matches('\n').to_string();
+            if rest.is_empty() {
+                inlines.remove(0);
+                if let Some(Node::SoftBreak { .. }) = inlines.first() {
+                    inlines.remove(0);
+                }
+            } else {
+                *text = rest;
+            }
+        }
+        if inlines.is_empty() {
+            children.remove(0);
+        }
+    }
+
+    Some(Node::Alert {
+        kind,
+        children,
+        meta: Meta::default(),
+    })
 }
 
 struct FenceOpener {
@@ -2798,6 +3080,7 @@ struct InlineParser<'a, Ext, Meta> {
     provisional: bool,
     gfm: bool,
     math: bool,
+    highlights: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3058,6 +3341,20 @@ where
                         }));
                         continue;
                     }
+                }
+            }
+
+            if self.highlights && self.remaining().starts_with("==") {
+                if let Some(node) = self.try_delimited("==", false)? {
+                    flush_text_piece(&mut pieces, &mut text);
+                    let Node::Emphasis { children, .. } = node else {
+                        unreachable!()
+                    };
+                    pieces.push(InlinePiece::Node(Node::Highlight {
+                        children,
+                        meta: self.meta.clone(),
+                    }));
+                    continue;
                 }
             }
 
@@ -3366,6 +3663,7 @@ where
             provisional: self.provisional,
             gfm: self.gfm,
             math: self.math,
+            highlights: self.highlights,
         };
         let children = inner.parse_until(None)?;
         self.index = inner_end + delim.len();
@@ -3517,6 +3815,7 @@ where
                     self.provisional,
                     self.gfm,
                     self.math,
+                    self.highlights,
                 )?;
                 // Links cannot contain other links
                 if !image && contains_link(&children) {
@@ -3563,6 +3862,7 @@ where
             self.provisional,
             self.gfm,
             self.math,
+            self.highlights,
         )?;
         if !image && contains_link(&children) {
             return Ok(None);
@@ -4795,6 +5095,7 @@ fn parse_inline_children<Ext, Meta>(
     provisional: bool,
     gfm: bool,
     math: bool,
+    highlights: bool,
 ) -> Result<Vec<Node<Ext, Meta>>, Error>
 where
     Meta: Default + Clone,
@@ -4810,6 +5111,7 @@ where
         provisional,
         gfm,
         math,
+        highlights,
     };
     parser.parse_until(None)
 }
@@ -5209,10 +5511,17 @@ fn plain_text<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> String {
             Node::Emphasis { children, .. }
             | Node::Strong { children, .. }
             | Node::Strikethrough { children, .. }
+            | Node::Subscript { children, .. }
+            | Node::Superscript { children, .. }
+            | Node::Highlight { children, .. }
             | Node::Link { children, .. }
             | Node::Paragraph { children, .. }
             | Node::Heading { children, .. }
             | Node::BlockQuote { children, .. }
+            | Node::Alert { children, .. }
+            | Node::DefinitionList { children, .. }
+            | Node::DefinitionTerm { children, .. }
+            | Node::DefinitionDescription { children, .. }
             | Node::List { children, .. }
             | Node::Item { children, .. }
             | Node::TaskItem { children, .. }
