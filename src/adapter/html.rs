@@ -274,6 +274,11 @@ impl<R> HtmlAdapter<R> {
                 escape_html(literal, out);
                 out.push_str("</code></pre>\n");
             }
+            Node::MathBlock { math, .. } => {
+                out.push_str("<pre><code class=\"language-math math-display\">");
+                escape_html(math, out);
+                out.push_str("</code></pre>\n");
+            }
             Node::Html { html, .. } => {
                 if is_type1_html_block(html) {
                     out.push_str(html);
@@ -294,6 +299,7 @@ impl<R> HtmlAdapter<R> {
                 }
             }
             Node::FootnoteRef { .. } => self.write_inline(node, out)?,
+            Node::MathInline { .. } => self.write_inline(node, out)?,
             Node::Text { .. }
             | Node::Emphasis { .. }
             | Node::Strong { .. }
@@ -404,6 +410,19 @@ impl<R> HtmlAdapter<R> {
             Node::CodeSpan { code, .. } => {
                 out.push_str("<code>");
                 escape_html(code, out);
+                out.push_str("</code>");
+            }
+            Node::MathInline { math, .. } => {
+                out.push_str("<code class=\"language-math math-inline\">");
+                escape_html(math, out);
+                out.push_str("</code>");
+            }
+            Node::MathBlock { math, .. } => {
+                // Display math encountered in an inline position (e.g. `$$x^2$$`
+                // in the middle of a paragraph). Emit as an inline-valid `<code>`
+                // with `math-display` so renderers still style it as display math.
+                out.push_str("<code class=\"language-math math-display\">");
+                escape_html(math, out);
                 out.push_str("</code>");
             }
             Node::Html { html, .. } => out.push_str(html),
@@ -705,6 +724,7 @@ fn is_block_like<Ext, Meta>(children: &[Node<Ext, Meta>]) -> bool {
                 | Node::TableRow { .. }
                 | Node::TableCell { .. }
                 | Node::CodeBlock { .. }
+                | Node::MathBlock { .. }
                 | Node::Html { .. }
                 | Node::ThematicBreak { .. }
                 | Node::Document { .. }

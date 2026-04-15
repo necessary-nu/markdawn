@@ -1,7 +1,7 @@
 use markdawn::{HtmlAdapter, Parser, StreamItem, VecSink};
 
 fn render_html(input: &str) -> String {
-    let mut parser = Parser::<(), ()>::new();
+    let mut parser = Parser::<(), ()>::builder().with_gfm().with_math().build();
     let mut sink = VecSink::new();
     parser.push_str(input, &mut sink).unwrap();
     parser.finish(&mut sink).unwrap();
@@ -106,10 +106,7 @@ fn gfm_html_block_type_1_without_end_marker_closes_at_document_end() {
 #[test]
 fn gfm_html_block_end_marker_may_share_the_start_line() {
     let html = render_html("<style>p{color:red;}</style>\n*foo*\n");
-    assert_eq!(
-        html,
-        "<style>p{color:red;}</style>\n<p><em>foo</em></p>\n"
-    );
+    assert_eq!(html, "<style>p{color:red;}</style>\n<p><em>foo</em></p>\n");
 }
 
 // gfm[verify leaf-blocks.html-blocks.type-6-partial-tag-need-not-be-completed]

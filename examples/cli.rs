@@ -6,7 +6,18 @@ fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
 
-    let mut parser = Parser::<(), ()>::new();
+    let args: Vec<String> = std::env::args().collect();
+    let gfm = args.iter().any(|a| a == "--gfm");
+    let math = args.iter().any(|a| a == "--math");
+
+    let mut builder = Parser::<(), ()>::builder();
+    if gfm {
+        builder = builder.with_gfm();
+    }
+    if math {
+        builder = builder.with_math();
+    }
+    let mut parser = builder.build();
     let mut sink = VecSink::new();
     parser.push_str(&input, &mut sink).unwrap();
     parser.finish(&mut sink).unwrap();

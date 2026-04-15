@@ -1,5 +1,5 @@
 use crate::error::{Error, StreamError};
-use crate::ext::{InlineExtension, InlineExtensionMatch};
+use crate::ext::{BlockMatch, Extension, InlineMatch};
 use crate::node::{CorrelationId, Emission, Node, StreamItem, TableAlignment};
 use crate::sink::Sink;
 use std::collections::{HashMap, HashSet};
@@ -41,13 +41,17 @@ struct RawFootnoteDef {
 type RawFootnoteDefs = HashMap<String, RawFootnoteDef>;
 
 pub struct ParserBuilder<Ext = (), Meta = ()> {
-    inline_extensions: Vec<Box<dyn InlineExtension<Ext, Meta>>>,
+    extensions: Vec<Box<dyn Extension<Ext, Meta>>>,
+    gfm: bool,
+    math: bool,
 }
 
 impl<Ext, Meta> Default for ParserBuilder<Ext, Meta> {
     fn default() -> Self {
         Self {
-            inline_extensions: Vec::new(),
+            extensions: Vec::new(),
+            gfm: false,
+            math: false,
         }
     }
 }
@@ -57,11 +61,21 @@ impl<Ext, Meta> ParserBuilder<Ext, Meta> {
         Self::default()
     }
 
-    pub fn with_inline_extension(
-        mut self,
-        extension: impl InlineExtension<Ext, Meta> + 'static,
-    ) -> Self {
-        self.inline_extensions.push(Box::new(extension));
+    pub fn with_extension(mut self, extension: impl Extension<Ext, Meta> + 'static) -> Self {
+        self.extensions.push(Box::new(extension));
+        self
+    }
+
+    /// Enable GitHub Flavored Markdown extensions: tables, strikethrough,
+    /// bare-URL autolinks, raw-HTML tagfilter, task lists, and footnotes.
+    pub fn with_gfm(mut self) -> Self {
+        self.gfm = true;
+        self
+    }
+
+    /// Enable math extension: `$…$`, `$$…$$`, `\(…\)`, `\[…\]`.
+    pub fn with_math(mut self) -> Self {
+        self.math = true;
         self
     }
 
@@ -69,7 +83,9 @@ impl<Ext, Meta> ParserBuilder<Ext, Meta> {
         Parser {
             buffer: String::new(),
             finished: false,
-            inline_extensions: self.inline_extensions,
+            extensions: self.extensions,
+            gfm: self.gfm,
+            math: self.math,
             live_blocks: Vec::new(),
             next_id: 1,
         }
@@ -79,7 +95,9 @@ impl<Ext, Meta> ParserBuilder<Ext, Meta> {
 pub struct Parser<Ext = (), Meta = ()> {
     buffer: String,
     finished: bool,
-    inline_extensions: Vec<Box<dyn InlineExtension<Ext, Meta>>>,
+    extensions: Vec<Box<dyn Extension<Ext, Meta>>>,
+    gfm: bool,
+    math: bool,
     live_blocks: Vec<LiveBlock<Ext, Meta>>,
     next_id: CorrelationId,
 }
@@ -200,7 +218,11 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     {
         let split = split_lines(&self.buffer);
         let refs = self.collect_reference_definitions(&split.lines)?;
-        let raw_footnotes = collect_raw_footnote_definitions(&split.lines);
+        let raw_footnotes = if self.gfm {
+            collect_raw_footnote_definitions(&split.lines)
+        } else {
+            HashMap::new()
+        };
         let footnote_labels: FootnoteLabels = raw_footnotes.keys().cloned().collect();
         let mut blocks = self.parse_block_lines(
             &split.lines,
@@ -209,14 +231,36 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             &refs,
             &footnote_labels,
         )?;
-        self.finalize_footnotes(
-            &mut blocks,
-            &raw_footnotes,
-            &refs,
-            &footnote_labels,
-            finalizing,
-        )?;
+        if self.gfm {
+            self.finalize_footnotes(
+                &mut blocks,
+                &raw_footnotes,
+                &refs,
+                &footnote_labels,
+                finalizing,
+            )?;
+        }
         Ok(blocks)
+    }
+
+    fn try_block_extension(
+        &self,
+        lines: &[String],
+        start: usize,
+    ) -> Option<(usize, Node<Ext, Meta>)> {
+        for extension in &self.extensions {
+            if let Some(BlockMatch {
+                consumed_lines,
+                node,
+            }) = extension.try_block(lines, start)
+            {
+                if consumed_lines == 0 {
+                    continue;
+                }
+                return Some((consumed_lines, node));
+            }
+        }
+        None
     }
 
     fn finalize_footnotes(
@@ -325,10 +369,12 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
             if !in_paragraph {
                 // Skip footnote definitions — handled by collect_footnote_definitions.
-                if let Some((next, _, _)) = collect_footnote_def_lines(lines, index) {
-                    index = next;
-                    in_paragraph = false;
-                    continue;
+                if self.gfm {
+                    if let Some((next, _, _)) = collect_footnote_def_lines(lines, index) {
+                        index = next;
+                        in_paragraph = false;
+                        continue;
+                    }
                 }
                 if let Some((next, (label, def))) = parse_reference_definition(lines, index) {
                     refs.entry(label).or_insert(def);
@@ -355,10 +401,26 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
+            // Skip extension blocks so their content isn't scanned for link
+            // reference definitions.
+            if let Some((consumed, _)) = self.try_block_extension(lines, index) {
+                index += consumed;
+                in_paragraph = false;
+                continue;
+            }
+
             if let Some((next, _)) = self.parse_html_block(lines, index, true, true) {
                 index = next;
                 in_paragraph = false;
                 continue;
+            }
+
+            if self.math {
+                if let Some((next, _)) = parse_math_block::<Ext, Meta>(lines, index, true) {
+                    index = next;
+                    in_paragraph = false;
+                    continue;
+                }
             }
 
             if let Some((next, _)) = self.parse_fenced_code(lines, index, true) {
@@ -452,13 +514,26 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
             // Skip footnote definitions — they are collected separately and rendered
             // in a synthetic footnote section at the end of the document.
-            if let Some((next, _, _)) = collect_footnote_def_lines(lines, index) {
-                index = next;
-                continue;
+            if self.gfm {
+                if let Some((next, _, _)) = collect_footnote_def_lines(lines, index) {
+                    index = next;
+                    continue;
+                }
             }
 
             if let Some((next, _)) = parse_reference_definition(lines, index) {
                 index = next;
+                continue;
+            }
+
+            // User-provided block extensions run before all built-in block
+            // parsers so they can shadow any syntax.
+            if let Some((consumed, node)) = self.try_block_extension(lines, index) {
+                blocks.push(ParsedBlock {
+                    node,
+                    provisional: false,
+                });
+                index += consumed;
                 continue;
             }
 
@@ -469,12 +544,14 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
-            if let Some((next, block)) =
-                self.parse_table(lines, index, finalizing, terminated, refs, footnote_labels)?
-            {
-                blocks.push(block);
-                index = next;
-                continue;
+            if self.gfm {
+                if let Some((next, block)) =
+                    self.parse_table(lines, index, finalizing, terminated, refs, footnote_labels)?
+                {
+                    blocks.push(block);
+                    index = next;
+                    continue;
+                }
             }
 
             if let Some((next, block)) =
@@ -506,6 +583,14 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 blocks.push(block);
                 index = next;
                 continue;
+            }
+
+            if self.math {
+                if let Some((next, block)) = parse_math_block(lines, index, finalizing) {
+                    blocks.push(block);
+                    index = next;
+                    continue;
+                }
             }
 
             if let Some((next, block)) = self.parse_fenced_code(&lines, index, finalizing) {
@@ -618,7 +703,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             if inner_lines
                 .last()
                 .is_some_and(|line| is_paragraph_continuation_candidate(line))
-                && is_lazy_block_quote_continuation(&lines[index], lines, index)
+                && is_lazy_block_quote_continuation(&lines[index], lines, index, self.gfm)
             {
                 inner_lines.push(lines[index].clone());
                 lazy_flags.push(true);
@@ -926,7 +1011,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             if !inner_lines
                 .last()
                 .is_some_and(|line| line.trim().is_empty())
-                && is_lazy_list_continuation(&lines[index], lines, index)
+                && is_lazy_list_continuation(&lines[index], lines, index, self.gfm)
             {
                 if saw_blank_separator {
                     loose = true;
@@ -945,7 +1030,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                     .last()
                     .is_some_and(|line| is_paragraph_continuation_candidate(line))
                 && strip_indented_code_line(&lines[index]).is_some()
-                && is_lazy_block_quote_continuation(&lines[index], lines, index)
+                && is_lazy_block_quote_continuation(&lines[index], lines, index, self.gfm)
             {
                 inner_lines.push(lines[index].clone());
                 index += 1;
@@ -971,7 +1056,11 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             refs,
             footnote_labels,
         )?;
-        let children = normalize_task_item(children);
+        let children = if self.gfm {
+            normalize_task_item(children)
+        } else {
+            children
+        };
         Ok((
             index,
             ParsedListItem {
@@ -1502,7 +1591,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
             // GFM tables can interrupt a paragraph: current line is potential
             // header, next line is a delimiter row.
-            if lines[index].contains('|')
+            if self.gfm
+                && lines[index].contains('|')
                 && index + 1 < lines.len()
                 && parse_table_delimiter(&lines[index + 1]).is_some()
             {
@@ -1549,11 +1639,13 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         let mut parser = InlineParser {
             input: text,
             index: 0,
-            inline_extensions: &self.inline_extensions,
+            extensions: &self.extensions,
             meta: Meta::default(),
             provisional,
             refs,
             footnote_labels,
+            gfm: self.gfm,
+            math: self.math,
         };
         parser.parse_until(None)
     }
@@ -2182,6 +2274,90 @@ fn collect_footnote_def_lines(
     Some((rewind_to, label, body))
 }
 
+enum MathFence {
+    Dollar,
+    Bracket,
+}
+
+fn math_block_opener(line: &str) -> Option<MathFence> {
+    let trimmed = trim_up_to_three_spaces(line).trim();
+    if trimmed == "$$" {
+        Some(MathFence::Dollar)
+    } else if trimmed == "\\[" {
+        Some(MathFence::Bracket)
+    } else {
+        None
+    }
+}
+
+fn math_block_closer(line: &str, opener: &MathFence) -> bool {
+    let trimmed = trim_up_to_three_spaces(line).trim();
+    match opener {
+        MathFence::Dollar => trimmed == "$$",
+        MathFence::Bracket => trimmed == "\\]",
+    }
+}
+
+fn parse_math_block<Ext, Meta>(
+    lines: &[String],
+    start: usize,
+    finalizing: bool,
+) -> Option<(usize, ParsedBlock<Ext, Meta>)>
+where
+    Meta: Default,
+{
+    let opener = math_block_opener(&lines[start])?;
+
+    let mut content = Vec::new();
+    let mut index = start + 1;
+    while index < lines.len() {
+        if math_block_closer(&lines[index], &opener) {
+            index += 1;
+            let math = content.join("\n");
+            return Some((
+                index,
+                ParsedBlock {
+                    node: Node::MathBlock {
+                        math,
+                        meta: Meta::default(),
+                    },
+                    provisional: false,
+                },
+            ));
+        }
+        content.push(lines[index].clone());
+        index += 1;
+    }
+
+    // No closer found — if finalizing, include all remaining content
+    if finalizing {
+        let math = content.join("\n");
+        Some((
+            index,
+            ParsedBlock {
+                node: Node::MathBlock {
+                    math,
+                    meta: Meta::default(),
+                },
+                provisional: false,
+            },
+        ))
+    } else {
+        // Provisional — we might get a closer later
+        let math = content.join("\n");
+        Some((
+            index,
+            ParsedBlock {
+                node: Node::MathBlock {
+                    math,
+                    meta: Meta::default(),
+                },
+                provisional: true,
+            },
+        ))
+    }
+}
+
 fn collect_raw_footnote_definitions(lines: &[String]) -> RawFootnoteDefs {
     let mut defs: RawFootnoteDefs = HashMap::new();
     let mut index = 0;
@@ -2615,11 +2791,13 @@ fn is_setext_underline(line: &str) -> bool {
 struct InlineParser<'a, Ext, Meta> {
     input: &'a str,
     index: usize,
-    inline_extensions: &'a [Box<dyn InlineExtension<Ext, Meta>>],
+    extensions: &'a [Box<dyn Extension<Ext, Meta>>],
     refs: &'a ReferenceDefinitions,
     footnote_labels: &'a FootnoteLabels,
     meta: Meta,
     provisional: bool,
+    gfm: bool,
+    math: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2695,7 +2873,7 @@ where
                 }
             }
 
-            if let Some(InlineExtensionMatch { consumed, node }) = self.try_extension() {
+            if let Some(InlineMatch { consumed, node }) = self.try_extension() {
                 if consumed == 0
                     || self.index + consumed > self.input.len()
                     || !self.input.is_char_boundary(self.index + consumed)
@@ -2707,6 +2885,29 @@ where
                 pieces.push(InlinePiece::Node(node));
                 self.index += consumed;
                 continue;
+            }
+
+            // Math: \(...\) emits MathInline, \[...\] always emits MathBlock
+            // (display math is block-level even when written inline). Must
+            // precede the backslash-escape handler.
+            if self.math
+                && (self.remaining().starts_with("\\(") || self.remaining().starts_with("\\["))
+            {
+                if let Some((math, display)) = self.try_math_backslash_span() {
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(if display {
+                        Node::MathBlock {
+                            math,
+                            meta: self.meta.clone(),
+                        }
+                    } else {
+                        Node::MathInline {
+                            math,
+                            meta: self.meta.clone(),
+                        }
+                    }));
+                    continue;
+                }
             }
 
             if self.remaining().starts_with("\\\n") {
@@ -2769,16 +2970,36 @@ where
                 continue;
             }
 
+            if self.math && self.remaining().starts_with('$') {
+                if let Some((math, display)) = self.try_math_span() {
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(if display {
+                        Node::MathBlock {
+                            math,
+                            meta: self.meta.clone(),
+                        }
+                    } else {
+                        Node::MathInline {
+                            math,
+                            meta: self.meta.clone(),
+                        }
+                    }));
+                    continue;
+                }
+            }
+
             if let Some(node) = self.try_autolink() {
                 flush_text_piece(&mut pieces, &mut text);
                 pieces.push(InlinePiece::Node(node));
                 continue;
             }
 
-            if let Some(node) = self.try_autolink_literal() {
-                flush_text_piece(&mut pieces, &mut text);
-                pieces.push(InlinePiece::Node(node));
-                continue;
+            if self.gfm {
+                if let Some(node) = self.try_autolink_literal() {
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(node));
+                    continue;
+                }
             }
 
             if let Some(html) = self.try_html_inline() {
@@ -2807,10 +3028,12 @@ where
                 }
             }
 
-            if let Some(node) = self.try_footnote_ref() {
-                flush_text_piece(&mut pieces, &mut text);
-                pieces.push(InlinePiece::Node(node));
-                continue;
+            if self.gfm {
+                if let Some(node) = self.try_footnote_ref() {
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(node));
+                    continue;
+                }
             }
 
             if let Some(node) = self.try_link_or_image()? {
@@ -2820,7 +3043,7 @@ where
             }
 
             // GFM strikethrough: runs of 1 or 2 tildes (3+ are literal).
-            if self.remaining().starts_with('~') {
+            if self.gfm && self.remaining().starts_with('~') {
                 let run = self.remaining().chars().take_while(|c| *c == '~').count();
                 if run <= 2 {
                     let delim: &str = if run == 2 { "~~" } else { "~" };
@@ -2881,9 +3104,9 @@ where
         Ok(resolve_emphasis(pieces, &self.meta))
     }
 
-    fn try_extension(&self) -> Option<InlineExtensionMatch<Ext, Meta>> {
-        for extension in self.inline_extensions {
-            if let Some(candidate) = extension.try_parse(self.remaining()) {
+    fn try_extension(&self) -> Option<InlineMatch<Ext, Meta>> {
+        for extension in self.extensions {
+            if let Some(candidate) = extension.try_inline(self.remaining()) {
                 return Some(candidate);
             }
         }
@@ -2941,6 +3164,89 @@ where
         }
 
         None
+    }
+
+    fn try_math_span(&mut self) -> Option<(String, bool)> {
+        let remaining = self.remaining();
+        let (run, display) = if remaining.starts_with("$$") {
+            (2, true)
+        } else if remaining.starts_with('$') {
+            (1, false)
+        } else {
+            return None;
+        };
+
+        let search_start = self.index + run;
+        let rest = &self.input[search_start..];
+
+        if display {
+            let close = rest.find("$$")?;
+            let content = &rest[..close];
+            self.index = search_start + close + 2;
+            return Some((content.to_string(), true));
+        }
+
+        // Single $: find matching $ that isn't part of $$
+        let bytes = rest.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'$' {
+                if i + 1 < bytes.len() && bytes[i + 1] == b'$' {
+                    i += 2;
+                    continue;
+                }
+                // Check backslash escape
+                if i > 0 && bytes[i - 1] == b'\\' {
+                    i += 1;
+                    continue;
+                }
+                let content = &rest[..i];
+                // Content must not start AND end with a space (unless all spaces)
+                if content.len() > 1
+                    && content.starts_with(' ')
+                    && content.ends_with(' ')
+                    && content.trim().is_empty() == false
+                {
+                    i += 1;
+                    continue;
+                }
+                if content.is_empty() {
+                    i += 1;
+                    continue;
+                }
+                self.index = search_start + i + 1;
+                return Some((content.to_string(), false));
+            }
+            i += 1;
+        }
+        None
+    }
+
+    fn try_math_backslash_span(&mut self) -> Option<(String, bool)> {
+        let remaining = self.remaining();
+        if remaining.starts_with("\\(") {
+            let search_start = self.index + 2;
+            let rest = &self.input[search_start..];
+            let close = rest.find("\\)")?;
+            let content = &rest[..close];
+            if content.is_empty() {
+                return None;
+            }
+            self.index = search_start + close + 2;
+            Some((content.to_string(), false))
+        } else if remaining.starts_with("\\[") {
+            let search_start = self.index + 2;
+            let rest = &self.input[search_start..];
+            let close = rest.find("\\]")?;
+            let content = &rest[..close];
+            if content.is_empty() {
+                return None;
+            }
+            self.index = search_start + close + 2;
+            Some((content.to_string(), true))
+        } else {
+            None
+        }
     }
 
     // gfm[impl inlines.emphasis-and-strong-emphasis.delimiter-run-definition]
@@ -3053,11 +3359,13 @@ where
         let mut inner = InlineParser {
             input: &self.input[inner_start..inner_end],
             index: 0,
-            inline_extensions: self.inline_extensions,
+            extensions: self.extensions,
             refs: self.refs,
             footnote_labels: self.footnote_labels,
             meta: self.meta.clone(),
             provisional: self.provisional,
+            gfm: self.gfm,
+            math: self.math,
         };
         let children = inner.parse_until(None)?;
         self.index = inner_end + delim.len();
@@ -3202,11 +3510,13 @@ where
             if let Some((consumed, destination, title)) = parse_inline_link_target(after_open) {
                 let children = parse_inline_children(
                     label,
-                    self.inline_extensions,
+                    self.extensions,
                     self.refs,
                     self.footnote_labels,
                     self.meta.clone(),
                     self.provisional,
+                    self.gfm,
+                    self.math,
                 )?;
                 // Links cannot contain other links
                 if !image && contains_link(&children) {
@@ -3246,11 +3556,13 @@ where
 
         let children = parse_inline_children(
             label,
-            self.inline_extensions,
+            self.extensions,
             self.refs,
             self.footnote_labels,
             self.meta.clone(),
             self.provisional,
+            self.gfm,
+            self.math,
         )?;
         if !image && contains_link(&children) {
             return Ok(None);
@@ -3315,7 +3627,11 @@ where
             return None;
         };
 
-        let html = filter_disallowed_html(&remaining[..end]);
+        let html = if self.gfm {
+            filter_disallowed_html(&remaining[..end])
+        } else {
+            remaining[..end].to_string()
+        };
         self.index += end;
         Some(html)
     }
@@ -4472,11 +4788,13 @@ fn is_html_whitespace(ch: char) -> bool {
 
 fn parse_inline_children<Ext, Meta>(
     text: &str,
-    inline_extensions: &[Box<dyn InlineExtension<Ext, Meta>>],
+    extensions: &[Box<dyn Extension<Ext, Meta>>],
     refs: &ReferenceDefinitions,
     footnote_labels: &FootnoteLabels,
     meta: Meta,
     provisional: bool,
+    gfm: bool,
+    math: bool,
 ) -> Result<Vec<Node<Ext, Meta>>, Error>
 where
     Meta: Default + Clone,
@@ -4485,11 +4803,13 @@ where
     let mut parser = InlineParser {
         input: text,
         index: 0,
-        inline_extensions,
+        extensions,
         refs,
         footnote_labels,
         meta,
         provisional,
+        gfm,
+        math,
     };
     parser.parse_until(None)
 }
@@ -4667,7 +4987,7 @@ fn is_paragraph_continuation_candidate(line: &str) -> bool {
     true
 }
 
-fn is_lazy_list_continuation(line: &str, lines: &[String], index: usize) -> bool {
+fn is_lazy_list_continuation(line: &str, lines: &[String], index: usize, gfm: bool) -> bool {
     !line.trim().is_empty()
         && parse_list_marker(line).is_none()
         && strip_block_quote_marker(line).is_none()
@@ -4675,27 +4995,29 @@ fn is_lazy_list_continuation(line: &str, lines: &[String], index: usize) -> bool
         && parse_fence_opener(line).is_none()
         && !is_thematic_break(line)
         && parse_reference_definition(lines, index).is_none()
-        && !matches!(parse_table_delimiter(line), Some(_))
+        && !(gfm && matches!(parse_table_delimiter(line), Some(_)))
         && !classify_html_block_start(line).is_some_and(|start| start.can_interrupt_paragraph)
         && !matches!(trim_up_to_three_spaces(line).chars().next(), Some('#'))
-        && !(line.contains('|')
+        && !(gfm
+            && line.contains('|')
             && index + 1 < lines.len()
             && parse_table_delimiter(&lines[index + 1]).is_some())
 }
 
 /// Like `is_lazy_list_continuation` but for block quotes: indented code does
 /// NOT disqualify, because indented code cannot interrupt a paragraph.
-fn is_lazy_block_quote_continuation(line: &str, lines: &[String], index: usize) -> bool {
+fn is_lazy_block_quote_continuation(line: &str, lines: &[String], index: usize, gfm: bool) -> bool {
     !line.trim().is_empty()
         && parse_list_marker(line).is_none_or(|m| !can_interrupt_paragraph_with_list(m))
         && strip_block_quote_marker(line).is_none()
         && parse_fence_opener(line).is_none()
         && !is_thematic_break(line)
         && parse_reference_definition(lines, index).is_none()
-        && !matches!(parse_table_delimiter(line), Some(_))
+        && !(gfm && matches!(parse_table_delimiter(line), Some(_)))
         && !classify_html_block_start(line).is_some_and(|start| start.can_interrupt_paragraph)
         && !matches!(trim_up_to_three_spaces(line).chars().next(), Some('#'))
-        && !(line.contains('|')
+        && !(gfm
+            && line.contains('|')
             && index + 1 < lines.len()
             && parse_table_delimiter(&lines[index + 1]).is_some())
 }
@@ -4907,6 +5229,7 @@ fn plain_text<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> String {
             Node::TableCell { children, .. } => out.push_str(&plain_text(children)),
             Node::Image { alt, .. } => out.push_str(alt),
             Node::CodeBlock { literal, .. } => out.push_str(literal),
+            Node::MathInline { math, .. } | Node::MathBlock { math, .. } => out.push_str(math),
             Node::Html { html, .. } => out.push_str(html),
             Node::ThematicBreak { .. } => {}
         }
@@ -5220,22 +5543,23 @@ fn is_escapable(ch: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::Parser;
-    use crate::ext::{InlineExtension, InlineExtensionMatch};
+    use crate::ext::{BlockMatch, Extension, InlineMatch};
     use crate::node::{Node, StreamItem};
     use crate::sink::VecSink;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum TestExt {
         Math(String),
+        Note(String),
     }
 
     struct MathExtension;
 
-    impl InlineExtension<TestExt, ()> for MathExtension {
-        fn try_parse(&self, input: &str) -> Option<InlineExtensionMatch<TestExt, ()>> {
+    impl Extension<TestExt, ()> for MathExtension {
+        fn try_inline(&self, input: &str) -> Option<InlineMatch<TestExt, ()>> {
             let rest = input.strip_prefix('$')?;
             let end = rest.find('$')?;
-            Some(InlineExtensionMatch {
+            Some(InlineMatch {
                 consumed: end + 2,
                 node: Node::Custom {
                     payload: TestExt::Math(rest[..end].to_owned()),
@@ -5243,6 +5567,35 @@ mod tests {
                     meta: (),
                 },
             })
+        }
+    }
+
+    /// A block extension that matches `:::note` / `:::` fences and captures
+    /// the enclosed body as a single Note payload.
+    struct NoteBlockExtension;
+
+    impl Extension<TestExt, ()> for NoteBlockExtension {
+        fn try_block(&self, lines: &[String], start: usize) -> Option<BlockMatch<TestExt, ()>> {
+            if lines[start].trim() != ":::note" {
+                return None;
+            }
+            let mut body = Vec::new();
+            let mut index = start + 1;
+            while index < lines.len() {
+                if lines[index].trim() == ":::" {
+                    return Some(BlockMatch {
+                        consumed_lines: index - start + 1,
+                        node: Node::Custom {
+                            payload: TestExt::Note(body.join("\n")),
+                            children: Vec::new(),
+                            meta: (),
+                        },
+                    });
+                }
+                body.push(lines[index].clone());
+                index += 1;
+            }
+            None
         }
     }
 
@@ -5424,9 +5777,7 @@ mod tests {
 
     #[test]
     fn supports_inline_extension_hooks() {
-        let mut parser = Parser::builder()
-            .with_inline_extension(MathExtension)
-            .build();
+        let mut parser = Parser::builder().with_extension(MathExtension).build();
         let mut sink = VecSink::new();
 
         parser.push_str("before $x^2$ after\n", &mut sink).unwrap();
@@ -5445,6 +5796,36 @@ mod tests {
                     Node::Text { text: after, .. }
                 ] if before == "before " && after == " after" && payload == &TestExt::Math("x^2".to_owned()))
         ));
+    }
+
+    #[test]
+    fn supports_block_extension_hooks() {
+        let mut parser = Parser::builder().with_extension(NoteBlockExtension).build();
+        let mut sink = VecSink::new();
+
+        parser
+            .push_str("before\n\n:::note\nhello\nworld\n:::\n\nafter\n", &mut sink)
+            .unwrap();
+        parser.finish(&mut sink).unwrap();
+
+        let nodes: Vec<_> = sink
+            .items()
+            .iter()
+            .filter_map(|item| match item {
+                StreamItem::Upsert(e) if !e.provisional => Some(e.node.clone()),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(nodes.len(), 3);
+        assert!(matches!(&nodes[0], Node::Paragraph { .. }));
+        match &nodes[1] {
+            Node::Custom { payload, .. } => {
+                assert_eq!(payload, &TestExt::Note("hello\nworld".to_owned()));
+            }
+            other => panic!("expected custom note block, got {other:?}"),
+        }
+        assert!(matches!(&nodes[2], Node::Paragraph { .. }));
     }
 
     // gfm[verify inlines.links.inline-link-definition]
@@ -5658,7 +6039,7 @@ mod tests {
     // gfm[verify inlines.autolinks-extension.extended-url-autolink-definition]
     #[test]
     fn supports_strikethrough_and_autolinks() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<(), ()>::builder().with_gfm().build();
         let mut sink = VecSink::new();
 
         parser
@@ -5702,7 +6083,7 @@ mod tests {
     // gfm[verify leaf-blocks.tables-extension.table-definition]
     #[test]
     fn supports_task_list_items_and_tables() {
-        let mut parser = Parser::<(), ()>::new();
+        let mut parser = Parser::<(), ()>::builder().with_gfm().build();
         let mut sink = VecSink::new();
 
         parser
@@ -6069,6 +6450,41 @@ mod tests {
             .collect();
 
         assert_eq!(one_final, chunked_final);
+    }
+
+    #[test]
+    fn defaults_to_pure_commonmark() {
+        let mut parser = Parser::<(), ()>::new();
+        let mut sink = VecSink::new();
+
+        // GFM table syntax → stays as paragraphs (pipe-separated text)
+        parser
+            .push_str("| a | b |\n| - | - |\n| 1 | 2 |\n\n", &mut sink)
+            .unwrap();
+        // GFM strikethrough → literal tildes
+        parser.push_str("~~strike~~\n\n", &mut sink).unwrap();
+        // Footnote ref → literal text
+        parser.push_str("[^ref]\n\n", &mut sink).unwrap();
+        // Math → literal dollar signs
+        parser.push_str("$x^2$\n\n", &mut sink).unwrap();
+        parser.finish(&mut sink).unwrap();
+
+        let nodes: Vec<_> = sink
+            .items()
+            .iter()
+            .filter_map(|item| match item {
+                StreamItem::Upsert(e) if !e.provisional => Some(&e.node),
+                _ => None,
+            })
+            .collect();
+
+        // All should be paragraphs — no Table, Strikethrough, FootnoteRef, MathInline
+        for node in &nodes {
+            assert!(
+                matches!(node, Node::Paragraph { .. }),
+                "expected Paragraph, got {node:?}"
+            );
+        }
     }
 
     #[test]
