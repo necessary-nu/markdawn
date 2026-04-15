@@ -116,6 +116,14 @@ pub enum Node<Ext = (), Meta = ()> {
         literal: String,
         meta: Meta,
     },
+    MathInline {
+        math: String,
+        meta: Meta,
+    },
+    MathBlock {
+        math: String,
+        meta: Meta,
+    },
     Html {
         html: String,
         meta: Meta,

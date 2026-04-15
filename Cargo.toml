@@ -4,21 +4,31 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+base64 = "0.22"
 entities = "1.0"
 indexmap = "2"
+mathml-core = { path = "../mathml-rs" }
 percent-encoding = "2.3"
 
 [target.'cfg(target_os = "ios")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = [
     "NSAttributedString",
+    "NSCache",
     "NSData",
+    "NSError",
     "NSString",
     "NSDictionary",
+    "NSURL",
+    "NSURLRequest",
+    "NSURLResponse",
+    "NSURLSession",
     "NSValue",
+    "block2",
 ] }
 objc2-core-foundation = { version = "0.3", features = ["CFBase", "CFData"] }
 objc2-ui-kit = { version = "0.3", features = [
+    "UIAccessibility",
     "UIFont",
     "UIColor",
     "UIImage",
