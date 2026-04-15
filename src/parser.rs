@@ -3100,6 +3100,55 @@ where
     // gfm[impl inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
     fn try_autolink_literal(&mut self) -> Option<Node<Ext, Meta>> {
         let remaining = self.remaining();
+
+        // GFM extended autolinks for `mailto:` and `xmpp:` schemes.
+        // Must follow a word boundary (start of input, whitespace, or punctuation
+        // that's not part of an alphanumeric word).
+        for scheme in ["mailto:", "xmpp:"] {
+            if let Some(after) = remaining.strip_prefix(scheme) {
+                // Word-boundary check: previous char must not be alphanumeric
+                let prev = char_before(self.input, self.index);
+                if prev.is_some_and(|c| c.is_ascii_alphanumeric()) {
+                    continue;
+                }
+                // Find end at whitespace or `<`
+                let end = after
+                    .find(|ch: char| ch.is_whitespace() || matches!(ch, '<'))
+                    .unwrap_or(after.len());
+                let body = &after[..end];
+                // The body must contain `@` for it to be an email-style autolink
+                if !body.contains('@') {
+                    continue;
+                }
+                // The email part is up to the first `/` regardless of scheme;
+                // for xmpp we then optionally include `/resource` after it.
+                let email_end_in_body = body.find('/').unwrap_or(body.len());
+                let email_part = &body[..email_end_in_body];
+                let validated = email_part.trim_end_matches('.');
+                if !looks_like_email(validated) {
+                    continue;
+                }
+                let total_in_body = if scheme == "xmpp:" {
+                    body.len()
+                } else {
+                    email_part.len()
+                };
+                let full_text = &remaining[..scheme.len() + total_in_body];
+                let trimmed_full = full_text.trim_end_matches('.');
+                let trimmed_full = trim_autolink_trailing(trimmed_full);
+                self.index += trimmed_full.len();
+                return Some(Node::Link {
+                    destination: trimmed_full.to_owned(),
+                    title: None,
+                    children: vec![Node::Text {
+                        text: trimmed_full.to_owned(),
+                        meta: self.meta.clone(),
+                    }],
+                    meta: self.meta.clone(),
+                });
+            }
+        }
+
         for prefix in ["https://", "http://", "ftp://"] {
             if let Some(rest) = remaining.strip_prefix(prefix) {
                 let end = rest
@@ -3125,6 +3174,10 @@ where
                 .find(|ch: char| ch.is_whitespace() || matches!(ch, '<'))
                 .unwrap_or(remaining.len());
             let raw = &remaining[..end];
+            // Validate domain: underscores not allowed in last 2 segments of host
+            if !is_valid_www_host(raw) {
+                return None;
+            }
             let trimmed = trim_autolink_trailing(raw);
             self.index += trimmed.len();
             let destination = format!("http://{trimmed}");
@@ -3139,8 +3192,10 @@ where
             });
         }
 
+        // Bare email autolinks: stop at whitespace, `<`, or `/`
+        // (path components after the email aren't part of the autolink).
         let end = remaining
-            .find(|ch: char| ch.is_whitespace() || matches!(ch, '<'))
+            .find(|ch: char| ch.is_whitespace() || matches!(ch, '<' | '/'))
             .unwrap_or(remaining.len());
         let candidate = &remaining[..end];
         // For emails, only strip trailing dots (not full URL trailing rules)
@@ -4551,6 +4606,27 @@ fn looks_like_url(text: &str) -> bool {
 // gfm[impl inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
 // gfm[impl inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
 // gfm[impl inlines.autolinks-extension.left-angle-bracket-ends-autolink]
+/// GFM extended www autolinks: the host portion of the URL must consist of
+/// dot-separated DNS labels, and the LAST TWO labels of the host must not
+/// contain underscores.
+fn is_valid_www_host(url: &str) -> bool {
+    // Extract host: everything before the first '/', '?', '#'.
+    let host_end = url
+        .find(|c: char| matches!(c, '/' | '?' | '#'))
+        .unwrap_or(url.len());
+    let host = &url[..host_end];
+    let labels: Vec<&str> = host.split('.').collect();
+    let n = labels.len();
+    if n < 2 {
+        return false;
+    }
+    // Check the last two labels for underscores
+    if labels[n - 1].contains('_') || labels[n - 2].contains('_') {
+        return false;
+    }
+    true
+}
+
 fn trim_autolink_trailing(url: &str) -> &str {
     let mut end = url.len();
     let bytes = url.as_bytes();
@@ -4563,7 +4639,7 @@ fn trim_autolink_trailing(url: &str) -> &str {
 
         if matches!(
             last,
-            b'?' | b'!' | b'.' | b',' | b':' | b'*' | b'_' | b'~' | b'\''
+            b'?' | b'!' | b'.' | b',' | b':' | b'*' | b'_' | b'~' | b'\'' | b'"'
         ) {
             end -= 1;
             continue;

@@ -1,3 +1,12 @@
+//! Per-block attributed-string rendering for text-like markdown nodes.
+//!
+//! Block-level nodes that map to standalone UIViews (Table, CodeBlock, BlockQuote)
+//! are NOT rendered here — `BlockSink` dispatches those directly to view factories
+//! in `crate::adapter::textkit::views`.
+//!
+//! Inline SVG (within text content) is rendered as an `NSTextAttachment` with
+//! `setImage`, which is the one place attachments behave reliably.
+
 use std::sync::Arc;
 
 use objc2::AnyThread;
@@ -12,7 +21,6 @@ use objc2_ui_kit::{
 
 use crate::node::Node;
 
-use super::attachment::{BlockData, MarkdownBlockAttachment};
 use super::attrs;
 use super::style::TextKitStyle;
 use super::svg;
@@ -70,48 +78,50 @@ impl<Ext, Meta> RenderTextKitCustom<Ext, Meta> for () {
 #[derive(Debug)]
 pub enum TextKitError {
     UnsupportedCustomNode,
+    UnsupportedBlockNode,
 }
 
 impl core::fmt::Display for TextKitError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::UnsupportedCustomNode => f.write_str("custom node renderer not configured"),
+            Self::UnsupportedBlockNode => f.write_str("non-text block passed to text renderer"),
         }
     }
 }
 
 impl std::error::Error for TextKitError {}
 
-pub struct TextKitAdapter<R = ()> {
+/// Render text-like markdown blocks (Paragraph, Heading, List, ListItem, ThematicBreak,
+/// Document container) to an attributed string. Non-text blocks (Table, CodeBlock,
+/// BlockQuote, block-level Html/SVG) return `Err(UnsupportedBlockNode)`.
+pub struct TextRenderer<R = ()> {
     pub(crate) style: Arc<TextKitStyle>,
     pub(crate) custom: R,
 }
 
-impl Default for TextKitAdapter<()> {
+impl Default for TextRenderer<()> {
     fn default() -> Self {
-        Self::new()
+        Self::new(Arc::new(TextKitStyle::default()))
     }
 }
 
-impl TextKitAdapter<()> {
-    pub fn new() -> Self {
-        Self {
-            style: Arc::new(TextKitStyle::default()),
-            custom: (),
-        }
-    }
-
-    pub fn with_style(style: Arc<TextKitStyle>) -> Self {
+impl TextRenderer<()> {
+    pub fn new(style: Arc<TextKitStyle>) -> Self {
         Self { style, custom: () }
     }
 }
 
-impl<R> TextKitAdapter<R> {
-    pub fn with_custom_renderer(style: Arc<TextKitStyle>, custom: R) -> Self {
+impl<R> TextRenderer<R> {
+    pub fn with_custom(style: Arc<TextKitStyle>, custom: R) -> Self {
         Self { style, custom }
     }
 
-    pub fn render<Ext, Meta>(
+    pub fn style(&self) -> &Arc<TextKitStyle> {
+        &self.style
+    }
+
+    pub fn render_text_block<Ext, Meta>(
         &self,
         node: &Node<Ext, Meta>,
         ctx: &RenderCtx,
@@ -126,10 +136,10 @@ impl<R> TextKitAdapter<R> {
             is_last_list_item: ctx.is_last_list_item,
             is_last_block: true,
         };
-        self.render_block(node, &root_ctx)
+        self.render_block_inner(node, &root_ctx)
     }
 
-    fn render_block<Ext, Meta>(
+    fn render_block_inner<Ext, Meta>(
         &self,
         node: &Node<Ext, Meta>,
         ctx: &RenderCtx,
@@ -158,7 +168,7 @@ impl<R> TextKitAdapter<R> {
                         is_last_list_item: false,
                         is_last_block: i == last_idx,
                     };
-                    let child_str = self.render_block(child, &child_ctx)?;
+                    let child_str = self.render_block_inner(child, &child_ctx)?;
                     result.appendAttributedString(&child_str);
                 }
             }
@@ -187,30 +197,6 @@ impl<R> TextKitAdapter<R> {
                     ctx.is_last_block,
                 );
                 attrs::apply_paragraph_style(&result, &ps);
-            }
-            Node::BlockQuote { children, .. } => {
-                // Render children as attributed string, then wrap in an attachment view
-                let inner_content = NSMutableAttributedString::new();
-                let last_idx = children.len().saturating_sub(1);
-                for (i, child) in children.iter().enumerate() {
-                    let inner_ctx = RenderCtx {
-                        blockquote_depth: 0, // reset — the view handles visual treatment
-                        list_stack: ctx.list_stack.clone(),
-                        provisional: ctx.provisional,
-                        is_last_list_item: false,
-                        is_last_block: i == last_idx,
-                    };
-                    let child_str = self.render_block(child, &inner_ctx)?;
-                    inner_content.appendAttributedString(&child_str);
-                }
-                let data = BlockData::BlockQuote {
-                    content: Retained::into_super(inner_content),
-                };
-                let attachment =
-                    MarkdownBlockAttachment::new_with_data(data, Arc::clone(&self.style));
-                let astr = NSAttributedString::attributedStringWithAttachment(&attachment);
-                result.appendAttributedString(&astr);
-                append_plain(&result, "\n", &base_font, &text_color);
             }
             Node::List {
                 ordered,
@@ -243,7 +229,7 @@ impl<R> TextKitAdapter<R> {
                     }
                     inner_ctx.is_last_list_item = i == last_idx;
                     inner_ctx.is_last_block = ctx.is_last_block && i == last_idx;
-                    let child_str = self.render_block(child, &inner_ctx)?;
+                    let child_str = self.render_block_inner(child, &inner_ctx)?;
                     result.appendAttributedString(&child_str);
                 }
             }
@@ -260,7 +246,7 @@ impl<R> TextKitAdapter<R> {
                             result.appendAttributedString(&rendered);
                         }
                         other => {
-                            let rendered = self.render_block(other, ctx)?;
+                            let rendered = self.render_block_inner(other, ctx)?;
                             result.appendAttributedString(&rendered);
                         }
                     }
@@ -295,7 +281,7 @@ impl<R> TextKitAdapter<R> {
                             result.appendAttributedString(&rendered);
                         }
                         other => {
-                            let rendered = self.render_block(other, ctx)?;
+                            let rendered = self.render_block_inner(other, ctx)?;
                             result.appendAttributedString(&rendered);
                         }
                     }
@@ -312,49 +298,6 @@ impl<R> TextKitAdapter<R> {
                     ctx.blockquote_depth,
                 );
                 attrs::apply_paragraph_style(&result, &ps);
-            }
-            Node::Table {
-                alignments: _,
-                header,
-                rows,
-                ..
-            } => {
-                let (header_cells, data_rows, col_widths) =
-                    self.extract_table_data(header, rows, ctx);
-                let data = BlockData::Table {
-                    header_cells,
-                    rows: data_rows,
-                    col_widths,
-                };
-                let attachment =
-                    MarkdownBlockAttachment::new_with_data(data, Arc::clone(&self.style));
-                let astr = NSAttributedString::attributedStringWithAttachment(&attachment);
-                result.appendAttributedString(&astr);
-                append_plain(&result, "\n", &base_font, &text_color);
-            }
-            Node::CodeBlock { info, literal, .. } => {
-                let data = BlockData::CodeBlock {
-                    literal: literal.clone(),
-                    language: info.clone(),
-                };
-                let attachment =
-                    MarkdownBlockAttachment::new_with_data(data, Arc::clone(&self.style));
-                let astr = NSAttributedString::attributedStringWithAttachment(&attachment);
-                result.appendAttributedString(&astr);
-                append_plain(&result, "\n", &base_font, &text_color);
-            }
-            Node::Html { html, .. } => {
-                if let Some(svg_attachment) = try_render_svg_html(html) {
-                    result.appendAttributedString(&svg_attachment);
-                    append_plain(&result, "\n", &base_font, &text_color);
-                } else {
-                    let code_font =
-                        attrs::monospaced_font(&self.style, self.style.body_font_size);
-                    append_plain(&result, html, &code_font, &text_color);
-                    if !html.ends_with('\n') {
-                        append_plain(&result, "\n", &code_font, &text_color);
-                    }
-                }
             }
             Node::ThematicBreak { .. } => {
                 append_plain(
@@ -391,6 +334,23 @@ impl<R> TextKitAdapter<R> {
                 result.appendAttributedString(&inline);
                 append_plain(&result, "\n", &base_font, &text_color);
             }
+            Node::Html { html, .. } => {
+                if let Some(svg_attachment) = try_render_svg_html(html) {
+                    result.appendAttributedString(&svg_attachment);
+                    append_plain(&result, "\n", &base_font, &text_color);
+                } else {
+                    let code_font =
+                        attrs::monospaced_font(&self.style, self.style.body_font_size);
+                    append_plain(&result, html, &code_font, &text_color);
+                    if !html.ends_with('\n') {
+                        append_plain(&result, "\n", &code_font, &text_color);
+                    }
+                }
+            }
+            // Non-text blocks should be intercepted by the sink before reaching here.
+            Node::Table { .. } | Node::CodeBlock { .. } | Node::BlockQuote { .. } => {
+                return Err(TextKitError::UnsupportedBlockNode);
+            }
             Node::TableRow { cells, .. } => {
                 // Standalone table row outside a Table — render cells as text
                 for (i, cell) in cells.iter().enumerate() {
@@ -415,7 +375,7 @@ impl<R> TextKitAdapter<R> {
         Ok(result)
     }
 
-    fn render_inlines<Ext, Meta>(
+    pub(crate) fn render_inlines<Ext, Meta>(
         &self,
         nodes: &[Node<Ext, Meta>],
         base_font: &UIFont,
@@ -510,11 +470,12 @@ impl<R> TextKitAdapter<R> {
             } => self
                 .custom
                 .render_custom(payload, children, &self.style, ctx),
-            other => self.render_block(other, ctx),
+            other => self.render_block_inner(other, ctx),
         }
     }
 
-    fn extract_table_data<Ext, Meta>(
+    /// Extract flat cell text + column widths from a table for view factory consumption.
+    pub(crate) fn extract_table_data<Ext, Meta>(
         &self,
         header: &[Node<Ext, Meta>],
         rows: &[Node<Ext, Meta>],
@@ -565,6 +526,40 @@ impl<R> TextKitAdapter<R> {
         (header_cells, data_rows, col_widths)
     }
 
+    /// Render the inner content of a blockquote as an attributed string suitable
+    /// for embedding in a UITextView inside the blockquote view.
+    pub(crate) fn render_blockquote_content<Ext, Meta>(
+        &self,
+        children: &[Node<Ext, Meta>],
+        ctx: &RenderCtx,
+    ) -> Result<Retained<NSMutableAttributedString>, TextKitError>
+    where
+        R: RenderTextKitCustom<Ext, Meta>,
+    {
+        let inner_ctx = RenderCtx {
+            blockquote_depth: 0, // view handles visual treatment
+            list_stack: ctx.list_stack.clone(),
+            provisional: ctx.provisional,
+            is_last_list_item: false,
+            is_last_block: true,
+        };
+        let result = NSMutableAttributedString::new();
+        let last_idx = children.len().saturating_sub(1);
+        for (i, child) in children.iter().enumerate() {
+            let mut child_ctx = RenderCtx {
+                blockquote_depth: 0,
+                list_stack: inner_ctx.list_stack.clone(),
+                provisional: ctx.provisional,
+                is_last_list_item: false,
+                is_last_block: i == last_idx,
+            };
+            child_ctx.is_last_block = i == last_idx;
+            let child_str = self.render_block_inner(child, &child_ctx)?;
+            result.appendAttributedString(&child_str);
+        }
+        Ok(result)
+    }
+
     fn list_item_prefix(&self, ctx: &RenderCtx) -> String {
         if let Some(frame) = ctx.list_stack.last() {
             if frame.ordered {
@@ -588,8 +583,7 @@ fn attributed_string(
     result
 }
 
-/// Try to render an HTML chunk as an SVG `NSTextAttachment`.
-/// Returns `None` if the chunk doesn't look like SVG or rendering failed.
+/// Try to render an HTML chunk as an SVG `NSTextAttachment` (image-based, not view provider).
 fn try_render_svg_html(html: &str) -> Option<Retained<NSAttributedString>> {
     if !svg::is_svg_data(html.as_bytes()) {
         return None;
