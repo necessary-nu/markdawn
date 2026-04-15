@@ -1,9 +1,16 @@
 mod adapter;
 mod error;
 mod ext;
+#[cfg(feature = "highlight")]
+mod highlight;
 mod node;
 mod parser;
 mod sink;
+
+#[cfg(feature = "highlight")]
+pub use crate::highlight::SpanHighlighter;
+#[cfg(feature = "highlight")]
+pub use arborium;
 
 #[cfg(target_os = "ios")]
 pub use crate::adapter::{

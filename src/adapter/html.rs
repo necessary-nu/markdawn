@@ -43,6 +43,8 @@ impl<Ext, Meta> RenderHtmlCustom<Ext, Meta> for () {
 
 pub struct HtmlAdapter<R = ()> {
     custom: R,
+    #[cfg(feature = "highlight")]
+    highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SpanHighlighter>>>,
 }
 
 impl Default for HtmlAdapter<()> {
@@ -53,11 +55,33 @@ impl Default for HtmlAdapter<()> {
 
 impl HtmlAdapter<()> {
     pub fn new() -> Self {
-        Self { custom: () }
+        Self {
+            custom: (),
+            #[cfg(feature = "highlight")]
+            highlighter: core::cell::RefCell::new(None),
+        }
     }
 
     pub fn with_custom_renderer<Custom>(custom: Custom) -> HtmlAdapter<Custom> {
-        HtmlAdapter { custom }
+        HtmlAdapter {
+            custom,
+            #[cfg(feature = "highlight")]
+            highlighter: core::cell::RefCell::new(None),
+        }
+    }
+}
+
+#[cfg(feature = "highlight")]
+impl<R> HtmlAdapter<R> {
+    /// Install a syntax highlighter. Any `arborium::advanced::HighlightSpans`
+    /// implementation works. Failures in highlighting fall back to plain
+    /// `<pre><code>` rendering.
+    pub fn with_highlighter<H>(mut self, highlighter: H) -> Self
+    where
+        H: arborium::advanced::HighlightSpans + 'static,
+    {
+        self.highlighter = core::cell::RefCell::new(Some(Box::new(highlighter)));
+        self
     }
 }
 
@@ -86,6 +110,47 @@ impl<R> HtmlAdapter<R> {
         let mut out = String::new();
         self.write_block(node, &mut out)?;
         Ok(out)
+    }
+
+    /// Returns `true` if the code block was rendered with syntax highlighting.
+    #[cfg(feature = "highlight")]
+    fn try_highlight_code_block(
+        &self,
+        info: Option<&str>,
+        literal: &str,
+        out: &mut String,
+    ) -> Result<bool, HtmlError> {
+        let Some(lang) = info else {
+            return Ok(false);
+        };
+        let mut borrow = self.highlighter.borrow_mut();
+        let Some(hl) = borrow.as_mut() else {
+            return Ok(false);
+        };
+        let Some(spans) = hl.spans(lang, literal) else {
+            return Ok(false);
+        };
+        out.push_str("<pre><code class=\"language-");
+        escape_html(lang, out);
+        out.push_str("\">");
+        let html = arborium::advanced::spans_to_html(
+            literal,
+            spans,
+            &arborium::advanced::HtmlFormat::default(),
+        );
+        out.push_str(&html);
+        out.push_str("</code></pre>\n");
+        Ok(true)
+    }
+
+    #[cfg(not(feature = "highlight"))]
+    fn try_highlight_code_block(
+        &self,
+        _info: Option<&str>,
+        _literal: &str,
+        _out: &mut String,
+    ) -> Result<bool, HtmlError> {
+        Ok(false)
     }
 
     fn write_block<Ext, Meta>(
@@ -263,16 +328,18 @@ impl<R> HtmlAdapter<R> {
                 self.write_table_row(node, &[], out)?;
             }
             Node::CodeBlock { info, literal, .. } => {
-                match info {
-                    Some(info) => {
-                        out.push_str("<pre><code class=\"language-");
-                        escape_html(info, out);
-                        out.push_str("\">");
+                if !self.try_highlight_code_block(info.as_deref(), literal, out)? {
+                    match info {
+                        Some(info) => {
+                            out.push_str("<pre><code class=\"language-");
+                            escape_html(info, out);
+                            out.push_str("\">");
+                        }
+                        None => out.push_str("<pre><code>"),
                     }
-                    None => out.push_str("<pre><code>"),
+                    escape_html(literal, out);
+                    out.push_str("</code></pre>\n");
                 }
-                escape_html(literal, out);
-                out.push_str("</code></pre>\n");
             }
             Node::MathBlock { math, .. } => {
                 out.push_str("<pre><code class=\"language-math math-display\">");
@@ -681,7 +748,11 @@ impl<S, R> HtmlSink<S, R> {
     pub fn with_custom_renderer(inner: S, custom: R) -> Self {
         Self {
             inner,
-            adapter: HtmlAdapter { custom },
+            adapter: HtmlAdapter {
+                custom,
+                #[cfg(feature = "highlight")]
+                highlighter: core::cell::RefCell::new(None),
+            },
         }
     }
 

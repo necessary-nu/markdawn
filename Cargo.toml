@@ -3,7 +3,11 @@ name = "markdawn"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+highlight = ["dep:arborium"]
+
 [dependencies]
+arborium = { path = "../arborium/crates/arborium", optional = true, features = ["all-languages"] }
 base64 = "0.22"
 entities = "1.0"
 indexmap = "2"

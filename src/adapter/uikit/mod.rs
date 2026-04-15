@@ -7,6 +7,8 @@ mod math;
 mod render;
 mod style;
 pub mod svg;
+#[cfg(feature = "highlight")]
+mod syntax;
 mod views;
 
 pub use self::block_sink::BlockSink;

@@ -1,6 +1,6 @@
 use objc2::MainThreadMarker;
 use objc2::rc::Retained;
-use objc2_foundation::NSString;
+use objc2_foundation::{NSAttributedString, NSString};
 use objc2_ui_kit::{NSObjectUIAccessibility, UIColor, UIFont, UILabel, UIView};
 
 use crate::adapter::uikit::attrs;
@@ -13,6 +13,7 @@ const BADGE_INSET: f64 = 6.0;
 pub fn build_code_block_view(
     literal: &str,
     language: Option<&str>,
+    highlighted: Option<&NSAttributedString>,
     style: &UIKitStyle,
     mtm: MainThreadMarker,
 ) -> Retained<UIView> {
@@ -43,11 +44,17 @@ pub fn build_code_block_view(
     }
 
     let label = UILabel::new(mtm);
-    let ns_text = NSString::from_str(literal.trim_end_matches('\n'));
-    label.setText(Some(&ns_text));
-    unsafe {
-        label.setFont(Some(&font));
-        label.setTextColor(Some(&style.code_text_color));
+    if let Some(attr) = highlighted {
+        unsafe {
+            label.setAttributedText(Some(attr));
+        }
+    } else {
+        let ns_text = NSString::from_str(literal.trim_end_matches('\n'));
+        label.setText(Some(&ns_text));
+        unsafe {
+            label.setFont(Some(&font));
+            label.setTextColor(Some(&style.code_text_color));
+        }
     }
     label.setNumberOfLines(0);
     label.setTranslatesAutoresizingMaskIntoConstraints(false);

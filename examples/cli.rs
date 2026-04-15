@@ -9,6 +9,8 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let gfm = args.iter().any(|a| a == "--gfm");
     let math = args.iter().any(|a| a == "--math");
+    #[cfg(feature = "highlight")]
+    let highlight = args.iter().any(|a| a == "--highlight");
 
     let mut builder = Parser::<(), ()>::builder();
     if gfm {
@@ -22,6 +24,13 @@ fn main() {
     parser.push_str(&input, &mut sink).unwrap();
     parser.finish(&mut sink).unwrap();
 
+    #[cfg(feature = "highlight")]
+    let adapter = if highlight {
+        HtmlAdapter::new().with_highlighter(markdawn::arborium::Highlighter::new())
+    } else {
+        HtmlAdapter::new()
+    };
+    #[cfg(not(feature = "highlight"))]
     let adapter = HtmlAdapter::new();
     let mut order = Vec::new();
     let mut values = Vec::<(u64, String)>::new();

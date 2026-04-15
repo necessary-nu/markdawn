@@ -32,6 +32,8 @@ pub struct BlockSink<R = ()> {
     compartments: Vec<Compartment>,
     element_map: ElementMap,
     mtm: MainThreadMarker,
+    #[cfg(feature = "highlight")]
+    highlighter: Option<Box<dyn crate::highlight::SpanHighlighter>>,
 }
 
 enum Compartment {
@@ -73,6 +75,8 @@ impl BlockSink<()> {
             element_map: ElementMap::new(),
 
             mtm,
+            #[cfg(feature = "highlight")]
+            highlighter: None,
         }
     }
 }
@@ -87,7 +91,21 @@ impl<R> BlockSink<R> {
             element_map: ElementMap::new(),
 
             mtm,
+            #[cfg(feature = "highlight")]
+            highlighter: None,
         }
+    }
+
+    /// Install a syntax highlighter for fenced code blocks. Any
+    /// `arborium::advanced::HighlightSpans` implementation works; failures
+    /// silently fall back to plain monospace rendering.
+    #[cfg(feature = "highlight")]
+    pub fn with_highlighter<H>(mut self, highlighter: H) -> Self
+    where
+        H: arborium::advanced::HighlightSpans + 'static,
+    {
+        self.highlighter = Some(Box::new(highlighter));
+        self
     }
 
     /// The `UIStackView` that arranges all rendered blocks. Embed this in your hierarchy.
@@ -263,7 +281,7 @@ impl<R> BlockSink<R> {
     }
 
     fn build_block_view<Ext, Meta>(
-        &self,
+        &mut self,
         node: &Node<Ext, Meta>,
         provisional: bool,
     ) -> Result<(Retained<UIView>, Option<table::TableHandles>), UIKitError>
@@ -289,10 +307,34 @@ impl<R> BlockSink<R> {
                     table::build_table_view(&header_cells, &data_rows, alignments, style, self.mtm);
                 (v, Some(h))
             }
-            Node::CodeBlock { info, literal, .. } => (
-                code_block::build_code_block_view(literal, info.as_deref(), style, self.mtm),
-                None,
-            ),
+            Node::CodeBlock { info, literal, .. } => {
+                #[cfg(feature = "highlight")]
+                let highlighted = info.as_deref().and_then(|lang| {
+                    let spans = self.highlighter.as_mut()?.spans(lang, literal)?;
+                    let style = self.renderer.style();
+                    let font = super::attrs::monospaced_font(style, style.body_font_size);
+                    Some(super::syntax::build_highlighted(
+                        literal,
+                        &spans,
+                        style,
+                        &font,
+                        &style.code_text_color,
+                    ))
+                });
+                #[cfg(not(feature = "highlight"))]
+                let highlighted: Option<Retained<NSMutableAttributedString>> = None;
+                let style = self.renderer.style();
+                (
+                    code_block::build_code_block_view(
+                        literal,
+                        info.as_deref(),
+                        highlighted.as_deref().map(|m| &**m),
+                        style,
+                        self.mtm,
+                    ),
+                    None,
+                )
+            }
             Node::BlockQuote { children, .. } => {
                 let content = self.renderer.render_blockquote_content(children, &ctx)?;
                 (
