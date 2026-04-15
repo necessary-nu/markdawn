@@ -712,6 +712,14 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     {
         let mut inner_lines = Vec::new();
         let starts_empty = marker.content.trim().is_empty();
+        let mut in_fence: Option<(char, usize)> =
+            parse_fence_opener(&marker.content).map(|f| (f.marker, f.count));
+        // Track whether we're currently "inside" a sublist nested within this
+        // item. Once a top-level list marker line opens a sublist, any
+        // subsequent indented content (and blank lines surrounded by such
+        // content) belongs to that sublist, not the outer item.
+        let mut in_sublist =
+            in_fence.is_none() && parse_list_marker(&marker.content).is_some();
         inner_lines.push(marker.content);
         let mut index = start + 1;
         let mut saw_blank_separator = false;
@@ -737,15 +745,42 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                     }
                     break;
                 }
+                // Count blanks outside fences. The loose check below filters
+                // out blanks that don't actually separate top-level blocks.
+                if in_fence.is_none() {
+                    saw_blank_separator = true;
+                }
                 inner_lines.push(String::new());
-                saw_blank_separator = true;
                 index += 1;
                 continue;
             }
 
             if let Some(stripped) = strip_list_continuation(&lines[index], marker.content_indent) {
-                if saw_blank_separator {
+                let stripped_indent = leading_indent(&stripped).columns;
+                // Update fence state based on the stripped content
+                let was_in_fence = in_fence.is_some();
+                if let Some((m, c)) = in_fence {
+                    if is_fence_closer(&stripped, m, c) {
+                        in_fence = None;
+                    }
+                } else if let Some(f) = parse_fence_opener(&stripped) {
+                    in_fence = Some((f.marker, f.count));
+                }
+                // Determine looseness BEFORE updating in_sublist: a new
+                // top-level construct (paragraph, list, code block) following
+                // a top-level blank makes the item loose. We use the OLD
+                // in_sublist state — the new line opens a top-level block if
+                // it's at indent 0 OR continues a code block (indent>0 only
+                // counts as nested when we were already in a sublist).
+                let was_in_sublist = in_sublist;
+                let new_top_level_block = !was_in_fence
+                    && (stripped_indent == 0 || (stripped_indent > 0 && !was_in_sublist));
+                if saw_blank_separator && new_top_level_block {
                     loose = true;
+                }
+                // Sublist tracking: only relevant when not in a code fence.
+                if in_fence.is_none() && stripped_indent == 0 {
+                    in_sublist = parse_list_marker(&stripped).is_some();
                 }
                 inner_lines.push(stripped);
                 saw_blank_separator = false;
