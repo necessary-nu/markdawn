@@ -129,6 +129,23 @@ pub enum Node<Ext = (), Meta = ()> {
     ThematicBreak {
         meta: Meta,
     },
+    FootnoteRef {
+        label: String,
+        number: u32,
+        ref_num: u32,
+        meta: Meta,
+    },
+    FootnoteDefinition {
+        label: String,
+        number: u32,
+        backref_count: u32,
+        children: Vec<Node<Ext, Meta>>,
+        meta: Meta,
+    },
+    FootnoteSection {
+        children: Vec<Node<Ext, Meta>>,
+        meta: Meta,
+    },
     Custom {
         payload: Ext,
         children: Vec<Node<Ext, Meta>>,

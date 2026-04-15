@@ -2,7 +2,7 @@ use crate::error::{Error, StreamError};
 use crate::ext::{InlineExtension, InlineExtensionMatch};
 use crate::node::{CorrelationId, Emission, Node, StreamItem, TableAlignment};
 use crate::sink::Sink;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ParsedBlock<Ext, Meta> {
@@ -30,6 +30,15 @@ struct ReferenceDefinition {
     destination: String,
     title: Option<String>,
 }
+
+type FootnoteLabels = HashSet<String>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RawFootnoteDef {
+    lines: Vec<String>,
+}
+
+type RawFootnoteDefs = HashMap<String, RawFootnoteDef>;
 
 pub struct ParserBuilder<Ext = (), Meta = ()> {
     inline_extensions: Vec<Box<dyn InlineExtension<Ext, Meta>>>,
@@ -191,7 +200,91 @@ impl<Ext, Meta> Parser<Ext, Meta> {
     {
         let split = split_lines(&self.buffer);
         let refs = self.collect_reference_definitions(&split.lines)?;
-        self.parse_block_lines(&split.lines, finalizing, split.terminated, &refs)
+        let raw_footnotes = collect_raw_footnote_definitions(&split.lines);
+        let footnote_labels: FootnoteLabels = raw_footnotes.keys().cloned().collect();
+        let mut blocks = self.parse_block_lines(
+            &split.lines,
+            finalizing,
+            split.terminated,
+            &refs,
+            &footnote_labels,
+        )?;
+        self.finalize_footnotes(
+            &mut blocks,
+            &raw_footnotes,
+            &refs,
+            &footnote_labels,
+            finalizing,
+        )?;
+        Ok(blocks)
+    }
+
+    fn finalize_footnotes(
+        &self,
+        blocks: &mut Vec<ParsedBlock<Ext, Meta>>,
+        raw_footnotes: &RawFootnoteDefs,
+        refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
+        finalizing: bool,
+    ) -> Result<(), Error>
+    where
+        Meta: Default + Clone + PartialEq,
+        Ext: Clone + PartialEq,
+    {
+        if raw_footnotes.is_empty() {
+            return Ok(());
+        }
+
+        let mut ordered_labels: Vec<String> = Vec::new();
+        let mut occurrences: HashMap<String, u32> = HashMap::new();
+        for block in blocks.iter() {
+            collect_footnote_refs(&block.node, &mut ordered_labels, &mut occurrences);
+        }
+
+        if ordered_labels.is_empty() {
+            return Ok(());
+        }
+
+        let mut label_numbers: HashMap<String, u32> = HashMap::new();
+        for (idx, label) in ordered_labels.iter().enumerate() {
+            label_numbers.insert(label.clone(), (idx + 1) as u32);
+        }
+
+        let mut counters: HashMap<String, u32> = HashMap::new();
+        for block in blocks.iter_mut() {
+            assign_footnote_ref_numbers(&mut block.node, &label_numbers, &mut counters);
+        }
+
+        let mut section_children: Vec<Node<Ext, Meta>> = Vec::with_capacity(ordered_labels.len());
+        for label in ordered_labels.iter() {
+            let number = label_numbers[label];
+            let backref_count = *occurrences.get(label).unwrap_or(&0);
+            let raw = raw_footnotes
+                .get(label)
+                .expect("ordered label must have a definition");
+            let children_blocks =
+                self.parse_block_lines(&raw.lines, finalizing, true, refs, footnote_labels)?;
+            let children: Vec<Node<Ext, Meta>> =
+                children_blocks.into_iter().map(|b| b.node).collect();
+            section_children.push(Node::FootnoteDefinition {
+                label: label.clone(),
+                number,
+                backref_count,
+                children,
+                meta: Meta::default(),
+            });
+        }
+
+        let provisional = blocks.iter().any(|b| b.provisional);
+        blocks.push(ParsedBlock {
+            node: Node::FootnoteSection {
+                children: section_children,
+                meta: Meta::default(),
+            },
+            provisional,
+        });
+
+        Ok(())
     }
 
     // gfm[impl leaf-blocks.link-reference-definitions.may-appear-before-or-after-uses]
@@ -231,6 +324,12 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             }
 
             if !in_paragraph {
+                // Skip footnote definitions — handled by collect_footnote_definitions.
+                if let Some((next, _, _)) = collect_footnote_def_lines(lines, index) {
+                    index = next;
+                    in_paragraph = false;
+                    continue;
+                }
                 if let Some((next, (label, def))) = parse_reference_definition(lines, index) {
                     refs.entry(label).or_insert(def);
                     index = next;
@@ -275,7 +374,10 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             }
 
             // ATX heading and thematic break also reset paragraph state
-            if self.parse_atx_heading(&lines[index], refs)?.is_some()
+            let empty_fn_labels: FootnoteLabels = FootnoteLabels::new();
+            if self
+                .parse_atx_heading(&lines[index], refs, &empty_fn_labels)?
+                .is_some()
                 || is_thematic_break(&lines[index])
             {
                 in_paragraph = false;
@@ -314,12 +416,13 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         finalizing: bool,
         terminated: bool,
         refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
     ) -> Result<Vec<ParsedBlock<Ext, Meta>>, Error>
     where
         Meta: Default + Clone + PartialEq,
         Ext: Clone + PartialEq,
     {
-        self.parse_block_lines_with_lazy(lines, finalizing, terminated, refs, &[])
+        self.parse_block_lines_with_lazy(lines, finalizing, terminated, refs, footnote_labels, &[])
     }
 
     fn parse_block_lines_with_lazy(
@@ -328,6 +431,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         finalizing: bool,
         terminated: bool,
         refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
         lazy: &[bool],
     ) -> Result<Vec<ParsedBlock<Ext, Meta>>, Error>
     where
@@ -346,6 +450,13 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
+            // Skip footnote definitions — they are collected separately and rendered
+            // in a synthetic footnote section at the end of the document.
+            if let Some((next, _, _)) = collect_footnote_def_lines(lines, index) {
+                index = next;
+                continue;
+            }
+
             if let Some((next, _)) = parse_reference_definition(lines, index) {
                 index = next;
                 continue;
@@ -359,7 +470,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             }
 
             if let Some((next, block)) =
-                self.parse_table(lines, index, finalizing, terminated, refs)?
+                self.parse_table(lines, index, finalizing, terminated, refs, footnote_labels)?
             {
                 blocks.push(block);
                 index = next;
@@ -367,7 +478,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             }
 
             if let Some((next, block)) =
-                self.parse_block_quote(lines, index, finalizing, terminated, refs)
+                self.parse_block_quote(lines, index, finalizing, terminated, refs, footnote_labels)
             {
                 blocks.push(block?);
                 index = next;
@@ -390,7 +501,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             }
 
             if let Some((next, block)) =
-                self.parse_list(lines, index, finalizing, terminated, refs)?
+                self.parse_list(lines, index, finalizing, terminated, refs, footnote_labels)?
             {
                 blocks.push(block);
                 index = next;
@@ -411,7 +522,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
-            if let Some(block) = self.parse_atx_heading(&lines[index], refs)? {
+            if let Some(block) = self.parse_atx_heading(&lines[index], refs, footnote_labels)? {
                 blocks.push(ParsedBlock {
                     node: block,
                     provisional: !finalizing && index + 1 == lines.len() && !terminated,
@@ -420,8 +531,15 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 continue;
             }
 
-            let (next, block) =
-                self.parse_paragraphish(&lines, index, finalizing, terminated, refs, lazy)?;
+            let (next, block) = self.parse_paragraphish(
+                &lines,
+                index,
+                finalizing,
+                terminated,
+                refs,
+                footnote_labels,
+                lazy,
+            )?;
             blocks.push(block);
             index = next;
         }
@@ -467,6 +585,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         finalizing: bool,
         terminated: bool,
         refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
     ) -> Option<(usize, Result<ParsedBlock<Ext, Meta>, Error>)>
     where
         Meta: Default + Clone + PartialEq,
@@ -526,6 +645,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 finalizing,
                 inner_terminated,
                 refs,
+                footnote_labels,
                 &lazy_flags,
             )
             .map(|children| ParsedBlock {
@@ -585,6 +705,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         finalizing: bool,
         terminated: bool,
         refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
     ) -> Result<Option<(usize, ParsedBlock<Ext, Meta>)>, Error>
     where
         Meta: Default + Clone + PartialEq,
@@ -616,8 +737,15 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 break;
             }
 
-            let (next, item) =
-                self.parse_list_item(lines, index, marker, finalizing, terminated, refs)?;
+            let (next, item) = self.parse_list_item(
+                lines,
+                index,
+                marker,
+                finalizing,
+                terminated,
+                refs,
+                footnote_labels,
+            )?;
             items.push(item);
             index = next;
         }
@@ -705,6 +833,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         finalizing: bool,
         terminated: bool,
         refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
     ) -> Result<(usize, ParsedListItem<Ext, Meta>), Error>
     where
         Meta: Default + Clone + PartialEq,
@@ -718,8 +847,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         // item. Once a top-level list marker line opens a sublist, any
         // subsequent indented content (and blank lines surrounded by such
         // content) belongs to that sublist, not the outer item.
-        let mut in_sublist =
-            in_fence.is_none() && parse_list_marker(&marker.content).is_some();
+        let mut in_sublist = in_fence.is_none() && parse_list_marker(&marker.content).is_some();
         inner_lines.push(marker.content);
         let mut index = start + 1;
         let mut saw_blank_separator = false;
@@ -836,7 +964,13 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         } else {
             true
         };
-        let children = self.parse_block_lines(&inner_lines, finalizing, inner_terminated, refs)?;
+        let children = self.parse_block_lines(
+            &inner_lines,
+            finalizing,
+            inner_terminated,
+            refs,
+            footnote_labels,
+        )?;
         let children = normalize_task_item(children);
         Ok((
             index,
@@ -882,8 +1016,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         while index < lines.len() {
             if lines[index].trim().is_empty() {
                 // Preserve whitespace content beyond the 4-space indent
-                let blank_content = strip_indent_columns(&lines[index], 4)
-                    .unwrap_or_default();
+                let blank_content = strip_indent_columns(&lines[index], 4).unwrap_or_default();
                 pending_blanks.push(blank_content);
                 index += 1;
                 continue;
@@ -1046,6 +1179,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         finalizing: bool,
         terminated: bool,
         refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
     ) -> Result<Option<(usize, ParsedBlock<Ext, Meta>)>, Error>
     where
         Meta: Default + Clone + PartialEq,
@@ -1085,7 +1219,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             // Pad or truncate to match header column count
             cells.resize(alignments.len(), String::new());
             rows.push(Node::TableRow {
-                cells: self.parse_table_cells(&cells, false, &alignments, refs)?,
+                cells: self.parse_table_cells(&cells, false, &alignments, refs, footnote_labels)?,
                 meta: Meta::default(),
             });
             index += 1;
@@ -1097,7 +1231,13 @@ impl<Ext, Meta> Parser<Ext, Meta> {
                 node: Node::Table {
                     alignments: alignments.clone(),
                     header: vec![Node::TableRow {
-                        cells: self.parse_table_cells(&header_cells, true, &alignments, refs)?,
+                        cells: self.parse_table_cells(
+                            &header_cells,
+                            true,
+                            &alignments,
+                            refs,
+                            footnote_labels,
+                        )?,
                         meta: Meta::default(),
                     }],
                     rows,
@@ -1115,6 +1255,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         header: bool,
         alignments: &[Option<TableAlignment>],
         refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
     ) -> Result<Vec<Node<Ext, Meta>>, Error>
     where
         Meta: Default + Clone + PartialEq,
@@ -1123,7 +1264,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         let mut out = Vec::with_capacity(cells.len());
         for (index, cell) in cells.iter().enumerate() {
             out.push(Node::TableCell {
-                children: self.parse_inline_nodes(cell.trim(), false, refs)?,
+                children: self.parse_inline_nodes(cell.trim(), false, refs, footnote_labels)?,
                 header,
                 alignment: alignments.get(index).copied().flatten(),
                 meta: Meta::default(),
@@ -1223,6 +1364,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         &self,
         line: &str,
         refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
     ) -> Result<Option<Node<Ext, Meta>>, Error>
     where
         Meta: Default + Clone,
@@ -1248,7 +1390,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         }
 
         let content = strip_atx_content(rest.trim());
-        let children = self.parse_inline_nodes(content, false, refs)?;
+        let children = self.parse_inline_nodes(content, false, refs, footnote_labels)?;
         Ok(Some(Node::Heading {
             level: count as u8,
             children,
@@ -1299,6 +1441,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         finalizing: bool,
         terminated: bool,
         refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
         lazy: &[bool],
     ) -> Result<(usize, ParsedBlock<Ext, Meta>), Error>
     where
@@ -1324,7 +1467,8 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             // Setext underline cannot be a lazy continuation line
             if !is_lazy && is_setext_underline(&lines[index]) {
                 let text = join_lines(&collected);
-                let children = self.parse_inline_nodes(text.trim(), false, refs)?;
+                let children =
+                    self.parse_inline_nodes(text.trim(), false, refs, footnote_labels)?;
                 let level = if lines[index].trim_start().starts_with('=') {
                     1
                 } else {
@@ -1344,7 +1488,9 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             }
 
             if parse_fence_opener(&lines[index]).is_some()
-                || self.parse_atx_heading(&lines[index], refs)?.is_some()
+                || self
+                    .parse_atx_heading(&lines[index], refs, footnote_labels)?
+                    .is_some()
                 || is_thematic_break(&lines[index])
                 || strip_block_quote_marker(&lines[index]).is_some()
                 || parse_list_marker(&lines[index]).is_some_and(can_interrupt_paragraph_with_list)
@@ -1369,8 +1515,9 @@ impl<Ext, Meta> Parser<Ext, Meta> {
 
         let text = join_lines(&collected);
         let trimmed = text.trim_ascii();
-        let provisional = index == lines.len() && !finalizing && (terminated || !trimmed.is_empty());
-        let children = self.parse_inline_nodes(trimmed, provisional, refs)?;
+        let provisional =
+            index == lines.len() && !finalizing && (terminated || !trimmed.is_empty());
+        let children = self.parse_inline_nodes(trimmed, provisional, refs, footnote_labels)?;
 
         Ok((
             index,
@@ -1393,6 +1540,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
         text: &str,
         provisional: bool,
         refs: &ReferenceDefinitions,
+        footnote_labels: &FootnoteLabels,
     ) -> Result<Vec<Node<Ext, Meta>>, Error>
     where
         Meta: Default + Clone,
@@ -1405,6 +1553,7 @@ impl<Ext, Meta> Parser<Ext, Meta> {
             meta: Meta::default(),
             provisional,
             refs,
+            footnote_labels,
         };
         parser.parse_until(None)
     }
@@ -1954,6 +2103,115 @@ fn collect_list_item_lines(lines: &[String], start: usize) -> Option<(usize, Vec
     Some((index, items))
 }
 
+// Detects the start of a footnote definition: `[^label]:` (with up to 3 leading spaces).
+// Returns (label, byte_offset_of_content_after_colon_on_first_line).
+fn parse_footnote_def_opener(line: &str) -> Option<(String, usize)> {
+    let trimmed = trim_up_to_three_spaces(line);
+    let indent_bytes = line.len() - trimmed.len();
+    let after_bracket = trimmed.strip_prefix("[^")?;
+    let label_end = find_footnote_label_end(after_bracket)?;
+    let label = &after_bracket[..label_end];
+    if label.is_empty() || label.chars().any(|c| c.is_whitespace()) {
+        return None;
+    }
+    let after_label = &after_bracket[label_end + 1..];
+    if !after_label.starts_with(':') {
+        return None;
+    }
+    let content_offset = indent_bytes + 2 + label_end + 1 + 1;
+    Some((label.to_string(), content_offset))
+}
+
+fn find_footnote_label_end(s: &str) -> Option<usize> {
+    let mut escaped = false;
+    for (i, ch) in s.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == ']' {
+            return Some(i);
+        }
+        if ch == '[' || ch == '\n' {
+            return None;
+        }
+    }
+    None
+}
+
+// Collect all raw lines belonging to a footnote definition starting at `start`.
+// Strips the opener prefix and 4 columns of indentation from continuation lines.
+// Returns (next_index_after_def, label, body_lines).
+fn collect_footnote_def_lines(
+    lines: &[String],
+    start: usize,
+) -> Option<(usize, String, Vec<String>)> {
+    let (label, content_offset) = parse_footnote_def_opener(&lines[start])?;
+    let first_content = lines[start][content_offset..].trim_start().to_string();
+    let mut body: Vec<String> = vec![first_content];
+
+    let mut index = start + 1;
+    let mut pending_blanks: usize = 0;
+    while index < lines.len() {
+        let line = &lines[index];
+        if line.trim().is_empty() {
+            pending_blanks += 1;
+            index += 1;
+            continue;
+        }
+        let indent = leading_indent(line);
+        if indent.columns >= 4 {
+            for _ in 0..pending_blanks {
+                body.push(String::new());
+            }
+            pending_blanks = 0;
+            let stripped = strip_indent_columns(line, 4).unwrap_or_else(|| line.clone());
+            body.push(stripped);
+            index += 1;
+            continue;
+        }
+        break;
+    }
+
+    // Rewind past trailing blanks inside the footnote — those belong to the surrounding document.
+    let rewind_to = index - pending_blanks;
+    Some((rewind_to, label, body))
+}
+
+fn collect_raw_footnote_definitions(lines: &[String]) -> RawFootnoteDefs {
+    let mut defs: RawFootnoteDefs = HashMap::new();
+    let mut index = 0;
+    let mut in_paragraph = false;
+    while index < lines.len() {
+        if lines[index].trim().is_empty() {
+            in_paragraph = false;
+            index += 1;
+            continue;
+        }
+        if !in_paragraph {
+            if let Some((next, label, body)) = collect_footnote_def_lines(lines, index) {
+                defs.entry(label).or_insert(RawFootnoteDef { lines: body });
+                index = next;
+                continue;
+            }
+        }
+        // Conservatively treat other lines as potentially paragraph text so that
+        // a `[^label]:` appearing mid-paragraph doesn't steal content.
+        in_paragraph = !is_thematic_break(&lines[index])
+            && classify_html_block_start(&lines[index]).is_none()
+            && parse_fence_opener(&lines[index]).is_none()
+            && !lines[index].trim_start().starts_with('#')
+            && strip_block_quote_marker(&lines[index]).is_none()
+            && parse_list_marker(&lines[index]).is_none();
+        index += 1;
+    }
+    defs
+}
+
 fn trim_up_to_three_spaces(line: &str) -> &str {
     let mut removed = 0;
     let mut start = 0;
@@ -2359,6 +2617,7 @@ struct InlineParser<'a, Ext, Meta> {
     index: usize,
     inline_extensions: &'a [Box<dyn InlineExtension<Ext, Meta>>],
     refs: &'a ReferenceDefinitions,
+    footnote_labels: &'a FootnoteLabels,
     meta: Meta,
     provisional: bool,
 }
@@ -2546,6 +2805,12 @@ where
                         continue;
                     }
                 }
+            }
+
+            if let Some(node) = self.try_footnote_ref() {
+                flush_text_piece(&mut pieces, &mut text);
+                pieces.push(InlinePiece::Node(node));
+                continue;
             }
 
             if let Some(node) = self.try_link_or_image()? {
@@ -2790,6 +3055,7 @@ where
             index: 0,
             inline_extensions: self.inline_extensions,
             refs: self.refs,
+            footnote_labels: self.footnote_labels,
             meta: self.meta.clone(),
             provisional: self.provisional,
         };
@@ -2880,6 +3146,32 @@ where
     // gfm[impl inlines.images.reference-image-labels-are-case-insensitive]
     // gfm[impl inlines.images.reference-image-labels-cannot-contain-unescaped-brackets]
     // gfm[impl inlines.images.shortcut-image-labels-are-case-insensitive]
+    // GFM footnotes: [^label] references a footnote definition collected earlier.
+    // Only emit a FootnoteRef if a matching definition exists; otherwise fall
+    // through so the text becomes literal (matching cmark-gfm behaviour).
+    fn try_footnote_ref(&mut self) -> Option<Node<Ext, Meta>> {
+        let remaining = self.remaining();
+        if !remaining.starts_with("[^") {
+            return None;
+        }
+        let body = &remaining[2..];
+        let end = find_footnote_label_end(body)?;
+        let label = &body[..end];
+        if label.is_empty() || label.chars().any(|c| c.is_whitespace()) {
+            return None;
+        }
+        if !self.footnote_labels.contains(label) {
+            return None;
+        }
+        self.index += 2 + end + 1;
+        Some(Node::FootnoteRef {
+            label: label.to_string(),
+            number: 0,
+            ref_num: 0,
+            meta: self.meta.clone(),
+        })
+    }
+
     // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.closing-bracket-triggers-link-search]
     // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-scan-backward]
     // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case]
@@ -2912,6 +3204,7 @@ where
                     label,
                     self.inline_extensions,
                     self.refs,
+                    self.footnote_labels,
                     self.meta.clone(),
                     self.provisional,
                 )?;
@@ -2955,6 +3248,7 @@ where
             label,
             self.inline_extensions,
             self.refs,
+            self.footnote_labels,
             self.meta.clone(),
             self.provisional,
         )?;
@@ -3576,10 +3870,7 @@ fn find_delimited_closer(input: &str, mut index: usize, delim: &str) -> Option<u
             // delim.len() tildes (not part of a longer run).
             let is_tilde = delim == "~~" || delim == "~";
             let exact_run_ok = if is_tilde {
-                let run = input[index..]
-                    .chars()
-                    .take_while(|c| *c == '~')
-                    .count();
+                let run = input[index..].chars().take_while(|c| *c == '~').count();
                 run == delim.len()
             } else {
                 true
@@ -3589,10 +3880,7 @@ fn find_delimited_closer(input: &str, mut index: usize, delim: &str) -> Option<u
             }
             // Skip past this whole tilde run if it's the wrong length
             if is_tilde {
-                let run = input[index..]
-                    .chars()
-                    .take_while(|c| *c == '~')
-                    .count();
+                let run = input[index..].chars().take_while(|c| *c == '~').count();
                 index += run;
             } else {
                 index += delim.len();
@@ -4182,20 +4470,11 @@ fn is_html_whitespace(ch: char) -> bool {
     matches!(ch, ' ' | '\t' | '\n' | '\u{000B}' | '\u{000C}' | '\r')
 }
 
-fn looks_like_inline_tag(body: &str) -> bool {
-    let body = body.trim();
-    if body.is_empty() {
-        return false;
-    }
-
-    let first = body.chars().next().unwrap_or(' ');
-    first == '/' || first == '!' || first == '?' || first.is_ascii_alphabetic()
-}
-
 fn parse_inline_children<Ext, Meta>(
     text: &str,
     inline_extensions: &[Box<dyn InlineExtension<Ext, Meta>>],
     refs: &ReferenceDefinitions,
+    footnote_labels: &FootnoteLabels,
     meta: Meta,
     provisional: bool,
 ) -> Result<Vec<Node<Ext, Meta>>, Error>
@@ -4208,6 +4487,7 @@ where
         index: 0,
         inline_extensions,
         refs,
+        footnote_labels,
         meta,
         provisional,
     };
@@ -4479,6 +4759,124 @@ fn split_table_row(line: &str) -> Vec<String> {
     cells
 }
 
+fn collect_footnote_refs<Ext, Meta>(
+    node: &Node<Ext, Meta>,
+    ordered_labels: &mut Vec<String>,
+    occurrences: &mut HashMap<String, u32>,
+) {
+    match node {
+        Node::FootnoteRef { label, .. } => {
+            let count = occurrences.entry(label.clone()).or_insert(0);
+            *count += 1;
+            if *count == 1 {
+                ordered_labels.push(label.clone());
+            }
+        }
+        Node::Document { children, .. }
+        | Node::Paragraph { children, .. }
+        | Node::Heading { children, .. }
+        | Node::BlockQuote { children, .. }
+        | Node::List { children, .. }
+        | Node::Item { children, .. }
+        | Node::TaskItem { children, .. }
+        | Node::Emphasis { children, .. }
+        | Node::Strong { children, .. }
+        | Node::Strikethrough { children, .. }
+        | Node::Link { children, .. }
+        | Node::Custom { children, .. } => {
+            for child in children {
+                collect_footnote_refs(child, ordered_labels, occurrences);
+            }
+        }
+        Node::Table { header, rows, .. } => {
+            for n in header {
+                collect_footnote_refs(n, ordered_labels, occurrences);
+            }
+            for n in rows {
+                collect_footnote_refs(n, ordered_labels, occurrences);
+            }
+        }
+        Node::TableRow { cells, .. } => {
+            for n in cells {
+                collect_footnote_refs(n, ordered_labels, occurrences);
+            }
+        }
+        Node::TableCell { children, .. } => {
+            for child in children {
+                collect_footnote_refs(child, ordered_labels, occurrences);
+            }
+        }
+        // FootnoteDefinition / FootnoteSection only appear at top level after
+        // post-processing; if encountered here we still recurse so nested refs
+        // inside a definition's content get counted.
+        Node::FootnoteDefinition { children, .. } | Node::FootnoteSection { children, .. } => {
+            for child in children {
+                collect_footnote_refs(child, ordered_labels, occurrences);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn assign_footnote_ref_numbers<Ext, Meta>(
+    node: &mut Node<Ext, Meta>,
+    label_numbers: &HashMap<String, u32>,
+    counters: &mut HashMap<String, u32>,
+) {
+    match node {
+        Node::FootnoteRef {
+            label,
+            number,
+            ref_num,
+            ..
+        } => {
+            if let Some(n) = label_numbers.get(label) {
+                *number = *n;
+            }
+            let counter = counters.entry(label.clone()).or_insert(0);
+            *counter += 1;
+            *ref_num = *counter;
+        }
+        Node::Document { children, .. }
+        | Node::Paragraph { children, .. }
+        | Node::Heading { children, .. }
+        | Node::BlockQuote { children, .. }
+        | Node::List { children, .. }
+        | Node::Item { children, .. }
+        | Node::TaskItem { children, .. }
+        | Node::Emphasis { children, .. }
+        | Node::Strong { children, .. }
+        | Node::Strikethrough { children, .. }
+        | Node::Link { children, .. }
+        | Node::Custom { children, .. }
+        | Node::FootnoteDefinition { children, .. }
+        | Node::FootnoteSection { children, .. } => {
+            for child in children {
+                assign_footnote_ref_numbers(child, label_numbers, counters);
+            }
+        }
+        Node::Table { header, rows, .. } => {
+            for n in header {
+                assign_footnote_ref_numbers(n, label_numbers, counters);
+            }
+            for n in rows {
+                assign_footnote_ref_numbers(n, label_numbers, counters);
+            }
+        }
+        Node::TableRow { cells, .. } => {
+            for n in cells {
+                assign_footnote_ref_numbers(n, label_numbers, counters);
+            }
+        }
+        Node::TableCell { children, .. } => {
+            for child in children {
+                assign_footnote_ref_numbers(child, label_numbers, counters);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn plain_text<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> String {
     let mut out = String::new();
     for node in nodes {
@@ -4497,7 +4895,10 @@ fn plain_text<Ext, Meta>(nodes: &[Node<Ext, Meta>]) -> String {
             | Node::Item { children, .. }
             | Node::TaskItem { children, .. }
             | Node::Document { children, .. }
+            | Node::FootnoteDefinition { children, .. }
+            | Node::FootnoteSection { children, .. }
             | Node::Custom { children, .. } => out.push_str(&plain_text(children)),
+            Node::FootnoteRef { label, .. } => out.push_str(label),
             Node::Table { header, rows, .. } => {
                 out.push_str(&plain_text(header));
                 out.push_str(&plain_text(rows));
@@ -4549,12 +4950,20 @@ fn parse_entity_reference(input: &str) -> Option<(usize, String)> {
         .or_else(|| entity.strip_prefix("#X"))
     {
         let ch = u32::from_str_radix(hex, 16).ok().and_then(|n| {
-            if n == 0 { Some('\u{FFFD}') } else { char::from_u32(n) }
+            if n == 0 {
+                Some('\u{FFFD}')
+            } else {
+                char::from_u32(n)
+            }
         })?;
         Some((end + 1, ch.to_string()))
     } else if let Some(num) = entity.strip_prefix('#') {
         let ch = num.parse::<u32>().ok().and_then(|n| {
-            if n == 0 { Some('\u{FFFD}') } else { char::from_u32(n) }
+            if n == 0 {
+                Some('\u{FFFD}')
+            } else {
+                char::from_u32(n)
+            }
         })?;
         Some((end + 1, ch.to_string()))
     } else {

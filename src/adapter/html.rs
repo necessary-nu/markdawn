@@ -102,6 +102,54 @@ impl<R> HtmlAdapter<R> {
                     self.write_block(child, out)?;
                 }
             }
+            Node::FootnoteSection { children, .. } => {
+                if children.is_empty() {
+                    return Ok(());
+                }
+                out.push_str("<section class=\"footnotes\" data-footnotes>\n<ol>\n");
+                for child in children {
+                    self.write_block(child, out)?;
+                }
+                out.push_str("</ol>\n</section>\n");
+            }
+            Node::FootnoteDefinition {
+                label,
+                number,
+                backref_count,
+                children,
+                ..
+            } => {
+                out.push_str("<li id=\"fn-");
+                escape_href(label, out);
+                out.push_str("\">\n");
+                if children.is_empty() {
+                    self.write_footnote_backrefs(label, *number, *backref_count, out);
+                    out.push('\n');
+                } else {
+                    let last_idx = children.len() - 1;
+                    for (idx, child) in children.iter().enumerate() {
+                        if idx == last_idx {
+                            if let Node::Paragraph {
+                                children: inlines, ..
+                            } = child
+                            {
+                                out.push_str("<p>");
+                                self.write_inlines(inlines, out)?;
+                                out.push(' ');
+                                self.write_footnote_backrefs(label, *number, *backref_count, out);
+                                out.push_str("</p>\n");
+                            } else {
+                                self.write_block(child, out)?;
+                                self.write_footnote_backrefs(label, *number, *backref_count, out);
+                                out.push('\n');
+                            }
+                        } else {
+                            self.write_block(child, out)?;
+                        }
+                    }
+                }
+                out.push_str("</li>\n");
+            }
             Node::Paragraph { children, .. } => {
                 out.push_str("<p>");
                 self.write_inlines(children, out)?;
@@ -245,6 +293,7 @@ impl<R> HtmlAdapter<R> {
                     out.push('\n');
                 }
             }
+            Node::FootnoteRef { .. } => self.write_inline(node, out)?,
             Node::Text { .. }
             | Node::Emphasis { .. }
             | Node::Strong { .. }
@@ -283,6 +332,24 @@ impl<R> HtmlAdapter<R> {
     {
         match node {
             Node::Text { text, .. } => escape_html(text, out),
+            Node::FootnoteRef {
+                label,
+                number,
+                ref_num,
+                ..
+            } => {
+                out.push_str("<sup class=\"footnote-ref\"><a href=\"#fn-");
+                escape_href(label, out);
+                out.push_str("\" id=\"fnref-");
+                escape_href(label, out);
+                if *ref_num > 1 {
+                    out.push('-');
+                    out.push_str(&ref_num.to_string());
+                }
+                out.push_str("\" data-footnote-ref>");
+                out.push_str(&number.to_string());
+                out.push_str("</a></sup>");
+            }
             Node::Emphasis { children, .. } => {
                 out.push_str("<em>");
                 self.write_inlines(children, out)?;
@@ -356,6 +423,8 @@ impl<R> HtmlAdapter<R> {
             | Node::TableCell { .. }
             | Node::CodeBlock { .. }
             | Node::ThematicBreak { .. }
+            | Node::FootnoteDefinition { .. }
+            | Node::FootnoteSection { .. }
             | Node::Document { .. } => self.write_block(node, out)?,
         }
 
@@ -456,11 +525,12 @@ impl<R> HtmlAdapter<R> {
                 out.push('\n');
             }
             for (i, child) in children.iter().enumerate() {
-                if let Node::Paragraph { children: inlines, .. } = child {
+                if let Node::Paragraph {
+                    children: inlines, ..
+                } = child
+                {
                     self.write_inlines(inlines, out)?;
-                    if i + 1 < children.len()
-                        && matches!(children[i + 1], Node::Paragraph { .. })
-                    {
+                    if i + 1 < children.len() && matches!(children[i + 1], Node::Paragraph { .. }) {
                         out.push('\n');
                     }
                 } else {
@@ -476,6 +546,42 @@ impl<R> HtmlAdapter<R> {
             out.push_str("</li>\n");
         }
         Ok(())
+    }
+
+    fn write_footnote_backrefs(&self, label: &str, number: u32, count: u32, out: &mut String) {
+        let count = count.max(1);
+        for i in 1..=count {
+            if i > 1 {
+                out.push(' ');
+            }
+            out.push_str("<a href=\"#fnref-");
+            escape_href(label, out);
+            if i > 1 {
+                out.push('-');
+                out.push_str(&i.to_string());
+            }
+            out.push_str(
+                "\" class=\"footnote-backref\" data-footnote-backref data-footnote-backref-idx=\"",
+            );
+            out.push_str(&number.to_string());
+            if i > 1 {
+                out.push('-');
+                out.push_str(&i.to_string());
+            }
+            out.push_str("\" aria-label=\"Back to reference ");
+            out.push_str(&number.to_string());
+            if i > 1 {
+                out.push('-');
+                out.push_str(&i.to_string());
+            }
+            out.push_str("\">↩");
+            if i > 1 {
+                out.push_str("<sup class=\"footnote-ref\">");
+                out.push_str(&i.to_string());
+                out.push_str("</sup>");
+            }
+            out.push_str("</a>");
+        }
     }
 }
 
@@ -523,7 +629,7 @@ where
 }
 
 fn escape_href(url: &str, out: &mut String) {
-    use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
+    use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 
     // Encode everything except URL-safe characters and already-encoded %XX
     const URL_SAFE: &AsciiSet = &NON_ALPHANUMERIC
