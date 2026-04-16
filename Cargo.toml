@@ -4,12 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
+dioxus = ["dep:dioxus", "dep:dioxus-core"]
 highlight = ["dep:arborium"]
 pikchr = ["dep:pikru", "dep:facet-dessert", "dep:facet-reflect", "dep:facet-path"]
 
 [dependencies]
 arborium = { path = "../arborium/crates/arborium", optional = true, features = ["all-languages"] }
 base64 = "0.22"
+dioxus = { version = "0.7", optional = true, default-features = false, features = ["lib"] }
+dioxus-core = { version = "0.7", optional = true }
 entities = "1.0"
 # pikru 1.2.0 → facet-dom → facet-dessert / facet-reflect / facet-path; cargo
 # picks the latest patches in the ^0.44 range but the 0.44.6 versions secretly
@@ -22,6 +25,13 @@ indexmap = "2"
 mathml-core = { path = "../mathml-rs" }
 percent-encoding = "2.3"
 pikru = { version = "1", optional = true }
+
+[dev-dependencies]
+dioxus-ssr = "0.7"
+
+[[example]]
+name = "ssg_blog"
+required-features = ["dioxus"]
 
 [target.'cfg(target_os = "ios")'.dependencies]
 objc2 = "0.6"

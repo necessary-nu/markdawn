@@ -15,6 +15,10 @@ pub use crate::highlight::SpanHighlighter;
 #[cfg(feature = "highlight")]
 pub use arborium;
 
+#[cfg(feature = "dioxus")]
+pub use crate::adapter::dioxus::{
+    DioxusOptions, Markdown, RenderDioxusCustom, render_markdown, render_node,
+};
 #[cfg(target_os = "ios")]
 pub use crate::adapter::uikit::cancel_image_load;
 #[cfg(target_os = "ios")]

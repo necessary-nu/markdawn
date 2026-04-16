@@ -1,3 +1,5 @@
+#[cfg(feature = "dioxus")]
+pub mod dioxus;
 pub mod html;
 #[cfg(target_os = "ios")]
 pub mod uikit;
