@@ -3225,6 +3225,11 @@ enum InlinePiece<Ext> {
         count: usize,
         can_open: bool,
         can_close: bool,
+        /// Absolute byte position of the first delimiter character in the
+        /// source (already includes the parser's `base_offset`). Used to
+        /// build accurate `source` spans on the resulting `Emphasis` /
+        /// `Strong` nodes when the delimiter run is consumed.
+        byte_pos: usize,
     },
 }
 
@@ -3497,6 +3502,7 @@ where
                         count: run.count,
                         can_open: run.can_open,
                         can_close: run.can_close,
+                        byte_pos: self.base_offset + self.index,
                     });
                     self.index += run.count;
                     break 'iter;
@@ -4328,28 +4334,31 @@ where
         let mut changed = false;
 
         'outer: for closer_index in 0..pieces.len() {
-            let (marker, closer_count, can_close, can_open) = match &pieces[closer_index] {
-                InlinePiece::Delimiter {
-                    marker,
-                    count,
-                    can_open,
-                    can_close,
-                } => (*marker, *count, *can_close, *can_open),
-                _ => continue,
-            };
+            let (marker, closer_count, can_close, can_open, closer_byte_pos) =
+                match &pieces[closer_index] {
+                    InlinePiece::Delimiter {
+                        marker,
+                        count,
+                        can_open,
+                        can_close,
+                        byte_pos,
+                    } => (*marker, *count, *can_close, *can_open, *byte_pos),
+                    _ => continue,
+                };
             if !can_close || closer_count == 0 {
                 continue;
             }
 
             for opener_index in (0..closer_index).rev() {
-                let (open_marker, opener_count, opener_can_open, opener_can_close) =
+                let (open_marker, opener_count, opener_can_open, opener_can_close, opener_byte_pos) =
                     match &pieces[opener_index] {
                         InlinePiece::Delimiter {
                             marker,
                             count,
                             can_open,
                             can_close,
-                        } => (*marker, *count, *can_open, *can_close),
+                            byte_pos,
+                        } => (*marker, *count, *can_open, *can_close, *byte_pos),
                         _ => continue,
                     };
 
@@ -4380,16 +4389,21 @@ where
                     _ => unreachable!(),
                 };
 
+                // Span covers the consumed delimiters on both sides:
+                // opener consumes its last `used` chars; closer consumes its
+                // first `used` chars.
+                let span = SourceSpan::new(opener_byte_pos + opener_rem, closer_byte_pos + used);
+
                 let children = materialize_inline_pieces(inner);
                 let wrapped = if used == 2 {
                     Node::Strong {
                         children,
-                        source: SourceSpan::default(),
+                        source: span,
                     }
                 } else {
                     Node::Emphasis {
                         children,
-                        source: SourceSpan::default(),
+                        source: span,
                     }
                 };
 
@@ -4400,6 +4414,7 @@ where
                         count: opener_rem,
                         can_open: opener_can_open,
                         can_close: opener_can_close,
+                        byte_pos: opener_byte_pos,
                     });
                 }
                 replacement.push(InlinePiece::Node(wrapped));
@@ -4409,6 +4424,7 @@ where
                         count: closer_rem,
                         can_open,
                         can_close,
+                        byte_pos: closer_byte_pos + used,
                     });
                 }
 

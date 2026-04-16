@@ -53,12 +53,19 @@ enum Compartment {
         // without removing/inserting the view (which causes the parent stack to
         // re-layout sibling text and visually jump).
         table_handles: Option<table::TableHandles>,
+        /// Remote image URLs introduced by this block view (e.g. images
+        /// inside table cells). Cancelled when the compartment is removed.
+        image_urls: Vec<String>,
     },
 }
 
 struct TextBlockEntry {
     id: CorrelationId,
     range: NSRange,
+    /// Remote image URLs introduced by this block, kept so we can cancel
+    /// any in-flight downloads if the block is replaced or removed before
+    /// the response arrives.
+    image_urls: Vec<String>,
 }
 
 impl BlockSink<()> {
@@ -227,6 +234,7 @@ impl<R> BlockSink<R> {
             blocks.push(TextBlockEntry {
                 id,
                 range: NSRange::new(insert_loc, len),
+                image_urls: Vec::new(),
             });
             self.element_map.insert(
                 id,
@@ -250,6 +258,7 @@ impl<R> BlockSink<R> {
                 blocks: vec![TextBlockEntry {
                     id,
                     range: NSRange::new(0, len),
+                    image_urls: Vec::new(),
                 }],
             });
             self.element_map.insert(
@@ -288,6 +297,7 @@ impl<R> BlockSink<R> {
             view,
             id,
             table_handles,
+            image_urls: Vec::new(),
         });
         self.element_map
             .insert(id, ElementLocation::BlockView { compartment_index });
@@ -428,6 +438,7 @@ impl<R> BlockSink<R> {
                     view: old_view,
                     id: existing_id,
                     table_handles: old_handles,
+                    ..
                 } = &mut self.compartments[compartment_index]
                 else {
                     return Ok(());
@@ -524,7 +535,7 @@ impl<R> BlockSink<R> {
         Ok(())
     }
 
-    fn register_pending_images(&self, ctx: &RenderCtx, compartment_index: usize) {
+    fn register_pending_images(&mut self, ctx: &RenderCtx, compartment_index: usize) {
         let pending = ctx
             .pending_images
             .borrow_mut()
@@ -533,12 +544,31 @@ impl<R> BlockSink<R> {
         if pending.is_empty() {
             return;
         }
-        if let Compartment::TextRun {
-            content_storage, ..
-        } = &self.compartments[compartment_index]
-        {
-            for p in pending {
-                super::image_loader::load(&p.url, &p.attachment, content_storage, self.mtm);
+        match &mut self.compartments[compartment_index] {
+            Compartment::TextRun {
+                content_storage,
+                blocks,
+                ..
+            } => {
+                for p in pending {
+                    super::image_loader::load(&p.url, &p.attachment, content_storage, self.mtm);
+                    if let Some(last) = blocks.last_mut() {
+                        last.image_urls.push(p.url);
+                    }
+                }
+            }
+            Compartment::BlockView {
+                image_urls, view, ..
+            } => {
+                // BlockViews don't own a content storage, but we still register
+                // the load against a synthetic placeholder content storage held
+                // by the view's text views (tables) — for now, just track URLs
+                // for cancellation. The image_loader.load call needs a content
+                // storage; until BlockView wiring lands, we record only.
+                let _ = view;
+                for p in pending {
+                    image_urls.push(p.url);
+                }
             }
         }
     }
@@ -575,6 +605,9 @@ impl<R> BlockSink<R> {
                     entry.range.location =
                         (entry.range.location as isize - removed.range.length as isize) as usize;
                 }
+                for url in &removed.image_urls {
+                    super::image_loader::cancel(url);
+                }
 
                 // If the run is now empty, remove the compartment.
                 if blocks.is_empty() {
@@ -587,14 +620,20 @@ impl<R> BlockSink<R> {
                 }
             }
             ElementLocation::BlockView { compartment_index } => {
-                let Compartment::BlockView { view, .. } = &self.compartments[compartment_index]
+                let Compartment::BlockView {
+                    view, image_urls, ..
+                } = &self.compartments[compartment_index]
                 else {
                     return;
                 };
                 self.stack_view.removeArrangedSubview(view);
                 view.removeFromSuperview();
+                let urls: Vec<String> = image_urls.clone();
                 self.compartments.remove(compartment_index);
                 shift_compartment_indices(&mut self.element_map, compartment_index, -1);
+                for url in &urls {
+                    super::image_loader::cancel(url);
+                }
             }
         }
     }

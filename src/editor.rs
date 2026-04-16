@@ -305,6 +305,37 @@ mod tests {
     }
 
     #[test]
+    fn inline_emphasis_span_maps_back_to_source() {
+        let mut doc = EditableDocument::new(Parser::<()>::new());
+        let _ = doc.set_source("hello *world* end").unwrap();
+        let para = &doc.blocks()[0].node;
+        let Node::Paragraph { children, .. } = para else {
+            panic!("expected paragraph");
+        };
+        let emphasis = children
+            .iter()
+            .find(|c| matches!(c, Node::Emphasis { .. }))
+            .expect("expected emphasis child");
+        let span = emphasis.source();
+        assert_eq!(&doc.source()[span.start..span.end], "*world*");
+    }
+
+    #[test]
+    fn inline_strong_span_maps_back_to_source() {
+        let mut doc = EditableDocument::new(Parser::<()>::new());
+        let _ = doc.set_source("a **bold** b").unwrap();
+        let Node::Paragraph { children, .. } = &doc.blocks()[0].node else {
+            panic!("expected paragraph");
+        };
+        let strong = children
+            .iter()
+            .find(|c| matches!(c, Node::Strong { .. }))
+            .expect("expected strong child");
+        let span = strong.source();
+        assert_eq!(&doc.source()[span.start..span.end], "**bold**");
+    }
+
+    #[test]
     fn inline_code_span_maps_back_to_source() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
         let _ = doc.set_source("hello `code` end").unwrap();
