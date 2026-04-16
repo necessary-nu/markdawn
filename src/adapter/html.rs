@@ -1,7 +1,6 @@
 use core::fmt;
 
 use crate::node::{AlertKind, Emission, Node, StreamItem, TableAlignment};
-use crate::parser::filter_disallowed_html;
 use crate::sink::Sink;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +42,7 @@ impl<Ext> RenderHtmlCustom<Ext> for () {
 
 pub struct HtmlAdapter<R = ()> {
     custom: R,
+    html_filter: crate::HtmlFilter,
     #[cfg(feature = "highlight")]
     highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SpanHighlighter>>>,
     #[cfg(feature = "pikchr")]
@@ -59,6 +59,7 @@ impl HtmlAdapter<()> {
     pub fn new() -> Self {
         Self {
             custom: (),
+            html_filter: crate::HtmlFilter::safe(),
             #[cfg(feature = "highlight")]
             highlighter: core::cell::RefCell::new(None),
             #[cfg(feature = "pikchr")]
@@ -69,11 +70,23 @@ impl HtmlAdapter<()> {
     pub fn with_custom_renderer<Custom>(custom: Custom) -> HtmlAdapter<Custom> {
         HtmlAdapter {
             custom,
+            html_filter: crate::HtmlFilter::safe(),
             #[cfg(feature = "highlight")]
             highlighter: core::cell::RefCell::new(None),
             #[cfg(feature = "pikchr")]
             pikchr: false,
         }
+    }
+}
+
+impl<R> HtmlAdapter<R> {
+    /// Override the HTML tag filter applied to every `Node::Html` (and
+    /// every block-level type 1 HTML block — we no longer pass type 1
+    /// blocks through unfiltered). Default is [`HtmlFilter::safe`].
+    /// Pass [`HtmlFilter::unrestricted`] to opt in to raw HTML.
+    pub fn with_html_filter(mut self, filter: crate::HtmlFilter) -> Self {
+        self.html_filter = filter;
+        self
     }
 }
 
@@ -387,11 +400,10 @@ impl<R> HtmlAdapter<R> {
                 out.push_str("</code></pre>\n");
             }
             Node::Html { html, .. } => {
-                if is_type1_html_block(html) {
-                    out.push_str(html);
-                } else {
-                    out.push_str(&filter_disallowed_html(html));
-                }
+                // Always filter, regardless of GFM-spec type 1 exception.
+                // Consumers who really want raw HTML configure
+                // `HtmlFilter::unrestricted` on the adapter.
+                out.push_str(&self.html_filter.filter(html));
                 if !html.ends_with('\n') {
                     out.push('\n');
                 }
@@ -579,7 +591,7 @@ impl<R> HtmlAdapter<R> {
                 escape_html(math, out);
                 out.push_str("</code>");
             }
-            Node::Html { html, .. } => out.push_str(html),
+            Node::Html { html, .. } => out.push_str(&self.html_filter.filter(html)),
             Node::SoftBreak { .. } => out.push('\n'),
             Node::HardBreak { .. } => out.push_str("<br />\n"),
             Node::Custom {
@@ -782,6 +794,7 @@ impl<S, R> HtmlSink<S, R> {
             inner,
             adapter: HtmlAdapter {
                 custom,
+                html_filter: crate::HtmlFilter::safe(),
                 #[cfg(feature = "highlight")]
                 highlighter: core::cell::RefCell::new(None),
                 #[cfg(feature = "pikchr")]
@@ -851,27 +864,6 @@ fn escape_html(text: &str, out: &mut String) {
             _ => out.push(ch),
         }
     }
-}
-
-/// Type 1 HTML block tags (pre, script, style, textarea) are pass-through
-/// blocks whose content is raw HTML.  The disallowed-tag filter must NOT
-/// mangle these because the tag itself forms the block.
-fn is_type1_html_block(html: &str) -> bool {
-    const TYPE1_TAGS: &[&str] = &["pre", "script", "style", "textarea"];
-    let trimmed = html.trim_start();
-    for tag in TYPE1_TAGS {
-        let open = format!("<{tag}");
-        if trimmed.len() >= open.len() {
-            let candidate = &trimmed[..open.len()];
-            if candidate.eq_ignore_ascii_case(&open) {
-                let after = trimmed[open.len()..].chars().next();
-                if after.is_none_or(|ch| matches!(ch, ' ' | '\t' | '>' | '\n')) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
 }
 
 fn is_block_like<Ext>(children: &[Node<Ext>]) -> bool {

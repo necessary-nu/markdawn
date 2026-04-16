@@ -4,6 +4,7 @@ mod error;
 mod ext;
 #[cfg(feature = "highlight")]
 mod highlight;
+mod html_filter;
 mod node;
 mod parser;
 mod serializer;
@@ -29,6 +30,7 @@ pub use crate::adapter::{HtmlAdapter, HtmlError, HtmlSink, RenderHtmlCustom};
 pub use crate::editor::EditableDocument;
 pub use crate::error::{Error, ErrorLocation, StreamError};
 pub use crate::ext::{BlockMatch, Extension, InlineMatch};
+pub use crate::html_filter::{HtmlFilter, SAFE_DISALLOWED_TAGS};
 pub use crate::node::{
     AlertKind, CorrelationId, Emission, Node, SourceSpan, StreamItem, TableAlignment,
 };

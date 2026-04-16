@@ -80,12 +80,13 @@ impl<Ext> RenderDioxusCustom<Ext> for () {
     }
 }
 
-/// Stateful renderer that bundles parser options, an optional syntax
-/// highlighter, and an optional custom-extension renderer. Reusable across
-/// many `render` calls.
+/// Stateful renderer that bundles parser options, an HTML tag filter, an
+/// optional syntax highlighter, and an optional custom-extension renderer.
+/// Reusable across many `render` calls.
 pub struct Renderer<R = ()> {
     options: DioxusOptions,
     custom: R,
+    html_filter: crate::HtmlFilter,
     #[cfg(feature = "highlight")]
     highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SpanHighlighter>>>,
 }
@@ -101,6 +102,7 @@ impl<R> Renderer<R> {
         Self {
             options: DioxusOptions::default(),
             custom,
+            html_filter: crate::HtmlFilter::safe(),
             #[cfg(feature = "highlight")]
             highlighter: core::cell::RefCell::new(None),
         }
@@ -108,6 +110,13 @@ impl<R> Renderer<R> {
 
     pub fn with_options(mut self, options: DioxusOptions) -> Self {
         self.options = options;
+        self
+    }
+
+    /// Override the HTML tag filter (default [`crate::HtmlFilter::safe`]).
+    /// Pass [`crate::HtmlFilter::unrestricted`] to opt in to raw HTML.
+    pub fn with_html_filter(mut self, filter: crate::HtmlFilter) -> Self {
+        self.html_filter = filter;
         self
     }
 
@@ -204,7 +213,7 @@ impl<R> Renderer<R> {
             }
             Node::ThematicBreak { .. } => rsx! { hr {} },
             Node::Html { html, .. } => {
-                let safe = crate::parser::filter_disallowed_html(html);
+                let safe = self.html_filter.filter(html);
                 rsx! { div { dangerous_inner_html: safe } }
             }
             Node::Text { text, .. } => rsx! { "{text}" },
@@ -877,6 +886,18 @@ mod tests {
             !html.contains("<script>") || html.contains("&lt;script"),
             "expected script tag filtered, got: {html}"
         );
+    }
+
+    #[test]
+    fn unrestricted_filter_passes_script_through() {
+        let src = "<script>foo</script>";
+        let html = ssr(Renderer::default()
+            .with_html_filter(crate::HtmlFilter::unrestricted())
+            .render(src));
+        // Dioxus's dangerous_inner_html doesn't escape, but the SSR output
+        // still HTML-escapes the result of dangerous_inner_html attribute
+        // setting. Either way, the tag should NOT be neutered (no &lt;script).
+        assert!(!html.contains("&lt;script"), "got: {html}");
     }
 
     #[cfg(feature = "pikchr")]
