@@ -163,9 +163,10 @@ impl<R> Renderer<R> {
         R: RenderDioxusCustom<Ext>,
     {
         match node {
-            Node::Document { children, .. }
-            | Node::FootnoteSection { children, .. }
-            | Node::DefinitionList { children, .. } => self.render_children(children),
+            Node::Document { children, .. } | Node::DefinitionList { children, .. } => {
+                self.render_children(children)
+            }
+            Node::FootnoteSection { children, .. } => self.render_footnote_section(children),
             Node::Paragraph { children, .. } => rsx! { p { {self.render_children(children)} } },
             Node::Heading {
                 level, children, ..
@@ -177,18 +178,14 @@ impl<R> Renderer<R> {
             Node::List {
                 ordered,
                 start,
+                tight,
                 children,
                 ..
-            } => self.render_list(*ordered, *start, children),
-            Node::Item { children, .. } => rsx! { li { {self.render_children(children)} } },
+            } => self.render_list(*ordered, *start, tight.unwrap_or(true), children),
+            Node::Item { children, .. } => self.render_item(children, false, false),
             Node::TaskItem {
                 checked, children, ..
-            } => rsx! {
-                li {
-                    input { r#type: "checkbox", disabled: true, checked: *checked }
-                    {self.render_children(children)}
-                }
-            },
+            } => self.render_item(children, true, *checked),
             Node::Table {
                 alignments,
                 header,
@@ -206,9 +203,10 @@ impl<R> Renderer<R> {
                 self.render_code_block(info.as_deref(), literal)
             }
             Node::ThematicBreak { .. } => rsx! { hr {} },
-            Node::Html { html, .. } => rsx! {
-                div { dangerous_inner_html: html.clone() }
-            },
+            Node::Html { html, .. } => {
+                let safe = crate::parser::filter_disallowed_html(html);
+                rsx! { div { dangerous_inner_html: safe } }
+            }
             Node::Text { text, .. } => rsx! { "{text}" },
             Node::Emphasis { children, .. } => rsx! { em { {self.render_children(children)} } },
             Node::Strong { children, .. } => rsx! { strong { {self.render_children(children)} } },
@@ -242,10 +240,12 @@ impl<R> Renderer<R> {
                 ..
             } => render_footnote_ref(label, *number, *ref_num),
             Node::FootnoteDefinition {
-                label, children, ..
-            } => rsx! {
-                li { id: format!("fn-{label}"), {self.render_children(children)} }
-            },
+                label,
+                number,
+                backref_count,
+                children,
+                ..
+            } => self.render_footnote_definition(label, *number, *backref_count, children),
             Node::DefinitionTerm { children, .. } => rsx! {
                 dt { {self.render_children(children)} }
             },
@@ -298,18 +298,158 @@ impl<R> Renderer<R> {
         }
     }
 
-    fn render_list<Ext>(&self, ordered: bool, start: Option<u64>, children: &[Node<Ext>]) -> Element
+    fn render_list<Ext>(
+        &self,
+        ordered: bool,
+        start: Option<u64>,
+        tight: bool,
+        children: &[Node<Ext>],
+    ) -> Element
     where
         R: RenderDioxusCustom<Ext>,
     {
+        let items = rsx! {
+            for child in children.iter() { {self.render_list_child(child, tight)} }
+        };
         if ordered {
             let start = start.unwrap_or(1);
+            rsx! { ol { start: start as i64, {items} } }
+        } else {
+            rsx! { ul { {items} } }
+        }
+    }
+
+    fn render_list_child<Ext>(&self, node: &Node<Ext>, tight: bool) -> Element
+    where
+        R: RenderDioxusCustom<Ext>,
+    {
+        match node {
+            Node::Item { children, .. } => {
+                self.render_item_with_tight(children, false, false, tight)
+            }
+            Node::TaskItem {
+                checked, children, ..
+            } => self.render_item_with_tight(children, true, *checked, tight),
+            other => self.render_node(other),
+        }
+    }
+
+    fn render_item<Ext>(&self, children: &[Node<Ext>], task: bool, checked: bool) -> Element
+    where
+        R: RenderDioxusCustom<Ext>,
+    {
+        // Standalone item (outside a List context). Default to tight rendering
+        // since CommonMark single-item lists are tight.
+        self.render_item_with_tight(children, task, checked, true)
+    }
+
+    fn render_item_with_tight<Ext>(
+        &self,
+        children: &[Node<Ext>],
+        task: bool,
+        checked: bool,
+        tight: bool,
+    ) -> Element
+    where
+        R: RenderDioxusCustom<Ext>,
+    {
+        let body = rsx! {
+            for (i, child) in children.iter().enumerate() {
+                {self.render_item_child(child, i, children.len(), tight)}
+            }
+        };
+        if task {
             rsx! {
-                ol { start: start as i64, {self.render_children(children)} }
+                li {
+                    input { r#type: "checkbox", disabled: true, checked: checked }
+                    " "
+                    {body}
+                }
             }
         } else {
-            rsx! {
-                ul { {self.render_children(children)} }
+            rsx! { li { {body} } }
+        }
+    }
+
+    fn render_item_child<Ext>(
+        &self,
+        child: &Node<Ext>,
+        idx: usize,
+        total: usize,
+        tight: bool,
+    ) -> Element
+    where
+        R: RenderDioxusCustom<Ext>,
+    {
+        if tight {
+            if let Node::Paragraph {
+                children: inlines, ..
+            } = child
+            {
+                // Tight list: skip the <p> wrapper, optionally insert a soft
+                // break between consecutive paragraphs.
+                let leading_break = idx > 0;
+                return rsx! {
+                    if leading_break { "\n" }
+                    {self.render_children(inlines)}
+                };
+            }
+        }
+        let _ = total;
+        self.render_node(child)
+    }
+
+    fn render_footnote_section<Ext>(&self, children: &[Node<Ext>]) -> Element
+    where
+        R: RenderDioxusCustom<Ext>,
+    {
+        if children.is_empty() {
+            return rsx! {};
+        }
+        rsx! {
+            section { class: "footnotes", "data-footnotes": "true",
+                ol { {self.render_children(children)} }
+            }
+        }
+    }
+
+    fn render_footnote_definition<Ext>(
+        &self,
+        label: &str,
+        number: u32,
+        backref_count: u32,
+        children: &[Node<Ext>],
+    ) -> Element
+    where
+        R: RenderDioxusCustom<Ext>,
+    {
+        let id = format!("fn-{label}");
+        // Append backref(s) to the last paragraph, or as a tail if the last
+        // child isn't a paragraph (matches the HTML adapter behavior).
+        if children.is_empty() {
+            return rsx! {
+                li { id: id, {render_footnote_backrefs(label, number, backref_count)} }
+            };
+        }
+        let last_idx = children.len() - 1;
+        rsx! {
+            li { id: id,
+                for (idx, child) in children.iter().enumerate() {
+                    if idx == last_idx {
+                        if let Node::Paragraph { children: inlines, .. } = child {
+                            p {
+                                {self.render_children(inlines)}
+                                " "
+                                {render_footnote_backrefs(label, number, backref_count)}
+                            }
+                        } else {
+                            {self.render_node(child)}
+                            {render_footnote_backrefs(label, number, backref_count)}
+                        }
+                    } else {
+                        {self.render_node(child)}
+                    }
+                }
             }
         }
     }
@@ -494,6 +634,45 @@ fn render_footnote_ref(label: &str, number: u32, ref_num: u32) -> Element {
     }
 }
 
+fn render_footnote_backrefs(label: &str, number: u32, count: u32) -> Element {
+    let count = count.max(1);
+    rsx! {
+        for i in 1..=count {
+            {
+                let href = if i > 1 {
+                    format!("#fnref-{label}-{i}")
+                } else {
+                    format!("#fnref-{label}")
+                };
+                let idx = if i > 1 {
+                    format!("{number}-{i}")
+                } else {
+                    number.to_string()
+                };
+                let aria = if i > 1 {
+                    format!("Back to reference {number}-{i}")
+                } else {
+                    format!("Back to reference {number}")
+                };
+                rsx! {
+                    if i > 1 { " " }
+                    a {
+                        href: href,
+                        class: "footnote-backref",
+                        "data-footnote-backref": "true",
+                        "data-footnote-backref-idx": idx,
+                        "aria-label": aria,
+                        "↩"
+                        if i > 1 {
+                            sup { class: "footnote-ref", "{i}" }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -623,6 +802,81 @@ mod tests {
         assert!(html.contains("type=\"checkbox\""));
         assert!(html.contains("disabled"));
         assert!(html.contains("checked"));
+    }
+
+    #[test]
+    fn tight_list_strips_paragraph_wrapper() {
+        let html = ssr(render_markdown(
+            "- one\n- two\n- three",
+            DioxusOptions::default(),
+        ));
+        // Tight list: <li>one</li>, NOT <li><p>one</p></li>
+        assert!(
+            !html.contains("<p>one"),
+            "tight list shouldn't wrap in <p>: {html}"
+        );
+        assert!(html.contains("<li>one"), "got: {html}");
+    }
+
+    #[test]
+    fn loose_list_keeps_paragraph_wrapper() {
+        // Blank line between items → loose list
+        let html = ssr(render_markdown(
+            "- one\n\n- two\n",
+            DioxusOptions::default(),
+        ));
+        assert!(
+            html.contains("<p>one</p>"),
+            "loose list should wrap in <p>: {html}"
+        );
+    }
+
+    #[test]
+    fn footnote_section_wraps_in_section_and_ol() {
+        let src = "see[^1]\n\n[^1]: a footnote";
+        let html = ssr(render_markdown(
+            src,
+            DioxusOptions {
+                gfm: true,
+                ..Default::default()
+            },
+        ));
+        assert!(html.contains("<section class=\"footnotes\""), "got: {html}");
+        assert!(html.contains("data-footnotes"), "got: {html}");
+        assert!(html.contains("<ol>"), "got: {html}");
+        assert!(html.contains("id=\"fn-1\""), "got: {html}");
+    }
+
+    #[test]
+    fn footnote_definition_appends_backref() {
+        let src = "see[^1]\n\n[^1]: a footnote";
+        let html = ssr(render_markdown(
+            src,
+            DioxusOptions {
+                gfm: true,
+                ..Default::default()
+            },
+        ));
+        assert!(html.contains("class=\"footnote-backref\""), "got: {html}");
+        assert!(html.contains("href=\"#fnref-1\""), "got: {html}");
+        assert!(html.contains("↩"), "expected backref arrow: {html}");
+    }
+
+    #[test]
+    fn html_block_strips_dangerous_tags() {
+        let src = "<script>alert('xss')</script>\n\nsafe";
+        let html = ssr(render_markdown(
+            src,
+            DioxusOptions {
+                gfm: true,
+                ..Default::default()
+            },
+        ));
+        // The tagfilter replaces `<` with `&lt;` for disallowed tags
+        assert!(
+            !html.contains("<script>") || html.contains("&lt;script"),
+            "expected script tag filtered, got: {html}"
+        );
     }
 
     #[cfg(feature = "pikchr")]
