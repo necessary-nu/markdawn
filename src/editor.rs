@@ -39,6 +39,8 @@ pub struct EditableDocument<Ext = ()> {
     blocks: Vec<LiveBlock<Ext>>,
     parser: Parser<Ext>,
     next_id: CorrelationId,
+    /// Block ID currently being shown in raw-source form (cursor inside).
+    cursor_block_id: Option<CorrelationId>,
 }
 
 impl<Ext> EditableDocument<Ext>
@@ -54,6 +56,7 @@ where
             blocks: Vec::new(),
             parser,
             next_id: 1,
+            cursor_block_id: None,
         }
     }
 
@@ -90,20 +93,100 @@ where
     ///
     /// `range` is in byte offsets into the current source. Panics if the
     /// range is invalid (out of bounds or not on a UTF-8 boundary).
+    ///
+    /// Internally uses block-window reparse: only blocks at or after the
+    /// edit position are reparsed; unchanged prefix blocks keep their IDs
+    /// and are not re-emitted.
     pub fn edit(
         &mut self,
         range: Range<usize>,
         replacement: &str,
     ) -> Result<Vec<StreamItem<Node<Ext>>>, Error> {
+        let edit_start = range.start;
         self.source.replace_range(range, replacement);
-        self.reparse()
+        self.reparse_from(edit_start)
+    }
+
+    /// Move the editing cursor to `byte_offset` (or `None` to clear). Returns
+    /// the events the renderer should consume to switch the previously-
+    /// cursored block back to its formatted rendering and the newly-
+    /// cursored block to a raw-source rendering (a `Node::CodeBlock` with
+    /// `info = "markdown"`).
+    ///
+    /// This is the Bear-style "reveal source under cursor" pattern.
+    /// Adapters that don't want this behaviour can ignore the cursor.
+    pub fn set_cursor(&mut self, byte_offset: Option<usize>) -> Vec<StreamItem<Node<Ext>>> {
+        use crate::node::{Emission, SourceSpan};
+
+        let new_id = byte_offset.and_then(|c| self.block_at(c)).map(|b| b.id);
+        if new_id == self.cursor_block_id {
+            return Vec::new();
+        }
+        let mut events = Vec::new();
+
+        // Re-emit the previous cursor block as formatted.
+        if let Some(prev_id) = self.cursor_block_id {
+            if let Some(block) = self.blocks.iter().find(|b| b.id == prev_id) {
+                events.push(StreamItem::Upsert(Emission {
+                    id: prev_id,
+                    provisional: block.provisional,
+                    node: block.node.clone(),
+                }));
+            }
+        }
+
+        // Emit the new cursor block as raw markdown source.
+        if let Some(id) = new_id {
+            if let Some(block) = self.blocks.iter().find(|b| b.id == id) {
+                let span = block.node.source();
+                let raw = self
+                    .source
+                    .get(span.start..span.end)
+                    .unwrap_or("")
+                    .trim_end_matches('\n')
+                    .to_string();
+                events.push(StreamItem::Upsert(Emission {
+                    id,
+                    provisional: block.provisional,
+                    node: Node::CodeBlock {
+                        info: Some("markdown".to_string()),
+                        literal: raw,
+                        source: SourceSpan::new(span.start, span.end),
+                    },
+                }));
+            }
+        }
+
+        self.cursor_block_id = new_id;
+        events
     }
 
     fn reparse(&mut self) -> Result<Vec<StreamItem<Node<Ext>>>, Error> {
-        let blocks = self.parser.parse_full(&self.source)?;
-        let previous = std::mem::take(&mut self.blocks);
-        let (new_blocks, events) = reconcile_blocks(previous, blocks, &mut self.next_id);
-        self.blocks = new_blocks;
+        self.reparse_from(0)
+    }
+
+    /// Reparse from the first block whose source span overlaps `edit_start`
+    /// onward. Blocks before that point are left untouched.
+    fn reparse_from(&mut self, edit_start: usize) -> Result<Vec<StreamItem<Node<Ext>>>, Error> {
+        let split_idx = self
+            .blocks
+            .iter()
+            .position(|b| b.node.source().end > edit_start)
+            .unwrap_or(self.blocks.len());
+
+        let prefix_byte_end = if split_idx == 0 {
+            0
+        } else {
+            self.blocks[split_idx - 1].node.source().end
+        };
+
+        let suffix_source = &self.source[prefix_byte_end..];
+        let suffix_blocks = self.parser.parse_full_at(suffix_source, prefix_byte_end)?;
+
+        let old_suffix: Vec<LiveBlock<Ext>> = self.blocks.drain(split_idx..).collect();
+        let (new_suffix_live, events) =
+            reconcile_blocks(old_suffix, suffix_blocks, &mut self.next_id);
+        self.blocks.extend(new_suffix_live);
         Ok(events)
     }
 }
@@ -222,11 +305,65 @@ mod tests {
     }
 
     #[test]
+    fn inline_code_span_maps_back_to_source() {
+        let mut doc = EditableDocument::new(Parser::<()>::new());
+        let _ = doc.set_source("hello `code` end").unwrap();
+        let para = &doc.blocks()[0].node;
+        let Node::Paragraph { children, .. } = para else {
+            panic!("expected paragraph");
+        };
+        let code = children
+            .iter()
+            .find(|c| matches!(c, Node::CodeSpan { .. }))
+            .expect("expected code span");
+        let span = code.source();
+        let slice = &doc.source()[span.start..span.end];
+        assert_eq!(slice, "`code`");
+    }
+
+    #[test]
     fn block_at_returns_none_for_blank_line_between_blocks() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
         let _ = doc.set_source("first\n\nsecond").unwrap();
         // Offset 6 is the "\n" between blocks
         assert!(doc.block_at(6).is_none());
+    }
+
+    #[test]
+    fn cursor_swaps_block_to_raw_source_and_back() {
+        let mut doc = EditableDocument::new(Parser::<()>::new());
+        let _ = doc.set_source("hello *world*\n\nsecond").unwrap();
+        let first_id = doc.blocks()[0].id;
+
+        // Move cursor inside the first block.
+        let events = doc.set_cursor(Some(3));
+        // Should emit one Upsert: the first block as raw CodeBlock.
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            StreamItem::Upsert(em) => {
+                assert_eq!(em.id, first_id);
+                assert!(matches!(
+                    em.node,
+                    Node::CodeBlock {
+                        info: Some(ref s),
+                        ..
+                    } if s == "markdown"
+                ));
+            }
+            _ => panic!("expected Upsert"),
+        }
+
+        // Move cursor away — should emit two Upserts: first block back to
+        // formatted (Paragraph), no second swap.
+        let events = doc.set_cursor(Some(15));
+        assert_eq!(events.len(), 2);
+        match &events[0] {
+            StreamItem::Upsert(em) => {
+                assert_eq!(em.id, first_id);
+                assert!(matches!(em.node, Node::Paragraph { .. }));
+            }
+            _ => panic!("expected Upsert for previous cursor block"),
+        }
     }
 
     #[test]

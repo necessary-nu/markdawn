@@ -12,7 +12,9 @@ use dispatch2::MainThreadBound;
 use objc2::rc::Retained;
 use objc2::{MainThreadMarker, Message};
 use objc2_core_foundation::{CGPoint, CGRect, CGSize};
-use objc2_foundation::{NSData, NSError, NSRange, NSString, NSURL, NSURLResponse, NSURLSession};
+use objc2_foundation::{
+    NSData, NSError, NSRange, NSString, NSURL, NSURLResponse, NSURLSession, NSURLSessionDataTask,
+};
 use objc2_ui_kit::{
     NSTextAttachment, NSTextContentStorage, NSTextElementProvider, NSTextStorageObserving, UIImage,
 };
@@ -28,6 +30,9 @@ type BoundEntry = MainThreadBound<PendingEntry>;
 
 struct LoaderState {
     pending: Mutex<HashMap<String, Vec<BoundEntry>>>,
+    /// In-flight `NSURLSessionDataTask` per URL, kept so we can `.cancel()`
+    /// when the consumer decides the image is no longer wanted.
+    tasks: Mutex<HashMap<String, Retained<NSURLSessionDataTask>>>,
 }
 
 // NSCache requires Send+Sync bounds on key/value types that objc2's generics
@@ -45,6 +50,7 @@ static SHARED: OnceLock<LoaderState> = OnceLock::new();
 fn shared() -> &'static LoaderState {
     SHARED.get_or_init(|| LoaderState {
         pending: Mutex::new(HashMap::new()),
+        tasks: Mutex::new(HashMap::new()),
     })
 }
 
@@ -105,7 +111,27 @@ fn start_fetch(url: &str) {
     );
 
     let task = unsafe { session.dataTaskWithURL_completionHandler(&ns_url, &block) };
+    if let Ok(mut tasks) = shared().tasks.lock() {
+        tasks.insert(url.to_string(), task.clone());
+    }
     task.resume();
+}
+
+/// Cancel any in-flight image download for `url` and discard pending
+/// attachments. Safe to call from any thread; the actual `.cancel()` message
+/// to `NSURLSessionDataTask` is thread-safe per Apple docs.
+pub fn cancel(url: &str) {
+    let task = if let Ok(mut tasks) = shared().tasks.lock() {
+        tasks.remove(url)
+    } else {
+        None
+    };
+    if let Some(task) = task {
+        task.cancel();
+    }
+    if let Ok(mut pending) = shared().pending.lock() {
+        pending.remove(url);
+    }
 }
 
 fn handle_completion(url: &str, data_ptr: *mut NSData, error_ptr: *mut NSError) {
@@ -144,6 +170,9 @@ fn handle_completion(url: &str, data_ptr: *mut NSData, error_ptr: *mut NSError) 
         let mut pending = shared().pending.lock().unwrap();
         pending.remove(url).unwrap_or_default()
     };
+    if let Ok(mut tasks) = shared().tasks.lock() {
+        tasks.remove(url);
+    }
 
     if entries.is_empty() {
         return;
@@ -159,9 +188,35 @@ fn handle_completion(url: &str, data_ptr: *mut NSData, error_ptr: *mut NSError) 
 }
 
 fn fail(url: &str) {
-    if let Ok(mut pending) = shared().pending.lock() {
-        pending.remove(url);
+    let entries: Vec<BoundEntry> = match shared().pending.lock() {
+        Ok(mut pending) => pending.remove(url).unwrap_or_default(),
+        Err(_) => return,
+    };
+    if entries.is_empty() {
+        return;
     }
+    dispatch2::run_on_main(move |mtm| {
+        let error = error_image_for_mtm(mtm);
+        for bound in entries {
+            let entry = bound.get(mtm);
+            if let Some(image) = error.as_ref() {
+                apply_image(&entry.attachment, image);
+            }
+            invalidate_layout(&entry.content_storage);
+        }
+    });
+}
+
+/// Return a generic "loading" SF Symbol UIImage. Called from the main thread
+/// only. `None` if SF Symbols are unavailable.
+pub(crate) fn placeholder_image() -> Option<Retained<UIImage>> {
+    let name = NSString::from_str("photo");
+    UIImage::systemImageNamed(&name)
+}
+
+fn error_image_for_mtm(_mtm: MainThreadMarker) -> Option<Retained<UIImage>> {
+    let name = NSString::from_str("exclamationmark.triangle");
+    UIImage::systemImageNamed(&name)
 }
 
 fn apply_image(attachment: &NSTextAttachment, image: &UIImage) {

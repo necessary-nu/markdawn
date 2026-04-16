@@ -12,5 +12,6 @@ mod syntax;
 mod views;
 
 pub use self::block_sink::BlockSink;
+pub use self::image_loader::cancel as cancel_image_load;
 pub use self::render::{RenderCtx, RenderUIKitCustom, TextRenderer, UIKitError};
 pub use self::style::UIKitStyle;

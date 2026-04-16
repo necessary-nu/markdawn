@@ -243,9 +243,14 @@ impl<Ext> Parser<Ext> {
 
     /// Parse a complete source string in one shot, bypassing the streaming
     /// state machine. Returns the parsed top-level blocks with their
-    /// `source` spans populated to byte ranges in the normalized source.
-    /// Used by `EditableDocument` to reparse on each edit.
-    pub(crate) fn parse_full(&mut self, source: &str) -> Result<Vec<ParsedBlock<Ext>>, Error>
+    /// `source` spans populated to byte ranges relative to `base_offset`
+    /// (the byte offset of `source` within an outer document). Used by
+    /// `EditableDocument` for both full and block-window reparse.
+    pub(crate) fn parse_full_at(
+        &mut self,
+        source: &str,
+        base_offset: usize,
+    ) -> Result<Vec<ParsedBlock<Ext>>, Error>
     where
         Ext: Clone + PartialEq,
     {
@@ -277,17 +282,23 @@ impl<Ext> Parser<Ext> {
             Some(&mut ranges),
         )?;
 
-        // Assign byte spans to top-level blocks based on captured line ranges.
+        // Assign byte spans to top-level blocks based on captured line ranges,
+        // then offset descendant inline spans (currently relative to the
+        // inline input) into the same source coordinate space. `base_offset`
+        // shifts everything so spans are valid in the outer source.
         for (block, range) in blocks.iter_mut().zip(ranges.iter()) {
             let start = line_offsets
                 .get(range.start)
                 .copied()
-                .unwrap_or(self.buffer.len());
+                .unwrap_or(self.buffer.len())
+                + base_offset;
             let end = line_offsets
                 .get(range.end)
                 .copied()
-                .unwrap_or(self.buffer.len());
-            set_top_level_span(&mut block.node, SourceSpan::new(start, end));
+                .unwrap_or(self.buffer.len())
+                + base_offset;
+            *block.node.source_mut() = SourceSpan::new(start, end);
+            offset_descendant_spans(&mut block.node, start);
         }
 
         if self.gfm {
@@ -1858,6 +1869,7 @@ impl<Ext> Parser<Ext> {
         let mut parser = InlineParser {
             input: text,
             index: 0,
+            base_offset: 0,
             extensions: &self.extensions,
             provisional,
             refs,
@@ -2144,6 +2156,18 @@ struct SplitLines {
 
 // gfm[impl preliminaries.characters-and-lines.line-definition]
 // gfm[impl preliminaries.characters-and-lines.blank-line-definition]
+/// Add `offset` to the `source` span of every descendant of `node` (NOT the
+/// node itself — its span is already absolute). Used to translate
+/// inline-relative spans produced by `InlineParser` into source-absolute
+/// coordinates.
+fn offset_descendant_spans<Ext>(node: &mut Node<Ext>, offset: usize) {
+    node.for_each_child_mut(|child| {
+        let span = child.source();
+        *child.source_mut() = SourceSpan::new(span.start + offset, span.end + offset);
+        offset_descendant_spans(child, offset);
+    });
+}
+
 /// Compute byte offsets where each line starts in `text`. Result has
 /// `lines + 1` entries: the last is `text.len()` (exclusive end of the last
 /// line). Line index `i`'s byte range is `result[i]..result[i+1]`.
@@ -2158,48 +2182,6 @@ fn compute_line_offsets(text: &str) -> Vec<usize> {
         offsets.push(text.len());
     }
     offsets
-}
-
-/// Set `source` on a top-level block node. Used by `parse_full` to assign
-/// byte spans after parsing.
-fn set_top_level_span<Ext>(node: &mut Node<Ext>, span: SourceSpan) {
-    match node {
-        Node::Document { source, .. }
-        | Node::Paragraph { source, .. }
-        | Node::Heading { source, .. }
-        | Node::BlockQuote { source, .. }
-        | Node::List { source, .. }
-        | Node::Item { source, .. }
-        | Node::TaskItem { source, .. }
-        | Node::Table { source, .. }
-        | Node::TableRow { source, .. }
-        | Node::TableCell { source, .. }
-        | Node::Text { source, .. }
-        | Node::Emphasis { source, .. }
-        | Node::Strong { source, .. }
-        | Node::Strikethrough { source, .. }
-        | Node::Subscript { source, .. }
-        | Node::Superscript { source, .. }
-        | Node::Highlight { source, .. }
-        | Node::Link { source, .. }
-        | Node::Image { source, .. }
-        | Node::CodeSpan { source, .. }
-        | Node::CodeBlock { source, .. }
-        | Node::MathInline { source, .. }
-        | Node::MathBlock { source, .. }
-        | Node::Html { source, .. }
-        | Node::SoftBreak { source, .. }
-        | Node::HardBreak { source, .. }
-        | Node::ThematicBreak { source, .. }
-        | Node::FootnoteRef { source, .. }
-        | Node::FootnoteDefinition { source, .. }
-        | Node::FootnoteSection { source, .. }
-        | Node::Alert { source, .. }
-        | Node::DefinitionList { source, .. }
-        | Node::DefinitionTerm { source, .. }
-        | Node::DefinitionDescription { source, .. }
-        | Node::Custom { source, .. } => *source = span,
-    }
 }
 
 fn split_lines(text: &str) -> SplitLines {
@@ -3204,6 +3186,11 @@ fn is_setext_underline(line: &str) -> bool {
 struct InlineParser<'a, Ext> {
     input: &'a str,
     index: usize,
+    /// Byte offset of `input` within the source document. Inline nodes get
+    /// `source` spans relative to this base — e.g. for a paragraph whose
+    /// content runs from byte 42 in source, `base_offset = 42` so an inline
+    /// at `index = 5..10` gets `source = SourceSpan { start: 47, end: 52 }`.
+    base_offset: usize,
     extensions: &'a [Box<dyn Extension<Ext>>],
     refs: &'a ReferenceDefinitions,
     footnote_labels: &'a FootnoteLabels,
@@ -3211,6 +3198,14 @@ struct InlineParser<'a, Ext> {
     gfm: bool,
     math: bool,
     highlights: bool,
+}
+
+impl<'a, Ext> InlineParser<'a, Ext> {
+    /// Build a `SourceSpan` from the byte range `[start, self.index)` in
+    /// `input`, translated to source coordinates via `base_offset`.
+    fn span_from(&self, start: usize) -> SourceSpan {
+        SourceSpan::new(self.base_offset + start, self.base_offset + self.index)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3285,245 +3280,266 @@ where
                 }
             }
 
-            if let Some(InlineMatch { consumed, node }) = self.try_extension() {
-                if consumed == 0
-                    || self.index + consumed > self.input.len()
-                    || !self.input.is_char_boundary(self.index + consumed)
-                {
-                    return Err(Error::InvalidExtensionMatch);
-                }
+            let iter_start = self.index;
+            let pieces_len_before = pieces.len();
 
-                flush_text_piece(&mut pieces, &mut text);
-                pieces.push(InlinePiece::Node(node));
-                self.index += consumed;
-                continue;
-            }
-
-            // Math: \(...\) emits MathInline, \[...\] always emits MathBlock
-            // (display math is block-level even when written inline). Must
-            // precede the backslash-escape handler.
-            if self.math
-                && (self.remaining().starts_with("\\(") || self.remaining().starts_with("\\["))
-            {
-                if let Some((math, display)) = self.try_math_backslash_span() {
-                    flush_text_piece(&mut pieces, &mut text);
-                    pieces.push(InlinePiece::Node(if display {
-                        Node::MathBlock {
-                            math,
-                            source: SourceSpan::default(),
-                        }
-                    } else {
-                        Node::MathInline {
-                            math,
-                            source: SourceSpan::default(),
-                        }
-                    }));
-                    continue;
-                }
-            }
-
-            if self.remaining().starts_with("\\\n") {
-                flush_text_piece(&mut pieces, &mut text);
-                pieces.push(InlinePiece::Node(Node::HardBreak {
-                    source: SourceSpan::default(),
-                }));
-                self.index += 2;
-                while self.index < self.input.len()
-                    && self.input.as_bytes().get(self.index) == Some(&b' ')
-                {
-                    self.index += 1;
-                }
-                continue;
-            }
-
-            if self.remaining().starts_with('\n') {
-                let trailing_spaces = text.chars().rev().take_while(|ch| *ch == ' ').count();
-                let is_hard = trailing_spaces >= 2;
-                if is_hard {
-                    while text.ends_with(' ') {
-                        text.pop();
+            'iter: {
+                if let Some(InlineMatch { consumed, node }) = self.try_extension() {
+                    if consumed == 0
+                        || self.index + consumed > self.input.len()
+                        || !self.input.is_char_boundary(self.index + consumed)
+                    {
+                        return Err(Error::InvalidExtensionMatch {
+                            location: Some(crate::error::ErrorLocation {
+                                byte_offset: self.base_offset + self.index,
+                            }),
+                        });
                     }
+
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(node));
+                    self.index += consumed;
+                    break 'iter;
+                }
+
+                // Math: \(...\) emits MathInline, \[...\] always emits MathBlock
+                // (display math is block-level even when written inline). Must
+                // precede the backslash-escape handler.
+                if self.math
+                    && (self.remaining().starts_with("\\(") || self.remaining().starts_with("\\["))
+                {
+                    if let Some((math, display)) = self.try_math_backslash_span() {
+                        flush_text_piece(&mut pieces, &mut text);
+                        pieces.push(InlinePiece::Node(if display {
+                            Node::MathBlock {
+                                math,
+                                source: SourceSpan::default(),
+                            }
+                        } else {
+                            Node::MathInline {
+                                math,
+                                source: SourceSpan::default(),
+                            }
+                        }));
+                        break 'iter;
+                    }
+                }
+
+                if self.remaining().starts_with("\\\n") {
                     flush_text_piece(&mut pieces, &mut text);
                     pieces.push(InlinePiece::Node(Node::HardBreak {
                         source: SourceSpan::default(),
                     }));
-                } else {
-                    flush_text_piece(&mut pieces, &mut text);
-                    pieces.push(InlinePiece::Node(Node::SoftBreak {
-                        source: SourceSpan::default(),
-                    }));
-                }
-                self.index += 1;
-                if is_hard {
+                    self.index += 2;
                     while self.index < self.input.len()
                         && self.input.as_bytes().get(self.index) == Some(&b' ')
                     {
                         self.index += 1;
                     }
+                    break 'iter;
                 }
-                continue;
-            }
 
-            if self.remaining().starts_with('`') {
-                if let Some(code) = self.try_code_span() {
-                    flush_text_piece(&mut pieces, &mut text);
-                    pieces.push(InlinePiece::Node(Node::CodeSpan {
-                        code,
-                        source: SourceSpan::default(),
-                    }));
-                    continue;
-                }
-                // No matching closer — consume entire backtick run as literal text
-                let run = self.remaining().chars().take_while(|ch| *ch == '`').count();
-                for _ in 0..run {
-                    text.push('`');
-                }
-                self.index += run;
-                continue;
-            }
-
-            if self.math && self.remaining().starts_with('$') {
-                if let Some((math, display)) = self.try_math_span() {
-                    flush_text_piece(&mut pieces, &mut text);
-                    pieces.push(InlinePiece::Node(if display {
-                        Node::MathBlock {
-                            math,
-                            source: SourceSpan::default(),
+                if self.remaining().starts_with('\n') {
+                    let trailing_spaces = text.chars().rev().take_while(|ch| *ch == ' ').count();
+                    let is_hard = trailing_spaces >= 2;
+                    if is_hard {
+                        while text.ends_with(' ') {
+                            text.pop();
                         }
+                        flush_text_piece(&mut pieces, &mut text);
+                        pieces.push(InlinePiece::Node(Node::HardBreak {
+                            source: SourceSpan::default(),
+                        }));
                     } else {
-                        Node::MathInline {
-                            math,
+                        flush_text_piece(&mut pieces, &mut text);
+                        pieces.push(InlinePiece::Node(Node::SoftBreak {
                             source: SourceSpan::default(),
+                        }));
+                    }
+                    self.index += 1;
+                    if is_hard {
+                        while self.index < self.input.len()
+                            && self.input.as_bytes().get(self.index) == Some(&b' ')
+                        {
+                            self.index += 1;
                         }
-                    }));
-                    continue;
+                    }
+                    break 'iter;
                 }
-            }
 
-            if let Some(node) = self.try_autolink() {
-                flush_text_piece(&mut pieces, &mut text);
-                pieces.push(InlinePiece::Node(node));
-                continue;
-            }
-
-            if self.gfm {
-                if let Some(node) = self.try_autolink_literal() {
-                    flush_text_piece(&mut pieces, &mut text);
-                    pieces.push(InlinePiece::Node(node));
-                    continue;
+                if self.remaining().starts_with('`') {
+                    if let Some(code) = self.try_code_span() {
+                        flush_text_piece(&mut pieces, &mut text);
+                        pieces.push(InlinePiece::Node(Node::CodeSpan {
+                            code,
+                            source: SourceSpan::default(),
+                        }));
+                        break 'iter;
+                    }
+                    // No matching closer — consume entire backtick run as literal text
+                    let run = self.remaining().chars().take_while(|ch| *ch == '`').count();
+                    for _ in 0..run {
+                        text.push('`');
+                    }
+                    self.index += run;
+                    break 'iter;
                 }
-            }
 
-            if let Some(html) = self.try_html_inline() {
-                flush_text_piece(&mut pieces, &mut text);
-                pieces.push(InlinePiece::Node(Node::Html {
-                    html,
-                    source: SourceSpan::default(),
-                }));
-                continue;
-            }
-
-            // If `<` looked like a URI autolink attempt (e.g., `<http://...`)
-            // but failed (space inside, etc.), consume the whole `<...>` as
-            // literal text so a bare URL autolink doesn't grab content within.
-            if self.remaining().starts_with('<') {
-                let after_lt = &self.remaining()[1..];
-                if let Some(close) = after_lt.find('>') {
-                    let body = &after_lt[..close];
-                    if body.contains("://") || body.contains("http") {
-                        text.push('<');
-                        text.push_str(body);
-                        text.push('>');
-                        self.index += 1 + close + 1;
-                        continue;
+                if self.math && self.remaining().starts_with('$') {
+                    if let Some((math, display)) = self.try_math_span() {
+                        flush_text_piece(&mut pieces, &mut text);
+                        pieces.push(InlinePiece::Node(if display {
+                            Node::MathBlock {
+                                math,
+                                source: SourceSpan::default(),
+                            }
+                        } else {
+                            Node::MathInline {
+                                math,
+                                source: SourceSpan::default(),
+                            }
+                        }));
+                        break 'iter;
                     }
                 }
-            }
 
-            if self.gfm {
-                if let Some(node) = self.try_footnote_ref() {
+                if let Some(node) = self.try_autolink() {
                     flush_text_piece(&mut pieces, &mut text);
                     pieces.push(InlinePiece::Node(node));
-                    continue;
+                    break 'iter;
                 }
-            }
 
-            if let Some(node) = self.try_link_or_image()? {
-                flush_text_piece(&mut pieces, &mut text);
-                pieces.push(InlinePiece::Node(node));
-                continue;
-            }
+                if self.gfm {
+                    if let Some(node) = self.try_autolink_literal() {
+                        flush_text_piece(&mut pieces, &mut text);
+                        pieces.push(InlinePiece::Node(node));
+                        break 'iter;
+                    }
+                }
 
-            // GFM strikethrough: runs of 1 or 2 tildes (3+ are literal).
-            if self.gfm && self.remaining().starts_with('~') {
-                let run = self.remaining().chars().take_while(|c| *c == '~').count();
-                if run <= 2 {
-                    let delim: &str = if run == 2 { "~~" } else { "~" };
-                    if let Some(node) = self.try_delimited(delim, false)? {
+                if let Some(html) = self.try_html_inline() {
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(Node::Html {
+                        html,
+                        source: SourceSpan::default(),
+                    }));
+                    break 'iter;
+                }
+
+                // If `<` looked like a URI autolink attempt (e.g., `<http://...`)
+                // but failed (space inside, etc.), consume the whole `<...>` as
+                // literal text so a bare URL autolink doesn't grab content within.
+                if self.remaining().starts_with('<') {
+                    let after_lt = &self.remaining()[1..];
+                    if let Some(close) = after_lt.find('>') {
+                        let body = &after_lt[..close];
+                        if body.contains("://") || body.contains("http") {
+                            text.push('<');
+                            text.push_str(body);
+                            text.push('>');
+                            self.index += 1 + close + 1;
+                            break 'iter;
+                        }
+                    }
+                }
+
+                if self.gfm {
+                    if let Some(node) = self.try_footnote_ref() {
+                        flush_text_piece(&mut pieces, &mut text);
+                        pieces.push(InlinePiece::Node(node));
+                        break 'iter;
+                    }
+                }
+
+                if let Some(node) = self.try_link_or_image()? {
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(node));
+                    break 'iter;
+                }
+
+                // GFM strikethrough: runs of 1 or 2 tildes (3+ are literal).
+                if self.gfm && self.remaining().starts_with('~') {
+                    let run = self.remaining().chars().take_while(|c| *c == '~').count();
+                    if run <= 2 {
+                        let delim: &str = if run == 2 { "~~" } else { "~" };
+                        if let Some(node) = self.try_delimited(delim, false)? {
+                            flush_text_piece(&mut pieces, &mut text);
+                            let Node::Emphasis { children, .. } = node else {
+                                unreachable!()
+                            };
+                            pieces.push(InlinePiece::Node(Node::Strikethrough {
+                                children,
+                                source: SourceSpan::default(),
+                            }));
+                            break 'iter;
+                        }
+                    }
+                }
+
+                if self.highlights && self.remaining().starts_with("==") {
+                    if let Some(node) = self.try_delimited("==", false)? {
                         flush_text_piece(&mut pieces, &mut text);
                         let Node::Emphasis { children, .. } = node else {
                             unreachable!()
                         };
-                        pieces.push(InlinePiece::Node(Node::Strikethrough {
+                        pieces.push(InlinePiece::Node(Node::Highlight {
                             children,
                             source: SourceSpan::default(),
                         }));
-                        continue;
+                        break 'iter;
                     }
                 }
-            }
 
-            if self.highlights && self.remaining().starts_with("==") {
-                if let Some(node) = self.try_delimited("==", false)? {
+                if let Some(run) = self.parse_delimiter_run() {
                     flush_text_piece(&mut pieces, &mut text);
-                    let Node::Emphasis { children, .. } = node else {
-                        unreachable!()
-                    };
-                    pieces.push(InlinePiece::Node(Node::Highlight {
-                        children,
-                        source: SourceSpan::default(),
-                    }));
-                    continue;
+                    pieces.push(InlinePiece::Delimiter {
+                        marker: run.marker,
+                        count: run.count,
+                        can_open: run.can_open,
+                        can_close: run.can_close,
+                    });
+                    self.index += run.count;
+                    break 'iter;
                 }
-            }
 
-            if let Some(run) = self.parse_delimiter_run() {
-                flush_text_piece(&mut pieces, &mut text);
-                pieces.push(InlinePiece::Delimiter {
-                    marker: run.marker,
-                    count: run.count,
-                    can_open: run.can_open,
-                    can_close: run.can_close,
-                });
-                self.index += run.count;
-                continue;
-            }
-
-            if self.remaining().starts_with('\\') {
-                let next_index = self.index + '\\'.len_utf8();
-                if next_index < self.input.len() {
-                    let next = self.input[next_index..].chars().next().unwrap_or('\\');
-                    if is_escapable(next) {
-                        text.push(next);
-                        self.index = next_index + next.len_utf8();
-                        continue;
+                if self.remaining().starts_with('\\') {
+                    let next_index = self.index + '\\'.len_utf8();
+                    if next_index < self.input.len() {
+                        let next = self.input[next_index..].chars().next().unwrap_or('\\');
+                        if is_escapable(next) {
+                            text.push(next);
+                            self.index = next_index + next.len_utf8();
+                            break 'iter;
+                        }
                     }
                 }
+
+                if let Some((consumed, decoded)) = parse_entity_reference(self.remaining()) {
+                    text.push_str(&decoded);
+                    self.index += consumed;
+                    break 'iter;
+                }
+
+                let next = self
+                    .remaining()
+                    .chars()
+                    .next()
+                    .ok_or(Error::MalformedEventStream {
+                        location: Some(crate::error::ErrorLocation {
+                            byte_offset: self.base_offset + self.index,
+                        }),
+                    })?;
+                text.push(next);
+                self.index += next.len_utf8();
             }
 
-            if let Some((consumed, decoded)) = parse_entity_reference(self.remaining()) {
-                text.push_str(&decoded);
-                self.index += consumed;
-                continue;
+            // If a Node piece was just pushed, set its source span based on
+            // the byte range we consumed during this iteration.
+            if pieces.len() > pieces_len_before {
+                if let Some(InlinePiece::Node(node)) = pieces.last_mut() {
+                    *node.source_mut() = self.span_from(iter_start);
+                }
             }
-
-            let next = self
-                .remaining()
-                .chars()
-                .next()
-                .ok_or(Error::MalformedEventStream)?;
-            text.push(next);
-            self.index += next.len_utf8();
         }
 
         flush_text_piece(&mut pieces, &mut text);
@@ -3781,6 +3797,7 @@ where
         let mut inner = InlineParser {
             input: &self.input[inner_start..inner_end],
             index: 0,
+            base_offset: self.base_offset + inner_start,
             extensions: self.extensions,
             refs: self.refs,
             footnote_labels: self.footnote_labels,
@@ -5208,6 +5225,7 @@ where
     let mut parser = InlineParser {
         input: text,
         index: 0,
+        base_offset: 0,
         extensions,
         refs,
         footnote_labels,
@@ -5600,44 +5618,17 @@ fn assign_footnote_ref_numbers<Ext>(
 fn plain_text<Ext>(nodes: &[Node<Ext>]) -> String {
     let mut out = String::new();
     for node in nodes {
-        match node {
+        node.walk(&mut |n| match n {
             Node::Text { text, .. } => out.push_str(text),
             Node::CodeSpan { code, .. } => out.push_str(code),
             Node::SoftBreak { .. } | Node::HardBreak { .. } => out.push(' '),
-            Node::Emphasis { children, .. }
-            | Node::Strong { children, .. }
-            | Node::Strikethrough { children, .. }
-            | Node::Subscript { children, .. }
-            | Node::Superscript { children, .. }
-            | Node::Highlight { children, .. }
-            | Node::Link { children, .. }
-            | Node::Paragraph { children, .. }
-            | Node::Heading { children, .. }
-            | Node::BlockQuote { children, .. }
-            | Node::Alert { children, .. }
-            | Node::DefinitionList { children, .. }
-            | Node::DefinitionTerm { children, .. }
-            | Node::DefinitionDescription { children, .. }
-            | Node::List { children, .. }
-            | Node::Item { children, .. }
-            | Node::TaskItem { children, .. }
-            | Node::Document { children, .. }
-            | Node::FootnoteDefinition { children, .. }
-            | Node::FootnoteSection { children, .. }
-            | Node::Custom { children, .. } => out.push_str(&plain_text(children)),
             Node::FootnoteRef { label, .. } => out.push_str(label),
-            Node::Table { header, rows, .. } => {
-                out.push_str(&plain_text(header));
-                out.push_str(&plain_text(rows));
-            }
-            Node::TableRow { cells, .. } => out.push_str(&plain_text(cells)),
-            Node::TableCell { children, .. } => out.push_str(&plain_text(children)),
             Node::Image { alt, .. } => out.push_str(alt),
             Node::CodeBlock { literal, .. } => out.push_str(literal),
             Node::MathInline { math, .. } | Node::MathBlock { math, .. } => out.push_str(math),
             Node::Html { html, .. } => out.push_str(html),
-            Node::ThematicBreak { .. } => {}
-        }
+            _ => {}
+        });
     }
     out
 }

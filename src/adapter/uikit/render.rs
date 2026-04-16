@@ -810,14 +810,25 @@ fn try_load_image(uri: &str, ctx: &RenderCtx) -> Option<Retained<NSMutableAttrib
     // 3. Remote URL — create placeholder, register for async loading via ctx
     if uri.starts_with("http://") || uri.starts_with("https://") {
         let attachment = NSTextAttachment::new();
-        // Small placeholder bounds so TextKit reserves space
-        attachment.setBounds(objc2_core_foundation::CGRect::new(
-            objc2_core_foundation::CGPoint::ZERO,
-            objc2_core_foundation::CGSize {
-                width: 20.0,
-                height: 20.0,
-            },
-        ));
+        if let Some(placeholder) = super::image_loader::placeholder_image() {
+            unsafe { attachment.setImage(Some(&placeholder)) };
+            let size = unsafe { placeholder.size() };
+            attachment.setBounds(objc2_core_foundation::CGRect::new(
+                objc2_core_foundation::CGPoint::ZERO,
+                objc2_core_foundation::CGSize {
+                    width: size.width.max(20.0),
+                    height: size.height.max(20.0),
+                },
+            ));
+        } else {
+            attachment.setBounds(objc2_core_foundation::CGRect::new(
+                objc2_core_foundation::CGPoint::ZERO,
+                objc2_core_foundation::CGSize {
+                    width: 20.0,
+                    height: 20.0,
+                },
+            ));
+        }
         ctx.pending_images.borrow_mut().push(PendingImage {
             url: uri.to_string(),
             attachment: attachment.clone(),

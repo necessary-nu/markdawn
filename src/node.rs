@@ -231,6 +231,173 @@ pub enum Node<Ext = ()> {
 }
 
 impl<Ext> Node<Ext> {
+    /// Visit each direct child of this node in document order.
+    ///
+    /// For container nodes (`Document`, `Paragraph`, `BlockQuote`, etc.) this
+    /// yields the `children` slice. For `Table` it yields header rows then
+    /// data rows. Leaf nodes (`Text`, `CodeBlock`, `ThematicBreak`, etc.)
+    /// yield nothing.
+    pub fn for_each_child(&self, mut f: impl FnMut(&Node<Ext>)) {
+        match self {
+            Node::Document { children, .. }
+            | Node::Paragraph { children, .. }
+            | Node::Heading { children, .. }
+            | Node::BlockQuote { children, .. }
+            | Node::List { children, .. }
+            | Node::Item { children, .. }
+            | Node::TaskItem { children, .. }
+            | Node::TableRow {
+                cells: children, ..
+            }
+            | Node::TableCell { children, .. }
+            | Node::Emphasis { children, .. }
+            | Node::Strong { children, .. }
+            | Node::Strikethrough { children, .. }
+            | Node::Subscript { children, .. }
+            | Node::Superscript { children, .. }
+            | Node::Highlight { children, .. }
+            | Node::Link { children, .. }
+            | Node::FootnoteDefinition { children, .. }
+            | Node::FootnoteSection { children, .. }
+            | Node::Alert { children, .. }
+            | Node::DefinitionList { children, .. }
+            | Node::DefinitionTerm { children, .. }
+            | Node::DefinitionDescription { children, .. }
+            | Node::Custom { children, .. } => {
+                for child in children {
+                    f(child);
+                }
+            }
+            Node::Table { header, rows, .. } => {
+                for row in header {
+                    f(row);
+                }
+                for row in rows {
+                    f(row);
+                }
+            }
+            Node::Text { .. }
+            | Node::Image { .. }
+            | Node::CodeSpan { .. }
+            | Node::CodeBlock { .. }
+            | Node::MathInline { .. }
+            | Node::MathBlock { .. }
+            | Node::Html { .. }
+            | Node::SoftBreak { .. }
+            | Node::HardBreak { .. }
+            | Node::ThematicBreak { .. }
+            | Node::FootnoteRef { .. } => {}
+        }
+    }
+
+    /// Mutable variant of [`for_each_child`].
+    pub fn for_each_child_mut(&mut self, mut f: impl FnMut(&mut Node<Ext>)) {
+        match self {
+            Node::Document { children, .. }
+            | Node::Paragraph { children, .. }
+            | Node::Heading { children, .. }
+            | Node::BlockQuote { children, .. }
+            | Node::List { children, .. }
+            | Node::Item { children, .. }
+            | Node::TaskItem { children, .. }
+            | Node::TableRow {
+                cells: children, ..
+            }
+            | Node::TableCell { children, .. }
+            | Node::Emphasis { children, .. }
+            | Node::Strong { children, .. }
+            | Node::Strikethrough { children, .. }
+            | Node::Subscript { children, .. }
+            | Node::Superscript { children, .. }
+            | Node::Highlight { children, .. }
+            | Node::Link { children, .. }
+            | Node::FootnoteDefinition { children, .. }
+            | Node::FootnoteSection { children, .. }
+            | Node::Alert { children, .. }
+            | Node::DefinitionList { children, .. }
+            | Node::DefinitionTerm { children, .. }
+            | Node::DefinitionDescription { children, .. }
+            | Node::Custom { children, .. } => {
+                for child in children {
+                    f(child);
+                }
+            }
+            Node::Table { header, rows, .. } => {
+                for row in header {
+                    f(row);
+                }
+                for row in rows {
+                    f(row);
+                }
+            }
+            Node::Text { .. }
+            | Node::Image { .. }
+            | Node::CodeSpan { .. }
+            | Node::CodeBlock { .. }
+            | Node::MathInline { .. }
+            | Node::MathBlock { .. }
+            | Node::Html { .. }
+            | Node::SoftBreak { .. }
+            | Node::HardBreak { .. }
+            | Node::ThematicBreak { .. }
+            | Node::FootnoteRef { .. } => {}
+        }
+    }
+
+    /// Pre-order walk over this node and all descendants. Convenience for
+    /// inspecting an entire tree.
+    pub fn walk(&self, f: &mut impl FnMut(&Node<Ext>)) {
+        f(self);
+        self.for_each_child(|child| child.walk(f));
+    }
+
+    /// Mutable variant of [`walk`].
+    pub fn walk_mut(&mut self, f: &mut impl FnMut(&mut Node<Ext>)) {
+        f(self);
+        self.for_each_child_mut(|child| child.walk_mut(f));
+    }
+
+    /// Returns a mutable reference to this node's `source` span.
+    pub fn source_mut(&mut self) -> &mut SourceSpan {
+        match self {
+            Node::Document { source, .. }
+            | Node::Paragraph { source, .. }
+            | Node::Heading { source, .. }
+            | Node::BlockQuote { source, .. }
+            | Node::List { source, .. }
+            | Node::Item { source, .. }
+            | Node::TaskItem { source, .. }
+            | Node::Table { source, .. }
+            | Node::TableRow { source, .. }
+            | Node::TableCell { source, .. }
+            | Node::Text { source, .. }
+            | Node::Emphasis { source, .. }
+            | Node::Strong { source, .. }
+            | Node::Strikethrough { source, .. }
+            | Node::Subscript { source, .. }
+            | Node::Superscript { source, .. }
+            | Node::Highlight { source, .. }
+            | Node::Link { source, .. }
+            | Node::Image { source, .. }
+            | Node::CodeSpan { source, .. }
+            | Node::CodeBlock { source, .. }
+            | Node::MathInline { source, .. }
+            | Node::MathBlock { source, .. }
+            | Node::Html { source, .. }
+            | Node::SoftBreak { source, .. }
+            | Node::HardBreak { source, .. }
+            | Node::ThematicBreak { source, .. }
+            | Node::FootnoteRef { source, .. }
+            | Node::FootnoteDefinition { source, .. }
+            | Node::FootnoteSection { source, .. }
+            | Node::Alert { source, .. }
+            | Node::DefinitionList { source, .. }
+            | Node::DefinitionTerm { source, .. }
+            | Node::DefinitionDescription { source, .. }
+            | Node::Custom { source, .. } => source,
+        }
+    }
+
     /// Returns the source span of this node.
     pub fn source(&self) -> SourceSpan {
         match self {
