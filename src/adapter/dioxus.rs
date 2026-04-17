@@ -80,6 +80,11 @@ impl<Ext> RenderDioxusCustom<Ext> for () {
     }
 }
 
+/// Callback that returns a per-kind icon to render inside the alert
+/// title. Supplied by the caller so markdawn stays agnostic of any
+/// particular icon library.
+pub type AlertIconFn = Box<dyn Fn(AlertKind) -> Element>;
+
 /// Stateful renderer that bundles parser options, an HTML tag filter, an
 /// optional syntax highlighter, and an optional custom-extension renderer.
 /// Reusable across many `render` calls.
@@ -87,6 +92,7 @@ pub struct Renderer<R = ()> {
     options: DioxusOptions,
     custom: R,
     html_filter: crate::HtmlFilter,
+    alert_icons: Option<AlertIconFn>,
     #[cfg(feature = "highlight")]
     highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SpanHighlighter>>>,
 }
@@ -103,6 +109,7 @@ impl<R> Renderer<R> {
             options: DioxusOptions::default(),
             custom,
             html_filter: crate::HtmlFilter::safe(),
+            alert_icons: None,
             #[cfg(feature = "highlight")]
             highlighter: core::cell::RefCell::new(None),
         }
@@ -117,6 +124,18 @@ impl<R> Renderer<R> {
     /// Pass [`crate::HtmlFilter::unrestricted`] to opt in to raw HTML.
     pub fn with_html_filter(mut self, filter: crate::HtmlFilter) -> Self {
         self.html_filter = filter;
+        self
+    }
+
+    /// Install a per-kind icon renderer for GitHub-style alerts.
+    /// The callback runs once per rendered alert to produce the leading
+    /// icon inside the title row. Markdawn stays icon-library-agnostic —
+    /// the caller picks the glyphs.
+    pub fn with_alert_icons<F>(mut self, render: F) -> Self
+    where
+        F: Fn(AlertKind) -> Element + 'static,
+    {
+        self.alert_icons = Some(Box::new(render));
         self
     }
 
@@ -299,9 +318,15 @@ impl<R> Renderer<R> {
             AlertKind::Warning => ("warning", "Warning"),
             AlertKind::Caution => ("caution", "Caution"),
         };
+        let icon = self.alert_icons.as_ref().map(|f| f(kind));
         rsx! {
             div { class: "markdown-alert markdown-alert-{slug}",
-                p { class: "markdown-alert-title", "{title}" }
+                p { class: "markdown-alert-title",
+                    if let Some(icon) = icon {
+                        span { class: "markdown-alert-icon", {icon} }
+                    }
+                    span { class: "markdown-alert-label", "{title}" }
+                }
                 {self.render_children(children)}
             }
         }
