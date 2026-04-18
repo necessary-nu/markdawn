@@ -3227,6 +3227,32 @@ impl<'a, Ext> InlineParser<'a, Ext> {
     }
 }
 
+impl<'a, Ext> crate::ext::InlineContext<Ext> for InlineParser<'a, Ext>
+where
+    Ext: Clone + PartialEq,
+{
+    fn parse_inline(&self, source: &str) -> Vec<Node<Ext>> {
+        let empty_refs: ReferenceDefinitions = ReferenceDefinitions::new();
+        let empty_labels: FootnoteLabels = FootnoteLabels::new();
+        let mut inner = InlineParser {
+            input: source,
+            index: 0,
+            base_offset: 0,
+            extensions: self.extensions,
+            refs: &empty_refs,
+            footnote_labels: &empty_labels,
+            provisional: false,
+            gfm: self.gfm,
+            math: self.math,
+            highlights: self.highlights,
+        };
+        match inner.parse_until(None) {
+            Ok(nodes) => promote_semantic_html(nodes),
+            Err(_) => Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EmphasisMarker {
     Asterisk,
@@ -3573,7 +3599,7 @@ where
 
     fn try_extension(&self) -> Option<InlineMatch<Ext>> {
         for extension in self.extensions {
-            if let Some(candidate) = extension.try_inline(self.remaining()) {
+            if let Some(candidate) = extension.try_inline_ctx(self.remaining(), self) {
                 return Some(candidate);
             }
         }
@@ -6001,6 +6027,34 @@ mod tests {
         }
     }
 
+    /// Inline extension that wraps `!![text]!!` runs as a TestExt::Note
+    /// node whose children come from recursively parsing `text` via the
+    /// provided `InlineContext`. Used to verify extensions can run the
+    /// full inline parser on captured substrings (emphasis, other
+    /// extensions, etc.).
+    struct NoteInlineExtension;
+
+    impl Extension<TestExt> for NoteInlineExtension {
+        fn try_inline_ctx(
+            &self,
+            input: &str,
+            ctx: &dyn crate::ext::InlineContext<TestExt>,
+        ) -> Option<InlineMatch<TestExt>> {
+            let rest = input.strip_prefix("!![")?;
+            let end = rest.find("]!!")?;
+            let inner = &rest[..end];
+            let children = ctx.parse_inline(inner);
+            Some(InlineMatch {
+                consumed: 3 + inner.len() + 3,
+                node: Node::Custom {
+                    payload: TestExt::Note(inner.to_owned()),
+                    children,
+                    source: SourceSpan::default(),
+                },
+            })
+        }
+    }
+
     /// A block extension that matches `:::note` / `:::` fences and captures
     /// the enclosed body as a single Note payload.
     struct NoteBlockExtension;
@@ -6227,6 +6281,55 @@ mod tests {
                     Node::Text { text: after, .. }
                 ] if before == "before " && after == " after" && payload == &TestExt::Math("x^2".to_owned()))
         ));
+    }
+
+    #[test]
+    fn supports_recursive_inline_parse_from_extension() {
+        // NoteInlineExtension captures `!![...]!!` and recursively parses
+        // the inner text via the InlineContext. Verifies that the full
+        // inline parser runs on the captured substring — in particular,
+        // `*x*` inside the extension's capture becomes a Node::Emphasis
+        // rather than literal text. This proves extensions can run
+        // recursive inline parses without a nested Parser hack.
+        let mut parser = Parser::builder()
+            .with_extension(NoteInlineExtension)
+            .build();
+        let mut sink = VecSink::new();
+        parser
+            .push_str("prefix !![before *italic* after]!! tail", &mut sink)
+            .unwrap();
+        parser.finish(&mut sink).unwrap();
+        let nodes: Vec<_> = sink
+            .items()
+            .iter()
+            .filter_map(|item| match item {
+                StreamItem::Upsert(e) if !e.provisional => Some(e.node.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(nodes.len(), 1);
+        let Node::Paragraph { children, .. } = &nodes[0] else {
+            panic!("expected paragraph, got {:?}", nodes[0]);
+        };
+        assert!(matches!(&children[0], Node::Text { text, .. } if text == "prefix "));
+        let Node::Custom {
+            children: note_children,
+            ..
+        } = &children[1]
+        else {
+            panic!("expected Note custom, got {:?}", children[1]);
+        };
+        let has_emphasis = note_children.iter().any(|n| {
+            matches!(
+                n,
+                Node::Emphasis { children, .. }
+                    if matches!(children.as_slice(), [Node::Text { text, .. }] if text == "italic")
+            )
+        });
+        assert!(
+            has_emphasis,
+            "expected emphasis from recursive parse, got: {note_children:?}"
+        );
     }
 
     #[test]

@@ -10,11 +10,36 @@ pub struct BlockMatch<Ext> {
     pub node: Node<Ext>,
 }
 
+/// Narrow surface allowing extensions to recursively parse a substring as
+/// an inline run. Passed to [`Extension::try_inline_ctx`] so extensions
+/// like `:role[<text>](<target>)` can fully parse `<text>` as markdown
+/// (emphasis, code, nested roles, etc.) rather than treating it as a
+/// literal string.
+pub trait InlineContext<Ext> {
+    /// Parse `source` as a fresh inline run. Returns the inline nodes.
+    /// Reference definitions and footnote labels are NOT inherited from
+    /// the surrounding document — the input is treated as self-contained.
+    fn parse_inline(&self, source: &str) -> Vec<Node<Ext>>;
+}
+
 pub trait Extension<Ext>: Send + Sync {
     /// Called during inline parsing with the remaining input at the current
     /// position. Return `Some(..)` to consume `consumed` bytes and emit a node.
     fn try_inline(&self, _input: &str) -> Option<InlineMatch<Ext>> {
         None
+    }
+
+    /// Context-aware variant of [`Self::try_inline`]. The `ctx` lets the
+    /// extension recursively parse captured substrings with full inline
+    /// semantics, including other registered extensions. Defaults to
+    /// delegating to [`Self::try_inline`] so existing extensions don't
+    /// need changes.
+    fn try_inline_ctx(
+        &self,
+        input: &str,
+        _ctx: &dyn InlineContext<Ext>,
+    ) -> Option<InlineMatch<Ext>> {
+        self.try_inline(input)
     }
 
     /// Called during block parsing with the document's line buffer and the
