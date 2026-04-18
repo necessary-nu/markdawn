@@ -146,7 +146,10 @@ impl<R> HtmlAdapter<R> {
         literal: &str,
         out: &mut String,
     ) -> Result<bool, HtmlError> {
-        let Some(lang) = info else {
+        let Some(lang) = info
+            .and_then(|s| s.split_whitespace().next())
+            .filter(|s| !s.is_empty())
+        else {
             return Ok(false);
         };
         let mut borrow = self.highlighter.borrow_mut();
@@ -182,7 +185,8 @@ impl<R> HtmlAdapter<R> {
     /// Returns `true` if the block was rendered as a pikchr SVG diagram.
     #[cfg(feature = "pikchr")]
     fn try_pikchr_code_block(&self, info: Option<&str>, literal: &str, out: &mut String) -> bool {
-        if !self.pikchr || info != Some("pikchr") {
+        let lang = info.and_then(|s| s.split_whitespace().next());
+        if !self.pikchr || lang != Some("pikchr") {
             return false;
         }
         let options = pikru::RenderOptions {
@@ -382,10 +386,14 @@ impl<R> HtmlAdapter<R> {
                 if !self.try_pikchr_code_block(info.as_deref(), literal, out)
                     && !self.try_highlight_code_block(info.as_deref(), literal, out)?
                 {
-                    match info {
-                        Some(info) => {
+                    let lang = info
+                        .as_deref()
+                        .and_then(|s| s.split_whitespace().next())
+                        .filter(|s| !s.is_empty());
+                    match lang {
+                        Some(lang) => {
                             out.push_str("<pre><code class=\"language-");
-                            escape_html(info, out);
+                            escape_html(lang, out);
                             out.push_str("\">");
                         }
                         None => out.push_str("<pre><code>"),
@@ -417,18 +425,24 @@ impl<R> HtmlAdapter<R> {
                     out.push('\n');
                 }
             }
-            Node::Alert { kind, children, .. } => {
-                let (slug, title) = match kind {
+            Node::Alert {
+                kind,
+                title,
+                children,
+                ..
+            } => {
+                let (slug, default_title) = match kind {
                     AlertKind::Note => ("note", "Note"),
                     AlertKind::Tip => ("tip", "Tip"),
                     AlertKind::Important => ("important", "Important"),
                     AlertKind::Warning => ("warning", "Warning"),
                     AlertKind::Caution => ("caution", "Caution"),
                 };
+                let shown_title = title.as_deref().unwrap_or(default_title);
                 out.push_str("<div class=\"markdown-alert markdown-alert-");
                 out.push_str(slug);
                 out.push_str("\">\n<p class=\"markdown-alert-title\">");
-                out.push_str(title);
+                escape_html(shown_title, out);
                 out.push_str("</p>\n");
                 for child in children {
                     self.write_block(child, out)?;

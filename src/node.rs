@@ -208,6 +208,9 @@ pub enum Node<Ext = ()> {
     },
     Alert {
         kind: AlertKind,
+        /// Optional custom title from `> [!KIND] Title`. When `None`,
+        /// renderers fall back to a default per-kind label (e.g. "Note").
+        title: Option<String>,
         children: Vec<Node<Ext>>,
         source: SourceSpan,
     },

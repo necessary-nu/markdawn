@@ -1991,13 +1991,26 @@ where
     };
 
     let mut children = std::mem::take(children);
+    let mut title: Option<String> = None;
 
     if let Some(Node::Paragraph {
         children: inlines, ..
     }) = children.first_mut()
     {
         if let Some(Node::Text { text, .. }) = inlines.first_mut() {
-            let rest = text[tag_len..].trim_start_matches('\n').to_string();
+            // After `[!KIND]`, anything on the same line (before the first
+            // newline) is an optional custom title; the remainder begins
+            // the body of the alert.
+            let after_tag = &text[tag_len..];
+            let (title_candidate, rest_after_nl) = match after_tag.find('\n') {
+                Some(nl) => (&after_tag[..nl], &after_tag[nl..]),
+                None => (after_tag, ""),
+            };
+            let title_trimmed = title_candidate.trim();
+            if !title_trimmed.is_empty() {
+                title = Some(title_trimmed.to_string());
+            }
+            let rest = rest_after_nl.trim_start_matches('\n').to_string();
             if rest.is_empty() {
                 inlines.remove(0);
                 if let Some(Node::SoftBreak { .. }) = inlines.first() {
@@ -2014,6 +2027,7 @@ where
 
     Some(Node::Alert {
         kind,
+        title,
         children,
         source: SourceSpan::default(),
     })
@@ -3100,8 +3114,13 @@ fn parse_fence_opener(line: &str) -> Option<FenceOpener> {
         return None;
     }
 
-    let first_word = rest.trim().split_whitespace().next().unwrap_or("");
-    let info = (!first_word.is_empty()).then(|| process_escapes_and_entities(first_word));
+    // Per CommonMark: the info string is the full trimmed text after the
+    // opening fence. Downstream consumers that only care about the
+    // "language" (first word) can split themselves — this preserves
+    // trailing attributes needed by custom rewriters (see
+    // `CodeBlockRewriter`).
+    let info_str = rest.trim();
+    let info = (!info_str.is_empty()).then(|| process_escapes_and_entities(info_str));
     Some(FenceOpener {
         marker,
         count,

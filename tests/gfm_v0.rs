@@ -60,10 +60,14 @@ fn render_block(node: &Node<()>, out: &mut String) {
             out.push_str(">\n");
         }
         Node::CodeBlock { info, literal, .. } => {
-            match info {
-                Some(info) => {
+            let lang = info
+                .as_deref()
+                .and_then(|s| s.split_whitespace().next())
+                .filter(|s| !s.is_empty());
+            match lang {
+                Some(lang) => {
                     out.push_str("<pre><code class=\"language-");
-                    escape_html(info, out);
+                    escape_html(lang, out);
                     out.push_str("\">");
                 }
                 None => out.push_str("<pre><code>"),

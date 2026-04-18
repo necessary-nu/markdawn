@@ -95,6 +95,7 @@ pub struct Renderer<R = ()> {
     alert_icons: Option<AlertIconFn>,
     #[cfg(feature = "highlight")]
     highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SpanHighlighter>>>,
+    code_block_rewriters: Vec<Box<dyn crate::ext::CodeBlockRewriter>>,
 }
 
 impl Default for Renderer<()> {
@@ -112,6 +113,7 @@ impl<R> Renderer<R> {
             alert_icons: None,
             #[cfg(feature = "highlight")]
             highlighter: core::cell::RefCell::new(None),
+            code_block_rewriters: Vec::new(),
         }
     }
 
@@ -148,6 +150,20 @@ impl<R> Renderer<R> {
         H: crate::highlight::SpanHighlighter + 'static,
     {
         *self.highlighter.borrow_mut() = Some(Box::new(highlighter));
+        self
+    }
+
+    /// Install a code-block rewriter. Rewriters are invoked inside
+    /// [`render_code_block`](Self::render_code_block) before pikchr /
+    /// highlighter / plain dispatch; the first rewriter that returns
+    /// `Some` replaces the `info` + `literal` fed to the rest of the
+    /// code-block pipeline. Call repeatedly to register multiple
+    /// rewriters — they're tried in registration order.
+    pub fn with_code_block_rewriter<W>(mut self, rewriter: W) -> Self
+    where
+        W: crate::ext::CodeBlockRewriter + 'static,
+    {
+        self.code_block_rewriters.push(Box::new(rewriter));
         self
     }
 }
@@ -202,7 +218,12 @@ impl<R> Renderer<R> {
             Node::BlockQuote { children, .. } => rsx! {
                 blockquote { {self.render_children(children)} }
             },
-            Node::Alert { kind, children, .. } => self.render_alert(*kind, children),
+            Node::Alert {
+                kind,
+                title,
+                children,
+                ..
+            } => self.render_alert(*kind, title.as_deref(), children),
             Node::List {
                 ordered,
                 start,
@@ -307,17 +328,23 @@ impl<R> Renderer<R> {
         }
     }
 
-    fn render_alert<Ext>(&self, kind: AlertKind, children: &[Node<Ext>]) -> Element
+    fn render_alert<Ext>(
+        &self,
+        kind: AlertKind,
+        custom_title: Option<&str>,
+        children: &[Node<Ext>],
+    ) -> Element
     where
         R: RenderDioxusCustom<Ext>,
     {
-        let (slug, title) = match kind {
+        let (slug, default_title) = match kind {
             AlertKind::Note => ("note", "Note"),
             AlertKind::Tip => ("tip", "Tip"),
             AlertKind::Important => ("important", "Important"),
             AlertKind::Warning => ("warning", "Warning"),
             AlertKind::Caution => ("caution", "Caution"),
         };
+        let title = custom_title.unwrap_or(default_title).to_string();
         let icon = self.alert_icons.as_ref().map(|f| f(kind));
         rsx! {
             div { class: "markdown-alert markdown-alert-{slug}",
@@ -331,6 +358,7 @@ impl<R> Renderer<R> {
             }
         }
     }
+
 
     fn render_list<Ext>(
         &self,
@@ -549,9 +577,39 @@ impl<R> Renderer<R> {
     }
 
     fn render_code_block(&self, info: Option<&str>, literal: &str) -> Element {
+        // 0. user-registered rewriters. The first one that returns Some
+        //    substitutes info + literal for the rest of the pipeline; a
+        //    rewriter producing info = Some("pikchr") therefore routes to
+        //    the pikchr branch below, producing info = Some("rust") routes
+        //    through the highlighter, etc.
+        let rewrite_owned;
+        let (info, literal) = if self.code_block_rewriters.is_empty() {
+            (info, literal)
+        } else {
+            let mut rewrite: Option<crate::ext::CodeBlockRewrite> = None;
+            for r in &self.code_block_rewriters {
+                if let Some(rw) = r.rewrite(info, literal) {
+                    rewrite = Some(rw);
+                    break;
+                }
+            }
+            match rewrite {
+                Some(rw) => {
+                    rewrite_owned = rw;
+                    (rewrite_owned.info.as_deref(), rewrite_owned.literal.as_str())
+                }
+                None => (info, literal),
+            }
+        };
+
+        // Helper: the "language" is the first whitespace-delimited word of
+        // the info string. Info strings may carry trailing metadata
+        // (attributes, filenames, etc.) consumed by rewriters.
+        let info_lang = info.map(|s| s.split_whitespace().next().unwrap_or(""));
+
         // 1. pikchr (feature-gated)
         #[cfg(feature = "pikchr")]
-        if self.options.pikchr && info == Some("pikchr") {
+        if self.options.pikchr && info_lang == Some("pikchr") {
             let opts = pikru::RenderOptions {
                 css_variables: true,
             };
@@ -564,7 +622,7 @@ impl<R> Renderer<R> {
 
         // 2. syntax highlighter (feature-gated)
         #[cfg(feature = "highlight")]
-        if let Some(lang) = info {
+        if let Some(lang) = info_lang.filter(|s| !s.is_empty()) {
             let mut borrow = self.highlighter.borrow_mut();
             if let Some(hl) = borrow.as_mut() {
                 if let Some(spans) = hl.spans(lang, literal) {
@@ -584,7 +642,7 @@ impl<R> Renderer<R> {
         }
 
         // 3. plain fallback
-        let class = match info {
+        let class = match info_lang {
             Some(lang) if !lang.is_empty() => format!("language-{lang}"),
             _ => String::new(),
         };
@@ -768,6 +826,38 @@ mod tests {
         assert!(html.contains("markdown-alert-warning"));
         assert!(html.contains(">Warning<"));
         assert!(html.contains("careful"));
+    }
+
+    #[test]
+    fn alert_custom_title_overrides_default_label() {
+        let html = ssr(render_markdown(
+            "> [!NOTE] My custom title\n> body paragraph",
+            DioxusOptions {
+                alerts: true,
+                ..Default::default()
+            },
+        ));
+        assert!(
+            html.contains(">My custom title<"),
+            "expected custom title; got: {html}"
+        );
+        assert!(
+            !html.contains(">Note<"),
+            "default label should be replaced; got: {html}"
+        );
+        assert!(html.contains("body paragraph"));
+    }
+
+    #[test]
+    fn alert_without_title_keeps_default_label() {
+        let html = ssr(render_markdown(
+            "> [!NOTE]\n> body",
+            DioxusOptions {
+                alerts: true,
+                ..Default::default()
+            },
+        ));
+        assert!(html.contains(">Note<"), "expected default label; got: {html}");
     }
 
     #[test]
@@ -993,5 +1083,62 @@ mod tests {
             .with_highlighter(StubHl(calls.clone()))
             .render("```\nno-lang\n```"));
         assert_eq!(calls.get(), 0, "no info string → highlighter not called");
+    }
+
+    #[test]
+    fn code_block_rewriter_substitutes_info_and_literal() {
+        struct StubRewriter;
+        impl crate::ext::CodeBlockRewriter for StubRewriter {
+            fn rewrite(
+                &self,
+                info: Option<&str>,
+                _literal: &str,
+            ) -> Option<crate::ext::CodeBlockRewrite> {
+                if info == Some("foo") {
+                    Some(crate::ext::CodeBlockRewrite {
+                        info: Some("bar".into()),
+                        literal: "hello world".into(),
+                    })
+                } else {
+                    None
+                }
+            }
+        }
+
+        let html = ssr(Renderer::default()
+            .with_code_block_rewriter(StubRewriter)
+            .render("```foo\nignored content\n```"));
+        assert!(
+            html.contains("class=\"language-bar\""),
+            "info should be substituted; got: {html}"
+        );
+        assert!(
+            html.contains("hello world"),
+            "literal should be substituted; got: {html}"
+        );
+        assert!(
+            !html.contains("ignored content"),
+            "original literal should not appear; got: {html}"
+        );
+    }
+
+    #[test]
+    fn code_block_rewriter_passes_through_non_matching() {
+        struct NeverMatches;
+        impl crate::ext::CodeBlockRewriter for NeverMatches {
+            fn rewrite(
+                &self,
+                _info: Option<&str>,
+                _literal: &str,
+            ) -> Option<crate::ext::CodeBlockRewrite> {
+                None
+            }
+        }
+
+        let html = ssr(Renderer::default()
+            .with_code_block_rewriter(NeverMatches)
+            .render("```text\nfoo\n```"));
+        assert!(html.contains("class=\"language-text\""), "got: {html}");
+        assert!(html.contains("foo"), "got: {html}");
     }
 }

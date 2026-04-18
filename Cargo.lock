@@ -18,6 +18,56 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "anstream"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "824a212faf96e9acacdbd09febd34438f8f711fb84e09a8916013cd7815ca28d"
+dependencies = [
+ "anstyle",
+ "anstyle-parse",
+ "anstyle-query",
+ "anstyle-wincon",
+ "colorchoice",
+ "is_terminal_polyfill",
+ "utf8parse",
+]
+
+[[package]]
+name = "anstyle"
+version = "1.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "940b3a0ca603d1eade50a4846a2afffd5ef57a9feac2c0e2ec2e14f9ead76000"
+
+[[package]]
+name = "anstyle-parse"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52ce7f38b242319f7cabaa6813055467063ecdc9d355bbb4ce0c68908cd8130e"
+dependencies = [
+ "utf8parse",
+]
+
+[[package]]
+name = "anstyle-query"
+version = "1.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
+dependencies = [
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "anstyle-wincon"
+version = "3.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
+dependencies = [
+ "anstyle",
+ "once_cell_polyfill",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -25,7 +75,7 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "arborium"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-ada",
  "arborium-agda",
@@ -103,6 +153,7 @@ dependencies = [
  "arborium-scala",
  "arborium-scheme",
  "arborium-scss",
+ "arborium-silo",
  "arborium-solidity",
  "arborium-sparql",
  "arborium-sql",
@@ -138,7 +189,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-ada"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -147,7 +198,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-agda"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -156,7 +207,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-asciidoc"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -165,7 +216,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-asm"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -174,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-awk"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -183,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-bash"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -192,7 +243,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-batch"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -201,7 +252,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-c"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -210,7 +261,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-c-sharp"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -219,7 +270,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-caddy"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -228,7 +279,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-capnp"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -237,7 +288,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-cedar"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -246,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-cedarschema"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -255,7 +306,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-clojure"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -264,7 +315,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-cmake"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -273,7 +324,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-cobol"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -282,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-commonlisp"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -291,7 +342,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-cpp"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-c",
  "arborium-sysroot",
@@ -301,7 +352,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-css"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -310,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-d"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -319,7 +370,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-dart"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -328,7 +379,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-devicetree"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -337,7 +388,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-diff"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -346,7 +397,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-dockerfile"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -355,7 +406,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-dot"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -364,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-elisp"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -373,7 +424,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-elixir"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -382,7 +433,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-elm"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -391,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-erlang"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -400,7 +451,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-fish"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -409,7 +460,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-fsharp"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -418,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-gleam"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -427,7 +478,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-glsl"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-c",
  "arborium-sysroot",
@@ -437,7 +488,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-go"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -446,7 +497,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-graphql"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -455,7 +506,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-groovy"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -464,7 +515,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-haskell"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -473,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-hcl"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -482,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-highlight"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-theme",
  "arborium-tree-sitter",
@@ -491,7 +542,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-hlsl"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-cpp",
  "arborium-sysroot",
@@ -501,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-html"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-css",
  "arborium-javascript",
@@ -512,7 +563,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-idris"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -521,7 +572,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-ini"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -530,7 +581,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-java"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -539,7 +590,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-javascript"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -548,7 +599,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-jinja2"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -557,7 +608,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-jq"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -566,7 +617,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-json"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -575,7 +626,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-julia"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -584,7 +635,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-kotlin"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -593,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-lean"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -602,7 +653,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-lua"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -611,7 +662,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-markdown"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-html",
  "arborium-sysroot",
@@ -623,7 +674,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-matlab"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -632,7 +683,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-meson"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -641,7 +692,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-nginx"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -650,7 +701,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-ninja"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -659,7 +710,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-nix"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -668,7 +719,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-objc"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-c",
  "arborium-sysroot",
@@ -678,7 +729,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-ocaml"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -687,7 +738,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-perl"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -696,7 +747,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-php"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -705,7 +756,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-postscript"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -714,7 +765,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-powershell"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -723,7 +774,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-prolog"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -732,7 +783,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-python"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -741,7 +792,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-query"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -750,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-r"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -759,7 +810,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-rego"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -768,7 +819,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-rescript"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -777,7 +828,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-ron"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -786,7 +837,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-ruby"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -795,7 +846,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-rust"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -804,7 +855,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-scala"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -813,7 +864,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-scheme"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -822,7 +873,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-scss"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-css",
  "arborium-sysroot",
@@ -831,8 +882,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "arborium-silo"
+version = "2.16.0"
+dependencies = [
+ "arborium-sysroot",
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "arborium-solidity"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -841,7 +901,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-sparql"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -850,7 +910,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-sql"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -859,7 +919,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-ssh-config"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -868,7 +928,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-starlark"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -877,7 +937,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-styx"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -886,7 +946,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-svelte"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-css",
  "arborium-html",
@@ -900,7 +960,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-swift"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -909,7 +969,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-sysroot"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "cc",
  "dlmalloc",
@@ -917,7 +977,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-textproto"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -926,11 +986,11 @@ dependencies = [
 
 [[package]]
 name = "arborium-theme"
-version = "0.0.0"
+version = "2.16.0"
 
 [[package]]
 name = "arborium-thrift"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -939,7 +999,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-tlaplus"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -948,7 +1008,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-toml"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -957,7 +1017,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-tree-sitter"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -969,7 +1029,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-tsx"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-javascript",
  "arborium-sysroot",
@@ -979,7 +1039,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-typescript"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-javascript",
  "arborium-sysroot",
@@ -989,7 +1049,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-typst"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -998,7 +1058,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-uiua"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1007,7 +1067,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-vb"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1016,7 +1076,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-verilog"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1025,7 +1085,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-vhdl"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1034,7 +1094,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-vim"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1043,7 +1103,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-vue"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-css",
  "arborium-html",
@@ -1057,7 +1117,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-wit"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1066,7 +1126,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-x86asm"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1075,7 +1135,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-xml"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1084,7 +1144,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-yaml"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1093,7 +1153,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-yuri"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1102,7 +1162,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-zig"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1111,7 +1171,7 @@ dependencies = [
 
 [[package]]
 name = "arborium-zsh"
-version = "0.0.0"
+version = "2.16.0"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1222,6 +1282,52 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
+name = "clap"
+version = "4.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ddb117e43bbf7dacf0a4190fef4d345b9bad68dfc649cb349e7d17d28428e51"
+dependencies = [
+ "clap_builder",
+ "clap_derive",
+]
+
+[[package]]
+name = "clap_builder"
+version = "4.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "714a53001bf66416adb0e2ef5ac857140e7dc3a0c48fb28b2f10762fc4b5069f"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "clap_lex",
+ "strsim",
+]
+
+[[package]]
+name = "clap_derive"
+version = "4.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2ce8604710f6733aa641a2b3731eaa1e8b3d9973d5e3565da11800813f997a9"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "clap_lex"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
+
+[[package]]
+name = "colorchoice"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
+
+[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1316,6 +1422,31 @@ checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "crossbeam-deque"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dd111b7b7f7d55b72c0a6ae361660ee5853c9af73f70c3c2ef6858b950e2e51"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-epoch"
+version = "0.9.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.8.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crypto-common"
@@ -1771,6 +1902,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "either"
+version = "1.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
+
+[[package]]
 name = "entities"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2180,6 +2317,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "is_terminal_polyfill"
+version = "1.70.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2390,6 +2533,8 @@ checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
 name = "mathml-core"
 version = "0.1.0"
 dependencies = [
+ "regex",
+ "svgtidy",
  "ttf-parser",
  "xmlem",
 ]
@@ -2657,6 +2802,12 @@ name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "once_cell_polyfill"
+version = "1.70.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "owo-colors"
@@ -2991,6 +3142,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
+name = "rayon"
+version = "1.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb39b166781f92d482534ef4b4b1b2568f42613b53e5b6c160e24cfbfa30926d"
+dependencies = [
+ "either",
+ "rayon-core",
+]
+
+[[package]]
+name = "rayon-core"
+version = "1.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22e18b0f0062d30d4230b2e85ff77fdfe4326feb054b9783a3460d8435c8ab91"
+dependencies = [
+ "crossbeam-deque",
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3300,6 +3471,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388bb28e6ddbee717745963b8932d9a6e24a5d3c93350655f733e938de04d81f"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "svgtidy"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84ea9b1cb76ea5df0f17aa9ebfcddf72aef97e30d5af886137e6373908e92c04"
+dependencies = [
+ "clap",
+ "indexmap",
+ "rayon",
+ "regex",
+ "walkdir",
+ "wasm-bindgen",
+ "xmlparser",
 ]
 
 [[package]]
@@ -3691,6 +3877,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
 
 [[package]]
+name = "utf8parse"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
+
+[[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3946,6 +4138,12 @@ dependencies = [
  "tracing",
  "unic-ucd",
 ]
+
+[[package]]
+name = "xmlparser"
+version = "0.13.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66fee0b777b0f5ac1c69bb06d361268faafa61cd4682ae064a171c16c433e9e4"
 
 [[package]]
 name = "yansi"

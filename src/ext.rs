@@ -24,3 +24,28 @@ pub trait Extension<Ext>: Send + Sync {
         None
     }
 }
+
+/// Replacement `(info, literal)` pair emitted by a [`CodeBlockRewriter`].
+pub struct CodeBlockRewrite {
+    pub info: Option<String>,
+    pub literal: String,
+}
+
+/// Render-time rewriter for fenced code blocks.
+///
+/// Called inside `Renderer::render_code_block` before the built-in pikchr /
+/// syntax-highlighter / plain-fallback dispatch. A rewriter that returns
+/// `Some` replaces the node's `info` + `literal` for rendering purposes
+/// only — the parsed node itself is left unchanged, and the rewritten
+/// values flow through the rest of the code-block pipeline (pikchr picks
+/// up a rewritten `Some("pikchr")` info; the highlighter picks up
+/// a rewritten language tag; unknown languages fall through to plain
+/// output). Rewriters are tried in registration order; the first one that
+/// returns `Some` wins.
+///
+/// This generalizes pikchr's pattern (hardcoded as `info == Some("pikchr")`
+/// inside the renderer) so downstream crates can register their own
+/// info-string handlers.
+pub trait CodeBlockRewriter: Send + Sync {
+    fn rewrite(&self, info: Option<&str>, literal: &str) -> Option<CodeBlockRewrite>;
+}

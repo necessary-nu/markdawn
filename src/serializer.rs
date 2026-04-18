@@ -83,7 +83,12 @@ fn write_block<Ext>(node: &Node<Ext>, out: &mut String, ctx: &mut WriteCtx) {
             }
             ctx.bq_depth -= 1;
         }
-        Node::Alert { kind, children, .. } => {
+        Node::Alert {
+            kind,
+            title,
+            children,
+            ..
+        } => {
             ctx.bq_depth += 1;
             let tag = match kind {
                 AlertKind::Note => "[!NOTE]",
@@ -94,6 +99,10 @@ fn write_block<Ext>(node: &Node<Ext>, out: &mut String, ctx: &mut WriteCtx) {
             };
             out.push_str("> ");
             out.push_str(tag);
+            if let Some(custom) = title {
+                out.push(' ');
+                out.push_str(custom);
+            }
             out.push('\n');
             let mut inner = String::new();
             let mut inner_ctx = ctx.clone();
@@ -498,6 +507,7 @@ mod tests {
     fn alert_serializes_with_tag() {
         let n = Node::<()>::Alert {
             kind: AlertKind::Warning,
+            title: None,
             children: vec![Node::Paragraph {
                 children: vec![Node::Text {
                     text: "be careful".into(),
@@ -508,5 +518,22 @@ mod tests {
             source: s(),
         };
         assert_eq!(serialize(&n), "> [!WARNING]\n> be careful\n");
+    }
+
+    #[test]
+    fn alert_with_custom_title_serializes_title_on_marker_line() {
+        let n = Node::<()>::Alert {
+            kind: AlertKind::Note,
+            title: Some("Custom title".into()),
+            children: vec![Node::Paragraph {
+                children: vec![Node::Text {
+                    text: "body".into(),
+                    source: s(),
+                }],
+                source: s(),
+            }],
+            source: s(),
+        };
+        assert_eq!(serialize(&n), "> [!NOTE] Custom title\n> body\n");
     }
 }
