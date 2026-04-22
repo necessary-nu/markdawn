@@ -47,6 +47,8 @@ pub struct HtmlAdapter<R = ()> {
     highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SpanHighlighter>>>,
     #[cfg(feature = "pikchr")]
     pikchr: bool,
+    #[cfg(feature = "graphviz")]
+    graphviz: bool,
 }
 
 impl Default for HtmlAdapter<()> {
@@ -64,6 +66,8 @@ impl HtmlAdapter<()> {
             highlighter: core::cell::RefCell::new(None),
             #[cfg(feature = "pikchr")]
             pikchr: false,
+            #[cfg(feature = "graphviz")]
+            graphviz: false,
         }
     }
 
@@ -75,6 +79,8 @@ impl HtmlAdapter<()> {
             highlighter: core::cell::RefCell::new(None),
             #[cfg(feature = "pikchr")]
             pikchr: false,
+            #[cfg(feature = "graphviz")]
+            graphviz: false,
         }
     }
 }
@@ -110,6 +116,21 @@ impl<R> HtmlAdapter<R> {
     /// inline SVG diagrams. Parse failures fall back to plain `<pre><code>`.
     pub fn with_pikchr(mut self) -> Self {
         self.pikchr = true;
+        self
+    }
+}
+
+#[cfg(feature = "graphviz")]
+impl<R> HtmlAdapter<R> {
+    /// Render fenced code blocks tagged `dot` or `graphviz` as inline SVG
+    /// diagrams by shelling into libgraphviz via `graphviz-sys`. Parse /
+    /// layout failures fall back to plain `<pre><code>`.
+    ///
+    /// Requires the Graphviz C libraries (`libgvc`, `libcgraph`) available
+    /// at build time (`brew install graphviz` on macOS; the `graphviz-dev`
+    /// package on Debian/Ubuntu).
+    pub fn with_graphviz(mut self) -> Self {
+        self.graphviz = true;
         self
     }
 }
@@ -204,6 +225,33 @@ impl<R> HtmlAdapter<R> {
 
     #[cfg(not(feature = "pikchr"))]
     fn try_pikchr_code_block(
+        &self,
+        _info: Option<&str>,
+        _literal: &str,
+        _out: &mut String,
+    ) -> bool {
+        false
+    }
+
+    /// Returns `true` if the block was rendered as a graphviz SVG diagram.
+    #[cfg(feature = "graphviz")]
+    fn try_graphviz_code_block(&self, info: Option<&str>, literal: &str, out: &mut String) -> bool {
+        let lang = info.and_then(|s| s.split_whitespace().next());
+        if !self.graphviz || !matches!(lang, Some("dot") | Some("graphviz")) {
+            return false;
+        }
+        let Ok(svg) = crate::graphviz::render_dot_to_svg(literal) else {
+            return false;
+        };
+        out.push_str(&svg);
+        if !svg.ends_with('\n') {
+            out.push('\n');
+        }
+        true
+    }
+
+    #[cfg(not(feature = "graphviz"))]
+    fn try_graphviz_code_block(
         &self,
         _info: Option<&str>,
         _literal: &str,
@@ -383,13 +431,18 @@ impl<R> HtmlAdapter<R> {
                 self.write_table_row(node, &[], out)?;
             }
             Node::CodeBlock { info, literal, .. } => {
-                if !self.try_pikchr_code_block(info.as_deref(), literal, out)
+                let lang = info
+                    .as_deref()
+                    .and_then(|s| s.split_whitespace().next())
+                    .filter(|s| !s.is_empty());
+                if matches!(lang, Some("ansi")) {
+                    write_ansi_block(literal, out);
+                } else if matches!(lang, Some("terminal")) {
+                    write_terminal_block(info.as_deref(), literal, out);
+                } else if !self.try_pikchr_code_block(info.as_deref(), literal, out)
+                    && !self.try_graphviz_code_block(info.as_deref(), literal, out)
                     && !self.try_highlight_code_block(info.as_deref(), literal, out)?
                 {
-                    let lang = info
-                        .as_deref()
-                        .and_then(|s| s.split_whitespace().next())
-                        .filter(|s| !s.is_empty());
                     match lang {
                         Some(lang) => {
                             out.push_str("<pre><code class=\"language-");
@@ -813,6 +866,8 @@ impl<S, R> HtmlSink<S, R> {
                 highlighter: core::cell::RefCell::new(None),
                 #[cfg(feature = "pikchr")]
                 pikchr: false,
+                #[cfg(feature = "graphviz")]
+                graphviz: false,
             },
         }
     }
@@ -878,6 +933,104 @@ fn escape_html(text: &str, out: &mut String) {
             _ => out.push(ch),
         }
     }
+}
+
+/// Emit a CSS-only toggleable two-pane wrapper for a `` ```ansi ``
+/// code block. The rendered pane shows SGR-parsed colored spans; the
+/// source pane shows the raw content with escape sequences annotated.
+/// A hidden checkbox + sibling selector flips between the two — no JS.
+///
+/// Only available with the `ansi` Cargo feature.
+#[cfg(feature = "ansi")]
+fn write_ansi_block(literal: &str, out: &mut String) {
+    use core::sync::atomic::{AtomicUsize, Ordering};
+    static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+
+    out.push_str("<div class=\"ansi-block\">");
+    // Self-close the <input> so the same markup is valid in both HTML5
+    // and XHTML (ePub readers parse strict XHTML and choke on open tags).
+    out.push_str(&format!(
+        "<input type=\"checkbox\" id=\"ansi-src-{id}\" class=\"ansi-toggle-input\" aria-hidden=\"true\" />"
+    ));
+    out.push_str(&format!(
+        "<label for=\"ansi-src-{id}\" class=\"ansi-toggle\"><span class=\"ansi-toggle-show\">show source</span><span class=\"ansi-toggle-hide\">show rendered</span></label>"
+    ));
+    out.push_str("<pre class=\"ansi-rendered\"><code class=\"language-ansi\">");
+    out.push_str(&crate::ansi_to_html::ansi_to_html(literal));
+    out.push_str("</code></pre>");
+    out.push_str("<pre class=\"ansi-source\"><code class=\"language-ansi-source\">");
+    out.push_str(&crate::ansi_to_html::ansi_to_annotated_source(literal));
+    out.push_str("</code></pre>");
+    out.push_str("</div>\n");
+}
+
+/// Fallback without the `ansi` feature: plain `<pre><code class="language-ansi">` with escapes visible as literal text.
+#[cfg(not(feature = "ansi"))]
+fn write_ansi_block(literal: &str, out: &mut String) {
+    out.push_str("<pre><code class=\"language-ansi\">");
+    escape_html(literal, out);
+    out.push_str("</code></pre>\n");
+}
+
+/// Emit a terminal-snapshot block. Feeds `literal` through a VT100
+/// emulator and renders the final visible screen, producing the same
+/// two-pane "rendered / show source" toggle as [`write_ansi_block`].
+/// The info-string MAY carry `cols=N rows=N` suffixes to pin the grid;
+/// defaults auto-size (80 cols, auto-trimmed rows).
+///
+/// Only available with the `terminal` Cargo feature.
+#[cfg(feature = "terminal")]
+fn write_terminal_block(info: Option<&str>, literal: &str, out: &mut String) {
+    use core::sync::atomic::{AtomicUsize, Ordering};
+    static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+
+    let (cols, rows) = parse_terminal_geometry(info);
+
+    out.push_str("<div class=\"terminal-block\">");
+    out.push_str(&format!(
+        "<input type=\"checkbox\" id=\"terminal-src-{id}\" class=\"terminal-toggle-input\" aria-hidden=\"true\" />"
+    ));
+    out.push_str(&format!(
+        "<label for=\"terminal-src-{id}\" class=\"terminal-toggle\"><span class=\"terminal-toggle-show\">show source</span><span class=\"terminal-toggle-hide\">show rendered</span></label>"
+    ));
+    out.push_str("<pre class=\"terminal-rendered\"><code class=\"language-terminal\">");
+    out.push_str(&crate::terminal::ansi_snapshot_to_html(literal, cols, rows));
+    out.push_str("</code></pre>");
+    out.push_str("<pre class=\"terminal-source\"><code class=\"language-terminal-source\">");
+    out.push_str(&crate::ansi_to_html::ansi_to_annotated_source(literal));
+    out.push_str("</code></pre>");
+    out.push_str("</div>\n");
+}
+
+/// Fallback without the `terminal` feature: same as `ansi` — just show
+/// the literal bytes with escapes visible as text.
+#[cfg(not(feature = "terminal"))]
+fn write_terminal_block(_info: Option<&str>, literal: &str, out: &mut String) {
+    out.push_str("<pre><code class=\"language-terminal\">");
+    escape_html(literal, out);
+    out.push_str("</code></pre>\n");
+}
+
+/// Parse `cols=N` / `rows=N` out of an info-string like
+/// `terminal cols=120 rows=40`. Unknown tokens are ignored; missing
+/// values fall back to the auto-sizing path in
+/// [`crate::terminal::ansi_snapshot_to_html`].
+#[cfg(feature = "terminal")]
+fn parse_terminal_geometry(info: Option<&str>) -> (Option<u16>, Option<u16>) {
+    let mut cols = None;
+    let mut rows = None;
+    if let Some(info) = info {
+        for token in info.split_whitespace().skip(1) {
+            if let Some(val) = token.strip_prefix("cols=") {
+                cols = val.parse().ok();
+            } else if let Some(val) = token.strip_prefix("rows=") {
+                rows = val.parse().ok();
+            }
+        }
+    }
+    (cols, rows)
 }
 
 fn is_block_like<Ext>(children: &[Node<Ext>]) -> bool {

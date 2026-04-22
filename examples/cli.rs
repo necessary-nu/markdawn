@@ -13,6 +13,8 @@ fn main() {
     let highlight = args.iter().any(|a| a == "--highlight");
     #[cfg(feature = "pikchr")]
     let pikchr = args.iter().any(|a| a == "--pikchr");
+    #[cfg(feature = "graphviz")]
+    let graphviz = args.iter().any(|a| a == "--graphviz");
 
     let mut builder = Parser::<()>::builder();
     if gfm {
@@ -36,6 +38,12 @@ fn main() {
     #[cfg(feature = "pikchr")]
     let adapter = if pikchr {
         adapter.with_pikchr()
+    } else {
+        adapter
+    };
+    #[cfg(feature = "graphviz")]
+    let adapter = if graphviz {
+        adapter.with_graphviz()
     } else {
         adapter
     };

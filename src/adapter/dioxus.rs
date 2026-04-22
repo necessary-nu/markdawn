@@ -52,6 +52,11 @@ pub struct DioxusOptions {
     /// `pikchr` are rendered as inline SVG via `pikru`. No-op otherwise.
     #[cfg(feature = "pikchr")]
     pub pikchr: bool,
+    /// When the `graphviz` feature is enabled, fenced code blocks tagged
+    /// `dot` or `graphviz` are rendered as inline SVG via `graphviz-sys`.
+    /// Requires the Graphviz C libraries at build time. No-op otherwise.
+    #[cfg(feature = "graphviz")]
+    pub graphviz: bool,
 }
 
 impl DioxusOptions {
@@ -65,6 +70,8 @@ impl DioxusOptions {
             definition_lists: true,
             #[cfg(feature = "pikchr")]
             pikchr: true,
+            #[cfg(feature = "graphviz")]
+            graphviz: true,
         }
     }
 }
@@ -359,7 +366,6 @@ impl<R> Renderer<R> {
         }
     }
 
-
     fn render_list<Ext>(
         &self,
         ordered: bool,
@@ -596,7 +602,10 @@ impl<R> Renderer<R> {
             match rewrite {
                 Some(rw) => {
                     rewrite_owned = rw;
-                    (rewrite_owned.info.as_deref(), rewrite_owned.literal.as_str())
+                    (
+                        rewrite_owned.info.as_deref(),
+                        rewrite_owned.literal.as_str(),
+                    )
                 }
                 None => (info, literal),
             }
@@ -607,6 +616,44 @@ impl<R> Renderer<R> {
         // (attributes, filenames, etc.) consumed by rewriters.
         let info_lang = info.map(|s| s.split_whitespace().next().unwrap_or(""));
 
+        // 0.5. ```ansi — render escape sequences as styled HTML via the
+        //      crate-level `ansi_to_html` helper. Dispatches to the
+        //      CSS-only two-pane wrapper so readers can flip to the
+        //      annotated-source view.
+        #[cfg(feature = "ansi")]
+        if info_lang == Some("ansi") {
+            let rendered = crate::ansi_to_html::ansi_to_html(literal);
+            let source = crate::ansi_to_html::ansi_to_annotated_source(literal);
+            let id = {
+                use core::sync::atomic::{AtomicUsize, Ordering};
+                static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+                NEXT_ID.fetch_add(1, Ordering::Relaxed)
+            };
+            let id_str = format!("ansi-src-{id}");
+            return rsx! {
+                div { class: "ansi-block",
+                    input {
+                        r#type: "checkbox",
+                        id: "{id_str}",
+                        class: "ansi-toggle-input",
+                        aria_hidden: "true",
+                    }
+                    label {
+                        r#for: "{id_str}",
+                        class: "ansi-toggle",
+                        span { class: "ansi-toggle-show", "show source" }
+                        span { class: "ansi-toggle-hide", "show rendered" }
+                    }
+                    pre { class: "ansi-rendered",
+                        code { class: "language-ansi", dangerous_inner_html: rendered }
+                    }
+                    pre { class: "ansi-source",
+                        code { class: "language-ansi-source", dangerous_inner_html: source }
+                    }
+                }
+            };
+        }
+
         // 1. pikchr (feature-gated)
         #[cfg(feature = "pikchr")]
         if self.options.pikchr && info_lang == Some("pikchr") {
@@ -616,6 +663,16 @@ impl<R> Renderer<R> {
             if let Ok(svg) = pikru::pikchr_with_options(literal, &opts) {
                 return rsx! {
                     div { class: "pikchr", dangerous_inner_html: svg }
+                };
+            }
+        }
+
+        // 1b. graphviz (feature-gated)
+        #[cfg(feature = "graphviz")]
+        if self.options.graphviz && matches!(info_lang, Some("dot") | Some("graphviz")) {
+            if let Ok(svg) = crate::graphviz::render_dot_to_svg(literal) {
+                return rsx! {
+                    div { class: "graphviz", dangerous_inner_html: svg }
                 };
             }
         }
@@ -857,7 +914,10 @@ mod tests {
                 ..Default::default()
             },
         ));
-        assert!(html.contains(">Note<"), "expected default label; got: {html}");
+        assert!(
+            html.contains(">Note<"),
+            "expected default label; got: {html}"
+        );
     }
 
     #[test]
@@ -1035,6 +1095,29 @@ mod tests {
         let src = "```pikchr\nbox \"Hello\"\n```";
         let html = ssr(render_markdown(src, DioxusOptions::default()));
         // pikchr feature off in options → just a code block
+        assert!(html.contains("<pre>"));
+        assert!(!html.contains("<svg"));
+    }
+
+    #[cfg(feature = "graphviz")]
+    #[test]
+    fn graphviz_block_renders_inline_svg() {
+        let src = "```dot\ndigraph { A -> B }\n```";
+        let html = ssr(Renderer::default()
+            .with_options(DioxusOptions {
+                graphviz: true,
+                ..Default::default()
+            })
+            .render(src));
+        assert!(html.contains("class=\"graphviz\""), "got: {html}");
+        assert!(html.contains("<svg"), "got: {html}");
+    }
+
+    #[cfg(feature = "graphviz")]
+    #[test]
+    fn graphviz_block_falls_back_when_disabled() {
+        let src = "```dot\ndigraph { A -> B }\n```";
+        let html = ssr(render_markdown(src, DioxusOptions::default()));
         assert!(html.contains("<pre>"));
         assert!(!html.contains("<svg"));
     }

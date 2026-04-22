@@ -24,6 +24,8 @@ use crate::sink::Sink;
 use super::element_map::{ElementLocation, ElementMap, shift_compartment_indices};
 use super::render::{RenderCtx, RenderUIKitCustom, TextRenderer, UIKitError};
 use super::style::UIKitStyle;
+#[cfg(feature = "graphviz")]
+use super::views::graphviz;
 #[cfg(feature = "pikchr")]
 use super::views::pikchr;
 use super::views::{blockquote, code_block, table, thematic_break};
@@ -38,6 +40,8 @@ pub struct BlockSink<R = ()> {
     highlighter: Option<Box<dyn crate::highlight::SpanHighlighter>>,
     #[cfg(feature = "pikchr")]
     pikchr: bool,
+    #[cfg(feature = "graphviz")]
+    graphviz: bool,
 }
 
 enum Compartment {
@@ -90,6 +94,8 @@ impl BlockSink<()> {
             highlighter: None,
             #[cfg(feature = "pikchr")]
             pikchr: false,
+            #[cfg(feature = "graphviz")]
+            graphviz: false,
         }
     }
 }
@@ -108,6 +114,8 @@ impl<R> BlockSink<R> {
             highlighter: None,
             #[cfg(feature = "pikchr")]
             pikchr: false,
+            #[cfg(feature = "graphviz")]
+            graphviz: false,
         }
     }
 
@@ -129,6 +137,16 @@ impl<R> BlockSink<R> {
     #[cfg(feature = "pikchr")]
     pub fn with_pikchr(mut self) -> Self {
         self.pikchr = true;
+        self
+    }
+
+    /// Render fenced code blocks tagged `dot` or `graphviz` as vector image
+    /// diagrams via `graphviz-sys`. Parse / layout failures fall back to
+    /// the regular code-block view. Requires libgvc / libcgraph to be
+    /// linkable in the iOS build.
+    #[cfg(feature = "graphviz")]
+    pub fn with_graphviz(mut self) -> Self {
+        self.graphviz = true;
         self
     }
 
@@ -335,6 +353,12 @@ impl<R> BlockSink<R> {
                 #[cfg(feature = "pikchr")]
                 if self.pikchr && info.as_deref() == Some("pikchr") {
                     if let Some(view) = pikchr::try_build_pikchr_view(literal, self.mtm) {
+                        return Ok((view, None));
+                    }
+                }
+                #[cfg(feature = "graphviz")]
+                if self.graphviz && matches!(info.as_deref(), Some("dot") | Some("graphviz")) {
+                    if let Some(view) = graphviz::try_build_graphviz_view(literal, self.mtm) {
                         return Ok((view, None));
                     }
                 }

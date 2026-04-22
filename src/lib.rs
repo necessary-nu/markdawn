@@ -6,6 +6,8 @@ mod ansi_to_html;
 mod editor;
 mod error;
 mod ext;
+#[cfg(feature = "graphviz")]
+mod graphviz;
 #[cfg(feature = "highlight")]
 mod highlight;
 mod html_filter;

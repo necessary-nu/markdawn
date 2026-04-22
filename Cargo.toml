@@ -7,6 +7,7 @@ edition = "2024"
 dioxus = ["dep:dioxus", "dep:dioxus-core"]
 highlight = ["dep:arborium"]
 pikchr = ["dep:pikru", "dep:facet-dessert", "dep:facet-reflect", "dep:facet-path"]
+graphviz = ["dep:graphviz-sys"]
 typst = []
 ansi = ["dep:vte", "dep:strip-ansi-escapes"]
 terminal = ["ansi", "dep:vt100"]
@@ -28,6 +29,7 @@ indexmap = "2"
 mathml-core = { path = "../mathml-rs" }
 percent-encoding = "2.3"
 pikru = { version = "1", optional = true }
+graphviz-sys = { version = "1", optional = true }
 vte = { version = "0.14", optional = true }
 strip-ansi-escapes = { version = "0.2", optional = true }
 vt100 = { version = "0.16", optional = true }
@@ -79,3 +81,4 @@ objc2-ui-kit = { version = "0.3", features = [
 block2 = "0.6"
 dispatch2 = "0.3"
 libc = "0.2"
+
