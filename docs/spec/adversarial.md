@@ -102,6 +102,23 @@ therefore sit in the residual-risk bucket.
 > libgraphviz's HTML-label parser does not open the `SRC` file for
 > image sizing.
 
+> adv[neutralise.numeric-clamps]
+> Render-cost-multiplying numeric attributes must be clamped to
+> sane maxima: `peripheries` to `MAX_PERIPHERIES` (5),
+> `samplepoints` to `MAX_SAMPLEPOINTS` (200), `dpi` to `MAX_DPI`
+> (300). The `layers` and `size` attributes have no legitimate use
+> in untrusted markdown rendering and are renamed entirely.
+> `minlen` is clamped separately by `neutralise.minlen-clamp`.
+
+> adv[neutralise.escape-expansion]
+> Each quoted string containing more than
+> `MAX_ESCAPE_EXPANSIONS_PER_STRING` (20) render-time escape
+> sequences (`\N`, `\G`, `\L`, `\E`, `\T`, `\H`) must be rejected
+> with `LabelEscapeFlood`. These escapes get substituted at render
+> time with node / graph / label / edge / tail / head names, so a
+> default attribute containing many of them applied to many nodes
+> via `node [label="…"]` is a billion-laughs amplifier.
+
 ## Output hardening (post-render SVG sanitiser)
 
 > adv[output.size-cap]

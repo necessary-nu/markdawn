@@ -22,6 +22,27 @@ pub const MAX_RECORD_DEPTH: usize = 16;
 pub const MAX_HTML_DEPTH: usize = 16;
 // adv[impl neutralise.minlen-clamp]
 pub const MAX_MINLEN: u32 = 20;
+/// adv[impl neutralise.numeric-clamps]
+/// `peripheries=100000` draws 100k concentric shapes on a single
+/// node; libgraphviz happily obliges. Clamp to a sane small number.
+pub const MAX_PERIPHERIES: u32 = 5;
+/// adv[impl neutralise.numeric-clamps]
+/// `samplepoints` controls polygon approximation of circles. High
+/// values multiply render cost per rounded shape.
+pub const MAX_SAMPLEPOINTS: u32 = 200;
+/// adv[impl neutralise.numeric-clamps]
+/// `dpi` affects SVG viewBox and downstream browser cost. SVG is
+/// nominally resolution-independent but graphviz scales coordinates
+/// by DPI, so huge values produce huge coordinate space.
+pub const MAX_DPI: u32 = 300;
+/// adv[impl neutralise.escape-expansion]
+/// Maximum number of `\N` / `\G` / `\L` / `\E` / `\T` / `\H`
+/// render-time escape expansions permitted in a single quoted
+/// string. Each gets substituted at render time with the node /
+/// graph / label / edge / tail / head name, so a default attribute
+/// with many escapes applied to many nodes is a billion-laughs
+/// amplifier.
+pub const MAX_ESCAPE_EXPANSIONS_PER_STRING: usize = 20;
 
 #[derive(Debug, Default)]
 pub struct ScanReport {
@@ -221,11 +242,22 @@ impl<'a> Scanner<'a> {
         self.out.push('"');
         self.i += 1;
         self.record_depth = 0;
+        // adv[impl neutralise.escape-expansion] — count backslash-letter
+        // render-time expansions per string and reject excess. `\N`,
+        // `\G`, `\L`, `\E`, `\T`, `\H` get substituted at render time.
+        let mut escape_expansions: usize = 0;
         while self.i < self.bytes.len() {
             let c = self.bytes[self.i];
             if c == b'\\' && self.i + 1 < self.bytes.len() {
+                let next = self.bytes[self.i + 1];
+                if matches!(next, b'N' | b'G' | b'L' | b'E' | b'T' | b'H') {
+                    escape_expansions = escape_expansions.saturating_add(1);
+                    if escape_expansions > MAX_ESCAPE_EXPANSIONS_PER_STRING {
+                        return Err(GraphvizError::LabelEscapeFlood(escape_expansions));
+                    }
+                }
                 self.out.push('\\');
-                self.out.push(self.bytes[self.i + 1] as char);
+                self.out.push(next as char);
                 self.i += 2;
                 continue;
             }
@@ -372,6 +404,9 @@ impl<'a> Scanner<'a> {
             let lower = name.to_ascii_lowercase();
             // adv[impl neutralise.external-file-attrs]
             // adv[impl neutralise.layout-override]
+            // adv[impl neutralise.numeric-clamps] `layers` / `size` have
+            // no legitimate use for untrusted markdown rendering; just
+            // drop them.
             let rename = matches!(
                 lower.as_str(),
                 "image"
@@ -380,9 +415,18 @@ impl<'a> Scanner<'a> {
                     | "imagepath"
                     | "layout"
                     | "stylesheet"
+                    | "layers"
+                    | "size"
             );
             let is_fontname = lower == "fontname";
-            let is_minlen = lower == "minlen";
+            // adv[impl neutralise.numeric-clamps]
+            let clamp_max: Option<u32> = match lower.as_str() {
+                "minlen" => Some(MAX_MINLEN),
+                "peripheries" => Some(MAX_PERIPHERIES),
+                "samplepoints" => Some(MAX_SAMPLEPOINTS),
+                "dpi" => Some(MAX_DPI),
+                _ => None,
+            };
 
             // Emit attribute name (possibly prefixed).
             if rename {
@@ -418,16 +462,16 @@ impl<'a> Scanner<'a> {
                         }
                     }
                 }
-                if is_minlen {
+                if let Some(max) = clamp_max {
                     let trimmed: String = self.out[before_len..]
                         .trim_matches('"')
                         .trim()
                         .to_owned();
                     if let Ok(n) = trimmed.parse::<u32>() {
-                        if n > MAX_MINLEN {
+                        if n > max {
                             self.out.truncate(before_len);
                             self.out.push('"');
-                            self.out.push_str(&MAX_MINLEN.to_string());
+                            self.out.push_str(&max.to_string());
                             self.out.push('"');
                         }
                     }
@@ -449,12 +493,12 @@ impl<'a> Scanner<'a> {
                     self.out.push(self.bytes[self.i] as char);
                     self.i += 1;
                 }
-                if is_minlen {
+                if let Some(max) = clamp_max {
                     let val = self.out[out_value_start..].trim().to_owned();
                     if let Ok(n) = val.parse::<u32>() {
-                        if n > MAX_MINLEN {
+                        if n > max {
                             self.out.truncate(out_value_start);
-                            self.out.push_str(&MAX_MINLEN.to_string());
+                            self.out.push_str(&max.to_string());
                         }
                     }
                 }
@@ -626,5 +670,72 @@ mod tests {
         let (out, _) = scan_and_scrub("digraph { A -> B [minlen=9999] }").unwrap();
         assert!(!out.contains("9999"), "got: {out}");
         assert!(out.contains("minlen=20"), "got: {out}");
+    }
+
+    // adv[verify neutralise.numeric-clamps]
+    #[test]
+    fn peripheries_clamped() {
+        let (out, _) = scan_and_scrub(r#"digraph { A [peripheries=100000] }"#).unwrap();
+        assert!(!out.contains("100000"), "got: {out}");
+        assert!(out.contains("peripheries="), "got: {out}");
+    }
+
+    // adv[verify neutralise.numeric-clamps]
+    #[test]
+    fn samplepoints_clamped() {
+        let (out, _) = scan_and_scrub(r#"digraph { A [samplepoints=50000] }"#).unwrap();
+        assert!(!out.contains("50000"), "got: {out}");
+    }
+
+    // adv[verify neutralise.numeric-clamps]
+    #[test]
+    fn dpi_clamped() {
+        let (out, _) = scan_and_scrub(r#"digraph { graph [dpi=10000]; A -> B }"#).unwrap();
+        assert!(!out.contains("10000"), "got: {out}");
+        assert!(out.contains("dpi="), "got: {out}");
+    }
+
+    // adv[verify neutralise.numeric-clamps]
+    #[test]
+    fn layers_attribute_neutralised() {
+        let (out, _) = scan_and_scrub(r#"digraph { graph [layers="a:b:c"]; A -> B }"#).unwrap();
+        assert!(!out.contains("[layers="), "got: {out}");
+        assert!(out.contains("_layers="), "got: {out}");
+    }
+
+    // adv[verify neutralise.numeric-clamps]
+    #[test]
+    fn size_attribute_neutralised() {
+        let (out, _) = scan_and_scrub(r#"digraph { graph [size="1000,1000!"]; A -> B }"#).unwrap();
+        assert!(!out.contains("[size="), "got: {out}");
+        assert!(out.contains("_size="), "got: {out}");
+    }
+
+    // adv[verify neutralise.numeric-clamps]
+    #[test]
+    fn legitimate_numeric_values_preserved() {
+        let (out, _) = scan_and_scrub(r#"digraph { A [peripheries=2, samplepoints=20] }"#).unwrap();
+        assert!(out.contains("peripheries=2"), "got: {out}");
+        assert!(out.contains("samplepoints=20"), "got: {out}");
+    }
+
+    // adv[verify neutralise.escape-expansion]
+    #[test]
+    fn escape_expansion_flood_rejected() {
+        let src = format!(
+            r#"digraph {{ node [label="{}"]; A; B; C }}"#,
+            "\\N".repeat(MAX_ESCAPE_EXPANSIONS_PER_STRING + 5)
+        );
+        let err = scan_and_scrub(&src).unwrap_err();
+        assert!(matches!(err, GraphvizError::LabelEscapeFlood(_)), "got: {err:?}");
+    }
+
+    // adv[verify neutralise.escape-expansion]
+    #[test]
+    fn normal_escape_use_preserved() {
+        // A couple of \N in a label — common legitimate use ("\N" = node name).
+        let (out, _) = scan_and_scrub(r#"digraph { node [label="name=\N id=\G"]; A; B }"#).unwrap();
+        assert!(out.contains("\\N"), "got: {out}");
+        assert!(out.contains("\\G"), "got: {out}");
     }
 }

@@ -23,8 +23,8 @@ use std::time::Duration;
 mod scrubber;
 
 pub use scrubber::{
-    MAX_ATTRIBUTES, MAX_EDGES, MAX_HTML_DEPTH, MAX_MINLEN, MAX_NODES, MAX_RECORD_DEPTH,
-    MAX_SUBGRAPHS,
+    MAX_ATTRIBUTES, MAX_DPI, MAX_EDGES, MAX_ESCAPE_EXPANSIONS_PER_STRING, MAX_HTML_DEPTH,
+    MAX_MINLEN, MAX_NODES, MAX_PERIPHERIES, MAX_RECORD_DEPTH, MAX_SAMPLEPOINTS, MAX_SUBGRAPHS,
 };
 
 /// Reject DOT source larger than this many bytes before any libgraphviz
@@ -76,6 +76,11 @@ pub enum GraphvizError {
     RecordLabelTooDeep(usize),
     /// HTML-label tag nesting exceeded [`MAX_HTML_DEPTH`].
     HtmlLabelTooDeep(usize),
+    /// A single quoted string contained more than
+    /// [`scrubber::MAX_ESCAPE_EXPANSIONS_PER_STRING`] render-time
+    /// escape sequences (`\N`, `\G`, `\L`, `\E`, `\T`, `\H`). Payload
+    /// is the observed count.
+    LabelEscapeFlood(usize),
     /// Heuristic node count exceeded [`MAX_NODES`].
     TooManyNodes(usize),
     /// Heuristic edge count (expanded for `A -> { … }` shorthand)
@@ -120,6 +125,11 @@ impl fmt::Display for GraphvizError {
             Self::HtmlLabelTooDeep(d) => write!(
                 f,
                 "DOT HTML-label tag nesting is {d}, exceeds cap of {MAX_HTML_DEPTH}"
+            ),
+            Self::LabelEscapeFlood(n) => write!(
+                f,
+                "DOT label has {n} render-time escape sequences, exceeds cap of {}",
+                scrubber::MAX_ESCAPE_EXPANSIONS_PER_STRING
             ),
             Self::TooManyNodes(n) => write!(f, "DOT source has {n} nodes, exceeds cap of {MAX_NODES}"),
             Self::TooManyEdges(n) => write!(f, "DOT source has {n} edges, exceeds cap of {MAX_EDGES}"),
