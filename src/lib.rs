@@ -1,4 +1,8 @@
 mod adapter;
+#[cfg(feature = "ansi")]
+mod ansi_style;
+#[cfg(feature = "ansi")]
+mod ansi_to_html;
 mod editor;
 mod error;
 mod ext;
@@ -9,7 +13,16 @@ mod node;
 mod parser;
 mod serializer;
 mod sink;
+#[cfg(feature = "terminal")]
+mod terminal;
 mod url;
+
+#[cfg(feature = "ansi")]
+pub use crate::ansi_to_html::{ansi_to_annotated_source, ansi_to_html};
+#[cfg(feature = "terminal")]
+pub use crate::terminal::{
+    Cell, TermEmulator, TermGrid, ansi_snapshot_to_ansi, ansi_snapshot_to_html,
+};
 
 #[cfg(feature = "highlight")]
 pub use crate::highlight::SpanHighlighter;
@@ -22,6 +35,10 @@ pub use crate::adapter::dioxus::{
 };
 #[cfg(target_os = "ios")]
 pub use crate::adapter::uikit::cancel_image_load;
+#[cfg(feature = "ansi")]
+pub use crate::adapter::{
+    AnsiAdapter, AnsiError, AnsiOptions, AnsiSink, AnsiWalker, ColorDepth, RenderAnsiCustom,
+};
 #[cfg(target_os = "ios")]
 pub use crate::adapter::{
     BlockSink, RenderCtx, RenderUIKitCustom, TextRenderer, UIKitError, UIKitStyle,
