@@ -1,8 +1,8 @@
 //! Render a pikchr code block as a vector `UIImageView`.
 //!
-//! Pipeline: pikchr source → `pikru::pikchr_with_options` → SVG bytes →
-//! `svg::render_svg` → `UIImage` → `UIImageView` constrained to its native
-//! aspect ratio.
+//! Pipeline: pikchr source → `crate::pikchr_render::render` (input cap
+//! + timeout + panic capture) → SVG bytes → `svg::render_svg` →
+//! `UIImage` → `UIImageView` constrained to its native aspect ratio.
 
 use objc2::rc::Retained;
 use objc2::{MainThreadMarker, MainThreadOnly};
@@ -18,10 +18,7 @@ pub(crate) fn try_build_pikchr_view(
     source: &str,
     mtm: MainThreadMarker,
 ) -> Option<Retained<UIView>> {
-    let options = pikru::RenderOptions {
-        css_variables: true,
-    };
-    let svg_str = pikru::pikchr_with_options(source, &options).ok()?;
+    let svg_str = crate::pikchr_render::render(source).ok()?;
     let image = svg::render_svg(svg_str.as_bytes())?;
 
     let size = unsafe { image.size() };

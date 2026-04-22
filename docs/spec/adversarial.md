@@ -161,6 +161,35 @@ therefore sit in the residual-risk bucket.
 > callback must be restored on exit so a single render doesn't
 > leave `err_sink` as the process-wide handler.
 
+## Pikchr runtime isolation
+
+The pikchr integration mirrors graphviz's defensive layer. `pikru`
+is a pure-Rust wrapper around the embedded libpikchr C library;
+libpikchr is reportedly reentrant, but we apply the same input cap /
+timeout / panic capture / serialisation as the graphviz path for
+uniform posture and defence in depth.
+
+> adv[pikchr.input.byte-cap]
+> Pikchr source exceeding `markdawn::pikchr_render::MAX_PIKCHR_BYTES`
+> (256 KB) must be rejected before calling libpikchr.
+
+> adv[pikchr.render.timeout]
+> Each pikchr render call must enforce a wall-clock timeout
+> (`PIKCHR_RENDER_TIMEOUT_SECS`, 10 s). On timeout, return
+> `PikchrError::TimedOut`. The worker thread cannot be killed from
+> outside; it continues running until libpikchr returns.
+
+> adv[pikchr.render.panic-capture]
+> The pikchr render thread must catch Rust panics via
+> `std::panic::catch_unwind` and return
+> `PikchrError::Panicked(message)` rather than propagating to the
+> caller.
+
+> adv[pikchr.render.serialise]
+> Concurrent pikchr render calls must serialise via a process-global
+> `Mutex`. Defensive — libpikchr is reentrant, but the Mutex cost is
+> negligible and matches the graphviz wrapper's shape.
+
 ## Residual risk
 
 Items explicitly NOT mitigated at this layer (documented for

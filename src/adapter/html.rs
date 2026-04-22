@@ -210,10 +210,7 @@ impl<R> HtmlAdapter<R> {
         if !self.pikchr || lang != Some("pikchr") {
             return false;
         }
-        let options = pikru::RenderOptions {
-            css_variables: true,
-        };
-        let Ok(svg) = pikru::pikchr_with_options(literal, &options) else {
+        let Ok(svg) = crate::pikchr_render::render(literal) else {
             return false;
         };
         if svg.len() > crate::svg_sanitize::MAX_SVG_BYTES {

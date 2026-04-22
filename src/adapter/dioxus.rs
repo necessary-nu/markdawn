@@ -662,10 +662,7 @@ impl<R> Renderer<R> {
         // 1. pikchr (feature-gated)
         #[cfg(feature = "pikchr")]
         if self.options.pikchr && info_lang == Some("pikchr") {
-            let opts = pikru::RenderOptions {
-                css_variables: true,
-            };
-            if let Ok(svg) = pikru::pikchr_with_options(literal, &opts) {
+            if let Ok(svg) = crate::pikchr_render::render(literal) {
                 if svg.len() <= crate::svg_sanitize::MAX_SVG_BYTES {
                     let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
                     return rsx! {

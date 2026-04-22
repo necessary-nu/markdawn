@@ -15,6 +15,8 @@ mod serializer;
 mod sink;
 #[cfg(any(feature = "graphviz", feature = "pikchr"))]
 mod svg_sanitize;
+#[cfg(feature = "pikchr")]
+mod pikchr_render;
 mod url_safety;
 #[cfg(feature = "terminal")]
 mod terminal;
