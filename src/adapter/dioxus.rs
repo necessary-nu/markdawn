@@ -573,9 +573,14 @@ impl<R> Renderer<R> {
         R: RenderDioxusCustom<Ext>,
     {
         let title = title.unwrap_or_default();
+        let href = if crate::url_safety::is_safe_url(destination) {
+            destination.to_string()
+        } else {
+            String::new()
+        };
         rsx! {
             a {
-                href: destination.to_string(),
+                href: href,
                 title: title.to_string(),
                 {self.render_children(children)}
             }
@@ -741,9 +746,14 @@ where
 
 fn render_image(destination: &str, title: Option<&str>, alt: &str) -> Element {
     let title = title.unwrap_or_default();
+    let src = if crate::url_safety::is_safe_url(destination) {
+        destination.to_string()
+    } else {
+        String::new()
+    };
     rsx! {
         img {
-            src: destination.to_string(),
+            src: src,
             alt: alt.to_string(),
             title: title.to_string(),
         }
@@ -858,6 +868,46 @@ mod tests {
         ));
         assert!(html.contains("href=\"https://example.com\""));
         assert!(html.contains(">click</a>"));
+    }
+
+    #[test]
+    fn javascript_link_href_is_stripped() {
+        let html = ssr(render_markdown(
+            "[x](javascript:alert(1))",
+            DioxusOptions::default(),
+        ));
+        assert!(!html.contains("javascript:"), "got: {html}");
+        assert!(html.contains("href=\"\""), "got: {html}");
+    }
+
+    #[test]
+    fn javascript_image_src_is_stripped() {
+        let html = ssr(render_markdown(
+            "![x](javascript:alert(1))",
+            DioxusOptions::default(),
+        ));
+        assert!(!html.contains("javascript:"), "got: {html}");
+    }
+
+    #[test]
+    fn data_url_in_link_is_stripped() {
+        // Base64-encoded `<script>alert(1)</script>` without parens so
+        // markdown parses the URL cleanly; sanitiser should still reject
+        // the `data:` scheme.
+        let html = ssr(render_markdown(
+            "[x](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)",
+            DioxusOptions::default(),
+        ));
+        assert!(!html.contains("data:"), "got: {html}");
+    }
+
+    #[test]
+    fn vbscript_url_in_link_is_stripped() {
+        let html = ssr(render_markdown(
+            "[x](vbscript:msgbox)",
+            DioxusOptions::default(),
+        ));
+        assert!(!html.contains("vbscript:"), "got: {html}");
     }
 
     #[test]

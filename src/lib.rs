@@ -13,6 +13,7 @@ mod node;
 mod parser;
 mod serializer;
 mod sink;
+mod url_safety;
 #[cfg(feature = "terminal")]
 mod terminal;
 mod url;

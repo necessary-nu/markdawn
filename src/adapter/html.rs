@@ -611,7 +611,9 @@ impl<R> HtmlAdapter<R> {
                 ..
             } => {
                 out.push_str("<a href=\"");
-                escape_href(destination, out);
+                if crate::url_safety::is_safe_url(destination) {
+                    escape_href(destination, out);
+                }
                 out.push('"');
                 if let Some(title) = title {
                     out.push_str(" title=\"");
@@ -629,7 +631,9 @@ impl<R> HtmlAdapter<R> {
                 ..
             } => {
                 out.push_str("<img src=\"");
-                escape_href(destination, out);
+                if crate::url_safety::is_safe_url(destination) {
+                    escape_href(destination, out);
+                }
                 out.push_str("\" alt=\"");
                 escape_html(alt, out);
                 out.push('"');
@@ -1183,6 +1187,58 @@ mod tests {
                 node: "<hr />\n".to_owned(),
             })]
         );
+    }
+
+    #[test]
+    fn javascript_link_destination_is_stripped() {
+        let adapter = HtmlAdapter::new();
+        let rendered = adapter
+            .render(StreamItem::Upsert(Emission {
+                id: 1,
+                provisional: false,
+                node: Node::<()>::Paragraph {
+                    children: vec![Node::Link {
+                        destination: "javascript:alert(1)".to_owned(),
+                        title: None,
+                        children: vec![Node::Text {
+                            text: "x".to_owned(),
+                            source: SourceSpan::default(),
+                        }],
+                        source: SourceSpan::default(),
+                    }],
+                    source: SourceSpan::default(),
+                },
+            }))
+            .unwrap();
+        let StreamItem::Upsert(emission) = rendered else {
+            panic!("expected upsert")
+        };
+        assert!(!emission.node.contains("javascript:"), "got: {}", emission.node);
+        assert!(emission.node.contains("href=\"\""), "got: {}", emission.node);
+    }
+
+    #[test]
+    fn javascript_image_destination_is_stripped() {
+        let adapter = HtmlAdapter::new();
+        let rendered = adapter
+            .render(StreamItem::Upsert(Emission {
+                id: 1,
+                provisional: false,
+                node: Node::<()>::Paragraph {
+                    children: vec![Node::Image {
+                        destination: "javascript:alert(1)".to_owned(),
+                        title: None,
+                        alt: "x".to_owned(),
+                        source: SourceSpan::default(),
+                    }],
+                    source: SourceSpan::default(),
+                },
+            }))
+            .unwrap();
+        let StreamItem::Upsert(emission) = rendered else {
+            panic!("expected upsert")
+        };
+        assert!(!emission.node.contains("javascript:"), "got: {}", emission.node);
     }
 
     #[test]
