@@ -110,6 +110,14 @@ therefore sit in the residual-risk bucket.
 > in untrusted markdown rendering and are renamed entirely.
 > `minlen` is clamped separately by `neutralise.minlen-clamp`.
 
+> adv[neutralise.numeric-overflow]
+> Attribute values that look like pathological numeric literals
+> (exponent magnitude > `MAX_NUMERIC_EXPONENT_DIGITS` digits, or
+> `nan` / `inf` / `infinity` literals) must be replaced with `"0"`.
+> Prevents `width=1e9999` style inputs from reaching libgraphviz's
+> `strtod`, which has had historical O(n²) parsing issues on
+> pathologically long scientific notation.
+
 > adv[neutralise.escape-expansion]
 > Each quoted string containing more than
 > `MAX_ESCAPE_EXPANSIONS_PER_STRING` (20) render-time escape
@@ -139,6 +147,21 @@ therefore sit in the residual-risk bucket.
 > adv[output.no-event-handlers]
 > `on*="…"` event-handler attributes (e.g. `onclick`, `onload`,
 > `onmouseover`) must be removed from emitted SVG.
+
+> adv[output.no-external-entities]
+> `<!ENTITY …>` declarations must be removed from emitted SVG.
+> Graphviz doesn't emit these itself, but belt-and-suspenders: any
+> entity declaration that reaches our output enables XML-bomb
+> expansion or external-entity exfiltration in downstream consumers
+> that honour them.
+
+> adv[output.no-stylesheet-pi]
+> `<?xml-stylesheet …?>` processing instructions must be removed
+> from emitted SVG. Attacker-controlled `href` inside the PI would
+> reference an external stylesheet; even with our URL allow-list on
+> attribute values, the PI as a whole is safer to drop. The benign
+> `<?xml version=…?>` declaration is distinct (its target is `xml`,
+> not `xml-stylesheet`) and must be preserved.
 
 ## Markdown input cap
 

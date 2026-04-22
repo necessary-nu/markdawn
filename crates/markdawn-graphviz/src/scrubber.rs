@@ -43,6 +43,12 @@ pub const MAX_DPI: u32 = 300;
 /// with many escapes applied to many nodes is a billion-laughs
 /// amplifier.
 pub const MAX_ESCAPE_EXPANSIONS_PER_STRING: usize = 20;
+/// adv[impl neutralise.numeric-overflow]
+/// Maximum exponent magnitude in a numeric attribute value before we
+/// neutralise the attribute. `width=1e9999` fed to libc's strtod can
+/// trigger O(n²) parsing behaviour ("strtod billion laughs"); any
+/// exponent > 3 digits is beyond the useful range for rendering.
+pub const MAX_NUMERIC_EXPONENT_DIGITS: usize = 3;
 
 #[derive(Debug, Default)]
 pub struct ScanReport {
@@ -462,12 +468,21 @@ impl<'a> Scanner<'a> {
                         }
                     }
                 }
-                if let Some(max) = clamp_max {
-                    let trimmed: String = self.out[before_len..]
-                        .trim_matches('"')
-                        .trim()
-                        .to_owned();
-                    if let Ok(n) = trimmed.parse::<u32>() {
+                let trimmed_value: String = self.out[before_len..]
+                    .trim_matches('"')
+                    .trim()
+                    .to_owned();
+                // adv[impl neutralise.numeric-overflow]
+                // Reject pathological numeric literals before libgraphviz's
+                // strtod touches them. Applies to any attribute that looks
+                // numeric, not just the clamp-list ones.
+                if looks_pathological_numeric(&trimmed_value) {
+                    self.out.truncate(before_len);
+                    self.out.push('"');
+                    self.out.push('0');
+                    self.out.push('"');
+                } else if let Some(max) = clamp_max {
+                    if let Ok(n) = trimmed_value.parse::<u32>() {
                         if n > max {
                             self.out.truncate(before_len);
                             self.out.push('"');
@@ -493,9 +508,13 @@ impl<'a> Scanner<'a> {
                     self.out.push(self.bytes[self.i] as char);
                     self.i += 1;
                 }
-                if let Some(max) = clamp_max {
-                    let val = self.out[out_value_start..].trim().to_owned();
-                    if let Ok(n) = val.parse::<u32>() {
+                let bare_value = self.out[out_value_start..].trim().to_owned();
+                // adv[impl neutralise.numeric-overflow]
+                if looks_pathological_numeric(&bare_value) {
+                    self.out.truncate(out_value_start);
+                    self.out.push('0');
+                } else if let Some(max) = clamp_max {
+                    if let Ok(n) = bare_value.parse::<u32>() {
                         if n > max {
                             self.out.truncate(out_value_start);
                             self.out.push_str(&max.to_string());
@@ -539,6 +558,46 @@ fn is_ident_body(b: u8) -> bool {
 
 fn last_nonspace(s: &str) -> Option<u8> {
     s.bytes().rev().find(|b| !matches!(*b, b' ' | b'\t' | b'\n' | b'\r'))
+}
+
+/// Returns true if `value` looks like a numeric literal with an
+/// absurdly large exponent, or is `nan` / `inf` / `infinity`.
+/// Non-numeric strings return false (pass through).
+fn looks_pathological_numeric(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower == "nan"
+        || lower == "inf"
+        || lower == "-inf"
+        || lower == "+inf"
+        || lower == "infinity"
+        || lower == "-infinity"
+        || lower == "+infinity"
+    {
+        return true;
+    }
+    // Does this look numeric? Must start with digit / sign / dot.
+    let first = trimmed.as_bytes()[0];
+    if !(first.is_ascii_digit() || first == b'-' || first == b'+' || first == b'.') {
+        return false;
+    }
+    // Check for a huge exponent: `e<N>` or `E<N>` with > cap digits
+    // after the `e`.
+    if let Some(e_pos) = trimmed.bytes().position(|b| b == b'e' || b == b'E') {
+        let exp_part = &trimmed[e_pos + 1..];
+        let exp_digits = exp_part
+            .trim_start_matches(|c: char| c == '+' || c == '-')
+            .bytes()
+            .take_while(|b| b.is_ascii_digit())
+            .count();
+        if exp_digits > MAX_NUMERIC_EXPONENT_DIGITS {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -728,6 +787,42 @@ mod tests {
         );
         let err = scan_and_scrub(&src).unwrap_err();
         assert!(matches!(err, GraphvizError::LabelEscapeFlood(_)), "got: {err:?}");
+    }
+
+    // adv[verify neutralise.numeric-overflow]
+    #[test]
+    fn huge_exponent_neutralised() {
+        let (out, _) = scan_and_scrub(r#"digraph { A [width="1e9999"] }"#).unwrap();
+        assert!(!out.contains("1e9999"), "got: {out}");
+    }
+
+    // adv[verify neutralise.numeric-overflow]
+    #[test]
+    fn infinity_literal_neutralised() {
+        let (out, _) = scan_and_scrub(r#"digraph { A [width="Infinity"] }"#).unwrap();
+        assert!(!out.to_lowercase().contains("infinity"), "got: {out}");
+    }
+
+    // adv[verify neutralise.numeric-overflow]
+    #[test]
+    fn nan_literal_neutralised() {
+        let (out, _) = scan_and_scrub(r#"digraph { A [width="NaN"] }"#).unwrap();
+        assert!(!out.to_lowercase().contains("nan"), "got: {out}");
+    }
+
+    // adv[verify neutralise.numeric-overflow]
+    #[test]
+    fn legitimate_float_values_preserved() {
+        let (out, _) = scan_and_scrub(r#"digraph { A [width="2.5", height="1.0"] }"#).unwrap();
+        assert!(out.contains("2.5"), "got: {out}");
+        assert!(out.contains("1.0"), "got: {out}");
+    }
+
+    // adv[verify neutralise.numeric-overflow]
+    #[test]
+    fn small_exponent_preserved() {
+        let (out, _) = scan_and_scrub(r#"digraph { A [width="1e2"] }"#).unwrap();
+        assert!(out.contains("1e2"), "got: {out}");
     }
 
     // adv[verify neutralise.escape-expansion]

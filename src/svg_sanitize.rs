@@ -41,6 +41,7 @@ pub fn sanitize_svg(svg: &str) -> String {
     while i < bytes.len() {
         let b = bytes[i];
 
+        // adv[impl output.no-script]
         // <script> blocks — match case-insensitively, skip to </script>.
         if b == b'<' && starts_with_ci(&bytes[i..], b"<script") {
             // Find the matching </script> (case-insensitive). If we
@@ -52,6 +53,34 @@ pub fn sanitize_svg(svg: &str) -> String {
                 break;
             }
             continue;
+        }
+
+        // adv[impl output.no-external-entities]
+        // `<!ENTITY …>` declarations enable XML-bomb style expansion
+        // and external-entity exfiltration if a downstream XML parser
+        // honours them. Graphviz doesn't emit these itself, but
+        // belt-and-suspenders: scan the whole SVG and drop any entity
+        // declaration that appears.
+        if b == b'<' && starts_with_ci(&bytes[i..], b"<!ENTITY") {
+            if let Some(end) = bytes[i..].iter().position(|&c| c == b'>') {
+                i += end + 1;
+                continue;
+            }
+            break;
+        }
+
+        // adv[impl output.no-stylesheet-pi]
+        // `<?xml-stylesheet href="…"?>` processing instruction
+        // references an external stylesheet; attacker-controlled href
+        // is an XSS / SSRF vector. The benign `<?xml version=…?>`
+        // declaration is preserved because its target is `xml`, not
+        // `xml-stylesheet`.
+        if b == b'<' && starts_with_ci(&bytes[i..], b"<?xml-stylesheet") {
+            if let Some(end) = find_ci(&bytes[i..], b"?>") {
+                i += end + 2;
+                continue;
+            }
+            break;
         }
 
         // Attribute start: inside a tag, an attribute looks like
@@ -265,6 +294,41 @@ mod tests {
         let svg = r#"<svg onload="alert(1)" xmlns="http://www.w3.org/2000/svg"></svg>"#;
         let out = sanitize_svg(svg);
         assert!(!out.contains("onload"), "got: {out}");
+    }
+
+    // adv[verify output.no-external-entities]
+    #[test]
+    fn entity_declaration_dropped() {
+        let svg = r#"<!DOCTYPE svg [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;">]><svg/>"#;
+        let out = sanitize_svg(svg);
+        assert!(!out.contains("<!ENTITY"), "got: {out}");
+    }
+
+    // adv[verify output.no-stylesheet-pi]
+    #[test]
+    fn xml_stylesheet_pi_dropped() {
+        let svg = r#"<?xml-stylesheet href="http://evil/evil.css"?><svg/>"#;
+        let out = sanitize_svg(svg);
+        assert!(!out.contains("xml-stylesheet"), "got: {out}");
+        assert!(!out.contains("evil"), "got: {out}");
+    }
+
+    // adv[verify output.no-stylesheet-pi]
+    #[test]
+    fn xml_declaration_preserved() {
+        // The benign `<?xml version="1.0"?>` declaration is NOT a
+        // stylesheet PI and should survive.
+        let svg = r#"<?xml version="1.0" encoding="UTF-8"?><svg/>"#;
+        let out = sanitize_svg(svg);
+        assert!(out.contains("<?xml version"), "got: {out}");
+    }
+
+    // adv[verify output.no-external-entities]
+    #[test]
+    fn unterminated_entity_declaration_truncates() {
+        let svg = r#"<svg><!ENTITY evil "bad"#;
+        let out = sanitize_svg(svg);
+        assert!(!out.contains("<!ENTITY"), "got: {out}");
     }
 
     #[test]
