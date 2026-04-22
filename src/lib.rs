@@ -13,6 +13,7 @@ mod node;
 mod parser;
 mod serializer;
 mod sink;
+mod svg_sanitize;
 mod url_safety;
 #[cfg(feature = "terminal")]
 mod terminal;

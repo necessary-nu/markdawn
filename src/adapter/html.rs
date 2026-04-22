@@ -216,8 +216,12 @@ impl<R> HtmlAdapter<R> {
         let Ok(svg) = pikru::pikchr_with_options(literal, &options) else {
             return false;
         };
-        out.push_str(&svg);
-        if !svg.ends_with('\n') {
+        if svg.len() > crate::svg_sanitize::MAX_SVG_BYTES {
+            return false;
+        }
+        let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
+        out.push_str(&sanitized);
+        if !sanitized.ends_with('\n') {
             out.push('\n');
         }
         true
@@ -243,8 +247,12 @@ impl<R> HtmlAdapter<R> {
         let Ok(svg) = markdawn_graphviz::render_dot_to_svg(literal) else {
             return false;
         };
-        out.push_str(&svg);
-        if !svg.ends_with('\n') {
+        if svg.len() > crate::svg_sanitize::MAX_SVG_BYTES {
+            return false;
+        }
+        let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
+        out.push_str(&sanitized);
+        if !sanitized.ends_with('\n') {
             out.push('\n');
         }
         true

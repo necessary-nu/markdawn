@@ -666,9 +666,12 @@ impl<R> Renderer<R> {
                 css_variables: true,
             };
             if let Ok(svg) = pikru::pikchr_with_options(literal, &opts) {
-                return rsx! {
-                    div { class: "pikchr", dangerous_inner_html: svg }
-                };
+                if svg.len() <= crate::svg_sanitize::MAX_SVG_BYTES {
+                    let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
+                    return rsx! {
+                        div { class: "pikchr", dangerous_inner_html: sanitized }
+                    };
+                }
             }
         }
 
@@ -676,9 +679,12 @@ impl<R> Renderer<R> {
         #[cfg(feature = "graphviz")]
         if self.options.graphviz && matches!(info_lang, Some("dot") | Some("graphviz")) {
             if let Ok(svg) = markdawn_graphviz::render_dot_to_svg(literal) {
-                return rsx! {
-                    div { class: "graphviz", dangerous_inner_html: svg }
-                };
+                if svg.len() <= crate::svg_sanitize::MAX_SVG_BYTES {
+                    let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
+                    return rsx! {
+                        div { class: "graphviz", dangerous_inner_html: sanitized }
+                    };
+                }
             }
         }
 
@@ -1184,6 +1190,33 @@ mod tests {
             .render(src));
         assert!(html.contains("class=\"graphviz\""), "got: {html}");
         assert!(html.contains("<svg"), "got: {html}");
+    }
+
+    #[cfg(feature = "graphviz")]
+    #[test]
+    fn graphviz_javascript_href_sanitized_in_output_svg() {
+        let src = "```dot\ndigraph { A [href=\"javascript:alert(1)\"] }\n```";
+        let html = ssr(Renderer::default()
+            .with_options(DioxusOptions {
+                graphviz: true,
+                ..Default::default()
+            })
+            .render(src));
+        assert!(html.contains("class=\"graphviz\""), "no graphviz div: {html}");
+        assert!(!html.contains("javascript:"), "leaked javascript: {html}");
+    }
+
+    #[cfg(feature = "graphviz")]
+    #[test]
+    fn graphviz_safe_href_preserved_in_output_svg() {
+        let src = "```dot\ndigraph { A [href=\"https://example.com\"] }\n```";
+        let html = ssr(Renderer::default()
+            .with_options(DioxusOptions {
+                graphviz: true,
+                ..Default::default()
+            })
+            .render(src));
+        assert!(html.contains("https://example.com"), "link stripped: {html}");
     }
 
     #[cfg(feature = "highlight")]
