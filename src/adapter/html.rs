@@ -1197,6 +1197,7 @@ mod tests {
         );
     }
 
+    // adv[verify markdown.url-allowlist]
     #[test]
     fn javascript_link_destination_is_stripped() {
         let adapter = HtmlAdapter::new();

@@ -876,6 +876,7 @@ mod tests {
         assert!(html.contains(">click</a>"));
     }
 
+    // adv[verify markdown.url-allowlist]
     #[test]
     fn javascript_link_href_is_stripped() {
         let html = ssr(render_markdown(

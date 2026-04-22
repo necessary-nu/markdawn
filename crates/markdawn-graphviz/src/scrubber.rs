@@ -8,12 +8,19 @@
 
 use crate::{GraphvizError, MAX_BRACE_DEPTH};
 
+// adv[impl input.node-cap]
 pub const MAX_NODES: usize = 1_000;
+// adv[impl input.edge-cap]
 pub const MAX_EDGES: usize = 2_000;
+// adv[impl input.attribute-cap]
 pub const MAX_ATTRIBUTES: usize = 2_000;
+// adv[impl input.subgraph-cap]
 pub const MAX_SUBGRAPHS: usize = 100;
+// adv[impl input.record-depth-cap]
 pub const MAX_RECORD_DEPTH: usize = 16;
+// adv[impl input.html-depth-cap]
 pub const MAX_HTML_DEPTH: usize = 16;
+// adv[impl neutralise.minlen-clamp]
 pub const MAX_MINLEN: u32 = 20;
 
 #[derive(Debug, Default)]
@@ -136,7 +143,6 @@ impl<'a> Scanner<'a> {
 
             // Attribute list
             if b == b'[' {
-                self.report.attributes = self.report.attributes.saturating_add(1);
                 self.out.push('[');
                 self.i += 1;
                 continue;
@@ -305,6 +311,7 @@ impl<'a> Scanner<'a> {
                     }
                 }
                 if is_img {
+                    // adv[impl neutralise.html-img-tag]
                     // Rename <IMG…> → <_img…> so graphviz's HTML-label
                     // parser doesn't recognise it as IMG and so doesn't
                     // try to open the SRC file.
@@ -357,8 +364,14 @@ impl<'a> Scanner<'a> {
         let is_attr = la < self.bytes.len() && self.bytes[la] == b'=';
 
         if is_attr {
+            // adv[impl input.attribute-cap] — count each name=value
+            // declaration, not `[…]` lists, so a single mega-list can't
+            // smuggle 100k attrs past the cap.
+            self.report.attributes = self.report.attributes.saturating_add(1);
             // Don't count attr names as nodes; don't fire edges.
             let lower = name.to_ascii_lowercase();
+            // adv[impl neutralise.external-file-attrs]
+            // adv[impl neutralise.layout-override]
             let rename = matches!(
                 lower.as_str(),
                 "image"
@@ -594,6 +607,20 @@ mod tests {
         assert_eq!(r.subgraphs, 2);
     }
 
+    #[test]
+    fn per_list_attr_count_counted() {
+        // Single `[…]` list with many attrs — counter should tick for
+        // each name=value, not for the list itself.
+        let mut src = String::from("digraph { A [");
+        for i in 0..100 {
+            src.push_str(&format!("a{i}={i}, "));
+        }
+        src.push_str("] }");
+        let (_, r) = scan_and_scrub(&src).unwrap();
+        assert!(r.attributes >= 100, "got attributes={}", r.attributes);
+    }
+
+    // adv[verify neutralise.minlen-clamp]
     #[test]
     fn minlen_clamped() {
         let (out, _) = scan_and_scrub("digraph { A -> B [minlen=9999] }").unwrap();

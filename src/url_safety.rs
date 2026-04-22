@@ -27,6 +27,7 @@ const ALLOWED_SCHEMES: &[&str] = &[
 ///   reject the whole input rather than try to second-guess normalisation.
 /// - URLs with a scheme not in the allow-list: `javascript:`, `data:`,
 ///   `vbscript:`, `file:`, `blob:`, etc.
+// adv[impl markdown.url-allowlist]
 pub fn is_safe_url(url: &str) -> bool {
     // Reject any control chars (including TAB and NL). Browsers strip
     // these during scheme parsing, so allowing them would let an

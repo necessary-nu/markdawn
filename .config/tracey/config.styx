@@ -1,1 +1,4 @@
-specs ({name markdawn, include (../commonmark-gfm/docs/spec/**/*.md), impls ({name main, languages (@rust), include ("src/**/*.rs" crates/**/*.rs "tests/**/*.rs"), exclude (target/**)})})
+specs (
+  {name markdawn, include (docs/spec/spec.md), impls ({name main, languages (@rust), include ("src/**/*.rs" crates/**/*.rs "tests/**/*.rs"), exclude (target/**)})}
+  {name adversarial, include (docs/spec/adversarial.md), impls ({name main, languages (@rust), include ("src/**/*.rs" crates/**/*.rs "tests/**/*.rs"), exclude (target/**)})}
+)

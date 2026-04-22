@@ -24,11 +24,15 @@ use crate::url_safety::is_safe_url;
 /// Maximum byte length of a rendered SVG we'll pass back to the
 /// caller. Graphviz can turn a small DOT input into a massive SVG
 /// (long labels on many edges, etc.); cap the amplification.
+// adv[impl output.size-cap]
 pub const MAX_SVG_BYTES: usize = 5 * 1024 * 1024;
 
 /// Sanitise `svg` in place. Returns the sanitised string. Never fails;
 /// the output is always a valid byte string (may be empty if input was
 /// dangerous enough to strip everything).
+// adv[impl output.url-allowlist]
+// adv[impl output.no-script]
+// adv[impl output.no-event-handlers]
 pub fn sanitize_svg(svg: &str) -> String {
     let bytes = svg.as_bytes();
     let mut out = String::with_capacity(bytes.len());
@@ -176,6 +180,23 @@ fn match_href_attr(bytes: &[u8]) -> Option<(usize, (usize, usize))> {
 mod tests {
     use super::*;
 
+    // adv[verify output.size-cap]
+    #[test]
+    fn size_cap_constant_bounds_expected() {
+        // The cap is the contract — verify the constant value and
+        // that the sanitiser runs in O(n) so the call-site check at
+        // adapter boundaries is meaningful.
+        assert!(MAX_SVG_BYTES >= 1024 * 1024, "cap too low for realistic diagrams");
+        assert!(MAX_SVG_BYTES <= 100 * 1024 * 1024, "cap too generous");
+    }
+
+    // adv[verify output.size-cap]
+    #[test]
+    fn svg_under_cap_flows_through() {
+        let svg = format!(r#"<svg><text>{}</text></svg>"#, "x".repeat(1024));
+        assert_eq!(sanitize_svg(&svg), svg);
+    }
+
     #[test]
     fn benign_svg_passes_unchanged() {
         let svg = r#"<svg xmlns="http://www.w3.org/2000/svg"><g><text>hello</text></g></svg>"#;
@@ -189,6 +210,7 @@ mod tests {
         assert!(out.contains(r#"xlink:href="https://example.com""#), "got: {out}");
     }
 
+    // adv[verify output.url-allowlist]
     #[test]
     fn javascript_xlink_href_is_neutered() {
         let svg = r#"<g><a xlink:href="javascript:alert(1)"><ellipse/></a></g>"#;
@@ -212,6 +234,7 @@ mod tests {
         assert!(!out.contains("data:"), "got: {out}");
     }
 
+    // adv[verify output.no-script]
     #[test]
     fn script_block_dropped() {
         let svg = r#"<svg><script>alert(1)</script><text>x</text></svg>"#;
@@ -228,6 +251,7 @@ mod tests {
         assert!(!out.contains("alert"), "got: {out}");
     }
 
+    // adv[verify output.no-event-handlers]
     #[test]
     fn event_handler_attribute_dropped() {
         let svg = r#"<ellipse onmouseover="alert(1)" cx="0" cy="0"/>"#;

@@ -1,0 +1,59 @@
+# nextest configuration for markdawn + markdawn-graphviz.
+#
+# Primary reason we care: the adversarial tests hit libgraphviz with
+# pathological input. If one of our defences is broken or bypassed,
+# the test would hang (libgraphviz spinning on a DoS-crafted graph)
+# rather than fail. Per-test timeouts convert those hangs into
+# explicit failures.
+#
+# Each test binary runs in its own process, so a libgraphviz
+# segfault / abort in one test can't bring down the whole run.
+
+[profile.default]
+# Warn about slow tests early but don't kill them by default — most
+# of our suite is well under a second. The adversarial profile
+# tightens this further.
+slow-timeout = { period = "10s", terminate-after = 3 }
+# No retries: flakiness in adversarial tests would hide real
+# regressions in our defences.
+retries = 0
+# Don't keep running after a failure — an adversarial test that
+# fails usually indicates a gap in the mitigation layer that needs
+# attention before more tests run.
+fail-fast = true
+
+[test-groups]
+# libgraphviz holds per-context process-global state and we serialise
+# renders with a Mutex inside markdawn-graphviz. Running the
+# adversarial test binary single-threaded surfaces any races in our
+# own wrapper code, and makes timing measurements more stable.
+graphviz-serial = { max-threads = 1 }
+
+# The adversarial integration suite in markdawn-graphviz.
+# Every test here either hits a cap + expects rejection in <1s OR is
+# `#[ignore]`d for manual runs. We set a tight slow-timeout so a hung
+# test (defence broken, libgraphviz spinning) fails within seconds.
+[[profile.default.overrides]]
+filter = 'binary(adversarial)'
+test-group = 'graphviz-serial'
+slow-timeout = { period = "5s", terminate-after = 2 }
+
+# Observational probes (cargo nextest run --run-ignored only). These
+# deliberately measure libgraphviz behaviour on borderline inputs and
+# may take longer than a normal test. Allow up to 60s before
+# termination.
+[[profile.default.overrides]]
+filter = 'binary(adversarial) and test(/^observe_/)'
+test-group = 'graphviz-serial'
+slow-timeout = { period = "30s", terminate-after = 2 }
+
+# CI-style profile: everything in default plus JUnit output for
+# pipelines that want machine-readable results. Use with
+# `cargo nextest run --profile ci`.
+[profile.ci]
+slow-timeout = { period = "10s", terminate-after = 3 }
+retries = 0
+fail-fast = false  # surface every failure in one run
+
+[profile.ci.junit]
+path = "junit.xml"

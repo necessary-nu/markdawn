@@ -17,7 +17,8 @@
 
 use core::fmt;
 use std::ffi::{CString, c_char, c_int};
-use std::sync::Mutex;
+use std::sync::{Mutex, mpsc};
+use std::time::Duration;
 
 mod scrubber;
 
@@ -29,17 +30,27 @@ pub use scrubber::{
 /// Reject DOT source larger than this many bytes before any libgraphviz
 /// call. Large enough for realistic diagrams; small enough that the
 /// worst adversarial inputs never reach the layout engine.
+// adv[impl input.byte-cap]
 pub const MAX_DOT_BYTES: usize = 256 * 1024;
 
 /// Reject DOT source whose `{`/`}` nesting depth exceeds this. Deeply
 /// nested subgraphs are the main way to trigger stack overflow inside
 /// libgraphviz's recursive layout.
+// adv[impl input.brace-depth-cap]
 pub const MAX_BRACE_DEPTH: usize = 64;
 
 /// Thread stack size for the dedicated render thread. Larger than the
 /// Rust default so moderate libgraphviz recursion doesn't overflow,
 /// while still bounded.
 const RENDER_STACK_BYTES: usize = 8 * 1024 * 1024;
+
+/// Wall-clock timeout for a single render call. Bounds how long a
+/// pathological input that passed every pre-flight cap can occupy
+/// libgraphviz. On timeout, [`render_dot_to_svg`] returns
+/// [`GraphvizError::TimedOut`]; the worker thread cannot be killed
+/// safely (libgraphviz is C, non-cooperative) so it continues running
+/// until libgraphviz returns. See the `adv[render.timeout]` spec.
+pub const RENDER_TIMEOUT_SECS: u64 = 10;
 
 #[derive(Debug, Clone)]
 pub enum GraphvizError {
@@ -80,6 +91,11 @@ pub enum GraphvizError {
     Panicked(String),
     /// The render thread could not be spawned.
     ThreadSpawn(String),
+    /// The render exceeded [`RENDER_TIMEOUT_SECS`] wall-clock. The
+    /// worker thread continues running in the background because
+    /// libgraphviz cannot be safely killed from outside; subsequent
+    /// callers will also time out until the stuck render completes.
+    TimedOut,
 }
 
 impl fmt::Display for GraphvizError {
@@ -116,6 +132,10 @@ impl fmt::Display for GraphvizError {
             Self::Panicked(msg) if msg.is_empty() => f.write_str("graphviz render thread panicked"),
             Self::Panicked(msg) => write!(f, "graphviz render thread panicked: {msg}"),
             Self::ThreadSpawn(msg) => write!(f, "could not spawn graphviz render thread: {msg}"),
+            Self::TimedOut => write!(
+                f,
+                "graphviz render exceeded {RENDER_TIMEOUT_SECS}s wall-clock timeout"
+            ),
         }
     }
 }
@@ -135,7 +155,22 @@ unsafe extern "C" {
 
 static RENDER_LOCK: Mutex<()> = Mutex::new(());
 
+/// Render DOT source to SVG with a custom wall-clock timeout. Exposed
+/// for tests and for callers that want a tighter budget than the
+/// default [`RENDER_TIMEOUT_SECS`]. Pre-render input caps are applied
+/// before the timer starts.
+pub fn render_dot_to_svg_with_timeout(
+    source: &str,
+    timeout: Duration,
+) -> Result<String, GraphvizError> {
+    render_inner_pipeline(source, timeout)
+}
+
 pub fn render_dot_to_svg(source: &str) -> Result<String, GraphvizError> {
+    render_inner_pipeline(source, Duration::from_secs(RENDER_TIMEOUT_SECS))
+}
+
+fn render_inner_pipeline(source: &str, timeout: Duration) -> Result<String, GraphvizError> {
     if source.len() > MAX_DOT_BYTES {
         return Err(GraphvizError::InputTooLarge(source.len()));
     }
@@ -158,22 +193,48 @@ pub fn render_dot_to_svg(source: &str) -> Result<String, GraphvizError> {
         return Err(GraphvizError::TooManySubgraphs(report.subgraphs));
     }
 
+    // adv[impl render.timeout] — spawn the worker, wait on a channel
+    // with a wall-clock timeout. On timeout the worker is orphaned; it
+    // keeps running until libgraphviz returns. Next caller's worker
+    // will block on RENDER_LOCK and will itself time out here.
+    // adv[impl render.panic-capture] — std::panic::catch_unwind inside
+    // the worker captures Rust panics; they arrive on the channel as
+    // Err(panic_payload).
     let owned = scrubbed;
-    let handle = std::thread::Builder::new()
+    let (tx, rx) = mpsc::channel::<Result<Result<String, GraphvizError>, Box<dyn std::any::Any + Send>>>();
+    std::thread::Builder::new()
         .stack_size(RENDER_STACK_BYTES)
         .name("markdawn-graphviz-render".to_owned())
-        .spawn(move || render_inner(&owned))
+        .spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                render_inner(&owned)
+            }));
+            let _ = tx.send(result);
+        })
         .map_err(|e| GraphvizError::ThreadSpawn(e.to_string()))?;
 
-    match handle.join() {
-        Ok(result) => result,
-        Err(panic_payload) => Err(GraphvizError::Panicked(panic_message(&panic_payload))),
+    match rx.recv_timeout(timeout) {
+        Ok(Ok(result)) => result,
+        Ok(Err(panic_payload)) => Err(GraphvizError::Panicked(panic_message(&panic_payload))),
+        Err(mpsc::RecvTimeoutError::Timeout) => Err(GraphvizError::TimedOut),
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            // Worker dropped the sender without sending — shouldn't
+            // happen because the closure always sends before returning.
+            // If it does, treat as a panic with no message.
+            Err(GraphvizError::Panicked(String::new()))
+        }
     }
 }
 
+// adv[impl render.error-callback-capture]
+// The C shim (`wrapper.c`) installs `agseterrf` on entry and restores the
+// previous callback on exit; diagnostics flow back to us via out_err and
+// get wrapped into `GraphvizError::RenderFailed`. Rust-side this is just
+// the bridge call.
 fn render_inner(source: &str) -> Result<String, GraphvizError> {
     let dot = CString::new(source).map_err(|_| GraphvizError::InvalidInput)?;
 
+    // adv[impl render.serialise]
     let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
     let mut svg_ptr: *mut c_char = core::ptr::null_mut();
@@ -266,6 +327,10 @@ mod tests {
         assert!(svg.contains("</svg>"));
     }
 
+    // adv[verify render.error-callback-capture]
+    // If err_sink wasn't installed, this test would have nothing to
+    // assert non-empty on (libgraphviz would have written straight to
+    // stderr).
     #[test]
     fn malformed_source_returns_err_with_message() {
         let err = render_dot_to_svg("not valid dot {{{{").unwrap_err();

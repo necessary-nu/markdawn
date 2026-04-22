@@ -13,6 +13,7 @@ mod node;
 mod parser;
 mod serializer;
 mod sink;
+#[cfg(any(feature = "graphviz", feature = "pikchr"))]
 mod svg_sanitize;
 mod url_safety;
 #[cfg(feature = "terminal")]
