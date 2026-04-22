@@ -19,6 +19,13 @@ use core::fmt;
 use std::ffi::{CString, c_char, c_int};
 use std::sync::Mutex;
 
+mod scrubber;
+
+pub use scrubber::{
+    MAX_ATTRIBUTES, MAX_EDGES, MAX_HTML_DEPTH, MAX_MINLEN, MAX_NODES, MAX_RECORD_DEPTH,
+    MAX_SUBGRAPHS,
+};
+
 /// Reject DOT source larger than this many bytes before any libgraphviz
 /// call. Large enough for realistic diagrams; small enough that the
 /// worst adversarial inputs never reach the layout engine.
@@ -53,6 +60,20 @@ pub enum GraphvizError {
     /// Input exceeded [`MAX_BRACE_DEPTH`] in `{`/`}` nesting. The
     /// numeric payload is the observed peak depth.
     InputTooDeep(usize),
+    /// Record-label `{`/`}` nesting inside a quoted string exceeded
+    /// [`MAX_RECORD_DEPTH`].
+    RecordLabelTooDeep(usize),
+    /// HTML-label tag nesting exceeded [`MAX_HTML_DEPTH`].
+    HtmlLabelTooDeep(usize),
+    /// Heuristic node count exceeded [`MAX_NODES`].
+    TooManyNodes(usize),
+    /// Heuristic edge count (expanded for `A -> { … }` shorthand)
+    /// exceeded [`MAX_EDGES`].
+    TooManyEdges(usize),
+    /// Attribute-list count exceeded [`MAX_ATTRIBUTES`].
+    TooManyAttributes(usize),
+    /// Subgraph count exceeded [`MAX_SUBGRAPHS`].
+    TooManySubgraphs(usize),
     /// The render thread panicked before producing a result. Payload is
     /// the panic message if it was recoverable as `&str`/`String`, else
     /// empty.
@@ -76,6 +97,22 @@ impl fmt::Display for GraphvizError {
                 f,
                 "DOT source brace nesting is {d}, exceeds cap of {MAX_BRACE_DEPTH}"
             ),
+            Self::RecordLabelTooDeep(d) => write!(
+                f,
+                "DOT record-label brace nesting is {d}, exceeds cap of {MAX_RECORD_DEPTH}"
+            ),
+            Self::HtmlLabelTooDeep(d) => write!(
+                f,
+                "DOT HTML-label tag nesting is {d}, exceeds cap of {MAX_HTML_DEPTH}"
+            ),
+            Self::TooManyNodes(n) => write!(f, "DOT source has {n} nodes, exceeds cap of {MAX_NODES}"),
+            Self::TooManyEdges(n) => write!(f, "DOT source has {n} edges, exceeds cap of {MAX_EDGES}"),
+            Self::TooManyAttributes(n) => {
+                write!(f, "DOT source has {n} attribute lists, exceeds cap of {MAX_ATTRIBUTES}")
+            }
+            Self::TooManySubgraphs(n) => {
+                write!(f, "DOT source has {n} subgraphs, exceeds cap of {MAX_SUBGRAPHS}")
+            }
             Self::Panicked(msg) if msg.is_empty() => f.write_str("graphviz render thread panicked"),
             Self::Panicked(msg) => write!(f, "graphviz render thread panicked: {msg}"),
             Self::ThreadSpawn(msg) => write!(f, "could not spawn graphviz render thread: {msg}"),
@@ -107,7 +144,21 @@ pub fn render_dot_to_svg(source: &str) -> Result<String, GraphvizError> {
         return Err(GraphvizError::InputTooDeep(depth));
     }
 
-    let owned = source.to_owned();
+    let (scrubbed, report) = scrubber::scan_and_scrub(source)?;
+    if report.identifiers > MAX_NODES {
+        return Err(GraphvizError::TooManyNodes(report.identifiers));
+    }
+    if report.edges > MAX_EDGES {
+        return Err(GraphvizError::TooManyEdges(report.edges));
+    }
+    if report.attributes > MAX_ATTRIBUTES {
+        return Err(GraphvizError::TooManyAttributes(report.attributes));
+    }
+    if report.subgraphs > MAX_SUBGRAPHS {
+        return Err(GraphvizError::TooManySubgraphs(report.subgraphs));
+    }
+
+    let owned = scrubbed;
     let handle = std::thread::Builder::new()
         .stack_size(RENDER_STACK_BYTES)
         .name("markdawn-graphviz-render".to_owned())
