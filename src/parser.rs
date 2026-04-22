@@ -100,6 +100,7 @@ pub struct ParserBuilder<Ext = ()> {
     alerts: bool,
     highlights: bool,
     definition_lists: bool,
+    max_input_bytes: Option<usize>,
 }
 
 impl<Ext> Default for ParserBuilder<Ext> {
@@ -111,6 +112,7 @@ impl<Ext> Default for ParserBuilder<Ext> {
             alerts: false,
             highlights: false,
             definition_lists: false,
+            max_input_bytes: None,
         }
     }
 }
@@ -165,6 +167,16 @@ impl<Ext> ParserBuilder<Ext> {
             .with_definition_lists()
     }
 
+    /// Reject input if cumulative bytes across `push_str`, `finish`,
+    /// and `parse_full_at` exceed `max`. Default is unlimited (no cap).
+    /// Useful when rendering untrusted markdown where you want a hard
+    /// upper bound before the parser starts allocating.
+    // adv[impl markdown.input.byte-cap]
+    pub fn with_max_input_bytes(mut self, max: usize) -> Self {
+        self.max_input_bytes = Some(max);
+        self
+    }
+
     pub fn build(self) -> Parser<Ext> {
         Parser {
             buffer: String::new(),
@@ -177,6 +189,8 @@ impl<Ext> ParserBuilder<Ext> {
             definition_lists: self.definition_lists,
             live_blocks: Vec::new(),
             next_id: 1,
+            max_input_bytes: self.max_input_bytes,
+            bytes_seen: 0,
         }
     }
 }
@@ -192,6 +206,8 @@ pub struct Parser<Ext = ()> {
     definition_lists: bool,
     live_blocks: Vec<LiveBlock<Ext>>,
     next_id: CorrelationId,
+    max_input_bytes: Option<usize>,
+    bytes_seen: usize,
 }
 
 impl<Ext> Default for Parser<Ext> {
@@ -209,6 +225,7 @@ impl<Ext> Parser<Ext> {
         ParserBuilder::new()
     }
 
+    // adv[impl markdown.input.byte-cap]
     pub fn push_str<S>(&mut self, chunk: &str, sink: &mut S) -> Result<(), StreamError<S::Error>>
     where
         S: Sink<Node<Ext>>,
@@ -220,6 +237,18 @@ impl<Ext> Parser<Ext> {
 
         if chunk.is_empty() {
             return Ok(());
+        }
+
+        if let Some(cap) = self.max_input_bytes {
+            let new_total = self.bytes_seen.saturating_add(chunk.len());
+            if new_total > cap {
+                return Err(Error::InputTooLarge {
+                    seen: new_total,
+                    cap,
+                }
+                .into());
+            }
+            self.bytes_seen = new_total;
         }
 
         self.buffer.push_str(&normalize_chunk(chunk));
@@ -246,6 +275,7 @@ impl<Ext> Parser<Ext> {
     /// `source` spans populated to byte ranges relative to `base_offset`
     /// (the byte offset of `source` within an outer document). Used by
     /// `EditableDocument` for both full and block-window reparse.
+    // adv[impl markdown.input.byte-cap]
     pub(crate) fn parse_full_at(
         &mut self,
         source: &str,
@@ -254,6 +284,15 @@ impl<Ext> Parser<Ext> {
     where
         Ext: Clone + PartialEq,
     {
+        if let Some(cap) = self.max_input_bytes {
+            if source.len() > cap {
+                return Err(Error::InputTooLarge {
+                    seen: source.len(),
+                    cap,
+                });
+            }
+        }
+
         self.buffer.clear();
         self.live_blocks.clear();
         self.finished = false;
@@ -6000,9 +6039,78 @@ fn is_escapable(ch: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::Parser;
+    use crate::error::{Error, StreamError};
     use crate::ext::{BlockMatch, Extension, InlineMatch};
     use crate::node::{Node, SourceSpan, StreamItem};
     use crate::sink::VecSink;
+
+    // adv[verify markdown.input.byte-cap]
+    #[test]
+    fn default_parser_has_no_input_cap() {
+        let mut parser = Parser::<()>::new();
+        let mut sink = VecSink::<Node<()>>::new();
+        // 256 KB benign input — no cap, should succeed.
+        let huge = "a\n\n".repeat(85_000);
+        parser.push_str(&huge, &mut sink).expect("no cap set");
+        parser.finish(&mut sink).expect("finish");
+    }
+
+    // adv[verify markdown.input.byte-cap]
+    #[test]
+    fn single_push_over_cap_rejected() {
+        let mut parser = Parser::<()>::builder()
+            .with_max_input_bytes(1024)
+            .build();
+        let mut sink = VecSink::<Node<()>>::new();
+        let huge = "a".repeat(2048);
+        let err = parser.push_str(&huge, &mut sink).unwrap_err();
+        match err {
+            StreamError::Parser(Error::InputTooLarge { seen, cap }) => {
+                assert_eq!(seen, 2048);
+                assert_eq!(cap, 1024);
+            }
+            other => panic!("expected InputTooLarge, got {other:?}"),
+        }
+    }
+
+    // adv[verify markdown.input.byte-cap]
+    #[test]
+    fn streaming_push_cumulative_trips_cap() {
+        let mut parser = Parser::<()>::builder()
+            .with_max_input_bytes(10)
+            .build();
+        let mut sink = VecSink::<Node<()>>::new();
+        // Three 4-byte chunks = 12 bytes total — trips at the third.
+        parser.push_str("aaaa", &mut sink).expect("first chunk");
+        parser.push_str("bbbb", &mut sink).expect("second chunk");
+        let err = parser.push_str("cccc", &mut sink).unwrap_err();
+        assert!(matches!(
+            err,
+            StreamError::Parser(Error::InputTooLarge { seen: 12, cap: 10 })
+        ));
+    }
+
+    // adv[verify markdown.input.byte-cap]
+    #[test]
+    fn exactly_at_cap_ok() {
+        let mut parser = Parser::<()>::builder()
+            .with_max_input_bytes(8)
+            .build();
+        let mut sink = VecSink::<Node<()>>::new();
+        parser.push_str("aaaabbbb", &mut sink).expect("at cap ok");
+        parser.finish(&mut sink).expect("finish ok");
+    }
+
+    // adv[verify markdown.input.byte-cap]
+    #[test]
+    fn usize_max_effectively_unlimited() {
+        let mut parser = Parser::<()>::builder()
+            .with_max_input_bytes(usize::MAX)
+            .build();
+        let mut sink = VecSink::<Node<()>>::new();
+        parser.push_str(&"a".repeat(100_000), &mut sink).expect("ok");
+        parser.finish(&mut sink).expect("finish");
+    }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum TestExt {

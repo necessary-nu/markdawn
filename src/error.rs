@@ -21,6 +21,14 @@ pub enum Error {
     MalformedEventStream {
         location: Option<ErrorLocation>,
     },
+    /// Cumulative input bytes across `push_str` / `finish` /
+    /// `parse_full_at` exceeded the configured cap
+    /// (`ParserBuilder::with_max_input_bytes`). Only raised when the
+    /// caller has opted in; default is unlimited.
+    InputTooLarge {
+        seen: usize,
+        cap: usize,
+    },
 }
 
 impl fmt::Display for Error {
@@ -40,6 +48,12 @@ impl fmt::Display for Error {
                     write!(f, " at byte {}", loc.byte_offset)?;
                 }
                 Ok(())
+            }
+            Self::InputTooLarge { seen, cap } => {
+                write!(
+                    f,
+                    "markdown input exceeded configured cap: {seen} bytes seen, cap is {cap}"
+                )
             }
         }
     }

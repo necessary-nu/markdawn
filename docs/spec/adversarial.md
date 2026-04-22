@@ -123,6 +123,17 @@ therefore sit in the residual-risk bucket.
 > `on*="…"` event-handler attributes (e.g. `onclick`, `onload`,
 > `onmouseover`) must be removed from emitted SVG.
 
+## Markdown input cap
+
+> adv[markdown.input.byte-cap]
+> The markdown parser must support a caller-supplied input-size cap
+> via `ParserBuilder::with_max_input_bytes(n)`. When set, cumulative
+> bytes across `push_str`, `finish`, and `parse_full_at` exceeding
+> the cap must return `Error::InputTooLarge { seen, cap }`. Default
+> is unlimited (`None`) so existing callers aren't affected. Useful
+> for host apps rendering untrusted markdown that want a hard upper
+> bound before the parser starts allocating.
+
 ## Markdown URL hardening
 
 > adv[markdown.url-allowlist]
