@@ -275,6 +275,24 @@ impl<'a> Scanner<'a> {
                     return Ok(());
                 }
                 let self_closing = j > self.i + 1 && self.bytes[j - 1] == b'/';
+
+                // Extract tag name and check for dangerous ones. Graphviz's
+                // HTML-label parser supports <IMG SRC="..."/> which opens
+                // a file at render time. Neutralise by renaming to an
+                // unknown tag name that graphviz will error on or skip.
+                let name_start = if is_close { self.i + 2 } else { self.i + 1 };
+                let mut name_end = name_start;
+                while name_end < self.bytes.len()
+                    && self.bytes[name_end].is_ascii_alphanumeric()
+                {
+                    name_end += 1;
+                }
+                let tag_name_lower = self.bytes[name_start..name_end]
+                    .iter()
+                    .map(|b| b.to_ascii_lowercase())
+                    .collect::<Vec<_>>();
+                let is_img = tag_name_lower == b"img";
+
                 if is_close {
                     self.html_depth = self.html_depth.saturating_sub(1);
                 } else if !self_closing {
@@ -286,8 +304,22 @@ impl<'a> Scanner<'a> {
                         return Err(GraphvizError::HtmlLabelTooDeep(self.html_depth));
                     }
                 }
-                self.out
-                    .push_str(core::str::from_utf8(&self.bytes[self.i..=j]).unwrap_or(""));
+                if is_img {
+                    // Rename <IMG…> → <_img…> so graphviz's HTML-label
+                    // parser doesn't recognise it as IMG and so doesn't
+                    // try to open the SRC file.
+                    self.out.push('<');
+                    if is_close {
+                        self.out.push('/');
+                    }
+                    self.out.push('_');
+                    self.out.push_str(
+                        core::str::from_utf8(&self.bytes[name_start..=j]).unwrap_or(""),
+                    );
+                } else {
+                    self.out
+                        .push_str(core::str::from_utf8(&self.bytes[self.i..=j]).unwrap_or(""));
+                }
                 self.i = j + 1;
                 continue;
             }
@@ -329,7 +361,12 @@ impl<'a> Scanner<'a> {
             let lower = name.to_ascii_lowercase();
             let rename = matches!(
                 lower.as_str(),
-                "image" | "shapefile" | "fontpath" | "imagepath" | "layout"
+                "image"
+                    | "shapefile"
+                    | "fontpath"
+                    | "imagepath"
+                    | "layout"
+                    | "stylesheet"
             );
             let is_fontname = lower == "fontname";
             let is_minlen = lower == "minlen";
@@ -484,6 +521,13 @@ mod tests {
     }
 
     #[test]
+    fn stylesheet_attribute_neutralised() {
+        let (out, _) = scan_and_scrub(r#"digraph { graph [stylesheet="evil.css"]; A }"#).unwrap();
+        assert!(!out.contains("[stylesheet="), "got: {out}");
+        assert!(out.contains("_stylesheet="), "got: {out}");
+    }
+
+    #[test]
     fn layout_attribute_neutralised() {
         let (out, _) = scan_and_scrub(r#"digraph { graph [layout=neato]; A -> B }"#).unwrap();
         assert!(!out.contains("[layout=neato"), "got: {out}");
@@ -525,6 +569,22 @@ mod tests {
         src.push_str(">] }");
         let err = scan_and_scrub(&src).unwrap_err();
         assert!(matches!(err, GraphvizError::HtmlLabelTooDeep(_)));
+    }
+
+    #[test]
+    fn html_label_img_tag_renamed() {
+        let (out, _) =
+            scan_and_scrub(r#"digraph { A [label=<<IMG SRC="/etc/passwd"/>>] }"#).unwrap();
+        assert!(!out.contains("<IMG"), "got: {out}");
+        assert!(!out.contains("<img"), "got: {out}");
+        assert!(out.contains("<_"), "got: {out}");
+    }
+
+    #[test]
+    fn html_label_safe_tags_preserved() {
+        let (out, _) = scan_and_scrub(r#"digraph { A [label=<<B>x</B>>] }"#).unwrap();
+        assert!(out.contains("<B>"), "got: {out}");
+        assert!(out.contains("</B>"), "got: {out}");
     }
 
     #[test]

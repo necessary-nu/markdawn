@@ -1208,6 +1208,35 @@ mod tests {
 
     #[cfg(feature = "graphviz")]
     #[test]
+    fn graphviz_url_alias_javascript_sanitized() {
+        // `URL=` is an alias for `href=`. Graphviz emits it as an
+        // xlink:href in SVG, where the post-render sanitiser catches
+        // the unsafe scheme.
+        let src = "```dot\ndigraph { A [URL=\"javascript:alert(1)\"]; B }\n```";
+        let html = ssr(Renderer::default()
+            .with_options(DioxusOptions {
+                graphviz: true,
+                ..Default::default()
+            })
+            .render(src));
+        assert!(!html.contains("javascript:"), "leaked: {html}");
+    }
+
+    #[cfg(feature = "graphviz")]
+    #[test]
+    fn graphviz_html_label_img_path_does_not_leak() {
+        let src = "```dot\ndigraph { A [label=<<IMG SRC=\"/etc/passwd\"/>>] }\n```";
+        let html = ssr(Renderer::default()
+            .with_options(DioxusOptions {
+                graphviz: true,
+                ..Default::default()
+            })
+            .render(src));
+        assert!(!html.contains("/etc/passwd"), "leaked: {html}");
+    }
+
+    #[cfg(feature = "graphviz")]
+    #[test]
     fn graphviz_safe_href_preserved_in_output_svg() {
         let src = "```dot\ndigraph { A [href=\"https://example.com\"] }\n```";
         let html = ssr(Renderer::default()
