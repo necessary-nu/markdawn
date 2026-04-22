@@ -1122,6 +1122,20 @@ mod tests {
         assert!(!html.contains("<svg"));
     }
 
+    #[cfg(feature = "graphviz")]
+    #[test]
+    fn graphviz_info_string_alias_also_renders() {
+        let src = "```graphviz\ndigraph { A -> B }\n```";
+        let html = ssr(Renderer::default()
+            .with_options(DioxusOptions {
+                graphviz: true,
+                ..Default::default()
+            })
+            .render(src));
+        assert!(html.contains("class=\"graphviz\""), "got: {html}");
+        assert!(html.contains("<svg"), "got: {html}");
+    }
+
     #[cfg(feature = "highlight")]
     #[test]
     fn highlighter_path_invoked_for_known_language() {

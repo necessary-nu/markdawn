@@ -69,52 +69,63 @@ int markdawn_gv_render_svg(const char *dot,
     *out_err = NULL;
 
     err_reset();
-    agseterrf(err_sink);
+    agusererrf prev_errf = agseterrf(err_sink);
+
+    int rc = 1;
+    GVC_t *gvc = NULL;
+    Agraph_t *g = NULL;
+    int laid_out = 0;
+    char *rendered = NULL;
+    size_t length = 0;
 
     if (!dot) {
-        *out_err = err_take();
-        return 1;
+        goto done;
     }
 
-    GVC_t *gvc = gvContext();
+    gvc = gvContext();
     if (!gvc) {
-        *out_err = err_take();
-        return 1;
+        goto done;
     }
 
-    Agraph_t *g = agmemread(dot);
+    g = agmemread(dot);
     if (!g) {
-        gvFreeContext(gvc);
-        *out_err = err_take();
-        return 1;
+        goto done;
     }
 
     if (gvLayout(gvc, g, "dot") != 0) {
-        agclose(g);
-        gvFreeContext(gvc);
-        *out_err = err_take();
-        return 1;
+        goto done;
     }
+    laid_out = 1;
 
-    char *rendered = NULL;
-    size_t length = 0;
-    int rc = gvRenderData(gvc, g, "svg", &rendered, &length);
-
-    gvFreeLayout(gvc, g);
-    agclose(g);
-    gvFreeContext(gvc);
-
-    if (rc != 0 || !rendered) {
+    int render_rc = gvRenderData(gvc, g, "svg", &rendered, &length);
+    if (render_rc != 0 || !rendered) {
         if (rendered) {
             gvFreeRenderData(rendered);
+            rendered = NULL;
         }
-        *out_err = err_take();
-        return 1;
+        goto done;
     }
 
     *out_svg = rendered;
     *out_len = length;
-    return 0;
+    rendered = NULL;
+    rc = 0;
+
+done:
+    if (laid_out && gvc && g) {
+        gvFreeLayout(gvc, g);
+    }
+    if (g) {
+        agclose(g);
+    }
+    if (gvc) {
+        gvFreeContext(gvc);
+    }
+    if (rc != 0) {
+        *out_err = err_take();
+    }
+    agseterrf(prev_errf);
+    return rc;
 }
 
 void markdawn_gv_free_render_data(char *ptr) {
