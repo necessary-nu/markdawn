@@ -205,6 +205,19 @@ therefore sit in the residual-risk bucket.
 > `Mutex`. libgraphviz keeps per-context state that is not thread-
 > safe; overlapping calls would race even with our wrapper.
 
+> adv[render.staged-timeout]
+> libgraphviz's pipeline is `agmemread` (parse) → `gvLayout` (layout)
+> → `gvRenderData` (render). Each stage must have its own wall-clock
+> budget (`PARSE_BUDGET_MS`, `LAYOUT_BUDGET_MS`, `RENDER_BUDGET_MS`)
+> enforced inside the C shim *between* stages. We can't interrupt
+> libgraphviz mid-call (non-cooperative C), but a stage that exceeds
+> its budget must bail before the next stage starts, so a
+> pathological parse doesn't consume the layout + render budgets
+> too. The C shim returns distinct error codes
+> (`MARKDAWN_GV_TIMEOUT_PARSE` / `_LAYOUT` / `_RENDER`) which map to
+> `GraphvizError::TimedOutAtParse` / `AtLayout` / `AtRender` with
+> the observed elapsed time as payload.
+
 > adv[render.error-callback-capture]
 > `agseterrf` must be installed around each render call so
 > libgraphviz diagnostics land in `GraphvizError::RenderFailed`

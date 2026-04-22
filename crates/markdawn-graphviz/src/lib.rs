@@ -52,6 +52,17 @@ const RENDER_STACK_BYTES: usize = 8 * 1024 * 1024;
 /// until libgraphviz returns. See the `adv[render.timeout]` spec.
 pub const RENDER_TIMEOUT_SECS: u64 = 10;
 
+/// Per-stage budgets enforced inside the C shim between
+/// `agmemread` / `gvLayout` / `gvRenderData`. We can't interrupt
+/// libgraphviz mid-call, but we *can* bail between stages so a
+/// pathological parse doesn't consume the layout + render budget too.
+// adv[impl render.staged-timeout]
+pub const PARSE_BUDGET_MS: u64 = 2_000;
+// adv[impl render.staged-timeout]
+pub const LAYOUT_BUDGET_MS: u64 = 7_000;
+// adv[impl render.staged-timeout]
+pub const RENDER_BUDGET_MS: u64 = 1_000;
+
 #[derive(Debug, Clone)]
 pub enum GraphvizError {
     /// DOT source could not be parsed, laid out, or rendered. The
@@ -101,6 +112,20 @@ pub enum GraphvizError {
     /// libgraphviz cannot be safely killed from outside; subsequent
     /// callers will also time out until the stuck render completes.
     TimedOut,
+    /// Parse stage (`agmemread`) exceeded [`PARSE_BUDGET_MS`].
+    /// Distinct from `TimedOut` — this means the shim caught it
+    /// between stages and no libgraphviz thread is orphaned.
+    TimedOutAtParse {
+        elapsed_ms: u64,
+    },
+    /// Layout stage (`gvLayout`) exceeded [`LAYOUT_BUDGET_MS`].
+    TimedOutAtLayout {
+        elapsed_ms: u64,
+    },
+    /// Render stage (`gvRenderData`) exceeded [`RENDER_BUDGET_MS`].
+    TimedOutAtRender {
+        elapsed_ms: u64,
+    },
 }
 
 impl fmt::Display for GraphvizError {
@@ -146,11 +171,29 @@ impl fmt::Display for GraphvizError {
                 f,
                 "graphviz render exceeded {RENDER_TIMEOUT_SECS}s wall-clock timeout"
             ),
+            Self::TimedOutAtParse { elapsed_ms } => write!(
+                f,
+                "graphviz parse stage exceeded {PARSE_BUDGET_MS}ms budget ({elapsed_ms}ms observed)"
+            ),
+            Self::TimedOutAtLayout { elapsed_ms } => write!(
+                f,
+                "graphviz layout stage exceeded {LAYOUT_BUDGET_MS}ms budget ({elapsed_ms}ms observed)"
+            ),
+            Self::TimedOutAtRender { elapsed_ms } => write!(
+                f,
+                "graphviz render stage exceeded {RENDER_BUDGET_MS}ms budget ({elapsed_ms}ms observed)"
+            ),
         }
     }
 }
 
 impl std::error::Error for GraphvizError {}
+
+const MARKDAWN_GV_OK: c_int = 0;
+const MARKDAWN_GV_FAILED: c_int = 1;
+const MARKDAWN_GV_TIMEOUT_PARSE: c_int = 2;
+const MARKDAWN_GV_TIMEOUT_LAYOUT: c_int = 3;
+const MARKDAWN_GV_TIMEOUT_RENDER: c_int = 4;
 
 unsafe extern "C" {
     fn markdawn_gv_render_svg(
@@ -158,6 +201,12 @@ unsafe extern "C" {
         out_svg: *mut *mut c_char,
         out_len: *mut usize,
         out_err: *mut *mut c_char,
+        parse_budget_ms: u64,
+        layout_budget_ms: u64,
+        render_budget_ms: u64,
+        out_parse_ms: *mut u64,
+        out_layout_ms: *mut u64,
+        out_render_ms: *mut u64,
     ) -> c_int;
     fn markdawn_gv_free_render_data(ptr: *mut c_char);
     fn markdawn_gv_free_error(ptr: *mut c_char);
@@ -250,26 +299,52 @@ fn render_inner(source: &str) -> Result<String, GraphvizError> {
     let mut svg_ptr: *mut c_char = core::ptr::null_mut();
     let mut svg_len: usize = 0;
     let mut err_ptr: *mut c_char = core::ptr::null_mut();
+    let mut parse_ms: u64 = 0;
+    let mut layout_ms: u64 = 0;
+    let mut render_ms: u64 = 0;
 
+    // adv[impl render.staged-timeout]
     let rc = unsafe {
-        markdawn_gv_render_svg(dot.as_ptr(), &mut svg_ptr, &mut svg_len, &mut err_ptr)
+        markdawn_gv_render_svg(
+            dot.as_ptr(),
+            &mut svg_ptr,
+            &mut svg_len,
+            &mut err_ptr,
+            PARSE_BUDGET_MS,
+            LAYOUT_BUDGET_MS,
+            RENDER_BUDGET_MS,
+            &mut parse_ms,
+            &mut layout_ms,
+            &mut render_ms,
+        )
     };
 
-    if rc != 0 {
-        let msg = take_c_string(err_ptr);
-        unsafe { markdawn_gv_free_error(err_ptr) };
-        return Err(GraphvizError::RenderFailed(msg));
+    // Free the error buffer regardless of outcome; we've either taken
+    // its contents into a String or we don't need it.
+    let diagnostic = take_c_string(err_ptr);
+    unsafe { markdawn_gv_free_error(err_ptr) };
+
+    match rc {
+        MARKDAWN_GV_OK => {
+            if svg_ptr.is_null() {
+                return Err(GraphvizError::RenderFailed(String::new()));
+            }
+            let slice = unsafe { core::slice::from_raw_parts(svg_ptr as *const u8, svg_len) };
+            let result = core::str::from_utf8(slice).map(str::to_owned);
+            unsafe { markdawn_gv_free_render_data(svg_ptr) };
+            result.map_err(|_| GraphvizError::NonUtf8Output)
+        }
+        MARKDAWN_GV_TIMEOUT_PARSE => {
+            Err(GraphvizError::TimedOutAtParse { elapsed_ms: parse_ms })
+        }
+        MARKDAWN_GV_TIMEOUT_LAYOUT => {
+            Err(GraphvizError::TimedOutAtLayout { elapsed_ms: layout_ms })
+        }
+        MARKDAWN_GV_TIMEOUT_RENDER => {
+            Err(GraphvizError::TimedOutAtRender { elapsed_ms: render_ms })
+        }
+        MARKDAWN_GV_FAILED | _ => Err(GraphvizError::RenderFailed(diagnostic)),
     }
-
-    if svg_ptr.is_null() {
-        return Err(GraphvizError::RenderFailed(String::new()));
-    }
-
-    let slice = unsafe { core::slice::from_raw_parts(svg_ptr as *const u8, svg_len) };
-    let result = core::str::from_utf8(slice).map(str::to_owned);
-    unsafe { markdawn_gv_free_render_data(svg_ptr) };
-
-    result.map_err(|_| GraphvizError::NonUtf8Output)
 }
 
 fn take_c_string(ptr: *mut c_char) -> String {

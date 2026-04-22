@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <graphviz/gvc.h>
 #include <graphviz/cgraph.h>
@@ -60,18 +61,36 @@ static char *err_take(void) {
     return copy;
 }
 
+/* Monotonic clock snapshot in milliseconds. */
+static uint64_t mono_ms(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+        return 0;
+    }
+    return (uint64_t)ts.tv_sec * 1000u + (uint64_t)(ts.tv_nsec / 1000000);
+}
+
 int markdawn_gv_render_svg(const char *dot,
                            char **out_svg,
                            size_t *out_len,
-                           char **out_err) {
+                           char **out_err,
+                           uint64_t parse_budget_ms,
+                           uint64_t layout_budget_ms,
+                           uint64_t render_budget_ms,
+                           uint64_t *out_parse_ms,
+                           uint64_t *out_layout_ms,
+                           uint64_t *out_render_ms) {
     *out_svg = NULL;
     *out_len = 0;
     *out_err = NULL;
+    *out_parse_ms = 0;
+    *out_layout_ms = 0;
+    *out_render_ms = 0;
 
     err_reset();
     agusererrf prev_errf = agseterrf(err_sink);
 
-    int rc = 1;
+    int rc = MARKDAWN_GV_FAILED;
     GVC_t *gvc = NULL;
     Agraph_t *g = NULL;
     int laid_out = 0;
@@ -87,17 +106,35 @@ int markdawn_gv_render_svg(const char *dot,
         goto done;
     }
 
+    /* Stage 1: parse (agmemread). */
+    uint64_t parse_start = mono_ms();
     g = agmemread(dot);
+    *out_parse_ms = mono_ms() - parse_start;
     if (!g) {
         goto done;
     }
+    if (parse_budget_ms > 0 && *out_parse_ms > parse_budget_ms) {
+        rc = MARKDAWN_GV_TIMEOUT_PARSE;
+        goto done;
+    }
 
-    if (gvLayout(gvc, g, "dot") != 0) {
+    /* Stage 2: layout (gvLayout). */
+    uint64_t layout_start = mono_ms();
+    int layout_rc = gvLayout(gvc, g, "dot");
+    *out_layout_ms = mono_ms() - layout_start;
+    if (layout_rc != 0) {
         goto done;
     }
     laid_out = 1;
+    if (layout_budget_ms > 0 && *out_layout_ms > layout_budget_ms) {
+        rc = MARKDAWN_GV_TIMEOUT_LAYOUT;
+        goto done;
+    }
 
+    /* Stage 3: render (gvRenderData). */
+    uint64_t render_start = mono_ms();
     int render_rc = gvRenderData(gvc, g, "svg", &rendered, &length);
+    *out_render_ms = mono_ms() - render_start;
     if (render_rc != 0 || !rendered) {
         if (rendered) {
             gvFreeRenderData(rendered);
@@ -105,11 +142,17 @@ int markdawn_gv_render_svg(const char *dot,
         }
         goto done;
     }
+    if (render_budget_ms > 0 && *out_render_ms > render_budget_ms) {
+        gvFreeRenderData(rendered);
+        rendered = NULL;
+        rc = MARKDAWN_GV_TIMEOUT_RENDER;
+        goto done;
+    }
 
     *out_svg = rendered;
     *out_len = length;
     rendered = NULL;
-    rc = 0;
+    rc = MARKDAWN_GV_OK;
 
 done:
     if (laid_out && gvc && g) {
@@ -121,7 +164,7 @@ done:
     if (gvc) {
         gvFreeContext(gvc);
     }
-    if (rc != 0) {
+    if (rc != MARKDAWN_GV_OK) {
         *out_err = err_take();
     }
     agseterrf(prev_errf);

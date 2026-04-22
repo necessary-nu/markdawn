@@ -36,8 +36,9 @@
 //! is never opened.
 
 use markdawn_graphviz::{
-    GraphvizError, MAX_ATTRIBUTES, MAX_BRACE_DEPTH, MAX_DOT_BYTES, MAX_EDGES, MAX_HTML_DEPTH,
-    MAX_NODES, MAX_RECORD_DEPTH, render_dot_to_svg, render_dot_to_svg_with_timeout,
+    GraphvizError, LAYOUT_BUDGET_MS, MAX_ATTRIBUTES, MAX_BRACE_DEPTH, MAX_DOT_BYTES, MAX_EDGES,
+    MAX_HTML_DEPTH, MAX_NODES, MAX_RECORD_DEPTH, PARSE_BUDGET_MS, RENDER_BUDGET_MS,
+    render_dot_to_svg, render_dot_to_svg_with_timeout,
 };
 use std::time::Duration;
 
@@ -488,6 +489,36 @@ fn a15_2_timeout_display_message() {
     let err = GraphvizError::TimedOut;
     let s = format!("{err}");
     assert!(s.to_lowercase().contains("timeout"), "got: {s}");
+}
+
+// adv[verify render.staged-timeout]
+#[test]
+fn a15_4_staged_timeout_variants_display() {
+    let errs = [
+        GraphvizError::TimedOutAtParse { elapsed_ms: 9_999 },
+        GraphvizError::TimedOutAtLayout { elapsed_ms: 9_999 },
+        GraphvizError::TimedOutAtRender { elapsed_ms: 9_999 },
+    ];
+    for err in errs {
+        let s = format!("{err}");
+        assert!(s.contains("9999"), "expected elapsed in message: {s}");
+        assert!(s.contains("budget"), "expected 'budget' in message: {s}");
+    }
+}
+
+// adv[verify render.staged-timeout]
+#[test]
+fn a15_5_staged_budget_constants_sane() {
+    // Per-stage budgets should fit comfortably inside the overall
+    // Rust-side wall-clock timeout, otherwise the Rust recv_timeout
+    // would fire before the C shim could return a stage-specific
+    // error.
+    let total_ms = PARSE_BUDGET_MS + LAYOUT_BUDGET_MS + RENDER_BUDGET_MS;
+    let rust_timeout_ms = markdawn_graphviz::RENDER_TIMEOUT_SECS * 1000;
+    assert!(
+        total_ms <= rust_timeout_ms,
+        "per-stage budgets sum {total_ms}ms exceeds Rust timeout {rust_timeout_ms}ms"
+    );
 }
 
 // adv[verify render.panic-capture]
