@@ -5,10 +5,34 @@
 //! written to the host process's stderr. A process-global `Mutex`
 //! serialises calls — libgraphviz keeps per-context state that is not
 //! safe to drive concurrently.
+//!
+//! To keep pathological input from taking down the whole host process,
+//! [`render_dot_to_svg`] applies two pre-flight gates before handing
+//! bytes to libgraphviz: an input-size cap ([`MAX_DOT_BYTES`]) and a
+//! brace-nesting-depth cap ([`MAX_BRACE_DEPTH`]). The render itself
+//! runs on a dedicated thread with a generous stack; Rust panics from
+//! the glue code are captured via `join`. Note that C-level `abort()`
+//! / `SIGSEGV` inside libgraphviz would still terminate the whole
+//! process — the gates are the real defence against those.
 
 use core::fmt;
 use std::ffi::{CString, c_char, c_int};
 use std::sync::Mutex;
+
+/// Reject DOT source larger than this many bytes before any libgraphviz
+/// call. Large enough for realistic diagrams; small enough that the
+/// worst adversarial inputs never reach the layout engine.
+pub const MAX_DOT_BYTES: usize = 256 * 1024;
+
+/// Reject DOT source whose `{`/`}` nesting depth exceeds this. Deeply
+/// nested subgraphs are the main way to trigger stack overflow inside
+/// libgraphviz's recursive layout.
+pub const MAX_BRACE_DEPTH: usize = 64;
+
+/// Thread stack size for the dedicated render thread. Larger than the
+/// Rust default so moderate libgraphviz recursion doesn't overflow,
+/// while still bounded.
+const RENDER_STACK_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
 pub enum GraphvizError {
@@ -23,6 +47,18 @@ pub enum GraphvizError {
     /// Input string contained an interior NUL byte so we couldn't hand
     /// it to libgraphviz.
     InvalidInput,
+    /// Input exceeded [`MAX_DOT_BYTES`]. The numeric payload is the
+    /// actual byte count.
+    InputTooLarge(usize),
+    /// Input exceeded [`MAX_BRACE_DEPTH`] in `{`/`}` nesting. The
+    /// numeric payload is the observed peak depth.
+    InputTooDeep(usize),
+    /// The render thread panicked before producing a result. Payload is
+    /// the panic message if it was recoverable as `&str`/`String`, else
+    /// empty.
+    Panicked(String),
+    /// The render thread could not be spawned.
+    ThreadSpawn(String),
 }
 
 impl fmt::Display for GraphvizError {
@@ -32,6 +68,17 @@ impl fmt::Display for GraphvizError {
             Self::RenderFailed(msg) => write!(f, "graphviz render failed: {}", msg.trim_end()),
             Self::NonUtf8Output => f.write_str("graphviz produced non-UTF-8 SVG"),
             Self::InvalidInput => f.write_str("DOT source contained interior NUL byte"),
+            Self::InputTooLarge(n) => write!(
+                f,
+                "DOT source is {n} bytes, exceeds cap of {MAX_DOT_BYTES} bytes"
+            ),
+            Self::InputTooDeep(d) => write!(
+                f,
+                "DOT source brace nesting is {d}, exceeds cap of {MAX_BRACE_DEPTH}"
+            ),
+            Self::Panicked(msg) if msg.is_empty() => f.write_str("graphviz render thread panicked"),
+            Self::Panicked(msg) => write!(f, "graphviz render thread panicked: {msg}"),
+            Self::ThreadSpawn(msg) => write!(f, "could not spawn graphviz render thread: {msg}"),
         }
     }
 }
@@ -52,6 +99,28 @@ unsafe extern "C" {
 static RENDER_LOCK: Mutex<()> = Mutex::new(());
 
 pub fn render_dot_to_svg(source: &str) -> Result<String, GraphvizError> {
+    if source.len() > MAX_DOT_BYTES {
+        return Err(GraphvizError::InputTooLarge(source.len()));
+    }
+    let depth = max_brace_depth(source);
+    if depth > MAX_BRACE_DEPTH {
+        return Err(GraphvizError::InputTooDeep(depth));
+    }
+
+    let owned = source.to_owned();
+    let handle = std::thread::Builder::new()
+        .stack_size(RENDER_STACK_BYTES)
+        .name("markdawn-graphviz-render".to_owned())
+        .spawn(move || render_inner(&owned))
+        .map_err(|e| GraphvizError::ThreadSpawn(e.to_string()))?;
+
+    match handle.join() {
+        Ok(result) => result,
+        Err(panic_payload) => Err(GraphvizError::Panicked(panic_message(&panic_payload))),
+    }
+}
+
+fn render_inner(source: &str) -> Result<String, GraphvizError> {
     let dot = CString::new(source).map_err(|_| GraphvizError::InvalidInput)?;
 
     let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -89,6 +158,49 @@ fn take_c_string(ptr: *mut c_char) -> String {
     cstr.to_string_lossy().into_owned()
 }
 
+fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        return (*s).to_owned();
+    }
+    if let Some(s) = payload.downcast_ref::<String>() {
+        return s.clone();
+    }
+    String::new()
+}
+
+/// Peak depth of `{` / `}` nesting, ignoring braces that appear inside
+/// DOT double-quoted strings (and the escaped `\"` within them).
+/// Line comments (`//…`) and block comments (`/* … */`) are not
+/// stripped — brace counts inside them still count toward the cap, so
+/// the check is conservative (errs on the side of rejecting more).
+fn max_brace_depth(source: &str) -> usize {
+    let mut depth: usize = 0;
+    let mut max: usize = 0;
+    let mut in_string = false;
+    let mut escape = false;
+    for b in source.bytes() {
+        if escape {
+            escape = false;
+            continue;
+        }
+        match b {
+            b'\\' if in_string => escape = true,
+            b'"' => in_string = !in_string,
+            b'{' if !in_string => {
+                depth += 1;
+                if depth > max {
+                    max = depth;
+                }
+            }
+            b'}' if !in_string => {
+                depth = depth.saturating_sub(1);
+            }
+            _ => {}
+        }
+    }
+    max
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,5 +230,43 @@ mod tests {
     fn interior_nul_rejected() {
         let err = render_dot_to_svg("digraph { \0 }").unwrap_err();
         assert!(matches!(err, GraphvizError::InvalidInput));
+    }
+
+    #[test]
+    fn oversize_input_rejected_before_libgraphviz() {
+        let huge = "a".repeat(MAX_DOT_BYTES + 1);
+        let err = render_dot_to_svg(&huge).unwrap_err();
+        match err {
+            GraphvizError::InputTooLarge(n) => assert_eq!(n, MAX_DOT_BYTES + 1),
+            other => panic!("expected InputTooLarge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn deeply_nested_braces_rejected() {
+        let mut src = String::from("digraph ");
+        for _ in 0..(MAX_BRACE_DEPTH + 1) {
+            src.push_str("{ subgraph ");
+        }
+        for _ in 0..(MAX_BRACE_DEPTH + 1) {
+            src.push_str(" }");
+        }
+        let err = render_dot_to_svg(&src).unwrap_err();
+        match err {
+            GraphvizError::InputTooDeep(d) => assert!(d > MAX_BRACE_DEPTH),
+            other => panic!("expected InputTooDeep, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn braces_inside_strings_do_not_count_toward_depth() {
+        assert_eq!(max_brace_depth(r#"digraph { a [label="{{{{{{"] }"#), 1);
+    }
+
+    #[test]
+    fn escaped_quote_inside_string_preserves_string_state() {
+        // The \" is escaped, so the string doesn't close until the
+        // final literal quote. The { inside stays inside the string.
+        assert_eq!(max_brace_depth(r#"a "b\"{" c"#), 0);
     }
 }
