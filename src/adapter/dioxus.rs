@@ -670,7 +670,7 @@ impl<R> Renderer<R> {
         // 1b. graphviz (feature-gated)
         #[cfg(feature = "graphviz")]
         if self.options.graphviz && matches!(info_lang, Some("dot") | Some("graphviz")) {
-            if let Ok(svg) = crate::graphviz::render_dot_to_svg(literal) {
+            if let Ok(svg) = markdawn_graphviz::render_dot_to_svg(literal) {
                 return rsx! {
                     div { class: "graphviz", dangerous_inner_html: svg }
                 };

@@ -240,7 +240,7 @@ impl<R> HtmlAdapter<R> {
         if !self.graphviz || !matches!(lang, Some("dot") | Some("graphviz")) {
             return false;
         }
-        let Ok(svg) = crate::graphviz::render_dot_to_svg(literal) else {
+        let Ok(svg) = markdawn_graphviz::render_dot_to_svg(literal) else {
             return false;
         };
         out.push_str(&svg);

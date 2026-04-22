@@ -18,7 +18,7 @@ pub(crate) fn try_build_graphviz_view(
     source: &str,
     mtm: MainThreadMarker,
 ) -> Option<Retained<UIView>> {
-    let svg_str = crate::graphviz::render_dot_to_svg(source).ok()?;
+    let svg_str = markdawn_graphviz::render_dot_to_svg(source).ok()?;
     let image = svg::render_svg(svg_str.as_bytes())?;
 
     let size = unsafe { image.size() };
