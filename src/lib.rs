@@ -33,6 +33,8 @@ pub use arborium;
 pub use crate::adapter::dioxus::{
     DioxusOptions, Markdown, RenderDioxusCustom, Renderer, render_markdown, render_node,
 };
+#[cfg(feature = "typst")]
+pub use crate::adapter::typst::TypstWalker;
 #[cfg(target_os = "ios")]
 pub use crate::adapter::uikit::cancel_image_load;
 #[cfg(feature = "ansi")]
@@ -44,6 +46,8 @@ pub use crate::adapter::{
     BlockSink, RenderCtx, RenderUIKitCustom, TextRenderer, UIKitError, UIKitStyle,
 };
 pub use crate::adapter::{HtmlAdapter, HtmlError, HtmlSink, RenderHtmlCustom};
+#[cfg(feature = "typst")]
+pub use crate::adapter::{RenderTypstCustom, TypstAdapter, TypstError, TypstSink};
 pub use crate::editor::EditableDocument;
 pub use crate::error::{Error, ErrorLocation, StreamError};
 pub use crate::ext::{

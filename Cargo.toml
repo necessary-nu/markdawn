@@ -7,6 +7,7 @@ edition = "2024"
 dioxus = ["dep:dioxus", "dep:dioxus-core"]
 highlight = ["dep:arborium"]
 pikchr = ["dep:pikru", "dep:facet-dessert", "dep:facet-reflect", "dep:facet-path"]
+typst = []
 ansi = ["dep:vte", "dep:strip-ansi-escapes"]
 terminal = ["ansi", "dep:vt100"]
 
