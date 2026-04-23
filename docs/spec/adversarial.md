@@ -206,22 +206,31 @@ therefore sit in the residual-risk bucket.
 > safe; overlapping calls would race even with our wrapper.
 
 > adv[render.process-isolation]
-> On Linux, each render runs in a fork()ed child process. Parent
-> reads the SVG via a pipe with a `poll()`-based timeout; on
-> timeout or oversized response the child is SIGKILLed and the
-> kernel reclaims its memory. If the child crashes (libgraphviz
-> abort / SIGSEGV / stack overflow / OOM-killed) the parent
-> observes the death via `waitpid` and returns
-> `GraphvizError::ForkCrashed` without going down with it.
+> Each render runs in a fork()ed child process. Parent reads the
+> SVG via a pipe with a `poll()`-based timeout; on timeout or
+> oversized response the child is SIGKILLed and the kernel
+> reclaims its memory. If the child crashes (libgraphviz abort /
+> SIGSEGV / stack overflow / OOM-killed) the parent observes the
+> death via `waitpid` and returns `GraphvizError::ForkCrashed`
+> without going down with it.
 >
-> On macOS the Objective-C runtime refuses `+initialize` after
-> fork() (libgraphviz's plugins pull in Cocoa via image codecs,
-> tripping the check), so the fork path deadlocks the child. The
-> macOS code path falls back to the in-thread renderer — same
-> staged timeouts and input caps, but process crashes inside
-> libgraphviz still take the host process with them. Downstream
-> macOS callers who need hard isolation can run markdawn itself in
-> a subprocess.
+> Works on both Linux and macOS because markdawn-graphviz vendors
+> libgraphviz as a submodule and builds a minimal static set
+> (cgraph, cdt, gvc, common, dotgen, pack, label, pathplan, xdot,
+> util, sparse, vpsc, rbtree, ast, expr, sfio) plus just the `dot`
+> layout plugin and `core` SVG renderer — with
+> `WITH_QUARTZ=OFF` / no Cocoa, `WITH_PANGOCAIRO=OFF`,
+> `with_ortho=OFF`, `with_sfdp=OFF`, `WITH_GD=OFF`, `WITH_RSVG=OFF`,
+> `WITH_EXPAT=OFF`, `WITH_WEBP=OFF`, `WITH_X=OFF`, and all language
+> bindings (`ENABLE_SWIG=OFF` etc) off. No dlopen / dyld plugin
+> loader, no Objective-C runtime, so fork() has no fork-safety
+> traps to hit.
+>
+> System-graphviz mode (`MARKDAWN_GV_USE_SYSTEM=1` or explicit
+> `GRAPHVIZ_LIB_DIR`) bypasses the vendored build; on macOS
+> Homebrew graphviz pulls Cocoa via its Quartz plugin and fork
+> will fail there. The `markdawn_gv_prewarm` callback stays
+> installed as a best-effort mitigation for that case.
 
 > adv[render.staged-timeout]
 > libgraphviz's pipeline is `agmemread` (parse) → `gvLayout` (layout)

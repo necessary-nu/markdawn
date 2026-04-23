@@ -17,7 +17,7 @@
 
 use core::fmt;
 use std::ffi::{CString, c_char, c_int};
-use std::sync::{Mutex, mpsc};
+use std::sync::{Mutex, Once, mpsc};
 use std::time::Duration;
 
 mod scrubber;
@@ -249,7 +249,7 @@ unsafe extern "C" {
         out_layout_ms: *mut u64,
         out_render_ms: *mut u64,
     ) -> c_int;
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     fn markdawn_gv_render_svg_forked(
         dot: *const c_char,
         out_svg: *mut *mut c_char,
@@ -263,8 +263,23 @@ unsafe extern "C" {
         out_layout_ms: *mut u64,
         out_render_ms: *mut u64,
     ) -> c_int;
+    fn markdawn_gv_prewarm();
     fn markdawn_gv_free_render_data(ptr: *mut c_char);
     fn markdawn_gv_free_error(ptr: *mut c_char);
+}
+
+// adv[impl render.process-isolation]
+// Before the first fork()-isolated render, the parent must complete
+// libgraphviz's plugin load (which on macOS transitively dlopen()s
+// Cocoa via the quartz plugin and triggers Objective-C `+initialize`).
+// If the child is the first to do this, macOS's objc runtime treats
+// it as unsafe and either deadlocks or crashes. Running the same
+// initialisation in the parent before fork() leaves the child with
+// fully-initialised classes in its inherited address space.
+static PREWARM: Once = Once::new();
+
+fn ensure_prewarmed() {
+    PREWARM.call_once(|| unsafe { markdawn_gv_prewarm() });
 }
 
 static RENDER_LOCK: Mutex<()> = Mutex::new(());
@@ -349,25 +364,25 @@ fn render_inner_pipeline(source: &str, timeout: Duration) -> Result<String, Grap
 // adv[impl render.serialise]
 // adv[impl render.error-callback-capture]
 //
-// Dispatch table. On Linux the forked path is used — kernel SIGKILLs
-// a runaway child without blinking and libgraphviz's post-fork-no-exec
-// usage is well-tolerated. On macOS the Objective-C runtime refuses
-// fork() while `+initialize` might be in progress (which libgraphviz
-// can trigger via its Cocoa-using plugins), so the forked path
-// deadlocks the child — fall back to the in-thread path there. Other
-// unices behave like Linux in practice.
-#[cfg(target_os = "linux")]
+// Dispatch table. Forked path is used wherever fork() is viable —
+// Linux directly, and macOS *after* a parent-side pre-warm that
+// completes libgraphviz's plugin load (including the Cocoa-using
+// quartz plugin and its Objective-C `+initialize`) before any
+// fork() happens. Without the pre-warm the macOS objc runtime's
+// fork-safety check fires in the child and deadlocks it.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn render_inner(source: &str) -> Result<String, GraphvizError> {
+    ensure_prewarmed();
     render_inner_forked(source)
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn render_inner(source: &str) -> Result<String, GraphvizError> {
     render_inner_in_process(source)
 }
 
 // adv[impl render.process-isolation]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn render_inner_forked(source: &str) -> Result<String, GraphvizError> {
     let dot = CString::new(source).map_err(|_| GraphvizError::InvalidInput)?;
 

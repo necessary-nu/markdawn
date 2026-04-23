@@ -80,6 +80,16 @@ int markdawn_gv_render_svg_forked(const char *dot,
                                   uint64_t *out_layout_ms,
                                   uint64_t *out_render_ms);
 
+/*
+ * Force libgraphviz plugin load + Objective-C `+initialize` in the
+ * calling process. Safe to call any number of times. On macOS this
+ * is essential before the first fork()-isolated render: if the
+ * parent hasn't yet touched libgraphviz, the child will be the one
+ * to trigger +initialize, and the objc runtime's fork-safety check
+ * will deadlock or crash the child.
+ */
+void markdawn_gv_prewarm(void);
+
 /* Free a buffer returned via *out_svg. */
 void markdawn_gv_free_render_data(char *ptr);
 

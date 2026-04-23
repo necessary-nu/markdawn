@@ -11,6 +11,22 @@
 
 #include <graphviz/gvc.h>
 #include <graphviz/cgraph.h>
+#include <graphviz/gvplugin.h>
+
+/*
+ * Static-build plugin registration. With USE_LTDL=OFF graphviz can't
+ * discover plugins at runtime via dlopen, so we have to hand
+ * gvAddLibrary each `gvplugin_*_LTX_library` symbol that our static
+ * link included. The symbols come from plugin/{core,dot_layout,
+ * neato_layout}/gvplugin_*.c.
+ */
+extern gvplugin_library_t gvplugin_core_LTX_library;
+extern gvplugin_library_t gvplugin_dot_layout_LTX_library;
+
+static void register_static_plugins(GVC_t *gvc) {
+    gvAddLibrary(gvc, &gvplugin_core_LTX_library);
+    gvAddLibrary(gvc, &gvplugin_dot_layout_LTX_library);
+}
 
 /*
  * libgraphviz's agseterrf installs a callback that receives a
@@ -110,6 +126,7 @@ int markdawn_gv_render_svg(const char *dot,
     if (!gvc) {
         goto done;
     }
+    register_static_plugins(gvc);
 
     /* Stage 1: parse (agmemread). */
     uint64_t parse_start = mono_ms();
@@ -174,6 +191,50 @@ done:
     }
     agseterrf(prev_errf);
     return rc;
+}
+
+/*
+ * Force libgraphviz plugin load AND exercise the full pipeline
+ * (parse → layout → SVG render) in the calling process so that
+ * every Objective-C class libgraphviz touches on macOS (NSString,
+ * UIFontDescriptor via Core Text, etc.) gets its `+initialize`
+ * completed before any fork(). In the child, Cocoa classes are
+ * inherited fully-initialised and the objc runtime's fork-safety
+ * check doesn't fire.
+ *
+ * Safe to call multiple times; callers usually gate this behind a
+ * std::sync::Once.
+ */
+void markdawn_gv_prewarm(void) {
+    /* Two warm-up renders: one with default fonts, one with a named
+     * font. Between them, every Objective-C class libgraphviz
+     * touches on macOS (NSString, UIFontDescriptor, Core Text's
+     * font-lookup path) gets +initialize'd in the parent. Child
+     * processes forked afterwards inherit fully-initialised state.
+     */
+    const char *warmups[] = {
+        "digraph { A -> B }",
+        "digraph { A [fontname=\"Helvetica\"] }",
+        NULL,
+    };
+    for (int i = 0; warmups[i] != NULL; i++) {
+        GVC_t *gvc = gvContext();
+        if (!gvc) continue;
+        register_static_plugins(gvc);
+        Agraph_t *g = agmemread(warmups[i]);
+        if (g) {
+            if (gvLayout(gvc, g, "dot") == 0) {
+                char *svg = NULL;
+                size_t len = 0;
+                if (gvRenderData(gvc, g, "svg", &svg, &len) == 0 && svg) {
+                    gvFreeRenderData(svg);
+                }
+                gvFreeLayout(gvc, g);
+            }
+            agclose(g);
+        }
+        gvFreeContext(gvc);
+    }
 }
 
 void markdawn_gv_free_render_data(char *ptr) {
