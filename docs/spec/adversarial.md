@@ -150,16 +150,27 @@ therefore sit in the residual-risk bucket.
 
 > adv[output.text-as-paths]
 > Every `<text>` element in emitted SVG must be converted to
-> outlined glyph `<path>` elements (using the bundled STIX Two
-> Text Roman font from mathml-core) with an invisible
-> `<text fill="transparent">` overlay preserved for text
-> selection, copy/paste, and screen readers. This makes the SVG
-> self-contained (no dependency on whatever fonts the viewer
-> happens to have installed) and visually consistent across
-> platforms while keeping the accessibility semantics intact.
-> Characters the bundled font doesn't cover fall back to leaving
-> the original `<text>` so the browser's fallback font can draw
-> them.
+> outlined glyph `<path>` elements (using the bundled Liberation
+> family — Serif / Sans / Mono, Regular weight, SIL OFL 1.1) with
+> an invisible `<text fill="transparent">` overlay preserved for
+> text selection, copy/paste, and screen readers.
+>
+> Face selection follows the `font-family` attribute
+> case-insensitively: the first comma-separated token that maps
+> to a generic family wins (`sans-serif` / `helvetica` / `arial`
+> etc. → Liberation Sans; `monospace` / `courier` / `consolas`
+> etc. → Liberation Mono; otherwise Liberation Serif). Liberation
+> is metric-compatible with Times / Helvetica / Courier (which is
+> exactly what graphviz and pikchr name in their output) so
+> advances line up with the engine's own layout calculations and
+> `text-anchor="middle"` labels stay centred inside their shapes.
+>
+> Per-character fallback: if the primary face doesn't have a
+> glyph for a codepoint, the converter tries the other two faces
+> before giving up. Only when NO Liberation face covers every
+> codepoint in the run is the original `<text>` preserved so the
+> browser's fallback font can render it (CJK, Deseret, emoji,
+> etc.).
 
 > adv[output.inline-trim]
 > Since every SVG we emit is embedded inline in HTML, the XML

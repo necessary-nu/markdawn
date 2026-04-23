@@ -6,25 +6,88 @@
 //! screen-reader semantics survive.
 //!
 //! Applied to graphviz and pikchr output after the security sanitiser.
-//! Falls back to leaving the `<text>` unchanged on any parse failure
-//! (unknown anchor, missing font glyph, malformed attributes).
+//! Falls back to leaving the `<text>` unchanged when we can't render a
+//! given input (unknown attributes, or a codepoint absent from all
+//! three bundled faces).
 
+use core::fmt::Write as _;
 use std::sync::LazyLock;
 
-use mathml_core::font::STIX_TWO_TEXT_ROMAN_DATA;
-use mathml_core::glyph::extract_glyph_path;
-use ttf_parser::Face;
+use ttf_parser::{Face, GlyphId, OutlineBuilder};
+
+// Red Hat's Liberation family (SIL OFL 1.1). Metric-compatible drop-in
+// replacements for Times / Helvetica / Courier, which is exactly what
+// graphviz and pikchr name in their emitted `font-family` attributes.
+// Using metric-compatible fonts means advances line up with whatever
+// the diagram engine used for its own layout calculations, so
+// `text-anchor="middle"` labels stay centred inside their shapes.
+pub const LIBERATION_SERIF_DATA: &[u8] = include_bytes!("../fonts/LiberationSerif-Regular.ttf");
+pub const LIBERATION_SANS_DATA: &[u8] = include_bytes!("../fonts/LiberationSans-Regular.ttf");
+pub const LIBERATION_MONO_DATA: &[u8] = include_bytes!("../fonts/LiberationMono-Regular.ttf");
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FamilyKind {
+    Serif,
+    Sans,
+    Mono,
+}
 
 // adv[impl output.text-as-paths]
-static FACE: LazyLock<Face<'static>> = LazyLock::new(|| {
-    Face::parse(STIX_TWO_TEXT_ROMAN_DATA, 0)
-        .expect("STIX Two Text Roman (bundled with mathml-core) must parse")
+static SERIF: LazyLock<Face<'static>> = LazyLock::new(|| {
+    Face::parse(LIBERATION_SERIF_DATA, 0).expect("LiberationSerif-Regular must parse")
 });
+static SANS: LazyLock<Face<'static>> = LazyLock::new(|| {
+    Face::parse(LIBERATION_SANS_DATA, 0).expect("LiberationSans-Regular must parse")
+});
+static MONO: LazyLock<Face<'static>> = LazyLock::new(|| {
+    Face::parse(LIBERATION_MONO_DATA, 0).expect("LiberationMono-Regular must parse")
+});
+
+fn face_for(kind: FamilyKind) -> &'static Face<'static> {
+    match kind {
+        FamilyKind::Serif => &SERIF,
+        FamilyKind::Sans => &SANS,
+        FamilyKind::Mono => &MONO,
+    }
+}
+
+/// Look at a comma-separated `font-family` attribute value and pick
+/// whether to render in Serif, Sans, or Mono. Case-insensitive,
+/// respects the first recognised family. Unknown names fall through
+/// to the next; empty / no hint defaults to Serif.
+fn pick_family(font_family: &str) -> FamilyKind {
+    for raw in font_family.split(',') {
+        let token = raw.trim().trim_matches(|c: char| c == '"' || c == '\'').to_ascii_lowercase();
+        match token.as_str() {
+            // Monospace hints.
+            "monospace" | "mono" | "courier" | "courier new" | "consolas"
+            | "menlo" | "dejavu sans mono" | "liberation mono"
+            | "jetbrains mono" | "fira code" | "source code pro" => {
+                return FamilyKind::Mono;
+            }
+            // Sans hints.
+            "sans-serif" | "sans" | "helvetica" | "helvetica neue"
+            | "arial" | "verdana" | "geneva" | "tahoma" | "trebuchet"
+            | "trebuchet ms" | "calibri" | "segoe ui" | "liberation sans"
+            | "dejavu sans" | "noto sans" => {
+                return FamilyKind::Sans;
+            }
+            // Serif hints.
+            "serif" | "times" | "times new roman" | "georgia"
+            | "cambria" | "garamond" | "palatino" | "liberation serif"
+            | "dejavu serif" | "noto serif" | "stix two text" => {
+                return FamilyKind::Serif;
+            }
+            _ => continue,
+        }
+    }
+    FamilyKind::Serif
+}
 
 /// Replace every `<text …>content</text>` in `svg` with outlined
 /// glyph paths followed by an invisible `<text>` for selection.
 /// `<text>` elements we can't understand (unknown attributes, missing
-/// glyphs) are left alone.
+/// glyphs across every bundled face) are left alone.
 pub fn text_to_paths(svg: &str) -> String {
     let mut out = String::with_capacity(svg.len());
     let mut i = 0;
@@ -37,8 +100,6 @@ pub fn text_to_paths(svg: &str) -> String {
                 continue;
             }
         }
-        // Copy one UTF-8 codepoint so multi-byte characters in labels
-        // round-trip correctly.
         let ch = svg[i..].chars().next().unwrap();
         out.push(ch);
         i += ch.len_utf8();
@@ -46,91 +107,82 @@ pub fn text_to_paths(svg: &str) -> String {
     out
 }
 
-/// Try to consume a `<text …>CONTENT</text>` block starting at the
-/// beginning of `bytes`. Returns `(bytes_consumed, replacement_svg)`
-/// on success.
 fn try_convert_text(bytes: &[u8]) -> Option<(usize, String)> {
     let open_close = bytes.iter().position(|&b| b == b'>')?;
     let tag_attrs = core::str::from_utf8(&bytes[5..open_close]).ok()?; // skip "<text"
     let after_open = open_close + 1;
-    // Find matching </text>.
     let content_end_rel = find_ci(&bytes[after_open..], b"</text>")?;
     let content = core::str::from_utf8(&bytes[after_open..after_open + content_end_rel]).ok()?;
     let total = after_open + content_end_rel + b"</text>".len();
 
-    // Parse attributes we care about.
     let x = parse_f64_attr(tag_attrs, "x")?;
     let y = parse_f64_attr(tag_attrs, "y")?;
     let font_size = parse_f64_attr(tag_attrs, "font-size")?;
     let anchor = parse_str_attr(tag_attrs, "text-anchor").unwrap_or("start");
     let fill = parse_str_attr(tag_attrs, "fill").unwrap_or("currentColor");
+    let family_hint = parse_str_attr(tag_attrs, "font-family").unwrap_or("");
+    let primary = pick_family(family_hint);
 
-    // Unescape the content — graphviz emits plain text or XML entities
-    // (`&lt;`, `&gt;`, `&amp;`, `&quot;`, `&apos;`).
     let content = unescape_xml(content);
     if content.is_empty() {
         return None;
     }
 
-    let face = &*FACE;
-    let upem = face.units_per_em();
-    if upem == 0 {
-        return None;
-    }
-    let scale = font_size / upem as f64;
-
-    // First pass: compute total advance so we can anchor-adjust.
-    let mut total_advance: f64 = 0.0;
-    let mut glyphs: Vec<(ttf_parser::GlyphId, f64)> = Vec::with_capacity(content.len());
+    // Walk each character, picking the primary face first and falling
+    // through to the other two faces if the primary doesn't have a
+    // glyph (so a stray `°` in a Sans label still renders instead of
+    // dropping back to raw <text>). Bail only if NONE of the three
+    // faces has the glyph.
+    let mut glyphs: Vec<(&'static Face<'static>, GlyphId, f64, f64)> =
+        Vec::with_capacity(content.chars().count());
     for ch in content.chars() {
         if ch.is_control() {
             continue;
         }
-        let glyph_id = match face.glyph_index(ch) {
-            Some(g) => g,
-            None => {
-                // Unknown glyph — bail so the caller emits the original
-                // <text> and the browser's fallback font handles it.
-                return None;
-            }
+        let (face, glyph_id) = match find_glyph(ch, primary) {
+            Some(p) => p,
+            None => return None,
         };
+        let upem = face.units_per_em();
+        if upem == 0 {
+            return None;
+        }
+        let scale = font_size / upem as f64;
         let advance = face.glyph_hor_advance(glyph_id).unwrap_or(0) as f64 * scale;
-        glyphs.push((glyph_id, advance));
-        total_advance += advance;
+        glyphs.push((face, glyph_id, scale, advance));
     }
     if glyphs.is_empty() {
         return None;
     }
 
+    let total_advance: f64 = glyphs.iter().map(|(_, _, _, adv)| adv).sum();
     let start_x = match anchor {
         "middle" => x - total_advance / 2.0,
         "end" => x - total_advance,
-        _ => x, // "start" or any other value
+        _ => x,
     };
 
-    // Build replacement: paths + transparent overlay text.
-    let mut out = String::with_capacity(256 + content.len() * 80);
+    let mut out = String::with_capacity(256 + glyphs.len() * 80);
     let mut cursor_x = start_x;
-    for (glyph_id, advance) in glyphs {
-        if let Some(path) = extract_glyph_path(face, glyph_id) {
+    for (face, glyph_id, scale, advance) in &glyphs {
+        if let Some(d) = extract_glyph_outline(face, *glyph_id) {
             out.push_str("<path d=\"");
-            out.push_str(&path.d);
+            out.push_str(&d);
             out.push_str("\" transform=\"translate(");
             write_f64(&mut out, cursor_x);
             out.push(' ');
             write_f64(&mut out, y);
             out.push_str(") scale(");
-            write_f64(&mut out, scale);
+            write_f64(&mut out, *scale);
             out.push(' ');
             out.push('-');
-            write_f64(&mut out, scale);
+            write_f64(&mut out, *scale);
             out.push_str(")\" fill=\"");
             out.push_str(&xml_escape_attr(fill));
             out.push_str("\"/>");
         }
         cursor_x += advance;
     }
-    // Invisible selectable overlay — preserves copy/paste + screen readers.
     out.push_str("<text x=\"");
     write_f64(&mut out, x);
     out.push_str("\" y=\"");
@@ -146,12 +198,64 @@ fn try_convert_text(bytes: &[u8]) -> Option<(usize, String)> {
     Some((total, out))
 }
 
+/// Find a glyph for `ch`, preferring the primary family but falling
+/// through to the other two faces. Returns the face that actually
+/// supplied the glyph plus the GlyphId within that face.
+fn find_glyph(ch: char, primary: FamilyKind) -> Option<(&'static Face<'static>, GlyphId)> {
+    let order = match primary {
+        FamilyKind::Serif => [FamilyKind::Serif, FamilyKind::Sans, FamilyKind::Mono],
+        FamilyKind::Sans => [FamilyKind::Sans, FamilyKind::Serif, FamilyKind::Mono],
+        FamilyKind::Mono => [FamilyKind::Mono, FamilyKind::Sans, FamilyKind::Serif],
+    };
+    for kind in order {
+        let face = face_for(kind);
+        if let Some(g) = face.glyph_index(ch) {
+            return Some((face, g));
+        }
+    }
+    None
+}
+
+// Inline replacement for mathml_core::glyph::extract_glyph_path so
+// this module doesn't pull a sibling-crate dep for 12 lines of TTF
+// outline walking.
+struct SvgPathBuilder {
+    d: String,
+}
+
+impl OutlineBuilder for SvgPathBuilder {
+    fn move_to(&mut self, x: f32, y: f32) {
+        let _ = write!(self.d, "M{x} {y} ");
+    }
+    fn line_to(&mut self, x: f32, y: f32) {
+        let _ = write!(self.d, "L{x} {y} ");
+    }
+    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+        let _ = write!(self.d, "Q{x1} {y1} {x} {y} ");
+    }
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        let _ = write!(self.d, "C{x1} {y1} {x2} {y2} {x} {y} ");
+    }
+    fn close(&mut self) {
+        self.d.push_str("Z ");
+    }
+}
+
+fn extract_glyph_outline(face: &Face<'_>, glyph_id: GlyphId) -> Option<String> {
+    let mut b = SvgPathBuilder { d: String::new() };
+    face.outline_glyph(glyph_id, &mut b);
+    if b.d.is_empty() {
+        None
+    } else {
+        Some(b.d.trim_end().to_owned())
+    }
+}
+
 fn parse_f64_attr(attrs: &str, name: &str) -> Option<f64> {
     parse_str_attr(attrs, name).and_then(|v| v.trim().parse::<f64>().ok())
 }
 
 fn parse_str_attr<'a>(attrs: &'a str, name: &str) -> Option<&'a str> {
-    // Look for `name=` preceded by whitespace or start-of-string.
     let mut search_from = 0;
     while let Some(pos) = attrs[search_from..].find(name) {
         let abs = search_from + pos;
@@ -165,7 +269,6 @@ fn parse_str_attr<'a>(attrs: &'a str, name: &str) -> Option<&'a str> {
             && (attrs.as_bytes()[after] == b'='
                 || matches!(attrs.as_bytes()[after], b' ' | b'\t' | b'\n' | b'\r'));
         if preceded_by_ws && followed_by_eq_ws {
-            // Skip whitespace + `=` + whitespace.
             let mut p = after;
             while p < attrs.len()
                 && matches!(attrs.as_bytes()[p], b' ' | b'\t' | b'\n' | b'\r')
@@ -205,13 +308,10 @@ fn parse_str_attr<'a>(attrs: &'a str, name: &str) -> Option<&'a str> {
 }
 
 fn write_f64(out: &mut String, v: f64) {
-    // Round to 2 decimal places for compact output.
     let rounded = (v * 100.0).round() / 100.0;
     if rounded == rounded.trunc() {
-        use core::fmt::Write;
         let _ = write!(out, "{}", rounded as i64);
     } else {
-        use core::fmt::Write;
         let _ = write!(out, "{rounded:.2}");
     }
 }
@@ -254,7 +354,6 @@ fn unescape_xml(s: &str) -> String {
                 }
             }
         }
-        // Pick the full utf-8 char.
         let ch = s[i..].chars().next().unwrap_or('\0');
         out.push(ch);
         i += ch.len_utf8();
@@ -300,7 +399,6 @@ mod tests {
         let out = text_to_paths(svg);
         assert!(out.contains("<path d="), "got: {out}");
         assert!(out.contains("fill=\"black\""), "got: {out}");
-        // Overlay preserves original text for selection.
         assert!(out.contains("fill=\"transparent\""), "got: {out}");
         assert!(out.contains(">Hi</text>"), "got: {out}");
     }
@@ -316,13 +414,13 @@ mod tests {
     // adv[verify output.text-as-paths]
     #[test]
     fn missing_glyph_leaves_original_text() {
-        // STIX Two Text Roman doesn't cover this CJK codepoint, so the
-        // converter bails and the original <text> is preserved verbatim
-        // so the browser's fallback font can render it.
-        let svg = r#"<text x="0" y="0" font-size="14">漢</text>"#;
+        // U+10400 Deseret capital Long I — absent from all three
+        // Liberation faces, so the converter bails and the original
+        // <text> is preserved verbatim so the browser's fallback
+        // font can render it.
+        let svg = r#"<text x="0" y="0" font-size="14">𐐀</text>"#;
         let out = text_to_paths(svg);
-        assert!(out.contains("<text"), "got: {out}");
-        assert!(out.contains("漢"), "got: {out}");
+        assert!(out.contains("𐐀"), "got: {out}");
         assert!(!out.contains("<path d="), "got: {out}");
     }
 
@@ -331,7 +429,6 @@ mod tests {
     fn xml_entities_in_content_are_decoded_then_reescaped() {
         let svg = r#"<text x="0" y="0" font-size="14">a&amp;b</text>"#;
         let out = text_to_paths(svg);
-        // The overlay text should contain the original "a&amp;b" form.
         assert!(out.contains("a&amp;b"), "got: {out}");
     }
 
@@ -351,6 +448,61 @@ mod tests {
         );
         let out = text_to_paths(svg);
         assert_eq!(out.matches("<path d=").count(), 2, "got: {out}");
-        assert_eq!(out.matches("<text").count(), 2, "got: {out}"); // two overlay texts
+        assert_eq!(out.matches("<text").count(), 2, "got: {out}");
+    }
+
+    // adv[verify output.text-as-paths]
+    #[test]
+    fn pick_family_defaults_to_serif() {
+        assert_eq!(pick_family(""), FamilyKind::Serif);
+        assert_eq!(pick_family("Unknown,Foobar"), FamilyKind::Serif);
+    }
+
+    // adv[verify output.text-as-paths]
+    #[test]
+    fn pick_family_respects_generic_keywords() {
+        assert_eq!(pick_family("Times,serif"), FamilyKind::Serif);
+        assert_eq!(
+            pick_family("Helvetica,Arial,sans-serif"),
+            FamilyKind::Sans
+        );
+        assert_eq!(pick_family("Courier,monospace"), FamilyKind::Mono);
+    }
+
+    // adv[verify output.text-as-paths]
+    #[test]
+    fn pick_family_case_insensitive() {
+        assert_eq!(pick_family("HELVETICA"), FamilyKind::Sans);
+        assert_eq!(pick_family("times new roman"), FamilyKind::Serif);
+        assert_eq!(pick_family("COURIER NEW"), FamilyKind::Mono);
+    }
+
+    // adv[verify output.text-as-paths]
+    // A space in Liberation Mono has a very different advance than in
+    // Liberation Serif (mono is fixed-width, ~600 units; serif is
+    // ~250). The translate() on the second <path> element tells us
+    // which face was used for the first glyph.
+    #[test]
+    fn mono_family_produces_wider_advances_than_serif() {
+        let mono_svg = r#"<text x="0" y="20" font-size="14" font-family="Courier,monospace">ii</text>"#;
+        let serif_svg = r#"<text x="0" y="20" font-size="14" font-family="Times,serif">ii</text>"#;
+        let mono_out = text_to_paths(mono_svg);
+        let serif_out = text_to_paths(serif_svg);
+        let mono_second_x = second_translate_x(&mono_out).expect("mono has second path");
+        let serif_second_x = second_translate_x(&serif_out).expect("serif has second path");
+        assert!(
+            mono_second_x > serif_second_x + 1.0,
+            "expected mono advance to exceed serif by >1 unit; mono={mono_second_x} serif={serif_second_x}"
+        );
+    }
+
+    fn second_translate_x(svg: &str) -> Option<f64> {
+        let mut idx = svg.find("translate(")?;
+        idx += "translate(".len();
+        let _first_end = svg[idx..].find(')')? + idx;
+        let rest = &svg[_first_end..];
+        let next = rest.find("translate(")? + "translate(".len();
+        let val_end = rest[next..].find(' ')? + next;
+        rest[next..val_end].parse::<f64>().ok()
     }
 }
