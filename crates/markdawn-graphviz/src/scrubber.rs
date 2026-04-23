@@ -158,8 +158,7 @@ impl<'a> Scanner<'a> {
                 let size = frame.size.max(1);
                 self.last_closed_set_size = size;
                 if frame.is_edge_rhs {
-                    self.report.edges =
-                        self.report.edges.saturating_add(frame.edge_left * size);
+                    self.report.edges = self.report.edges.saturating_add(frame.edge_left * size);
                 }
                 self.last_was_arrow = false;
                 self.outer_depth = self.outer_depth.saturating_sub(1);
@@ -326,9 +325,7 @@ impl<'a> Scanner<'a> {
                 // unknown tag name that graphviz will error on or skip.
                 let name_start = if is_close { self.i + 2 } else { self.i + 1 };
                 let mut name_end = name_start;
-                while name_end < self.bytes.len()
-                    && self.bytes[name_end].is_ascii_alphanumeric()
-                {
+                while name_end < self.bytes.len() && self.bytes[name_end].is_ascii_alphanumeric() {
                     name_end += 1;
                 }
                 let tag_name_lower = self.bytes[name_start..name_end]
@@ -358,9 +355,8 @@ impl<'a> Scanner<'a> {
                         self.out.push('/');
                     }
                     self.out.push('_');
-                    self.out.push_str(
-                        core::str::from_utf8(&self.bytes[name_start..=j]).unwrap_or(""),
-                    );
+                    self.out
+                        .push_str(core::str::from_utf8(&self.bytes[name_start..=j]).unwrap_or(""));
                 } else {
                     self.out
                         .push_str(core::str::from_utf8(&self.bytes[self.i..=j]).unwrap_or(""));
@@ -468,10 +464,8 @@ impl<'a> Scanner<'a> {
                         }
                     }
                 }
-                let trimmed_value: String = self.out[before_len..]
-                    .trim_matches('"')
-                    .trim()
-                    .to_owned();
+                let trimmed_value: String =
+                    self.out[before_len..].trim_matches('"').trim().to_owned();
                 // adv[impl neutralise.numeric-overflow]
                 // Reject pathological numeric literals before libgraphviz's
                 // strtod touches them. Applies to any attribute that looks
@@ -557,7 +551,9 @@ fn is_ident_body(b: u8) -> bool {
 }
 
 fn last_nonspace(s: &str) -> Option<u8> {
-    s.bytes().rev().find(|b| !matches!(*b, b' ' | b'\t' | b'\n' | b'\r'))
+    s.bytes()
+        .rev()
+        .find(|b| !matches!(*b, b' ' | b'\t' | b'\n' | b'\r'))
 }
 
 /// Returns true if `value` looks like a numeric literal with an
@@ -615,7 +611,10 @@ mod tests {
     fn fanout_counted() {
         let src = format!(
             "digraph {{ A -> {{ {} }} }}",
-            (0..50).map(|i| format!("b{i}")).collect::<Vec<_>>().join(" ")
+            (0..50)
+                .map(|i| format!("b{i}"))
+                .collect::<Vec<_>>()
+                .join(" ")
         );
         let (_, r) = scan_and_scrub(&src).unwrap();
         assert!(r.edges >= 50, "got edges={}", r.edges);
@@ -786,7 +785,10 @@ mod tests {
             "\\N".repeat(MAX_ESCAPE_EXPANSIONS_PER_STRING + 5)
         );
         let err = scan_and_scrub(&src).unwrap_err();
-        assert!(matches!(err, GraphvizError::LabelEscapeFlood(_)), "got: {err:?}");
+        assert!(
+            matches!(err, GraphvizError::LabelEscapeFlood(_)),
+            "got: {err:?}"
+        );
     }
 
     // adv[verify neutralise.numeric-overflow]

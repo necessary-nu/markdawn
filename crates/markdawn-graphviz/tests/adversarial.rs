@@ -446,7 +446,10 @@ fn a14_2_rank_same_flood_rejected() {
     }
     src.push_str("} }");
     let err = render_dot_to_svg(&src).unwrap_err();
-    assert!(matches!(err, GraphvizError::TooManyNodes(_)), "got: {err:?}");
+    assert!(
+        matches!(err, GraphvizError::TooManyNodes(_)),
+        "got: {err:?}"
+    );
 }
 
 // ----- A15: wall-clock render timeout -----
@@ -479,8 +482,8 @@ fn a15_1_timeout_fires_on_benign_input_with_zero_budget() {
     // worker can produce a result. Verifies that the TimedOut branch
     // is actually reachable — the worker thread leaks (it'll finish
     // eventually) but the caller returns promptly.
-    let err = render_dot_to_svg_with_timeout("digraph { A -> B }", Duration::from_millis(0))
-        .unwrap_err();
+    let err =
+        render_dot_to_svg_with_timeout("digraph { A -> B }", Duration::from_millis(0)).unwrap_err();
     assert!(matches!(err, GraphvizError::TimedOut), "got: {err:?}");
 }
 

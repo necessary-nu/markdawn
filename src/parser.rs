@@ -6058,9 +6058,7 @@ mod tests {
     // adv[verify markdown.input.byte-cap]
     #[test]
     fn single_push_over_cap_rejected() {
-        let mut parser = Parser::<()>::builder()
-            .with_max_input_bytes(1024)
-            .build();
+        let mut parser = Parser::<()>::builder().with_max_input_bytes(1024).build();
         let mut sink = VecSink::<Node<()>>::new();
         let huge = "a".repeat(2048);
         let err = parser.push_str(&huge, &mut sink).unwrap_err();
@@ -6076,9 +6074,7 @@ mod tests {
     // adv[verify markdown.input.byte-cap]
     #[test]
     fn streaming_push_cumulative_trips_cap() {
-        let mut parser = Parser::<()>::builder()
-            .with_max_input_bytes(10)
-            .build();
+        let mut parser = Parser::<()>::builder().with_max_input_bytes(10).build();
         let mut sink = VecSink::<Node<()>>::new();
         // Three 4-byte chunks = 12 bytes total — trips at the third.
         parser.push_str("aaaa", &mut sink).expect("first chunk");
@@ -6093,9 +6089,7 @@ mod tests {
     // adv[verify markdown.input.byte-cap]
     #[test]
     fn exactly_at_cap_ok() {
-        let mut parser = Parser::<()>::builder()
-            .with_max_input_bytes(8)
-            .build();
+        let mut parser = Parser::<()>::builder().with_max_input_bytes(8).build();
         let mut sink = VecSink::<Node<()>>::new();
         parser.push_str("aaaabbbb", &mut sink).expect("at cap ok");
         parser.finish(&mut sink).expect("finish ok");
@@ -6108,7 +6102,9 @@ mod tests {
             .with_max_input_bytes(usize::MAX)
             .build();
         let mut sink = VecSink::<Node<()>>::new();
-        parser.push_str(&"a".repeat(100_000), &mut sink).expect("ok");
+        parser
+            .push_str(&"a".repeat(100_000), &mut sink)
+            .expect("ok");
         parser.finish(&mut sink).expect("finish");
     }
 

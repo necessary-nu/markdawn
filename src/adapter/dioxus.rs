@@ -1202,7 +1202,10 @@ mod tests {
                 ..Default::default()
             })
             .render(src));
-        assert!(html.contains("class=\"graphviz\""), "no graphviz div: {html}");
+        assert!(
+            html.contains("class=\"graphviz\""),
+            "no graphviz div: {html}"
+        );
         assert!(!html.contains("javascript:"), "leaked javascript: {html}");
     }
 
@@ -1245,7 +1248,10 @@ mod tests {
                 ..Default::default()
             })
             .render(src));
-        assert!(html.contains("https://example.com"), "link stripped: {html}");
+        assert!(
+            html.contains("https://example.com"),
+            "link stripped: {html}"
+        );
     }
 
     #[cfg(feature = "highlight")]

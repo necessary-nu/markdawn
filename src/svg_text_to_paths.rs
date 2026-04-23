@@ -57,25 +57,26 @@ fn face_for(kind: FamilyKind) -> &'static Face<'static> {
 /// to the next; empty / no hint defaults to Serif.
 fn pick_family(font_family: &str) -> FamilyKind {
     for raw in font_family.split(',') {
-        let token = raw.trim().trim_matches(|c: char| c == '"' || c == '\'').to_ascii_lowercase();
+        let token = raw
+            .trim()
+            .trim_matches(|c: char| c == '"' || c == '\'')
+            .to_ascii_lowercase();
         match token.as_str() {
             // Monospace hints.
-            "monospace" | "mono" | "courier" | "courier new" | "consolas"
-            | "menlo" | "dejavu sans mono" | "liberation mono"
-            | "jetbrains mono" | "fira code" | "source code pro" => {
+            "monospace" | "mono" | "courier" | "courier new" | "consolas" | "menlo"
+            | "dejavu sans mono" | "liberation mono" | "jetbrains mono" | "fira code"
+            | "source code pro" => {
                 return FamilyKind::Mono;
             }
             // Sans hints.
-            "sans-serif" | "sans" | "helvetica" | "helvetica neue"
-            | "arial" | "verdana" | "geneva" | "tahoma" | "trebuchet"
-            | "trebuchet ms" | "calibri" | "segoe ui" | "liberation sans"
-            | "dejavu sans" | "noto sans" => {
+            "sans-serif" | "sans" | "helvetica" | "helvetica neue" | "arial" | "verdana"
+            | "geneva" | "tahoma" | "trebuchet" | "trebuchet ms" | "calibri" | "segoe ui"
+            | "liberation sans" | "dejavu sans" | "noto sans" => {
                 return FamilyKind::Sans;
             }
             // Serif hints.
-            "serif" | "times" | "times new roman" | "georgia"
-            | "cambria" | "garamond" | "palatino" | "liberation serif"
-            | "dejavu serif" | "noto serif" | "stix two text" => {
+            "serif" | "times" | "times new roman" | "georgia" | "cambria" | "garamond"
+            | "palatino" | "liberation serif" | "dejavu serif" | "noto serif" | "stix two text" => {
                 return FamilyKind::Serif;
             }
             _ => continue,
@@ -117,7 +118,11 @@ fn try_convert_text(bytes: &[u8]) -> Option<(usize, String)> {
 
     let x = parse_f64_attr(tag_attrs, "x")?;
     let y = parse_f64_attr(tag_attrs, "y")?;
-    let font_size = parse_f64_attr(tag_attrs, "font-size")?;
+    // font-size is usually present on graphviz output but pikchr
+    // inherits it from the enclosing <svg>'s style. Fall back to a
+    // sensible default matching pikchr's typical 14pt rendering.
+    const DEFAULT_FONT_SIZE: f64 = 14.0;
+    let font_size = parse_f64_attr(tag_attrs, "font-size").unwrap_or(DEFAULT_FONT_SIZE);
     let anchor = parse_str_attr(tag_attrs, "text-anchor").unwrap_or("start");
     let fill = parse_str_attr(tag_attrs, "fill").unwrap_or("currentColor");
     let family_hint = parse_str_attr(tag_attrs, "font-family").unwrap_or("");
@@ -259,20 +264,15 @@ fn parse_str_attr<'a>(attrs: &'a str, name: &str) -> Option<&'a str> {
     let mut search_from = 0;
     while let Some(pos) = attrs[search_from..].find(name) {
         let abs = search_from + pos;
-        let preceded_by_ws = abs == 0
-            || matches!(
-                attrs.as_bytes()[abs - 1],
-                b' ' | b'\t' | b'\n' | b'\r'
-            );
+        let preceded_by_ws =
+            abs == 0 || matches!(attrs.as_bytes()[abs - 1], b' ' | b'\t' | b'\n' | b'\r');
         let after = abs + name.len();
         let followed_by_eq_ws = after < attrs.len()
             && (attrs.as_bytes()[after] == b'='
                 || matches!(attrs.as_bytes()[after], b' ' | b'\t' | b'\n' | b'\r'));
         if preceded_by_ws && followed_by_eq_ws {
             let mut p = after;
-            while p < attrs.len()
-                && matches!(attrs.as_bytes()[p], b' ' | b'\t' | b'\n' | b'\r')
-            {
+            while p < attrs.len() && matches!(attrs.as_bytes()[p], b' ' | b'\t' | b'\n' | b'\r') {
                 p += 1;
             }
             if p >= attrs.len() || attrs.as_bytes()[p] != b'=' {
@@ -280,9 +280,7 @@ fn parse_str_attr<'a>(attrs: &'a str, name: &str) -> Option<&'a str> {
                 continue;
             }
             p += 1;
-            while p < attrs.len()
-                && matches!(attrs.as_bytes()[p], b' ' | b'\t' | b'\n' | b'\r')
-            {
+            while p < attrs.len() && matches!(attrs.as_bytes()[p], b' ' | b'\t' | b'\n' | b'\r') {
                 p += 1;
             }
             if p >= attrs.len() {
@@ -462,10 +460,7 @@ mod tests {
     #[test]
     fn pick_family_respects_generic_keywords() {
         assert_eq!(pick_family("Times,serif"), FamilyKind::Serif);
-        assert_eq!(
-            pick_family("Helvetica,Arial,sans-serif"),
-            FamilyKind::Sans
-        );
+        assert_eq!(pick_family("Helvetica,Arial,sans-serif"), FamilyKind::Sans);
         assert_eq!(pick_family("Courier,monospace"), FamilyKind::Mono);
     }
 
@@ -484,7 +479,8 @@ mod tests {
     // which face was used for the first glyph.
     #[test]
     fn mono_family_produces_wider_advances_than_serif() {
-        let mono_svg = r#"<text x="0" y="20" font-size="14" font-family="Courier,monospace">ii</text>"#;
+        let mono_svg =
+            r#"<text x="0" y="20" font-size="14" font-family="Courier,monospace">ii</text>"#;
         let serif_svg = r#"<text x="0" y="20" font-size="14" font-family="Times,serif">ii</text>"#;
         let mono_out = text_to_paths(mono_svg);
         let serif_out = text_to_paths(serif_svg);

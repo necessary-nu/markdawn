@@ -263,7 +263,10 @@ mod tests {
         // The cap is the contract — verify the constant value and
         // that the sanitiser runs in O(n) so the call-site check at
         // adapter boundaries is meaningful.
-        assert!(MAX_SVG_BYTES >= 1024 * 1024, "cap too low for realistic diagrams");
+        assert!(
+            MAX_SVG_BYTES >= 1024 * 1024,
+            "cap too low for realistic diagrams"
+        );
         assert!(MAX_SVG_BYTES <= 100 * 1024 * 1024, "cap too generous");
     }
 
@@ -284,7 +287,10 @@ mod tests {
     fn graphviz_shaped_safe_href_survives() {
         let svg = r#"<g><a xlink:href="https://example.com" xlink:title="hi"><ellipse/></a></g>"#;
         let out = sanitize_svg(svg);
-        assert!(out.contains(r#"xlink:href="https://example.com""#), "got: {out}");
+        assert!(
+            out.contains(r#"xlink:href="https://example.com""#),
+            "got: {out}"
+        );
     }
 
     // adv[verify output.url-allowlist]

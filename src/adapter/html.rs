@@ -1221,8 +1221,16 @@ mod tests {
         let StreamItem::Upsert(emission) = rendered else {
             panic!("expected upsert")
         };
-        assert!(!emission.node.contains("javascript:"), "got: {}", emission.node);
-        assert!(emission.node.contains("href=\"\""), "got: {}", emission.node);
+        assert!(
+            !emission.node.contains("javascript:"),
+            "got: {}",
+            emission.node
+        );
+        assert!(
+            emission.node.contains("href=\"\""),
+            "got: {}",
+            emission.node
+        );
     }
 
     #[test]
@@ -1246,7 +1254,11 @@ mod tests {
         let StreamItem::Upsert(emission) = rendered else {
             panic!("expected upsert")
         };
-        assert!(!emission.node.contains("javascript:"), "got: {}", emission.node);
+        assert!(
+            !emission.node.contains("javascript:"),
+            "got: {}",
+            emission.node
+        );
     }
 
     #[test]

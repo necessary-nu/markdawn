@@ -115,17 +115,11 @@ pub enum GraphvizError {
     /// Parse stage (`agmemread`) exceeded [`PARSE_BUDGET_MS`].
     /// Distinct from `TimedOut` — this means the shim caught it
     /// between stages and no libgraphviz thread is orphaned.
-    TimedOutAtParse {
-        elapsed_ms: u64,
-    },
+    TimedOutAtParse { elapsed_ms: u64 },
     /// Layout stage (`gvLayout`) exceeded [`LAYOUT_BUDGET_MS`].
-    TimedOutAtLayout {
-        elapsed_ms: u64,
-    },
+    TimedOutAtLayout { elapsed_ms: u64 },
     /// Render stage (`gvRenderData`) exceeded [`RENDER_BUDGET_MS`].
-    TimedOutAtRender {
-        elapsed_ms: u64,
-    },
+    TimedOutAtRender { elapsed_ms: u64 },
     /// fork()-isolated child process ran past the outer wall-clock
     /// timeout and was SIGKILLed. The host process is unaffected —
     /// kernel reclaimed all of the child's memory.
@@ -184,13 +178,23 @@ impl fmt::Display for GraphvizError {
                 "DOT label has {n} render-time escape sequences, exceeds cap of {}",
                 scrubber::MAX_ESCAPE_EXPANSIONS_PER_STRING
             ),
-            Self::TooManyNodes(n) => write!(f, "DOT source has {n} nodes, exceeds cap of {MAX_NODES}"),
-            Self::TooManyEdges(n) => write!(f, "DOT source has {n} edges, exceeds cap of {MAX_EDGES}"),
+            Self::TooManyNodes(n) => {
+                write!(f, "DOT source has {n} nodes, exceeds cap of {MAX_NODES}")
+            }
+            Self::TooManyEdges(n) => {
+                write!(f, "DOT source has {n} edges, exceeds cap of {MAX_EDGES}")
+            }
             Self::TooManyAttributes(n) => {
-                write!(f, "DOT source has {n} attribute lists, exceeds cap of {MAX_ATTRIBUTES}")
+                write!(
+                    f,
+                    "DOT source has {n} attribute lists, exceeds cap of {MAX_ATTRIBUTES}"
+                )
             }
             Self::TooManySubgraphs(n) => {
-                write!(f, "DOT source has {n} subgraphs, exceeds cap of {MAX_SUBGRAPHS}")
+                write!(
+                    f,
+                    "DOT source has {n} subgraphs, exceeds cap of {MAX_SUBGRAPHS}"
+                )
             }
             Self::Panicked(msg) if msg.is_empty() => f.write_str("graphviz render thread panicked"),
             Self::Panicked(msg) => write!(f, "graphviz render thread panicked: {msg}"),
@@ -217,9 +221,9 @@ impl fmt::Display for GraphvizError {
             Self::ForkCrashed => f.write_str(
                 "graphviz render child process died unexpectedly (abort / segfault / OOM)",
             ),
-            Self::ForkSyscallError => f.write_str(
-                "graphviz render fork()/pipe()/read() syscall failed",
-            ),
+            Self::ForkSyscallError => {
+                f.write_str("graphviz render fork()/pipe()/read() syscall failed")
+            }
         }
     }
 }
@@ -330,14 +334,14 @@ fn render_inner_pipeline(source: &str, timeout: Duration) -> Result<String, Grap
     // the worker captures Rust panics; they arrive on the channel as
     // Err(panic_payload).
     let owned = scrubbed;
-    let (tx, rx) = mpsc::channel::<Result<Result<String, GraphvizError>, Box<dyn std::any::Any + Send>>>();
+    let (tx, rx) =
+        mpsc::channel::<Result<Result<String, GraphvizError>, Box<dyn std::any::Any + Send>>>();
     std::thread::Builder::new()
         .stack_size(RENDER_STACK_BYTES)
         .name("markdawn-graphviz-render".to_owned())
         .spawn(move || {
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                render_inner(&owned)
-            }));
+            let result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_inner(&owned)));
             let _ = tx.send(result);
         })
         .map_err(|e| GraphvizError::ThreadSpawn(e.to_string()))?;

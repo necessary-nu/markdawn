@@ -87,9 +87,8 @@ pub fn render_with_timeout(source: &str, timeout: Duration) -> Result<String, Pi
         .stack_size(RENDER_STACK_BYTES)
         .name("markdawn-pikchr-render".to_owned())
         .spawn(move || {
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                render_inner(&owned)
-            }));
+            let result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_inner(&owned)));
             let _ = tx.send(result);
         })
         .map_err(|e| PikchrError::ThreadSpawn(e.to_string()))?;
@@ -144,8 +143,7 @@ mod tests {
     // adv[verify pikchr.render.timeout]
     #[test]
     fn timeout_fires_with_zero_budget() {
-        let err =
-            render_with_timeout(r#"box "Hi""#, Duration::from_millis(0)).unwrap_err();
+        let err = render_with_timeout(r#"box "Hi""#, Duration::from_millis(0)).unwrap_err();
         assert!(matches!(err, PikchrError::TimedOut), "got: {err:?}");
     }
 
@@ -162,11 +160,7 @@ mod tests {
     #[test]
     fn concurrent_renders_serialize() {
         let handles: Vec<_> = (0..8)
-            .map(|i| {
-                std::thread::spawn(move || {
-                    render(&format!(r#"box "box-{i}""#))
-                })
-            })
+            .map(|i| std::thread::spawn(move || render(&format!(r#"box "box-{i}""#))))
             .collect();
         for h in handles {
             let svg = h.join().expect("no panic").expect("render ok");

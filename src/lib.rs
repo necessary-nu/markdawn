@@ -11,18 +11,18 @@ mod highlight;
 mod html_filter;
 mod node;
 mod parser;
+#[cfg(feature = "pikchr")]
+mod pikchr_render;
 mod serializer;
 mod sink;
 #[cfg(any(feature = "graphviz", feature = "pikchr"))]
 mod svg_sanitize;
 #[cfg(any(feature = "graphviz", feature = "pikchr"))]
 mod svg_text_to_paths;
-#[cfg(feature = "pikchr")]
-mod pikchr_render;
-mod url_safety;
 #[cfg(feature = "terminal")]
 mod terminal;
 mod url;
+mod url_safety;
 
 #[cfg(feature = "ansi")]
 pub use crate::ansi_to_html::{ansi_to_annotated_source, ansi_to_html};
