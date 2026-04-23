@@ -2529,6 +2529,7 @@ dependencies = [
  "percent-encoding",
  "pikru",
  "strip-ansi-escapes",
+ "ttf-parser",
  "vt100",
  "vte 0.14.1",
 ]

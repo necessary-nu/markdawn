@@ -148,6 +148,29 @@ therefore sit in the residual-risk bucket.
 > `on*="…"` event-handler attributes (e.g. `onclick`, `onload`,
 > `onmouseover`) must be removed from emitted SVG.
 
+> adv[output.text-as-paths]
+> Every `<text>` element in emitted SVG must be converted to
+> outlined glyph `<path>` elements (using the bundled STIX Two
+> Text Roman font from mathml-core) with an invisible
+> `<text fill="transparent">` overlay preserved for text
+> selection, copy/paste, and screen readers. This makes the SVG
+> self-contained (no dependency on whatever fonts the viewer
+> happens to have installed) and visually consistent across
+> platforms while keeping the accessibility semantics intact.
+> Characters the bundled font doesn't cover fall back to leaving
+> the original `<text>` so the browser's fallback font can draw
+> them.
+
+> adv[output.inline-trim]
+> Since every SVG we emit is embedded inline in HTML, the XML
+> prologue (`<?xml version=…?>`), DOCTYPE (`<!DOCTYPE svg …>`),
+> and all `<!-- … -->` comments are dead weight — browsers treat
+> them as bogus comments in HTML context and they add ~400 bytes
+> per render of graphviz-generated boilerplate. The sanitiser
+> strips all three before returning. Also reduces surface for
+> comment-injection tricks (attacker-controlled labels that
+> manage to contain `-->` sequences).
+
 > adv[output.no-external-entities]
 > `<!ENTITY …>` declarations must be removed from emitted SVG.
 > Graphviz doesn't emit these itself, but belt-and-suspenders: any

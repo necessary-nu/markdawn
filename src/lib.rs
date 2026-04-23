@@ -15,6 +15,8 @@ mod serializer;
 mod sink;
 #[cfg(any(feature = "graphviz", feature = "pikchr"))]
 mod svg_sanitize;
+#[cfg(any(feature = "graphviz", feature = "pikchr"))]
+mod svg_text_to_paths;
 #[cfg(feature = "pikchr")]
 mod pikchr_render;
 mod url_safety;

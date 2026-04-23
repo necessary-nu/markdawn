@@ -31,6 +31,7 @@ facet-path = { version = "=0.44.4", optional = true }
 indexmap = "2"
 mathml-core = { path = "../mathml-rs" }
 percent-encoding = "2.3"
+ttf-parser = "0.25"
 pikru = { version = "1", optional = true }
 markdawn-graphviz = { path = "crates/markdawn-graphviz", optional = true }
 vte = { version = "0.14", optional = true }

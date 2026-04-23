@@ -665,8 +665,9 @@ impl<R> Renderer<R> {
             if let Ok(svg) = crate::pikchr_render::render(literal) {
                 if svg.len() <= crate::svg_sanitize::MAX_SVG_BYTES {
                     let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
+                    let final_svg = crate::svg_text_to_paths::text_to_paths(&sanitized);
                     return rsx! {
-                        div { class: "pikchr", dangerous_inner_html: sanitized }
+                        div { class: "pikchr", dangerous_inner_html: final_svg }
                     };
                 }
             }
@@ -678,8 +679,9 @@ impl<R> Renderer<R> {
             if let Ok(svg) = markdawn_graphviz::render_dot_to_svg(literal) {
                 if svg.len() <= crate::svg_sanitize::MAX_SVG_BYTES {
                     let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
+                    let final_svg = crate::svg_text_to_paths::text_to_paths(&sanitized);
                     return rsx! {
-                        div { class: "graphviz", dangerous_inner_html: sanitized }
+                        div { class: "graphviz", dangerous_inner_html: final_svg }
                     };
                 }
             }

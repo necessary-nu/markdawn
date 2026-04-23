@@ -217,8 +217,9 @@ impl<R> HtmlAdapter<R> {
             return false;
         }
         let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
-        out.push_str(&sanitized);
-        if !sanitized.ends_with('\n') {
+        let final_svg = crate::svg_text_to_paths::text_to_paths(&sanitized);
+        out.push_str(&final_svg);
+        if !final_svg.ends_with('\n') {
             out.push('\n');
         }
         true
@@ -248,8 +249,9 @@ impl<R> HtmlAdapter<R> {
             return false;
         }
         let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
-        out.push_str(&sanitized);
-        if !sanitized.ends_with('\n') {
+        let final_svg = crate::svg_text_to_paths::text_to_paths(&sanitized);
+        out.push_str(&final_svg);
+        if !final_svg.ends_with('\n') {
             out.push('\n');
         }
         true
