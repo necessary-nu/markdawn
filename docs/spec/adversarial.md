@@ -193,9 +193,24 @@ therefore sit in the residual-risk bucket.
 > `<?xml-stylesheet …?>` processing instructions must be removed
 > from emitted SVG. Attacker-controlled `href` inside the PI would
 > reference an external stylesheet; even with our URL allow-list on
-> attribute values, the PI as a whole is safer to drop. The benign
-> `<?xml version=…?>` declaration is distinct (its target is `xml`,
-> not `xml-stylesheet`) and must be preserved.
+> attribute values, the PI as a whole is safer to drop. Handled by
+> html5ever's HTML parse context in the sanitiser (PIs other than
+> `<?xml version=?>` are parsed as bogus comments and dropped).
+
+> adv[output.animate-href-safe]
+> SVG `<animate attributeName="href" values="javascript:…"/>` is a
+> known XSS amplifier: the element itself looks benign, and the
+> payload sits inside an `attributeName` string that a naive
+> `href`-checker misses. `<animate>` and `<set>` must not appear in
+> emitted SVG (they're not on the W3C safe-default allow-list and
+> are dropped on sanitise).
+
+> adv[output.foreign-object-safe]
+> SVG `<foreignObject>` embeds arbitrary HTML inside SVG. It stays
+> on the allow-list because MathML / tooltip content legitimately
+> uses it, but its contents must be sanitised as HTML — any
+> `<script>` or event-handler attribute hosted inside a
+> foreignObject must still be dropped.
 
 ## Markdown input cap
 
