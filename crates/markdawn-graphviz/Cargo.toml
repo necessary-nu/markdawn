@@ -5,6 +5,9 @@ edition = "2024"
 description = "DOT-to-SVG renderer wrapping libgvc/libcgraph behind a small C shim."
 license = "MIT"
 
+[dependencies]
+libc = "0.2"
+
 [build-dependencies]
 cc = "1"
 pkg-config = "0.3"

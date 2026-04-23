@@ -205,6 +205,24 @@ therefore sit in the residual-risk bucket.
 > `Mutex`. libgraphviz keeps per-context state that is not thread-
 > safe; overlapping calls would race even with our wrapper.
 
+> adv[render.process-isolation]
+> On Linux, each render runs in a fork()ed child process. Parent
+> reads the SVG via a pipe with a `poll()`-based timeout; on
+> timeout or oversized response the child is SIGKILLed and the
+> kernel reclaims its memory. If the child crashes (libgraphviz
+> abort / SIGSEGV / stack overflow / OOM-killed) the parent
+> observes the death via `waitpid` and returns
+> `GraphvizError::ForkCrashed` without going down with it.
+>
+> On macOS the Objective-C runtime refuses `+initialize` after
+> fork() (libgraphviz's plugins pull in Cocoa via image codecs,
+> tripping the check), so the fork path deadlocks the child. The
+> macOS code path falls back to the in-thread renderer — same
+> staged timeouts and input caps, but process crashes inside
+> libgraphviz still take the host process with them. Downstream
+> macOS callers who need hard isolation can run markdawn itself in
+> a subprocess.
+
 > adv[render.staged-timeout]
 > libgraphviz's pipeline is `agmemread` (parse) → `gvLayout` (layout)
 > → `gvRenderData` (render). Each stage must have its own wall-clock

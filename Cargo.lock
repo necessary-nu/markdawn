@@ -2538,6 +2538,7 @@ name = "markdawn-graphviz"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "libc",
  "pkg-config",
 ]
 

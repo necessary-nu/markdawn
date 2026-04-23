@@ -126,6 +126,34 @@ pub enum GraphvizError {
     TimedOutAtRender {
         elapsed_ms: u64,
     },
+    /// fork()-isolated child process ran past the outer wall-clock
+    /// timeout and was SIGKILLed. The host process is unaffected —
+    /// kernel reclaimed all of the child's memory.
+    ForkTimedOut,
+    /// fork()-isolated child died abnormally (libgraphviz abort() /
+    /// SIGSEGV / stack overflow / OOM-killed). Distinct from
+    /// `TimedOut` because this is the variant that catches
+    /// libgraphviz crashes without taking down the host process.
+    ForkCrashed,
+    /// fork() / pipe() / read() syscall failure in the isolation
+    /// wrapper. Usually indicates the host is out of file
+    /// descriptors or process table slots.
+    ForkSyscallError,
+}
+
+/// Replace `GraphvizError` with the non-forked variant name for a
+/// given return code so error text is consistent whether the render
+/// ran in-process or in a forked child.
+fn err_from_rc(rc: c_int, diagnostic: String, p_ms: u64, l_ms: u64, r_ms: u64) -> GraphvizError {
+    match rc {
+        MARKDAWN_GV_TIMEOUT_PARSE => GraphvizError::TimedOutAtParse { elapsed_ms: p_ms },
+        MARKDAWN_GV_TIMEOUT_LAYOUT => GraphvizError::TimedOutAtLayout { elapsed_ms: l_ms },
+        MARKDAWN_GV_TIMEOUT_RENDER => GraphvizError::TimedOutAtRender { elapsed_ms: r_ms },
+        MARKDAWN_GV_FORK_TIMEOUT => GraphvizError::ForkTimedOut,
+        MARKDAWN_GV_FORK_CRASHED => GraphvizError::ForkCrashed,
+        MARKDAWN_GV_FORK_SYSCALL_ERROR => GraphvizError::ForkSyscallError,
+        _ => GraphvizError::RenderFailed(diagnostic),
+    }
 }
 
 impl fmt::Display for GraphvizError {
@@ -183,6 +211,15 @@ impl fmt::Display for GraphvizError {
                 f,
                 "graphviz render stage exceeded {RENDER_BUDGET_MS}ms budget ({elapsed_ms}ms observed)"
             ),
+            Self::ForkTimedOut => f.write_str(
+                "graphviz render child process exceeded wall-clock timeout and was killed",
+            ),
+            Self::ForkCrashed => f.write_str(
+                "graphviz render child process died unexpectedly (abort / segfault / OOM)",
+            ),
+            Self::ForkSyscallError => f.write_str(
+                "graphviz render fork()/pipe()/read() syscall failed",
+            ),
         }
     }
 }
@@ -190,10 +227,14 @@ impl fmt::Display for GraphvizError {
 impl std::error::Error for GraphvizError {}
 
 const MARKDAWN_GV_OK: c_int = 0;
+#[allow(dead_code)] // Only referenced via the `_` match arm in err_from_rc.
 const MARKDAWN_GV_FAILED: c_int = 1;
 const MARKDAWN_GV_TIMEOUT_PARSE: c_int = 2;
 const MARKDAWN_GV_TIMEOUT_LAYOUT: c_int = 3;
 const MARKDAWN_GV_TIMEOUT_RENDER: c_int = 4;
+const MARKDAWN_GV_FORK_TIMEOUT: c_int = 5;
+const MARKDAWN_GV_FORK_CRASHED: c_int = 6;
+const MARKDAWN_GV_FORK_SYSCALL_ERROR: c_int = 7;
 
 unsafe extern "C" {
     fn markdawn_gv_render_svg(
@@ -201,6 +242,20 @@ unsafe extern "C" {
         out_svg: *mut *mut c_char,
         out_len: *mut usize,
         out_err: *mut *mut c_char,
+        parse_budget_ms: u64,
+        layout_budget_ms: u64,
+        render_budget_ms: u64,
+        out_parse_ms: *mut u64,
+        out_layout_ms: *mut u64,
+        out_render_ms: *mut u64,
+    ) -> c_int;
+    #[cfg(target_os = "linux")]
+    fn markdawn_gv_render_svg_forked(
+        dot: *const c_char,
+        out_svg: *mut *mut c_char,
+        out_len: *mut usize,
+        out_err: *mut *mut c_char,
+        total_timeout_ms: u64,
         parse_budget_ms: u64,
         layout_budget_ms: u64,
         render_budget_ms: u64,
@@ -290,10 +345,80 @@ fn render_inner_pipeline(source: &str, timeout: Duration) -> Result<String, Grap
 // previous callback on exit; diagnostics flow back to us via out_err and
 // get wrapped into `GraphvizError::RenderFailed`. Rust-side this is just
 // the bridge call.
+// adv[impl render.staged-timeout]
+// adv[impl render.serialise]
+// adv[impl render.error-callback-capture]
+//
+// Dispatch table. On Linux the forked path is used — kernel SIGKILLs
+// a runaway child without blinking and libgraphviz's post-fork-no-exec
+// usage is well-tolerated. On macOS the Objective-C runtime refuses
+// fork() while `+initialize` might be in progress (which libgraphviz
+// can trigger via its Cocoa-using plugins), so the forked path
+// deadlocks the child — fall back to the in-thread path there. Other
+// unices behave like Linux in practice.
+#[cfg(target_os = "linux")]
 fn render_inner(source: &str) -> Result<String, GraphvizError> {
+    render_inner_forked(source)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn render_inner(source: &str) -> Result<String, GraphvizError> {
+    render_inner_in_process(source)
+}
+
+// adv[impl render.process-isolation]
+#[cfg(target_os = "linux")]
+fn render_inner_forked(source: &str) -> Result<String, GraphvizError> {
     let dot = CString::new(source).map_err(|_| GraphvizError::InvalidInput)?;
 
-    // adv[impl render.serialise]
+    // RENDER_LOCK still serialises: forks are cheap but one at a time
+    // keeps behaviour predictable and stops fork-bomb-ish patterns if
+    // many callers hit us concurrently.
+    let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+    let total_timeout_ms = RENDER_TIMEOUT_SECS * 1000;
+    let mut svg_ptr: *mut c_char = core::ptr::null_mut();
+    let mut svg_len: usize = 0;
+    let mut err_ptr: *mut c_char = core::ptr::null_mut();
+    let mut parse_ms: u64 = 0;
+    let mut layout_ms: u64 = 0;
+    let mut render_ms: u64 = 0;
+
+    let rc = unsafe {
+        markdawn_gv_render_svg_forked(
+            dot.as_ptr(),
+            &mut svg_ptr,
+            &mut svg_len,
+            &mut err_ptr,
+            total_timeout_ms,
+            PARSE_BUDGET_MS,
+            LAYOUT_BUDGET_MS,
+            RENDER_BUDGET_MS,
+            &mut parse_ms,
+            &mut layout_ms,
+            &mut render_ms,
+        )
+    };
+
+    let diagnostic = take_c_string(err_ptr);
+    unsafe { markdawn_gv_free_error(err_ptr) };
+
+    if rc == MARKDAWN_GV_OK {
+        if svg_ptr.is_null() {
+            return Err(GraphvizError::RenderFailed(String::new()));
+        }
+        let slice = unsafe { core::slice::from_raw_parts(svg_ptr as *const u8, svg_len) };
+        let result = core::str::from_utf8(slice).map(str::to_owned);
+        unsafe { libc::free(svg_ptr as *mut libc::c_void) };
+        return result.map_err(|_| GraphvizError::NonUtf8Output);
+    }
+
+    Err(err_from_rc(rc, diagnostic, parse_ms, layout_ms, render_ms))
+}
+
+fn render_inner_in_process(source: &str) -> Result<String, GraphvizError> {
+    let dot = CString::new(source).map_err(|_| GraphvizError::InvalidInput)?;
+
     let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
     let mut svg_ptr: *mut c_char = core::ptr::null_mut();
@@ -303,7 +428,6 @@ fn render_inner(source: &str) -> Result<String, GraphvizError> {
     let mut layout_ms: u64 = 0;
     let mut render_ms: u64 = 0;
 
-    // adv[impl render.staged-timeout]
     let rc = unsafe {
         markdawn_gv_render_svg(
             dot.as_ptr(),
@@ -319,32 +443,20 @@ fn render_inner(source: &str) -> Result<String, GraphvizError> {
         )
     };
 
-    // Free the error buffer regardless of outcome; we've either taken
-    // its contents into a String or we don't need it.
     let diagnostic = take_c_string(err_ptr);
     unsafe { markdawn_gv_free_error(err_ptr) };
 
-    match rc {
-        MARKDAWN_GV_OK => {
-            if svg_ptr.is_null() {
-                return Err(GraphvizError::RenderFailed(String::new()));
-            }
-            let slice = unsafe { core::slice::from_raw_parts(svg_ptr as *const u8, svg_len) };
-            let result = core::str::from_utf8(slice).map(str::to_owned);
-            unsafe { markdawn_gv_free_render_data(svg_ptr) };
-            result.map_err(|_| GraphvizError::NonUtf8Output)
+    if rc == MARKDAWN_GV_OK {
+        if svg_ptr.is_null() {
+            return Err(GraphvizError::RenderFailed(String::new()));
         }
-        MARKDAWN_GV_TIMEOUT_PARSE => {
-            Err(GraphvizError::TimedOutAtParse { elapsed_ms: parse_ms })
-        }
-        MARKDAWN_GV_TIMEOUT_LAYOUT => {
-            Err(GraphvizError::TimedOutAtLayout { elapsed_ms: layout_ms })
-        }
-        MARKDAWN_GV_TIMEOUT_RENDER => {
-            Err(GraphvizError::TimedOutAtRender { elapsed_ms: render_ms })
-        }
-        MARKDAWN_GV_FAILED | _ => Err(GraphvizError::RenderFailed(diagnostic)),
+        let slice = unsafe { core::slice::from_raw_parts(svg_ptr as *const u8, svg_len) };
+        let result = core::str::from_utf8(slice).map(str::to_owned);
+        unsafe { markdawn_gv_free_render_data(svg_ptr) };
+        return result.map_err(|_| GraphvizError::NonUtf8Output);
     }
+
+    Err(err_from_rc(rc, diagnostic, parse_ms, layout_ms, render_ms))
 }
 
 fn take_c_string(ptr: *mut c_char) -> String {
