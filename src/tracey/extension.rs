@@ -92,6 +92,7 @@ fn recurse_children<Ext: From<TraceyExt> + Clone>(
     }
 }
 
+// [>r:markdown.syntax.inline-ignored+2]
 fn try_convert_to_req<Ext: From<TraceyExt> + Clone>(
     node: &mut Node<Ext>,
     source: &str,

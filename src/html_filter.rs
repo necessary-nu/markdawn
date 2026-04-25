@@ -14,6 +14,8 @@
 use sanitizer::SanitizerConfig;
 
 /// HTML pass-through policy. Cheap to clone (the inner config is `Clone`).
+//
+// [>r:markdown.html.sanitizer]
 #[derive(Debug, Clone)]
 pub struct HtmlFilter(Mode);
 

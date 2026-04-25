@@ -76,6 +76,11 @@ impl PartialEq<RuleId> for &str {
 /// Parse a rule id with an optional `+N` version suffix.
 ///
 /// `version: 0` means the marker had no `+N`. Explicit `+0` is rejected.
+//
+// [>r:ref.syntax.req-id+5]
+// [>r:ref.syntax.version+2]
+// [>r:ref.syntax.version.implicit+2]
+// [>r:markdown.constraint.id-grammar+2]
 pub fn parse_rule_id(id: &str) -> Option<RuleId> {
     if id.is_empty() {
         return None;
@@ -167,6 +172,10 @@ pub struct InlineCodeSpan {
 /// `text` is expected to be already stripped of the leading `> ` blockquote
 /// indent. The legacy paragraph-form (`r[id]`) and bracket-only form
 /// (`[r:id]`, no leading `:`) are **not** markers.
+//
+// [>r:markdown.syntax.marker+3]
+// [>r:markdown.syntax.paragraph-form-rejected]
+// [>r:markdown.constraint.marker+2]
 pub(crate) fn parse_req_leading_marker(text: &str) -> Option<(&str, ReqKind, &str, usize)> {
     let bytes = text.as_bytes();
     // Leading `:` outside the brackets is mandatory.
