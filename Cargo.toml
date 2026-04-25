@@ -9,11 +9,12 @@ edition = "2024"
 [features]
 dioxus = ["dep:dioxus", "dep:dioxus-core"]
 highlight = ["dep:arborium"]
-pikchr = ["dep:pikru", "dep:facet-dessert", "dep:facet-reflect", "dep:facet-path", "dep:sanitizer"]
-graphviz = ["dep:markdawn-graphviz", "dep:sanitizer"]
+pikchr = ["dep:pikru", "dep:facet-dessert", "dep:facet-reflect", "dep:facet-path"]
+graphviz = ["dep:markdawn-graphviz"]
 typst = []
 ansi = ["dep:vte", "dep:strip-ansi-escapes"]
 terminal = ["ansi", "dep:vt100"]
+tracey = ["dep:serde", "dep:serde_yaml", "dep:toml"]
 
 [dependencies]
 arborium = { path = "../arborium/crates/arborium", optional = true, features = ["all-languages"] }
@@ -21,23 +22,22 @@ base64 = "0.22"
 dioxus = { version = "0.7", optional = true, default-features = false, features = ["lib"] }
 dioxus-core = { version = "0.7", optional = true }
 entities = "1.0"
-# pikru 1.2.0 → facet-dom → facet-dessert / facet-reflect / facet-path; cargo
-# picks the latest patches in the ^0.44 range but the 0.44.6 versions secretly
-# bumped to facet-core 0.45, which gives an incompatible Facet trait. Pin the
-# whole facet stack to the last 0.44.5 patches that still use facet-core ^0.44.
-facet-dessert = { version = "=0.44.5", optional = true }
-facet-reflect = { version = "=0.44.5", optional = true }
-facet-path = { version = "=0.44.4", optional = true }
+facet-dessert = { version = "0.46.0", optional = true }
+facet-reflect = { version = "0.46.0", optional = true }
+facet-path = { version = "0.46.0", optional = true }
 indexmap = "2"
 mathml-core = { path = "../mathml-rs" }
 percent-encoding = "2.3"
 ttf-parser = "0.25"
-pikru = { version = "1", optional = true }
+pikru = { path = "../pikru", optional = true }
 markdawn-graphviz = { path = "crates/markdawn-graphviz", optional = true }
-sanitizer = { path = "../sanitizer-rs", optional = true }
+sanitizer = { path = "../sanitizer-rs" }
 vte = { version = "0.14", optional = true }
 strip-ansi-escapes = { version = "0.2", optional = true }
 vt100 = { version = "0.16", optional = true }
+serde = { version = "1", optional = true, features = ["derive"] }
+serde_yaml = { version = "0.9", optional = true }
+toml = { version = "0.8", optional = true }
 
 [dev-dependencies]
 dioxus-ssr = "0.7"

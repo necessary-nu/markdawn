@@ -21,6 +21,8 @@ mod svg_sanitize;
 mod svg_text_to_paths;
 #[cfg(feature = "terminal")]
 mod terminal;
+#[cfg(feature = "tracey")]
+pub mod tracey;
 mod url;
 mod url_safety;
 
@@ -60,7 +62,7 @@ pub use crate::error::{Error, ErrorLocation, StreamError};
 pub use crate::ext::{
     BlockMatch, CodeBlockRewrite, CodeBlockRewriter, Extension, InlineContext, InlineMatch,
 };
-pub use crate::html_filter::{HtmlFilter, SAFE_DISALLOWED_TAGS};
+pub use crate::html_filter::HtmlFilter;
 pub use crate::node::{
     AlertKind, CorrelationId, Emission, Node, SourceSpan, StreamItem, TableAlignment,
 };

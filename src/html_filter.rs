@@ -1,34 +1,28 @@
-//! Configurable HTML tag filtering for adapters.
+//! HTML pass-through policy applied to every `Node::Html` an adapter writes.
 //!
-//! Defaults to a safe-by-default policy that neutralizes the GFM
-//! disallowed-raw-html-extension tag list (`script`, `iframe`, `style`,
-//! etc.) by replacing the leading `<` with `&lt;` so the content renders
-//! as text instead of executing.
+//! Wraps the W3C-style [`sanitizer`] crate so adapters use a real HTML
+//! parser instead of byte-level scanning. Two modes ship out of the box:
 //!
-//! Adapters apply this filter to every `Node::Html` they render, regardless
-//! of whether GFM was enabled at parse time. Consumers who need to allow
-//! arbitrary HTML can call [`HtmlFilter::unrestricted`].
+//! - [`HtmlFilter::safe`] — sanitize via [`sanitizer::SanitizerConfig::safe_default`]
+//!   (the default).
+//! - [`HtmlFilter::unrestricted`] — pass HTML through verbatim. Use only when
+//!   the input is fully trusted.
+//!
+//! For finer control, build your own [`sanitizer::SanitizerConfig`] and pass
+//! it via [`HtmlFilter::custom`].
 
-/// The GFM tagfilter list. Replacing `<` with `&lt;` for these tag names
-/// (case-insensitive) is the standard "safe HTML in markdown" baseline.
-pub const SAFE_DISALLOWED_TAGS: &[&str] = &[
-    "textarea",
-    "title",
-    "style",
-    "xmp",
-    "iframe",
-    "noembed",
-    "noframes",
-    "script",
-    "plaintext",
-];
+use sanitizer::SanitizerConfig;
 
-/// Configurable HTML tag filter. Use [`HtmlFilter::safe`] for the
-/// GFM-style disallowed-tag list (the default), or
-/// [`HtmlFilter::unrestricted`] to pass everything through untouched.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HtmlFilter {
-    disallowed: Vec<String>,
+/// HTML pass-through policy. Cheap to clone (the inner config is `Clone`).
+#[derive(Debug, Clone)]
+pub struct HtmlFilter(Mode);
+
+#[derive(Debug, Clone)]
+enum Mode {
+    /// Run input through sanitizer with the given config.
+    Sanitize(SanitizerConfig),
+    /// Trust the input — emit it verbatim.
+    Unrestricted,
 }
 
 impl Default for HtmlFilter {
@@ -38,97 +32,39 @@ impl Default for HtmlFilter {
 }
 
 impl HtmlFilter {
-    /// Filter using the GFM tagfilter list.
+    /// Sanitize using the W3C-aligned safe defaults.
     pub fn safe() -> Self {
-        Self {
-            disallowed: SAFE_DISALLOWED_TAGS
-                .iter()
-                .map(|s| (*s).to_string())
-                .collect(),
-        }
+        Self(Mode::Sanitize(SanitizerConfig::safe_default()))
     }
 
-    /// Pass all HTML through unchanged. Use only when you trust the source.
+    /// Pass HTML through unchanged. Use only when the source is trusted.
     pub fn unrestricted() -> Self {
-        Self {
-            disallowed: Vec::new(),
-        }
+        Self(Mode::Unrestricted)
     }
 
-    /// Build a filter with a custom list of tag names to neutralize.
-    /// Tag matching is case-insensitive.
-    pub fn with_disallowed_tags<I, S>(tags: I) -> Self
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        Self {
-            disallowed: tags.into_iter().map(Into::into).collect(),
-        }
+    /// Sanitize using a caller-supplied [`SanitizerConfig`].
+    pub fn custom(config: SanitizerConfig) -> Self {
+        Self(Mode::Sanitize(config))
     }
 
-    /// Add an additional tag name to the disallowed list.
-    pub fn deny<S: Into<String>>(mut self, tag: S) -> Self {
-        self.disallowed.push(tag.into());
-        self
-    }
-
-    /// True if no tags are filtered (i.e. [`HtmlFilter::unrestricted`]).
+    /// True if the filter is the unrestricted pass-through.
     pub fn is_unrestricted(&self) -> bool {
-        self.disallowed.is_empty()
+        matches!(self.0, Mode::Unrestricted)
     }
 
-    /// Apply the filter, returning the (possibly modified) HTML string.
-    /// Replaces the `<` that opens any disallowed tag with `&lt;` so the
-    /// tag renders as visible text instead of executing.
+    /// Apply the policy.
+    ///
+    /// On sanitizer failure (e.g. invalid config — shouldn't happen for the
+    /// builtin profiles) the input is dropped and an empty string is
+    /// returned, mirroring the safer fallback.
     pub fn filter(&self, html: &str) -> String {
-        if self.disallowed.is_empty() {
-            return html.to_string();
+        match &self.0 {
+            Mode::Unrestricted => html.to_string(),
+            Mode::Sanitize(config) => match config.sanitize(html) {
+                Ok(out) => out.into_inner(),
+                Err(_) => String::new(),
+            },
         }
-        let mut result = String::with_capacity(html.len());
-        let mut i = 0;
-        let bytes = html.as_bytes();
-
-        while i < bytes.len() {
-            if bytes[i] == b'<' {
-                let after_angle = i + 1;
-                let is_closing = after_angle < bytes.len() && bytes[after_angle] == b'/';
-                let tag_name_start = if is_closing {
-                    after_angle + 1
-                } else {
-                    after_angle
-                };
-
-                let mut matched = false;
-                for tag in &self.disallowed {
-                    let tag_end = tag_name_start + tag.len();
-                    if tag_end <= bytes.len() {
-                        let candidate = &html[tag_name_start..tag_end];
-                        if candidate.eq_ignore_ascii_case(tag) {
-                            let boundary_ok = tag_end >= bytes.len()
-                                || matches!(bytes[tag_end], b' ' | b'\t' | b'\n' | b'>' | b'/');
-                            if boundary_ok {
-                                result.push_str("&lt;");
-                                i += 1;
-                                matched = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if !matched {
-                    result.push('<');
-                    i += 1;
-                }
-            } else {
-                let ch = html[i..].chars().next().unwrap();
-                result.push(ch);
-                i += ch.len_utf8();
-            }
-        }
-
-        result
     }
 }
 
@@ -137,33 +73,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn safe_neutralizes_script() {
-        let filtered = HtmlFilter::safe().filter("<script>alert(1)</script>");
-        assert_eq!(filtered, "&lt;script>alert(1)&lt;/script>");
+    fn safe_strips_script() {
+        let out = HtmlFilter::safe().filter("<p>ok</p><script>alert(1)</script>");
+        assert!(!out.contains("<script>"));
+        assert!(out.contains("<p>ok</p>"));
     }
 
     #[test]
-    fn safe_passes_through_div() {
-        let filtered = HtmlFilter::safe().filter("<div>hello</div>");
-        assert_eq!(filtered, "<div>hello</div>");
+    fn unrestricted_passes_em_dash_unchanged() {
+        // Regression: the previous byte-level filter panicked when its
+        // tag-name window crossed a UTF-8 boundary like an em dash.
+        let input = "<code>x</code> — long dash here";
+        assert_eq!(HtmlFilter::unrestricted().filter(input), input);
     }
 
     #[test]
-    fn unrestricted_passes_script_unchanged() {
-        let filtered = HtmlFilter::unrestricted().filter("<script>foo</script>");
-        assert_eq!(filtered, "<script>foo</script>");
-    }
-
-    #[test]
-    fn custom_disallowed_tag() {
-        let filter = HtmlFilter::safe().deny("custom-element");
-        let filtered = filter.filter("<custom-element>x</custom-element>");
-        assert_eq!(filtered, "&lt;custom-element>x&lt;/custom-element>");
-    }
-
-    #[test]
-    fn case_insensitive_match() {
-        let filtered = HtmlFilter::safe().filter("<SCRIPT>x</SCRIPT>");
-        assert_eq!(filtered, "&lt;SCRIPT>x&lt;/SCRIPT>");
+    fn safe_handles_em_dash_without_panic() {
+        let input = "<code>x</code> — long dash here";
+        let out = HtmlFilter::safe().filter(input);
+        assert!(out.contains("—"));
     }
 }

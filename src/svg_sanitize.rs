@@ -43,8 +43,8 @@ static CONFIG: LazyLock<SanitizerConfig> = LazyLock::new(|| {
     let mut cfg = SanitizerConfig::safe_default();
     if let Some(elements) = cfg.elements.as_mut() {
         for el in elements.iter_mut() {
-            let is_svg_a = el.name == "a"
-                && el.namespace.as_deref() == Some("http://www.w3.org/2000/svg");
+            let is_svg_a =
+                el.name == "a" && el.namespace.as_deref() == Some("http://www.w3.org/2000/svg");
             if is_svg_a {
                 if let Some(attrs) = el.attributes.as_mut() {
                     attrs.push(SanitizerAttribute::xlink("href"));
@@ -96,7 +96,8 @@ mod tests {
     // adv[verify output.no-script]
     #[test]
     fn script_block_dropped() {
-        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><circle/></svg>"#;
+        let svg =
+            r#"<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><circle/></svg>"#;
         let out = sanitize_svg(svg);
         assert!(!out.contains("<script"), "got: {out}");
         assert!(!out.contains("alert"), "got: {out}");
@@ -187,7 +188,8 @@ mod tests {
     // adv[verify output.animate-href-safe]
     #[test]
     fn set_element_dropped_entirely() {
-        let svg = r#"<svg><a><rect/><set attributeName="href" to="javascript:alert(1)"/></a></svg>"#;
+        let svg =
+            r#"<svg><a><rect/><set attributeName="href" to="javascript:alert(1)"/></a></svg>"#;
         let out = sanitize_svg(svg);
         assert!(!out.contains("<set"), "got: {out}");
         assert!(!out.contains("javascript:"), "got: {out}");
@@ -242,6 +244,9 @@ mod tests {
         let out = sanitize_svg(svg);
         assert!(out.contains("<svg"), "got: {out}");
         assert!(out.contains("<ellipse"), "got: {out}");
-        assert!(out.contains("cx=\"50\"") || out.contains("cx='50'"), "got: {out}");
+        assert!(
+            out.contains("cx=\"50\"") || out.contains("cx='50'"),
+            "got: {out}"
+        );
     }
 }
