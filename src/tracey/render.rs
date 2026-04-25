@@ -287,6 +287,9 @@ fn collect_metadata(
         } => {
             let raw = req_raw_text(source, span, base_offset, p);
             let body_html = render_children_to_html(children);
+            // The payload's `line` field is left at 0 in extract_reqs;
+            // compute it here from the absolute marker offset.
+            let line = byte_offset_to_line(source, p.marker_offset);
             let req = ReqDefinition {
                 id: p.id.clone(),
                 kind: p.kind,
@@ -296,7 +299,7 @@ fn collect_metadata(
                     span.start + base_offset,
                     span.end.saturating_sub(span.start),
                 ),
-                line: p.line,
+                line,
                 raw,
                 html: body_html,
             };

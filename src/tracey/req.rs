@@ -93,17 +93,26 @@ pub fn parse_rule_id(id: &str) -> Option<RuleId> {
     }
 }
 
-/// Kind of requirement marker — distinguishes ordinary definitions from
-/// constraints (which use the `PREFIX![ID]` marker syntax).
+/// Kind of requirement marker — distinguishes the three sigils tracey
+/// understands inside a GFM-alert-style spec marker:
+///
+/// - `> [>r:id]` → `Definition` (ordinary requirement)
+/// - `> [!r:id]` → `Constraint` (cross-cutting; applies to heading subtree)
+/// - `> [?r:id]` → `VerifyOnly` (leaf-scope; impl rejected)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ReqKind {
-    /// Ordinary requirement definition: `PREFIX[ID]`. Tracked for impl/verify
+    /// Ordinary requirement definition: `> [>r:ID]`. Tracked for impl/verify
     /// coverage in the usual way.
     #[default]
     Definition,
-    /// Constraint: `PREFIX![ID]`. Cross-cutting property that applies to its
+    /// Constraint: `> [!r:ID]`. Cross-cutting property that applies to its
     /// heading subtree. Verified, not implemented.
     Constraint,
+    /// Verify-only requirement: `> [?r:ID]`. Leaf-scope (no tree); impl
+    /// references are rejected. Used for conformance items like "the system
+    /// MUST produce output X for input Y" that have no single implementation
+    /// site, only a test artifact.
+    VerifyOnly,
 }
 
 /// A requirement definition extracted from markdown.
@@ -138,39 +147,54 @@ pub struct InlineCodeSpan {
     pub span: SourceSpan,
 }
 
-/// Strip a leading req marker from a line of text.
+/// Parse a tracey alert-form marker at the start of a blockquote line.
 ///
-/// A marker is `[a-z0-9]+\[…\]` (ordinary definition) or `[a-z0-9]+!\[…\]`
-/// (constraint, see [`ReqKind::Constraint`]) at the very start. Returns
-/// `(prefix, kind, marker_content, marker_byte_end)` where `marker_byte_end`
-/// is the index of the closing `]` in `text`.
+/// The marker shape is `[<sigil><prefix>:<id>]` where `<sigil>` is one of
+/// `>` (definition), `!` (constraint), or `?` (verify-only); `<prefix>` is
+/// `[a-z0-9]+`; and `<id>` is the rule id (validated by [`parse_rule_id`]).
+///
+/// Returns `(prefix, kind, marker_content, marker_byte_end)` where
+/// `marker_content` is the rule-id text and `marker_byte_end` is the byte
+/// index of the closing `]` in `text`.
+///
+/// `text` is expected to be already stripped of the leading `> ` blockquote
+/// indent. Bare `[<prefix>:<id>]` (no sigil) is **not** a marker — this
+/// keeps tracey from accidentally claiming arbitrary `[…]` brackets in
+/// prose.
 pub(crate) fn parse_req_leading_marker(text: &str) -> Option<(&str, ReqKind, &str, usize)> {
-    let mut prefix_len = 0usize;
-    for ch in text.chars() {
-        if ch.is_ascii_lowercase() || ch.is_ascii_digit() {
-            prefix_len += ch.len_utf8();
+    let bytes = text.as_bytes();
+    if bytes.first() != Some(&b'[') {
+        return None;
+    }
+    let kind = match bytes.get(1)? {
+        b'>' => ReqKind::Definition,
+        b'!' => ReqKind::Constraint,
+        b'?' => ReqKind::VerifyOnly,
+        _ => return None,
+    };
+    let prefix_start = 2;
+    let mut prefix_end = prefix_start;
+    while let Some(&b) = bytes.get(prefix_end) {
+        if b.is_ascii_lowercase() || b.is_ascii_digit() {
+            prefix_end += 1;
         } else {
             break;
         }
     }
-    if prefix_len == 0 {
+    if prefix_end == prefix_start {
         return None;
     }
-    let bytes = text.as_bytes();
-    let (kind, content_start) = match bytes.get(prefix_len) {
-        Some(&b'[') => (ReqKind::Definition, prefix_len + 1),
-        Some(&b'!') if bytes.get(prefix_len + 1) == Some(&b'[') => {
-            (ReqKind::Constraint, prefix_len + 2)
-        }
-        _ => return None,
-    };
-    let marker_end = text[content_start..].find(']')? + content_start;
-    if marker_end <= content_start {
+    if bytes.get(prefix_end) != Some(&b':') {
         return None;
     }
-    let prefix = &text[..prefix_len];
-    let marker_content = &text[content_start..marker_end];
-    Some((prefix, kind, marker_content, marker_end))
+    let id_start = prefix_end + 1;
+    let close = text[id_start..].find(']')? + id_start;
+    if close <= id_start {
+        return None;
+    }
+    let prefix = &text[prefix_start..prefix_end];
+    let marker_content = &text[id_start..close];
+    Some((prefix, kind, marker_content, close))
 }
 
 #[cfg(test)]
@@ -228,29 +252,62 @@ mod tests {
     }
 
     #[test]
-    fn marker_extraction() {
-        let (prefix, kind, content, end) = parse_req_leading_marker("r[my.req] body").unwrap();
+    fn marker_extraction_definition() {
+        let (prefix, kind, content, end) =
+            parse_req_leading_marker("[>r:my.req] body").unwrap();
         assert_eq!(prefix, "r");
         assert_eq!(kind, ReqKind::Definition);
         assert_eq!(content, "my.req");
-        assert_eq!(end, 8); // index of ']'
+        assert_eq!(end, 10); // index of ']'
     }
 
     #[test]
     fn marker_extraction_constraint() {
         let (prefix, kind, content, end) =
-            parse_req_leading_marker("r![determinism] body").unwrap();
+            parse_req_leading_marker("[!r:determinism] body").unwrap();
         assert_eq!(prefix, "r");
         assert_eq!(kind, ReqKind::Constraint);
         assert_eq!(content, "determinism");
-        assert_eq!(end, 14); // index of ']'
+        assert_eq!(end, 15); // index of ']'
     }
 
     #[test]
-    fn marker_extraction_constraint_does_not_match_bang_outside_marker() {
-        // `r!foo` (no brackets) is not a marker.
-        assert!(parse_req_leading_marker("r!foo").is_none());
-        // `r!` followed by anything other than `[` is not a marker.
-        assert!(parse_req_leading_marker("r!{foo}").is_none());
+    fn marker_extraction_verify_only() {
+        let (prefix, kind, content, end) =
+            parse_req_leading_marker("[?r:eq-byte-size] body").unwrap();
+        assert_eq!(prefix, "r");
+        assert_eq!(kind, ReqKind::VerifyOnly);
+        assert_eq!(content, "eq-byte-size");
+        assert_eq!(end, 16); // index of ']'
+    }
+
+    #[test]
+    fn marker_extraction_multi_char_prefix() {
+        let (prefix, kind, content, _) =
+            parse_req_leading_marker("[>h2:rfc.7540.streams] body").unwrap();
+        assert_eq!(prefix, "h2");
+        assert_eq!(kind, ReqKind::Definition);
+        assert_eq!(content, "rfc.7540.streams");
+    }
+
+    #[test]
+    fn marker_extraction_rejects_bare_form() {
+        // `[r:id]` (no sigil) is NOT a marker; the leading sigil is
+        // mandatory to avoid colliding with prose `[label:value]`.
+        assert!(parse_req_leading_marker("[r:my.req] body").is_none());
+    }
+
+    #[test]
+    fn marker_extraction_rejects_gfm_alerts() {
+        // GFM alert-block tokens shouldn't trigger tracey extraction.
+        assert!(parse_req_leading_marker("[!NOTE]").is_none());
+        assert!(parse_req_leading_marker("[!WARNING] something").is_none());
+    }
+
+    #[test]
+    fn marker_extraction_rejects_unknown_sigil() {
+        // Only `>`, `!`, `?` are valid sigils.
+        assert!(parse_req_leading_marker("[*r:foo]").is_none());
+        assert!(parse_req_leading_marker("[@r:foo]").is_none());
     }
 }

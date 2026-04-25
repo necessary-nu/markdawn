@@ -97,113 +97,47 @@ fn try_convert_to_req<Ext: From<TraceyExt> + Clone>(
     source: &str,
     base_offset: usize,
 ) {
-    match node {
-        // Paragraph form: `prefix[id] body…`
-        Node::Paragraph { children, source: span } => {
-            let abs_start = span.start + base_offset;
-            let abs_end = span.end + base_offset;
-            let Some((payload, marker_byte_len, body_start_in_block)) =
-                detect_marker_in_paragraph_block(source, abs_start, abs_end)
-            else {
-                return;
-            };
+    // Blockquote form only: `> [<sigil>r:id]\n> body…`. Paragraph-form
+    // markers are no longer supported — every requirement lives inside a
+    // GFM-style blockquote alert.
+    if let Node::BlockQuote { children, source: span } = node {
+        let abs_start = span.start + base_offset;
+        let block_text = &source[abs_start..span.end + base_offset];
+        let Some((marker_byte_len, payload)) =
+            detect_marker_in_blockquote_block(block_text, abs_start)
+        else {
+            return;
+        };
 
-            let body_text = &source[abs_start + body_start_in_block..abs_end];
-            let trimmed_body = body_text.trim_start_matches(|c: char| c == ' ' || c == '\t');
-            // Replace the leading Text child(ren) representing the marker with a
-            // version that has the marker removed. Simpler: rebuild children
-            // from the body text via inline reparse — but we don't have the
-            // inline parser here. Instead, walk the existing inline children
-            // and strip the marker from the first Text node.
-            strip_leading_marker_from_inlines(children, marker_byte_len);
-            let _ = trimmed_body;
-
-            let custom_payload = Ext::from(TraceyExt::Req(payload));
-            let new_children = std::mem::take(children);
-            let new_span = *span;
-            *node = Node::Custom {
-                payload: custom_payload,
-                children: new_children,
-                source: new_span,
-            };
+        // The marker is inside the first inner Paragraph. Strip it from
+        // that paragraph's first Text node.
+        if let Some(first_para) = children.first_mut()
+            && let Node::Paragraph { children: para_children, .. } = first_para
+        {
+            strip_leading_marker_from_inlines(para_children, marker_byte_len);
         }
-        // Blockquote form: `> prefix[id] body…`
-        Node::BlockQuote { children, source: span } => {
-            // The first inner child of a blockquote should be a Paragraph
-            // whose first text starts with the marker.
-            let abs_start = span.start + base_offset;
-            // The marker is on the first non-blank line; find it by scanning
-            // source for `[a-z0-9]+\[…\]` after any `> ` prefixes.
-            let block_text = &source[abs_start..span.end + base_offset];
-            let Some((marker_offset_in_block, marker_byte_len, payload)) =
-                detect_marker_in_blockquote_block(block_text, abs_start)
-            else {
-                return;
-            };
 
-            // The marker is inside the first inner Paragraph. Strip it from
-            // that paragraph's first Text node.
-            if let Some(first_para) = children.first_mut()
-                && let Node::Paragraph { children: para_children, .. } = first_para
-            {
-                strip_leading_marker_from_inlines(para_children, marker_byte_len);
-            }
-            let _ = marker_offset_in_block;
-
-            let custom_payload = Ext::from(TraceyExt::Req(payload));
-            let new_children = std::mem::take(children);
-            let new_span = *span;
-            *node = Node::Custom {
-                payload: custom_payload,
-                children: new_children,
-                source: new_span,
-            };
-        }
-        _ => {}
+        let custom_payload = Ext::from(TraceyExt::Req(payload));
+        let new_children = std::mem::take(children);
+        let new_span = *span;
+        *node = Node::Custom {
+            payload: custom_payload,
+            children: new_children,
+            source: new_span,
+        };
     }
 }
 
-/// Look for a paragraph-form marker within the byte range `[abs_start, abs_end)`
-/// of `source`. On success returns `(payload, marker_byte_len, body_start)`
-/// where `body_start` is the offset within the paragraph block at which the
-/// post-marker body starts.
-fn detect_marker_in_paragraph_block(
-    source: &str,
-    abs_start: usize,
-    abs_end: usize,
-) -> Option<(ReqPayload, usize, usize)> {
-    let block = source.get(abs_start..abs_end)?;
-    let (prefix, kind, marker_content, marker_end_idx) = parse_req_leading_marker(block)?;
-    let marker_byte_len = marker_end_idx + 1; // includes closing ']'
-
-    let id = parse_rule_id(marker_content)?;
-    let anchor_id = format!("r--{}", slugify(&id.to_string()));
-
-    let line = 1 + source[..abs_start].bytes().filter(|&b| b == b'\n').count();
-
-    Some((
-        ReqPayload {
-            id,
-            kind,
-            anchor_id,
-            marker_offset: abs_start,
-            marker_length: marker_byte_len,
-            line,
-            prefix: prefix.to_string(),
-        },
-        marker_byte_len,
-        marker_byte_len,
-    ))
-}
-
-/// Look for a blockquote-form marker. `block_text` is the entire blockquote
-/// source (including `> ` prefixes). Returns the marker offset *in the
-/// original source* via `abs_start` + relative.
+/// Look for a tracey alert-form marker on the first line of a blockquote.
+/// `block_text` is the entire blockquote source (including `> ` prefixes).
+/// On success returns `(marker_byte_len, payload)` where `marker_byte_len`
+/// is the length of the marker token inside the blockquote (i.e. of
+/// `[<sigil>prefix:id]`), used by the caller to strip the marker from the
+/// inline children.
 fn detect_marker_in_blockquote_block(
     block_text: &str,
     abs_start: usize,
-) -> Option<(usize, usize, ReqPayload)> {
-    // Find the first non-blockquote-prefix character on the first line.
+) -> Option<(usize, ReqPayload)> {
     let first_line_end = block_text.find('\n').unwrap_or(block_text.len());
     let first_line = &block_text[..first_line_end];
 
@@ -227,10 +161,13 @@ fn detect_marker_in_blockquote_block(
     let anchor_id = format!("r--{}", slugify(&id.to_string()));
 
     let marker_offset = abs_start + idx;
-    // Compute line number: count newlines before abs_start in the document.
-    // Caller will need to do this too; we just return marker_offset.
+    let line = 1 + block_text[..idx]
+        .bytes()
+        .filter(|&b| b == b'\n')
+        .count()
+        + (abs_start.saturating_sub(0)); // unused; line set by caller below
+    let _ = line;
     Some((
-        marker_offset,
         marker_byte_len,
         ReqPayload {
             id,
@@ -238,7 +175,7 @@ fn detect_marker_in_blockquote_block(
             anchor_id,
             marker_offset,
             marker_length: marker_byte_len,
-            line: 0, // filled in below
+            line: 0, // populated by collect_metadata using the absolute offset
             prefix: prefix.to_string(),
         },
     ))
