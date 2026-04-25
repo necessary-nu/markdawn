@@ -20,4 +20,4 @@ pub use frontmatter::{
 pub use handler::{DefaultReqHandler, HandlerError, InlineCodeHandler, ReqHandler};
 pub use heading::{Heading, slugify};
 pub use render::{DocElement, Document, Paragraph, RenderError, RenderOptions, render};
-pub use req::{InlineCodeSpan, ReqDefinition, RuleId, SourceSpan, parse_rule_id};
+pub use req::{InlineCodeSpan, ReqDefinition, ReqKind, RuleId, SourceSpan, parse_rule_id};

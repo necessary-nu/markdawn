@@ -4,7 +4,7 @@
 use crate::node::{Node, SourceSpan};
 
 use super::heading::slugify;
-use super::req::{RuleId, parse_req_leading_marker, parse_rule_id};
+use super::req::{ReqKind, RuleId, parse_req_leading_marker, parse_rule_id};
 
 /// Custom-node payload used inside `Node::Custom { payload: TraceyExt::Req(_), .. }`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,8 +19,11 @@ pub enum TraceyExt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReqPayload {
     pub id: RuleId,
+    /// Marker kind (ordinary requirement vs constraint). Tracks `PREFIX![ID]`
+    /// vs `PREFIX[ID]` at the marker level.
+    pub kind: ReqKind,
     pub anchor_id: String,
-    /// Span of the marker (e.g. `r[my.req]`).
+    /// Span of the marker (e.g. `r[my.req]` or `r![determinism]`).
     pub marker_offset: usize,
     pub marker_length: usize,
     /// 1-indexed line number where the marker appears.
@@ -170,7 +173,7 @@ fn detect_marker_in_paragraph_block(
     abs_end: usize,
 ) -> Option<(ReqPayload, usize, usize)> {
     let block = source.get(abs_start..abs_end)?;
-    let (prefix, marker_content, marker_end_idx) = parse_req_leading_marker(block)?;
+    let (prefix, kind, marker_content, marker_end_idx) = parse_req_leading_marker(block)?;
     let marker_byte_len = marker_end_idx + 1; // includes closing ']'
 
     let id = parse_rule_id(marker_content)?;
@@ -181,6 +184,7 @@ fn detect_marker_in_paragraph_block(
     Some((
         ReqPayload {
             id,
+            kind,
             anchor_id,
             marker_offset: abs_start,
             marker_length: marker_byte_len,
@@ -217,7 +221,7 @@ fn detect_marker_in_blockquote_block(
     }
 
     let marker_text = &first_line[idx..];
-    let (prefix, marker_content, marker_end_idx) = parse_req_leading_marker(marker_text)?;
+    let (prefix, kind, marker_content, marker_end_idx) = parse_req_leading_marker(marker_text)?;
     let marker_byte_len = marker_end_idx + 1;
     let id = parse_rule_id(marker_content)?;
     let anchor_id = format!("r--{}", slugify(&id.to_string()));
@@ -230,6 +234,7 @@ fn detect_marker_in_blockquote_block(
         marker_byte_len,
         ReqPayload {
             id,
+            kind,
             anchor_id,
             marker_offset,
             marker_length: marker_byte_len,

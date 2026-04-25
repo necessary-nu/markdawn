@@ -289,6 +289,7 @@ fn collect_metadata(
             let body_html = render_children_to_html(children);
             let req = ReqDefinition {
                 id: p.id.clone(),
+                kind: p.kind,
                 anchor_id: p.anchor_id.clone(),
                 marker_span: SourceSpan::new(p.marker_offset, p.marker_length),
                 span: SourceSpan::new(

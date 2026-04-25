@@ -132,3 +132,64 @@ fn inline_code_spans_collected() {
         .collect();
     assert_eq!(contents, vec!["foo", "bar"]);
 }
+
+#[test]
+fn extracts_constraint_marker() {
+    use markdawn::tracey::ReqKind;
+    let md = "r![determinism]\nThe system MUST be deterministic.\n";
+    let doc = render(md, &RenderOptions::default()).unwrap();
+    assert_eq!(doc.reqs.len(), 1);
+    assert_eq!(doc.reqs[0].id.base, "determinism");
+    assert_eq!(doc.reqs[0].kind, ReqKind::Constraint);
+    let s = doc.reqs[0].marker_span;
+    assert_eq!(&md[s.offset..s.offset + s.length], "r![determinism]");
+}
+
+#[test]
+fn extracts_constraint_in_blockquote() {
+    use markdawn::tracey::ReqKind;
+    let md = "> r![durability]\n> Once a write returns success its effect MUST survive crashes.\n";
+    let doc = render(md, &RenderOptions::default()).unwrap();
+    assert_eq!(doc.reqs.len(), 1);
+    assert_eq!(doc.reqs[0].id.base, "durability");
+    assert_eq!(doc.reqs[0].kind, ReqKind::Constraint);
+    let s = doc.reqs[0].marker_span;
+    assert_eq!(&md[s.offset..s.offset + s.length], "r![durability]");
+}
+
+#[test]
+fn ordinary_and_constraint_distinguished() {
+    use markdawn::tracey::ReqKind;
+    let md = concat!(
+        "r![determinism]\n",
+        "Cross-cutting property.\n",
+        "\n",
+        "r[storage.put]\n",
+        "Ordinary req.\n",
+    );
+    let doc = render(md, &RenderOptions::default()).unwrap();
+    assert_eq!(doc.reqs.len(), 2);
+    assert_eq!(doc.reqs[0].kind, ReqKind::Constraint);
+    assert_eq!(doc.reqs[1].kind, ReqKind::Definition);
+}
+
+#[test]
+fn constraint_accepts_single_segment_id() {
+    use markdawn::tracey::ReqKind;
+    let md = "r![foo]\nSingle-segment id is fine for a constraint.\n";
+    let doc = render(md, &RenderOptions::default()).unwrap();
+    assert_eq!(doc.reqs.len(), 1);
+    assert_eq!(doc.reqs[0].id.base, "foo");
+    assert_eq!(doc.reqs[0].kind, ReqKind::Constraint);
+}
+
+#[test]
+fn constraint_with_version_suffix() {
+    use markdawn::tracey::ReqKind;
+    let md = "r![determinism+2]\nBumped constraint.\n";
+    let doc = render(md, &RenderOptions::default()).unwrap();
+    assert_eq!(doc.reqs.len(), 1);
+    assert_eq!(doc.reqs[0].id.base, "determinism");
+    assert_eq!(doc.reqs[0].id.version, 2);
+    assert_eq!(doc.reqs[0].kind, ReqKind::Constraint);
+}
