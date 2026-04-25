@@ -135,6 +135,9 @@ fn try_convert_to_req<Ext: From<TraceyExt> + Clone>(
 /// is the length of the marker token inside the blockquote (i.e. of
 /// `:[<sigil?>prefix:id]`, including the leading `:`), used by the caller to
 /// strip the marker from the inline children.
+//
+// [>r:dashboard.editing.byte-range.req-span]
+// [>r:dashboard.editing.byte-range.marker-and-content]
 fn detect_marker_in_blockquote_block(
     block_text: &str,
     abs_start: usize,
