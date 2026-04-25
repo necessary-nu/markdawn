@@ -19,8 +19,8 @@ pub enum TraceyExt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReqPayload {
     pub id: RuleId,
-    /// Marker kind (ordinary requirement vs constraint). Tracks `PREFIX![ID]`
-    /// vs `PREFIX[ID]` at the marker level.
+    /// Marker kind (ordinary requirement vs constraint). Tracks
+    /// `:[!prefix:id]` vs `:[prefix:id]` at the marker level.
     pub kind: ReqKind,
     pub anchor_id: String,
     /// Span of the marker (e.g. `r[my.req]` or `r![determinism]`).
@@ -32,8 +32,8 @@ pub struct ReqPayload {
     pub prefix: String,
 }
 
-/// Walk the AST and convert paragraphs / blockquotes whose first text starts
-/// with a `prefix[id]` marker into `Node::Custom { TraceyExt::Req(_), … }`.
+/// Walk the AST and convert blockquotes whose first text starts with a
+/// `:[r:id]` (or `:[!r:id]`) marker into `Node::Custom { TraceyExt::Req(_), … }`.
 ///
 /// `source` is the full markdown body that markdawn parsed. `base_offset` is
 /// the byte offset of `source` within an outer document (used to shift node
@@ -97,9 +97,9 @@ fn try_convert_to_req<Ext: From<TraceyExt> + Clone>(
     source: &str,
     base_offset: usize,
 ) {
-    // Blockquote form only: `> [<sigil>r:id]\n> body…`. Paragraph-form
-    // markers are no longer supported — every requirement lives inside a
-    // GFM-style blockquote alert.
+    // Blockquote form only: `> :[r:id]\n> body…` or `> :[!r:id]\n> body…`.
+    // The leading `:` outside the brackets is the discriminator. Paragraph
+    // form is not supported.
     if let Node::BlockQuote { children, source: span } = node {
         let abs_start = span.start + base_offset;
         let block_text = &source[abs_start..span.end + base_offset];
@@ -128,12 +128,12 @@ fn try_convert_to_req<Ext: From<TraceyExt> + Clone>(
     }
 }
 
-/// Look for a tracey alert-form marker on the first line of a blockquote.
+/// Look for a tracey blockquote-form marker on the first line of a blockquote.
 /// `block_text` is the entire blockquote source (including `> ` prefixes).
 /// On success returns `(marker_byte_len, payload)` where `marker_byte_len`
 /// is the length of the marker token inside the blockquote (i.e. of
-/// `[<sigil>prefix:id]`), used by the caller to strip the marker from the
-/// inline children.
+/// `:[<sigil?>prefix:id]`, including the leading `:`), used by the caller to
+/// strip the marker from the inline children.
 fn detect_marker_in_blockquote_block(
     block_text: &str,
     abs_start: usize,
