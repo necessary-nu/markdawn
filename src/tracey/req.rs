@@ -270,8 +270,7 @@ mod tests {
 
     #[test]
     fn marker_extraction_definition() {
-        let (prefix, kind, content, end) =
-            parse_req_leading_marker(":[r:my.req] body").unwrap();
+        let (prefix, kind, content, end) = parse_req_leading_marker(":[r:my.req] body").unwrap();
         assert_eq!(prefix, "r");
         assert_eq!(kind, ReqKind::Definition);
         assert_eq!(content, "my.req");

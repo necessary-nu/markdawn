@@ -178,10 +178,10 @@ fn try_convert_text(bytes: &[u8]) -> Option<(usize, String)> {
             out.push(' ');
             write_f64(&mut out, y);
             out.push_str(") scale(");
-            write_f64(&mut out, *scale);
+            write_f64_precise(&mut out, *scale);
             out.push(' ');
             out.push('-');
-            write_f64(&mut out, *scale);
+            write_f64_precise(&mut out, *scale);
             out.push_str(")\" fill=\"");
             out.push_str(&xml_escape_attr(fill));
             out.push_str("\"/>");
@@ -311,6 +311,21 @@ fn write_f64(out: &mut String, v: f64) {
         let _ = write!(out, "{}", rounded as i64);
     } else {
         let _ = write!(out, "{rounded:.2}");
+    }
+}
+
+// Like `write_f64` but keeps 5 decimal places. Glyph scales are
+// `font_size / upem` — for Liberation Sans/Serif (upem=2048) at
+// font-size 14 that's ~0.00684, which `write_f64`'s 2-decimal rounding
+// would emit as 0.01 (46% too large) or, at font-size 10, as 0 entirely.
+fn write_f64_precise(out: &mut String, v: f64) {
+    let rounded = (v * 100_000.0).round() / 100_000.0;
+    if rounded == rounded.trunc() {
+        let _ = write!(out, "{}", rounded as i64);
+    } else {
+        let s = format!("{rounded:.5}");
+        let trimmed = s.trim_end_matches('0').trim_end_matches('.');
+        out.push_str(trimmed);
     }
 }
 
@@ -490,6 +505,37 @@ mod tests {
             mono_second_x > serif_second_x + 1.0,
             "expected mono advance to exceed serif by >1 unit; mono={mono_second_x} serif={serif_second_x}"
         );
+    }
+
+    // adv[verify output.text-as-paths]
+    // Regression: `write_f64`'s 2-decimal rounding was applied to the
+    // glyph scale, so `font-size 14 / upem 2048 ≈ 0.00684` shipped as
+    // `0.01` and glyphs rendered ~46% oversized vs. the cursor advance.
+    // Pin this on font-size 12 where the bad value (0.01) is maximally
+    // distinct from the correct value (~0.00586).
+    #[test]
+    fn glyph_scale_emitted_with_precision() {
+        let svg = r#"<text x="0" y="20" font-size="12" font-family="Helvetica">A</text>"#;
+        let out = text_to_paths(svg);
+        let scale_str = first_scale_value(&out).expect("path has scale()");
+        let parsed: f64 = scale_str.parse().expect("scale parses as f64");
+        let upem = SANS.units_per_em() as f64;
+        let expected = 12.0 / upem;
+        let err = (parsed - expected).abs();
+        assert!(
+            err < 1e-4,
+            "scale {parsed} differs from expected {expected} by {err} in: {out}",
+        );
+        assert!(
+            (parsed - 0.01).abs() > 1e-4,
+            "scale {parsed} is the buggy 0.01 value in: {out}",
+        );
+    }
+
+    fn first_scale_value(svg: &str) -> Option<&str> {
+        let idx = svg.find("scale(")? + "scale(".len();
+        let end = svg[idx..].find(' ')? + idx;
+        Some(&svg[idx..end])
     }
 
     fn second_translate_x(svg: &str) -> Option<f64> {

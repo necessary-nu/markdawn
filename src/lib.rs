@@ -15,14 +15,16 @@ mod parser;
 mod pikchr_render;
 mod serializer;
 mod sink;
-#[cfg(any(feature = "graphviz", feature = "pikchr"))]
+#[cfg(any(feature = "graphviz", feature = "pikchr", feature = "typst"))]
 mod svg_sanitize;
-#[cfg(any(feature = "graphviz", feature = "pikchr"))]
+#[cfg(any(feature = "graphviz", feature = "pikchr", feature = "typst"))]
 mod svg_text_to_paths;
 #[cfg(feature = "terminal")]
 mod terminal;
 #[cfg(feature = "tracey")]
 pub mod tracey;
+#[cfg(feature = "typst")]
+mod typst;
 mod url;
 mod url_safety;
 
@@ -42,6 +44,8 @@ pub use arborium;
 pub use crate::adapter::dioxus::{
     DioxusOptions, Markdown, RenderDioxusCustom, Renderer, render_markdown, render_node,
 };
+#[cfg(feature = "iced")]
+pub use crate::adapter::iced::selected_text;
 #[cfg(feature = "typst")]
 pub use crate::adapter::typst::TypstWalker;
 #[cfg(target_os = "ios")]
@@ -55,6 +59,8 @@ pub use crate::adapter::{
     BlockSink, RenderCtx, RenderUIKitCustom, TextRenderer, UIKitError, UIKitStyle,
 };
 pub use crate::adapter::{HtmlAdapter, HtmlError, HtmlSink, RenderHtmlCustom};
+#[cfg(feature = "iced")]
+pub use crate::adapter::{IcedOptions, IcedRenderer, IcedUrl, RenderIcedCustom};
 #[cfg(feature = "typst")]
 pub use crate::adapter::{RenderTypstCustom, TypstAdapter, TypstError, TypstSink};
 pub use crate::editor::EditableDocument;
@@ -70,3 +76,84 @@ pub use crate::parser::{LiveBlock, Parser, ParserBuilder};
 pub use crate::serializer::{serialize, serialize_blocks};
 pub use crate::sink::{Sink, VecSink};
 pub use crate::url::{MarkdawnUrl, parse_markdawn_url};
+
+/// Clear `info` on every `CodeBlock` whose info-language would dispatch
+/// to a diagram engine (pikchr / dot / graphviz). Adapters call this
+/// on nodes from a *provisional* parse — i.e. an unclosed fenced block
+/// mid-stream — to skip the diagram dispatch and fall through to plain
+/// rendering. Feeding partial dot/pikchr to its engine just produces
+/// repeated syntax errors until the closing fence arrives.
+#[allow(dead_code)]
+pub(crate) fn clear_provisional_diagram_info<Ext>(node: &mut crate::node::Node<Ext>) {
+    node.walk_mut(&mut |n| {
+        if is_diagram_code_block(n) {
+            if let crate::node::Node::CodeBlock { info, .. } = n {
+                *info = None;
+            }
+        }
+    });
+}
+
+/// Same intent as [`clear_provisional_diagram_info`], but for one-shot
+/// finalizing parses (where `provisional` is always `false` regardless
+/// of fence state). Walks `node`, and for each diagram CodeBlock,
+/// inspects its source slice in `source` — if the slice has no closing
+/// fence, the block was being typed mid-stream, so strip its info so
+/// the renderer falls through to plain text instead of dispatching
+/// pikchr/graphviz on every keystroke.
+#[allow(dead_code)]
+pub(crate) fn clear_unclosed_diagram_info<Ext>(source: &str, node: &mut crate::node::Node<Ext>) {
+    node.walk_mut(&mut |n| {
+        if !is_diagram_code_block(n) {
+            return;
+        }
+        let span = n.source();
+        let slice = source.get(span.start..span.end).unwrap_or("");
+        if fenced_code_block_is_closed(slice) {
+            return;
+        }
+        if let crate::node::Node::CodeBlock { info, .. } = n {
+            *info = None;
+        }
+    });
+}
+
+#[allow(dead_code)]
+fn is_diagram_code_block<Ext>(n: &crate::node::Node<Ext>) -> bool {
+    let crate::node::Node::CodeBlock { info, .. } = n else {
+        return false;
+    };
+    let lang = info.as_deref().and_then(|s| s.split_whitespace().next());
+    matches!(
+        lang,
+        Some("dot") | Some("graphviz") | Some("pikchr") | Some("typst")
+    )
+}
+
+/// `slice` is the source range covering a fenced code block including
+/// its opening fence and (if present) its closing fence. Returns true
+/// if a matching closing fence is present. Indented (non-fenced) code
+/// blocks return true — they can't be "unclosed" in the streaming
+/// sense.
+#[allow(dead_code)]
+fn fenced_code_block_is_closed(slice: &str) -> bool {
+    let mut lines = slice.lines();
+    let Some(opener) = lines.next() else {
+        return true;
+    };
+    let opener_trimmed = opener.trim_start_matches(' ');
+    let marker = match opener_trimmed.chars().next() {
+        Some('`') => '`',
+        Some('~') => '~',
+        _ => return true,
+    };
+    let opener_count = opener_trimmed.chars().take_while(|&c| c == marker).count();
+    if opener_count < 3 {
+        return true;
+    }
+    lines.any(|line| {
+        let trimmed = line.trim_start_matches(' ');
+        let count = trimmed.chars().take_while(|&c| c == marker).count();
+        count >= opener_count && trimmed[count..].chars().all(|c| c.is_whitespace())
+    })
+}

@@ -1,6 +1,6 @@
 #![cfg(feature = "tracey")]
 
-use markdawn::tracey::{ReqKind, RenderOptions, parse_rule_id, render};
+use markdawn::tracey::{RenderOptions, ReqKind, parse_rule_id, render};
 
 #[test]
 fn extracts_definition_blockquote() {
@@ -66,8 +66,18 @@ fn rejects_legacy_in_bracket_sigils() {
     // not the spec side.
     let md_gt = "> :[>r:foo]\n> body.\n";
     let md_q = "> :[?r:foo]\n> body.\n";
-    assert!(render(md_gt, &RenderOptions::default()).unwrap().reqs.is_empty());
-    assert!(render(md_q, &RenderOptions::default()).unwrap().reqs.is_empty());
+    assert!(
+        render(md_gt, &RenderOptions::default())
+            .unwrap()
+            .reqs
+            .is_empty()
+    );
+    assert!(
+        render(md_q, &RenderOptions::default())
+            .unwrap()
+            .reqs
+            .is_empty()
+    );
 }
 
 #[test]

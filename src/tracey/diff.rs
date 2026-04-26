@@ -6,10 +6,10 @@
 //! word-level diff inside the block.
 
 use crate::node::Node;
+use crate::node::StreamItem;
 use crate::parser::Parser;
 use crate::serializer::serialize;
 use crate::sink::VecSink;
-use crate::node::StreamItem;
 
 #[derive(Debug)]
 enum DiffOp<T> {
@@ -225,10 +225,9 @@ pub fn diff_markdown_inline(old: &str, new: &str) -> String {
                 let new_idx = i_new;
                 i_new += 1;
                 let new_block = &new_blocks[new_idx];
-                if let Some(pos) = pending_removes
-                    .iter()
-                    .position(|&old_idx| variant_tag(&old_blocks[old_idx]) == variant_tag(new_block))
-                {
+                if let Some(pos) = pending_removes.iter().position(|&old_idx| {
+                    variant_tag(&old_blocks[old_idx]) == variant_tag(new_block)
+                }) {
                     let old_idx = pending_removes.remove(pos);
                     let merged = diff_words(&old_md[old_idx], &new_md[new_idx]);
                     push_block(&mut out, &merged);

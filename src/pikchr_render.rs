@@ -29,8 +29,10 @@ pub enum PikchrError {
     /// Source exceeded [`MAX_PIKCHR_BYTES`]. Payload is the observed
     /// byte count.
     InputTooLarge(usize),
-    /// libpikchr rejected the source (parse / layout error).
-    Failed,
+    /// libpikchr rejected the source. Payload is the human-readable
+    /// error report from `pikru` (parse error message, line/column,
+    /// and source snippet).
+    Failed(String),
     /// The render worker thread panicked. Payload is the recovered
     /// message if any.
     Panicked(String),
@@ -48,7 +50,8 @@ impl fmt::Display for PikchrError {
                 f,
                 "pikchr source is {n} bytes, exceeds cap of {MAX_PIKCHR_BYTES} bytes"
             ),
-            Self::Failed => f.write_str("pikchr render failed"),
+            Self::Failed(msg) if msg.is_empty() => f.write_str("pikchr render failed"),
+            Self::Failed(msg) => write!(f, "pikchr render failed:\n{msg}"),
             Self::Panicked(msg) if msg.is_empty() => f.write_str("pikchr render thread panicked"),
             Self::Panicked(msg) => write!(f, "pikchr render thread panicked: {msg}"),
             Self::TimedOut => write!(
@@ -106,7 +109,7 @@ fn render_inner(source: &str) -> Result<String, PikchrError> {
     let opts = pikru::RenderOptions {
         css_variables: true,
     };
-    pikru::pikchr_with_options(source, &opts).map_err(|_| PikchrError::Failed)
+    pikru::pikchr_with_options(source, &opts).map_err(PikchrError::Failed)
 }
 
 fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> String {

@@ -1,0 +1,280 @@
+//! Hardened wrapper around the `typst` compiler for rendering single
+//! fenced `typst` code blocks to inline SVG.
+//!
+//! The defensive shape mirrors [`crate::pikchr_render`]: input byte
+//! cap, wall-clock render timeout, panic capture, and a process-wide
+//! `Mutex`. typst is reentrant (each compile uses its own [`World`]
+//! instance) but the comemo cache is process-wide, so the lock keeps
+//! cache contention deterministic and matches the pikchr pattern.
+
+mod inline_uses;
+mod world;
+
+use core::fmt;
+use std::sync::{Mutex, mpsc};
+use std::time::Duration;
+
+use typst::WorldExt;
+use typst::layout::{Abs, PagedDocument};
+
+use self::world::RenderWorld;
+
+/// Reject typst source larger than this many bytes before invoking the
+/// compiler. Same cap as pikchr — large enough for realistic diagrams,
+/// small enough that pathological inputs fail fast.
+pub const MAX_TYPST_BYTES: usize = 256 * 1024;
+
+/// Wall-clock budget for a single typst render. Mirrors pikchr.
+pub const TYPST_RENDER_TIMEOUT_SECS: u64 = 10;
+
+/// Padding around the merged-page SVG output (in points).
+const SVG_PADDING_PT: f64 = 4.0;
+
+/// Stack size for the render worker thread. Typst recurses deeply
+/// during layout for non-trivial documents.
+const RENDER_STACK_BYTES: usize = 16 * 1024 * 1024;
+
+#[derive(Debug, Clone)]
+pub enum TypstRenderError {
+    /// Source exceeded [`MAX_TYPST_BYTES`].
+    InputTooLarge(usize),
+    /// The typst compiler reported errors. Payload is a human-readable
+    /// summary of the diagnostic vector.
+    Failed(String),
+    /// The render worker thread panicked.
+    Panicked(String),
+    /// The render exceeded the wall-clock timeout.
+    TimedOut,
+    /// The render worker thread could not be spawned.
+    ThreadSpawn(String),
+}
+
+impl fmt::Display for TypstRenderError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InputTooLarge(n) => write!(
+                f,
+                "typst source is {n} bytes, exceeds cap of {MAX_TYPST_BYTES} bytes"
+            ),
+            Self::Failed(msg) if msg.is_empty() => f.write_str("typst render failed"),
+            Self::Failed(msg) => write!(f, "typst render failed:\n{msg}"),
+            Self::Panicked(msg) if msg.is_empty() => f.write_str("typst render thread panicked"),
+            Self::Panicked(msg) => write!(f, "typst render thread panicked: {msg}"),
+            Self::TimedOut => write!(
+                f,
+                "typst render exceeded {TYPST_RENDER_TIMEOUT_SECS}s wall-clock timeout"
+            ),
+            Self::ThreadSpawn(msg) => write!(f, "could not spawn typst render thread: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for TypstRenderError {}
+
+// adv[impl typst.render.serialise]
+static RENDER_LOCK: Mutex<()> = Mutex::new(());
+
+/// Render a typst source as SVG with the default timeout.
+pub fn render(source: &str) -> Result<String, TypstRenderError> {
+    render_with_timeout(source, Duration::from_secs(TYPST_RENDER_TIMEOUT_SECS))
+}
+
+/// Render a typst source as SVG with a caller-supplied wall-clock
+/// budget. Pre-flight input cap is applied before the timer starts.
+pub fn render_with_timeout(source: &str, timeout: Duration) -> Result<String, TypstRenderError> {
+    if source.len() > MAX_TYPST_BYTES {
+        return Err(TypstRenderError::InputTooLarge(source.len()));
+    }
+
+    let owned = wrap_with_preamble(source);
+    let (tx, rx) =
+        mpsc::channel::<Result<Result<String, TypstRenderError>, Box<dyn std::any::Any + Send>>>();
+
+    // adv[impl typst.render.timeout]
+    // adv[impl typst.render.panic-capture]
+    std::thread::Builder::new()
+        .stack_size(RENDER_STACK_BYTES)
+        .name("markdawn-typst".to_owned())
+        .spawn(move || {
+            let result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_inner(owned)));
+            let _ = tx.send(result);
+        })
+        .map_err(|e| TypstRenderError::ThreadSpawn(e.to_string()))?;
+
+    match rx.recv_timeout(timeout) {
+        Ok(Ok(result)) => result,
+        Ok(Err(panic_payload)) => Err(TypstRenderError::Panicked(panic_message(&panic_payload))),
+        Err(mpsc::RecvTimeoutError::Timeout) => Err(TypstRenderError::TimedOut),
+        Err(mpsc::RecvTimeoutError::Disconnected) => Err(TypstRenderError::Panicked(String::new())),
+    }
+}
+
+fn render_inner(source: String) -> Result<String, TypstRenderError> {
+    let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let world = RenderWorld::new(source);
+    let warned = typst::compile::<PagedDocument>(&world);
+    let document = warned
+        .output
+        .map_err(|diags| TypstRenderError::Failed(format_diagnostics(&diags, &world)))?;
+    let svg = typst_svg::svg_merged(&document, Abs::pt(SVG_PADDING_PT));
+    // typst-svg emits every glyph as <symbol>+<use xlink:href>; inline
+    // those into plain <g>+<path> before sanitisation, since the W3C
+    // safe baseline strips <use> wholesale.
+    Ok(inline_uses::inline_uses(&svg))
+}
+
+/// Wrap user source in a tiny preamble so the page sizes to its content
+/// instead of printing on a blank A4. Hard-coded because there is no
+/// per-block configuration surface yet.
+fn wrap_with_preamble(source: &str) -> String {
+    let mut out = String::with_capacity(source.len() + 96);
+    out.push_str(
+        "#set page(width: auto, height: auto, margin: 0.5em, fill: none)\n\
+         #set text(size: 11pt)\n",
+    );
+    out.push_str(source);
+    out
+}
+
+fn format_diagnostics<W: typst::World>(
+    diags: &ecow::EcoVec<typst::diag::SourceDiagnostic>,
+    world: &W,
+) -> String {
+    let mut s = String::new();
+    for (idx, diag) in diags.iter().enumerate() {
+        if idx > 0 {
+            s.push('\n');
+        }
+        s.push_str(&diag.message);
+        if let Some(id) = diag.span.id() {
+            if let Ok(source) = world.source(id) {
+                if let Some(range) = world.range(diag.span) {
+                    if let Some((line, col)) = source.lines().byte_to_line_column(range.start) {
+                        s.push_str(&format!(" (line {}, col {})", line + 1, col + 1));
+                    }
+                }
+            }
+        }
+        for hint in &diag.hints {
+            s.push_str("\n  hint: ");
+            s.push_str(hint);
+        }
+    }
+    s
+}
+
+fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        return (*s).to_owned();
+    }
+    if let Some(s) = payload.downcast_ref::<String>() {
+        return s.clone();
+    }
+    String::new()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oversize_input_rejected() {
+        let huge = "a".repeat(MAX_TYPST_BYTES + 1);
+        let err = render(&huge).unwrap_err();
+        match err {
+            TypstRenderError::InputTooLarge(n) => assert_eq!(n, MAX_TYPST_BYTES + 1),
+            other => panic!("expected InputTooLarge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn benign_source_renders() {
+        let svg = render("= Hello\n\nworld").expect("render ok");
+        assert!(svg.contains("<svg"), "got: {svg}");
+    }
+
+    #[test]
+    fn syntree_renders() {
+        let src = r#"
+#import "@preview/syntree:0.2.1": syntree
+#syntree("[S [NP cat] [VP sat]]")
+"#;
+        let svg = render(src).expect("syntree render ok");
+        assert!(svg.contains("<svg"), "expected svg root, got: {svg}");
+        assert!(
+            svg.contains("<path"),
+            "expected at least one <path> from syntree, got: {svg}"
+        );
+    }
+
+    #[test]
+    fn cetz_renders() {
+        let src = r#"
+#import "@preview/cetz:0.5.0"
+#cetz.canvas({
+  import cetz.draw: *
+  circle((0, 0), radius: 1)
+})
+"#;
+        let svg = render(src).expect("cetz render ok");
+        assert!(svg.contains("<svg"), "got: {svg}");
+        assert!(
+            svg.contains("<path"),
+            "expected path output, got len {}",
+            svg.len()
+        );
+    }
+
+    #[test]
+    fn timeout_fires_with_zero_budget() {
+        let err = render_with_timeout("= Hi", Duration::from_millis(0)).unwrap_err();
+        assert!(matches!(err, TypstRenderError::TimedOut), "got: {err:?}");
+    }
+
+    #[test]
+    fn panic_variant_round_trips_through_display() {
+        let err = TypstRenderError::Panicked("boom".to_owned());
+        let s = format!("{err}");
+        assert!(s.to_lowercase().contains("panic"), "got: {s}");
+        assert!(s.contains("boom"), "got: {s}");
+    }
+
+    #[test]
+    fn malformed_source_returns_failed() {
+        // Unbalanced bracket — typst will reject.
+        let err = render("#let x = (").unwrap_err();
+        assert!(matches!(err, TypstRenderError::Failed(_)), "got: {err:?}");
+    }
+
+    #[test]
+    fn rendered_svg_has_no_use_or_symbol() {
+        // After inline_uses runs, the output must be entirely
+        // <g>+<path> — both `<use>` and `<symbol>` are stripped by the
+        // SVG sanitiser baseline, so leaving them in would erase the
+        // text layer downstream.
+        let src = r#"#import "@preview/syntree:0.2.1": syntree
+#syntree("[S [NP cat]]")"#;
+        let svg = render(src).unwrap();
+        assert!(!svg.contains("<symbol"), "unexpected <symbol> in output");
+        assert!(!svg.contains("<use "), "unexpected <use> in output");
+        assert!(!svg.contains("<use/"), "unexpected <use/> in output");
+        assert!(
+            svg.contains("<path"),
+            "expected <path> elements; got: {}",
+            &svg[..svg.len().min(200)]
+        );
+    }
+
+    // adv[verify typst.render.serialise]
+    #[test]
+    fn concurrent_renders_serialize() {
+        let handles: Vec<_> = (0..4)
+            .map(|i| std::thread::spawn(move || render(&format!("= heading-{i}\n\nbody"))))
+            .collect();
+        for h in handles {
+            let svg = h.join().expect("no panic").expect("render ok");
+            assert!(svg.contains("<svg"), "got: {svg}");
+        }
+    }
+}

@@ -208,10 +208,7 @@ pub fn render(markdown: &str, opts: &RenderOptions) -> Result<Document, RenderEr
 }
 
 fn frontmatter_is_default(fm: &Frontmatter) -> bool {
-    fm.title.is_empty()
-        && fm.weight == 0
-        && fm.description.is_none()
-        && fm.template.is_none()
+    fm.title.is_empty() && fm.weight == 0 && fm.description.is_none() && fm.template.is_none()
 }
 
 fn build_html_adapter() -> HtmlAdapter<()> {
@@ -249,10 +246,7 @@ fn collect_metadata(
 
             // Pop any deeper-or-equal-level frames so the stack reflects
             // strictly-shallower ancestors of the current heading.
-            while heading_stack
-                .last()
-                .is_some_and(|(lvl, _)| *lvl >= *level)
-            {
+            while heading_stack.last().is_some_and(|(lvl, _)| *lvl >= *level) {
                 heading_stack.pop();
             }
 
@@ -448,7 +442,9 @@ fn req_raw_text(source: &str, span: &MdSpan, base_offset: usize, p: &ReqPayload)
     // Strip the marker and any leading whitespace after it.
     let marker_rel = p.marker_offset.saturating_sub(abs_start);
     let after_marker = block.get(marker_rel + p.marker_length..).unwrap_or(block);
-    after_marker.trim_start_matches(|c: char| c == ' ' || c == '\t').to_string()
+    after_marker
+        .trim_start_matches(|c: char| c == ' ' || c == '\t')
+        .to_string()
 }
 
 fn render_children_to_html(children: &[Node<TraceyExt>]) -> String {
@@ -485,7 +481,11 @@ fn strip_custom(node: &Node<TraceyExt>) -> Node<()> {
             children: children.iter().map(strip_custom).collect(),
             source: *source,
         },
-        Node::Heading { level, children, source } => Node::Heading {
+        Node::Heading {
+            level,
+            children,
+            source,
+        } => Node::Heading {
             level: *level,
             children: children.iter().map(strip_custom).collect(),
             source: *source,
@@ -511,12 +511,21 @@ fn strip_custom(node: &Node<TraceyExt>) -> Node<()> {
             children: children.iter().map(strip_custom).collect(),
             source: *source,
         },
-        Node::TaskItem { checked, children, source } => Node::TaskItem {
+        Node::TaskItem {
+            checked,
+            children,
+            source,
+        } => Node::TaskItem {
             checked: *checked,
             children: children.iter().map(strip_custom).collect(),
             source: *source,
         },
-        Node::Table { alignments, header, rows, source } => Node::Table {
+        Node::Table {
+            alignments,
+            header,
+            rows,
+            source,
+        } => Node::Table {
             alignments: alignments.clone(),
             header: header.iter().map(strip_custom).collect(),
             rows: rows.iter().map(strip_custom).collect(),
@@ -526,7 +535,12 @@ fn strip_custom(node: &Node<TraceyExt>) -> Node<()> {
             cells: cells.iter().map(strip_custom).collect(),
             source: *source,
         },
-        Node::TableCell { children, header, alignment, source } => Node::TableCell {
+        Node::TableCell {
+            children,
+            header,
+            alignment,
+            source,
+        } => Node::TableCell {
             children: children.iter().map(strip_custom).collect(),
             header: *header,
             alignment: *alignment,
@@ -560,13 +574,23 @@ fn strip_custom(node: &Node<TraceyExt>) -> Node<()> {
             children: children.iter().map(strip_custom).collect(),
             source: *source,
         },
-        Node::Link { destination, title, children, source } => Node::Link {
+        Node::Link {
+            destination,
+            title,
+            children,
+            source,
+        } => Node::Link {
             destination: destination.clone(),
             title: title.clone(),
             children: children.iter().map(strip_custom).collect(),
             source: *source,
         },
-        Node::Image { destination, title, alt, source } => Node::Image {
+        Node::Image {
+            destination,
+            title,
+            alt,
+            source,
+        } => Node::Image {
             destination: destination.clone(),
             title: title.clone(),
             alt: alt.clone(),
@@ -576,7 +600,11 @@ fn strip_custom(node: &Node<TraceyExt>) -> Node<()> {
             code: code.clone(),
             source: *source,
         },
-        Node::CodeBlock { info, literal, source } => Node::CodeBlock {
+        Node::CodeBlock {
+            info,
+            literal,
+            source,
+        } => Node::CodeBlock {
             info: info.clone(),
             literal: literal.clone(),
             source: *source,
@@ -647,7 +675,9 @@ fn strip_custom(node: &Node<TraceyExt>) -> Node<()> {
             children: children.iter().map(strip_custom).collect(),
             source: *source,
         },
-        Node::Custom { children, source, .. } => {
+        Node::Custom {
+            children, source, ..
+        } => {
             // Drop the custom payload; concatenate children as a Document fragment.
             Node::Document {
                 children: children.iter().map(strip_custom).collect(),
@@ -741,7 +771,10 @@ fn replace_reqs_with_html<'a>(
         }
         out.push_str(&handler.end(&req)?);
         let span = *source;
-        *node = Node::Html { html: out, source: span };
+        *node = Node::Html {
+            html: out,
+            source: span,
+        };
         return Ok(());
     }
 

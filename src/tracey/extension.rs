@@ -101,7 +101,11 @@ fn try_convert_to_req<Ext: From<TraceyExt> + Clone>(
     // Blockquote form only: `> :[r:id]\n> body…` or `> :[!r:id]\n> body…`.
     // The leading `:` outside the brackets is the discriminator. Paragraph
     // form is not supported.
-    if let Node::BlockQuote { children, source: span } = node {
+    if let Node::BlockQuote {
+        children,
+        source: span,
+    } = node
+    {
         let abs_start = span.start + base_offset;
         let block_text = &source[abs_start..span.end + base_offset];
         let Some((marker_byte_len, payload)) =
@@ -113,7 +117,10 @@ fn try_convert_to_req<Ext: From<TraceyExt> + Clone>(
         // The marker is inside the first inner Paragraph. Strip it from
         // that paragraph's first Text node.
         if let Some(first_para) = children.first_mut()
-            && let Node::Paragraph { children: para_children, .. } = first_para
+            && let Node::Paragraph {
+                children: para_children,
+                ..
+            } = first_para
         {
             strip_leading_marker_from_inlines(para_children, marker_byte_len);
         }
@@ -165,10 +172,8 @@ fn detect_marker_in_blockquote_block(
     let anchor_id = format!("r--{}", slugify(&id.to_string()));
 
     let marker_offset = abs_start + idx;
-    let line = 1 + block_text[..idx]
-        .bytes()
-        .filter(|&b| b == b'\n')
-        .count()
+    let line = 1
+        + block_text[..idx].bytes().filter(|&b| b == b'\n').count()
         + (abs_start.saturating_sub(0)); // unused; line set by caller below
     let _ = line;
     Some((

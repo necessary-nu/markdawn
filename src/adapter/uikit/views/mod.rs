@@ -6,3 +6,5 @@ pub(crate) mod graphviz;
 pub(crate) mod pikchr;
 pub(crate) mod table;
 pub(crate) mod thematic_break;
+#[cfg(feature = "typst")]
+pub(crate) mod typst;

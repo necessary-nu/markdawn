@@ -49,6 +49,8 @@ pub struct HtmlAdapter<R = ()> {
     pikchr: bool,
     #[cfg(feature = "graphviz")]
     graphviz: bool,
+    #[cfg(feature = "typst")]
+    typst: bool,
 }
 
 impl Default for HtmlAdapter<()> {
@@ -68,6 +70,8 @@ impl HtmlAdapter<()> {
             pikchr: false,
             #[cfg(feature = "graphviz")]
             graphviz: false,
+            #[cfg(feature = "typst")]
+            typst: false,
         }
     }
 
@@ -81,6 +85,8 @@ impl HtmlAdapter<()> {
             pikchr: false,
             #[cfg(feature = "graphviz")]
             graphviz: false,
+            #[cfg(feature = "typst")]
+            typst: false,
         }
     }
 }
@@ -120,6 +126,22 @@ impl<R> HtmlAdapter<R> {
     }
 }
 
+#[cfg(feature = "typst")]
+impl<R> HtmlAdapter<R> {
+    /// Render fenced code blocks tagged with the `typst` info string as
+    /// inline SVG figures by compiling the source through the Typst
+    /// compiler. Parse failures fall back to plain `<pre><code>`.
+    ///
+    /// Useful for syntax/parse trees (via the bundled `syntree` package),
+    /// general drawing (`cetz`), and arbitrary Typst graphics. No
+    /// network access is performed; only packages bundled into the
+    /// binary are reachable.
+    pub fn with_typst(mut self) -> Self {
+        self.typst = true;
+        self
+    }
+}
+
 #[cfg(feature = "graphviz")]
 impl<R> HtmlAdapter<R> {
     /// Render fenced code blocks tagged `dot` or `graphviz` as inline SVG
@@ -141,11 +163,16 @@ impl<R> HtmlAdapter<R> {
         R: RenderHtmlCustom<Ext>,
     {
         match item {
-            StreamItem::Upsert(emission) => Ok(StreamItem::Upsert(Emission {
-                id: emission.id,
-                provisional: emission.provisional,
-                node: self.render_node(&emission.node)?,
-            })),
+            StreamItem::Upsert(mut emission) => {
+                if emission.provisional {
+                    crate::clear_provisional_diagram_info(&mut emission.node);
+                }
+                Ok(StreamItem::Upsert(Emission {
+                    id: emission.id,
+                    provisional: emission.provisional,
+                    node: self.render_node(&emission.node)?,
+                }))
+            }
             StreamItem::Delete { id } => Ok(StreamItem::Delete { id }),
         }
     }
@@ -264,6 +291,33 @@ impl<R> HtmlAdapter<R> {
         _literal: &str,
         _out: &mut String,
     ) -> bool {
+        false
+    }
+
+    /// Returns `true` if the block was compiled as a typst SVG figure.
+    #[cfg(feature = "typst")]
+    fn try_typst_code_block(&self, info: Option<&str>, literal: &str, out: &mut String) -> bool {
+        let lang = info.and_then(|s| s.split_whitespace().next());
+        if !self.typst || lang != Some("typst") {
+            return false;
+        }
+        let Ok(svg) = crate::typst::render(literal) else {
+            return false;
+        };
+        if svg.len() > crate::svg_sanitize::MAX_SVG_BYTES {
+            return false;
+        }
+        let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
+        let final_svg = crate::svg_text_to_paths::text_to_paths(&sanitized);
+        out.push_str(&final_svg);
+        if !final_svg.ends_with('\n') {
+            out.push('\n');
+        }
+        true
+    }
+
+    #[cfg(not(feature = "typst"))]
+    fn try_typst_code_block(&self, _info: Option<&str>, _literal: &str, _out: &mut String) -> bool {
         false
     }
 
@@ -448,6 +502,7 @@ impl<R> HtmlAdapter<R> {
                     write_terminal_block(info.as_deref(), literal, out);
                 } else if !self.try_pikchr_code_block(info.as_deref(), literal, out)
                     && !self.try_graphviz_code_block(info.as_deref(), literal, out)
+                    && !self.try_typst_code_block(info.as_deref(), literal, out)
                     && !self.try_highlight_code_block(info.as_deref(), literal, out)?
                 {
                     match lang {
@@ -879,6 +934,8 @@ impl<S, R> HtmlSink<S, R> {
                 pikchr: false,
                 #[cfg(feature = "graphviz")]
                 graphviz: false,
+                #[cfg(feature = "typst")]
+                typst: false,
             },
         }
     }

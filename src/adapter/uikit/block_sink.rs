@@ -42,6 +42,8 @@ pub struct BlockSink<R = ()> {
     pikchr: bool,
     #[cfg(feature = "graphviz")]
     graphviz: bool,
+    #[cfg(feature = "typst")]
+    typst: bool,
 }
 
 enum Compartment {
@@ -96,6 +98,8 @@ impl BlockSink<()> {
             pikchr: false,
             #[cfg(feature = "graphviz")]
             graphviz: false,
+            #[cfg(feature = "typst")]
+            typst: false,
         }
     }
 }
@@ -116,6 +120,8 @@ impl<R> BlockSink<R> {
             pikchr: false,
             #[cfg(feature = "graphviz")]
             graphviz: false,
+            #[cfg(feature = "typst")]
+            typst: false,
         }
     }
 
@@ -147,6 +153,15 @@ impl<R> BlockSink<R> {
     #[cfg(feature = "graphviz")]
     pub fn with_graphviz(mut self) -> Self {
         self.graphviz = true;
+        self
+    }
+
+    /// Render fenced code blocks tagged `typst` as vector image figures
+    /// by compiling the source through the bundled Typst compiler.
+    /// Compile failures fall back to the regular code-block view.
+    #[cfg(feature = "typst")]
+    pub fn with_typst(mut self) -> Self {
+        self.typst = true;
         self
     }
 
@@ -350,15 +365,29 @@ impl<R> BlockSink<R> {
                 (v, Some(h))
             }
             Node::CodeBlock { info, literal, .. } => {
+                // Skip diagram dispatch on a provisional (mid-stream,
+                // unclosed-fence) code block — feeding partial source
+                // to the engine just produces repeated syntax errors
+                // until the closing fence arrives.
                 #[cfg(feature = "pikchr")]
-                if self.pikchr && info.as_deref() == Some("pikchr") {
+                if !provisional && self.pikchr && info.as_deref() == Some("pikchr") {
                     if let Some(view) = pikchr::try_build_pikchr_view(literal, self.mtm) {
                         return Ok((view, None));
                     }
                 }
                 #[cfg(feature = "graphviz")]
-                if self.graphviz && matches!(info.as_deref(), Some("dot") | Some("graphviz")) {
+                if !provisional
+                    && self.graphviz
+                    && matches!(info.as_deref(), Some("dot") | Some("graphviz"))
+                {
                     if let Some(view) = graphviz::try_build_graphviz_view(literal, self.mtm) {
+                        return Ok((view, None));
+                    }
+                }
+                #[cfg(feature = "typst")]
+                if !provisional && self.typst && info.as_deref() == Some("typst") {
+                    if let Some(view) = super::views::typst::try_build_typst_view(literal, self.mtm)
+                    {
                         return Ok((view, None));
                     }
                 }
