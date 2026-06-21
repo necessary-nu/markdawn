@@ -1,0 +1,28 @@
+[package]
+name = "markdawn-wasm-bindgen"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+# Recent rustc emits post-MVP wasm features (bulk-memory,
+# nontrapping-float-to-int, sign-ext, …) by default. wasm-opt rejects
+# those unless enabled, so run it with all features on (`-all`).
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '-all']
+
+[dependencies]
+# No diagram engines in core. pikchr and typst (and the diagram fonts
+# their SVG text-outlining pulls in) are separately-built, lazily-loaded
+# wasm modules (crates/markdawn-wasm-{pikchr,typst}). Diagram code blocks
+# arrive as plain `<pre><code class="language-…">`; the frontend swaps in
+# rendered SVG on demand. graphviz needs libc (emscripten only).
+markdawn = { path = "../..", default-features = false, features = [
+    "serde",
+] }
+wasm-bindgen = "0.2"
+indexmap = "2"
+serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"

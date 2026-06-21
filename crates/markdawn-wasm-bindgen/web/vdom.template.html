@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>markdawn — Preact (vdom) target</title>
+<!-- Arborium IIFE: lazy-loads per-language tree-sitter grammars the
+     first time it sees a `<code class="language-X">`. The vdom target
+     emits plain code-block vnodes (no server highlighting by default),
+     so the same client-side pass applies. -->
+<script src="https://cdn.jsdelivr.net/npm/@arborium/arborium@1/dist/arborium.iife.js" data-manual></script>
+<style>
+  :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
+  body { margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+  header { padding: 0.75rem 1rem; border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  header h1 { font-size: 1rem; margin: 0; }
+  header .status { font-family: ui-monospace, monospace; font-size: 0.8rem; opacity: 0.7; }
+  header button { font: inherit; font-size: 0.8rem; padding: 0.2rem 0.6rem; }
+  main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+  textarea, .preview { padding: 1rem; overflow: auto; border: 0; }
+  textarea { font-family: ui-monospace, monospace; font-size: 0.95rem; resize: none; outline: 0; border-right: 1px solid color-mix(in srgb, currentColor 20%, transparent); background: transparent; color: inherit; }
+  .preview { line-height: 1.45; background: #fafafa; color: #1a1a1a; color-scheme: light; }
+  .preview pre { background: #efefef; padding: 0.75rem; border-radius: 4px; overflow-x: auto; }
+  .preview code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+  .preview a { color: #0a58ca; }
+</style>
+</head>
+<body>
+<header>
+  <h1>markdawn — Preact (vdom) target</h1>
+  <button id="stream">▶ Simulate stream</button>
+  <span class="status" id="status">loading…</span>
+</header>
+<main>
+  <textarea id="src" spellcheck="false">{{SAMPLE}}</textarea>
+  <div class="preview" id="preview"></div>
+</main>
+
+<script type="module">
+import init, {
+  parseToVdom,
+  VdomParser,
+  VdomDocument,
+} from "./markdawn_wasm_bindgen.js";
+import { renderMarkdown, BlockStore } from "./preact.js";
+
+await init();
+
+const $src = document.getElementById("src");
+const $preview = document.getElementById("preview");
+const $status = document.getElementById("status");
+const $stream = document.getElementById("stream");
+
+// Playground passes raw HTML through unfiltered so `<div>`/`<details>`
+// etc. render. Production callers should omit this (defaults to the
+// `safe()` sanitizer) or pass `{ rawHtml: "safe" }`.
+const OPTS = { rawHtml: "unrestricted" };
+
+// --- Live editor (VdomDocument → keyed per-block reconciliation) ---
+const doc = new VdomDocument(OPTS);
+const store = new BlockStore();
+let streaming = false;
+
+function editorUpdate() {
+  const t0 = performance.now();
+  doc.setSource($src.value);
+  store.apply(doc.takeEvents());
+  store.renderTo($preview);
+  window.arborium?.highlightAll?.($preview);
+  const ms = (performance.now() - t0).toFixed(2);
+  $status.textContent = `${$src.value.length} chars · ${ms} ms · ${store.blocks.size} blocks (VdomDocument)`;
+}
+
+$src.addEventListener("input", () => {
+  if (streaming) return;
+  editorUpdate();
+});
+
+// --- Streaming (VdomParser ← chunked input, e.g. an LLM response) ---
+$stream.addEventListener("click", () => {
+  if (streaming) return;
+  streaming = true;
+  // Chunk by CODE POINTS, not UTF-16 code units. `String.slice` cuts on
+  // code units, which would split a surrogate pair (astral chars like
+  // Linear A, emoji) and hand wasm-bindgen a lone surrogate → U+FFFD.
+  // `Array.from` is surrogate-pair-aware, so chunk boundaries are clean.
+  const chars = Array.from($src.value);
+  const parser = new VdomParser(OPTS);
+  const streamStore = new BlockStore();
+  let i = 0;
+  const CHUNK = 12;
+  const timer = setInterval(() => {
+    if (i >= chars.length) {
+      parser.finish();
+      streamStore.apply(parser.takeEvents());
+      streamStore.renderTo($preview);
+      window.arborium?.highlightAll?.($preview);
+      clearInterval(timer);
+      streaming = false;
+      $status.textContent = `streamed ${chars.length} chars · ${streamStore.blocks.size} blocks (VdomParser)`;
+      return;
+    }
+    parser.pushStr(chars.slice(i, i + CHUNK).join(""));
+    i += CHUNK;
+    streamStore.apply(parser.takeEvents());
+    streamStore.renderTo($preview);
+    $status.textContent = `streaming… ${i}/${chars.length} chars · ${streamStore.blocks.size} blocks`;
+  }, 30);
+});
+
+// Initial render exercises the one-shot static path too.
+renderMarkdown(parseToVdom, $src.value, $preview, OPTS);
+window.arborium?.highlightAll?.($preview);
+editorUpdate();
+
+// Console playground.
+Object.assign(globalThis, { parseToVdom, VdomParser, VdomDocument, doc, store });
+console.log("vdom target ready: try parseToVdom('# hi') or new VdomParser()");
+</script>
+</body>
+</html>

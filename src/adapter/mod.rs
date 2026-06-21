@@ -2,6 +2,7 @@
 pub mod ansi;
 #[cfg(feature = "dioxus")]
 pub mod dioxus;
+pub(crate) mod escape;
 pub mod html;
 #[cfg(feature = "iced")]
 pub mod iced;
@@ -9,6 +10,7 @@ pub mod iced;
 pub mod typst;
 #[cfg(target_os = "ios")]
 pub mod uikit;
+pub mod vdom;
 
 #[cfg(feature = "ansi")]
 pub use self::ansi::{

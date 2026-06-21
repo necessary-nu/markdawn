@@ -1,19 +1,33 @@
 [workspace]
 members = ["crates/*"]
 
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
 [package]
 name = "markdawn"
 version = "0.1.0"
 edition = "2024"
 
 [features]
+default = ["highlight-all-languages"]
 dioxus = ["dep:dioxus", "dep:dioxus-core"]
 highlight = ["dep:arborium"]
+# Convenience superset of `highlight` that pulls every tree-sitter
+# parser arborium ships. On `default`, so native consumers get a
+# fully-stocked highlighter without thinking about it. Wasm builds
+# should set `default-features = false` and curate via a direct
+# `arborium` dep — `all-languages` adds ~100 MB of static data.
+highlight-all-languages = ["highlight", "arborium/all-languages"]
 pikchr = ["dep:pikru", "dep:facet-dessert", "dep:facet-reflect", "dep:facet-path"]
 graphviz = ["dep:markdawn-graphviz"]
 typst = [
     "dep:typst",
     "dep:typst-svg",
+    "dep:typst-pdf",
     "dep:typst-library",
     "dep:typst-syntax",
     "dep:typst-assets",
@@ -23,11 +37,16 @@ typst = [
 ]
 ansi = ["dep:vte", "dep:strip-ansi-escapes"]
 terminal = ["ansi", "dep:vt100"]
+# Derive `serde::Serialize` for the `vdom` VNode tree so it can be
+# handed to a JS frontend (e.g. via serde-wasm-bindgen). The canonical
+# vdom renderer itself is always available; this only adds the
+# serialization impls.
+serde = ["dep:serde"]
 tracey = ["dep:serde", "dep:serde_yaml", "dep:toml"]
 iced = ["dep:iced", "dep:iced_runtime", "dep:iced_graphics"]
 
 [dependencies]
-arborium = { path = "../arborium/crates/arborium", optional = true, features = ["all-languages"] }
+arborium = { path = "../arborium/crates/arborium", optional = true, default-features = false }
 base64 = "0.22"
 dioxus = { version = "0.7", optional = true, default-features = false, features = ["lib"] }
 dioxus-core = { version = "0.7", optional = true }
@@ -43,6 +62,7 @@ pikru = { path = "../pikru", optional = true }
 markdawn-graphviz = { path = "crates/markdawn-graphviz", optional = true }
 typst = { version = "0.14", optional = true }
 typst-svg = { version = "0.14", optional = true }
+typst-pdf = { version = "0.14", optional = true }
 typst-library = { version = "0.14", optional = true }
 typst-syntax = { version = "0.14", optional = true }
 typst-assets = { version = "0.14", optional = true, features = ["fonts"] }
@@ -62,6 +82,7 @@ iced_graphics = { version = "0.14", optional = true }
 
 [dev-dependencies]
 dioxus-ssr = "0.7"
+serde_json = "1"
 
 [[example]]
 name = "ssg_blog"

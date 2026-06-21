@@ -12,7 +12,7 @@ mod html_filter;
 mod node;
 mod parser;
 #[cfg(feature = "pikchr")]
-mod pikchr_render;
+pub mod pikchr_render;
 mod serializer;
 mod sink;
 #[cfg(any(feature = "graphviz", feature = "pikchr", feature = "typst"))]
@@ -24,7 +24,7 @@ mod terminal;
 #[cfg(feature = "tracey")]
 pub mod tracey;
 #[cfg(feature = "typst")]
-mod typst;
+pub mod typst;
 mod url;
 mod url_safety;
 
@@ -50,6 +50,9 @@ pub use crate::adapter::iced::selected_text;
 pub use crate::adapter::typst::TypstWalker;
 #[cfg(target_os = "ios")]
 pub use crate::adapter::uikit::cancel_image_load;
+pub use crate::adapter::vdom::{
+    AttrVal, Props, RenderVdomCustom, VNode, VdomAdapter, VdomError, VdomSink,
+};
 #[cfg(feature = "ansi")]
 pub use crate::adapter::{
     AnsiAdapter, AnsiError, AnsiOptions, AnsiSink, AnsiWalker, ColorDepth, RenderAnsiCustom,
@@ -156,4 +159,42 @@ fn fenced_code_block_is_closed(slice: &str) -> bool {
         let count = trimmed.chars().take_while(|&c| c == marker).count();
         count >= opener_count && trimmed[count..].chars().all(|c| c.is_whitespace())
     })
+}
+
+/// Sanitize + outline a freshly-rendered diagram SVG: drops scripts and
+/// disallowed refs, then converts `<text>` to `<path>` against the
+/// bundled fonts. `None` if the SVG exceeds the size cap. This is the
+/// shared tail of every diagram engine; the per-engine `render_*_to_svg`
+/// helpers below and the HTML/vdom adapters all funnel through it.
+#[cfg(any(feature = "pikchr", feature = "graphviz", feature = "typst"))]
+fn finalize_diagram_svg(svg: String) -> Option<String> {
+    if svg.len() > svg_sanitize::MAX_SVG_BYTES {
+        return None;
+    }
+    Some(svg_text_to_paths::text_to_paths(
+        &svg_sanitize::sanitize_svg(&svg),
+    ))
+}
+
+/// Render a `pikchr` diagram source to a sanitized, font-outlined SVG —
+/// the exact pipeline used for inline `pikchr` code blocks. `None` on
+/// parse failure or oversize output. Exposed so out-of-core renderers
+/// (e.g. a lazily-loaded wasm module) produce byte-identical output.
+#[cfg(feature = "pikchr")]
+pub fn render_pikchr_to_svg(source: &str) -> Option<String> {
+    finalize_diagram_svg(pikchr_render::render(source).ok()?)
+}
+
+/// Render a `dot`/`graphviz` source to a sanitized, font-outlined SVG.
+/// See [`render_pikchr_to_svg`].
+#[cfg(feature = "graphviz")]
+pub fn render_graphviz_to_svg(source: &str) -> Option<String> {
+    finalize_diagram_svg(markdawn_graphviz::render_dot_to_svg(source).ok()?)
+}
+
+/// Compile a `typst` source to a sanitized, font-outlined SVG figure.
+/// See [`render_pikchr_to_svg`].
+#[cfg(feature = "typst")]
+pub fn render_typst_to_svg(source: &str) -> Option<String> {
+    finalize_diagram_svg(typst::render(source).ok()?)
 }
