@@ -1,0 +1,8 @@
+.gradle/
+build/
+local.properties
+.idea/
+.kotlin/
+
+# Native libraries produced by ../crates/markdawn-android/build-android.sh
+**/jniLibs/

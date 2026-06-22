@@ -4598,6 +4598,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "markdawn-android"
+version = "0.1.0"
+dependencies = [
+ "indexmap",
+ "jni 0.21.1",
+ "libc",
+ "markdawn",
+ "serde",
+ "serde_json",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "markdawn-graphviz"
 version = "0.1.0"
 dependencies = [
