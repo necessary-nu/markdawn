@@ -1,1 +1,9 @@
 /target
+
+# Generated per-language Swift plugin crates (one cdylib per tree-sitter
+# grammar). Rebuild with crates/markdawn-swift/generate-plugins.sh.
+/crates/markdawn-swift-lang-*/
+
+# Swift build output (produced by crates/markdawn-swift/build-xcframework.sh)
+/crates/markdawn-swift/*.xcframework/
+/crates/markdawn-swift/build/
