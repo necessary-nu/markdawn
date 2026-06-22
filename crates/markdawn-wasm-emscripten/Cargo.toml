@@ -1,0 +1,12 @@
+[package]
+name = "markdawn-wasm-emscripten"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+# Pure-Rust core. Diagram engines (graphviz, typst, pikchr) and
+# syntax highlighting are lazy-loaded as separate wasm modules at
+# runtime — see `web/index.template.html`.
+markdawn = { path = "../..", default-features = false }
+indexmap = "2"

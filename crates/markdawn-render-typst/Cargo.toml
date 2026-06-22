@@ -1,0 +1,8 @@
+[package]
+name = "markdawn-render-typst"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+markdawn = { path = "../..", default-features = false, features = ["typst"] }

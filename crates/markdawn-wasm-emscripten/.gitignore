@@ -1,0 +1,9 @@
+web/markdawn_wasm_emscripten.js
+web/markdawn_wasm_emscripten.wasm
+web/markdawn_render_graphviz.js
+web/markdawn_render_graphviz.wasm
+web/markdawn_render_typst.js
+web/markdawn_render_typst.wasm
+web/markdawn_render_pikchr.js
+web/markdawn_render_pikchr.wasm
+web/index.html

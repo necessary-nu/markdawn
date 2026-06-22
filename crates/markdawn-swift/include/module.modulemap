@@ -1,0 +1,4 @@
+module MarkdawnFFI {
+  header "markdawn.h"
+  export *
+}

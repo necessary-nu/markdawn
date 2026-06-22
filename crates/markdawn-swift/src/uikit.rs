@@ -1,0 +1,157 @@
+//! UIKit ABI for driving the markdawn streaming parser from Swift / C.
+//!
+//! Returns live Objective-C objects (a managed `UIStackView` of compartments,
+//! optionally a flattened `NSAttributedString`) instead of HTML strings.
+//!
+//! `mw_uikit_state_new` must be called on the main thread — it returns NULL
+//! otherwise. All other functions are thread-safe in the sense that they
+//! can be called from the main thread; calling them from other threads is
+//! undefined behaviour (the underlying UIKit objects aren't thread-safe).
+
+use std::ffi::c_void;
+
+use objc2::MainThreadMarker;
+use objc2::Message;
+use objc2::rc::Retained;
+use objc2_ui_kit::UIStackView;
+
+use markdawn::arborium::Highlighter;
+use markdawn::{BlockSink, Parser, UIKitError};
+
+use crate::grammar_store::global_store;
+
+pub struct UIKitState {
+    parser: Parser<()>,
+    sink: BlockSink<()>,
+    pending: Vec<u8>,
+}
+
+impl UIKitState {
+    fn new(mtm: MainThreadMarker) -> Self {
+        // Highlighter consults the process-global store, which is populated at
+        // runtime by `mw_lang_*_init` plugins (see crate::grammar_store).
+        // Languages not registered fall through to plain monospace rendering.
+        let sink =
+            BlockSink::new(mtm).with_highlighter(Highlighter::with_store(global_store().clone()));
+        Self {
+            parser: Parser::builder().with_all().build(),
+            sink,
+            pending: Vec::new(),
+        }
+    }
+
+    fn push_bytes(&mut self, bytes: &[u8]) -> Result<(), ()> {
+        self.pending.extend_from_slice(bytes);
+        let valid_len = match std::str::from_utf8(&self.pending) {
+            Ok(_) => self.pending.len(),
+            Err(e) => e.valid_up_to(),
+        };
+        if valid_len == 0 {
+            return Ok(());
+        }
+        let chunk = unsafe { std::str::from_utf8_unchecked(&self.pending[..valid_len]) }.to_owned();
+        self.pending.drain(..valid_len);
+        self.parser
+            .push_str(&chunk, &mut self.sink)
+            .map_err(|_: markdawn::StreamError<UIKitError>| ())
+    }
+
+    fn finish(&mut self) -> Result<(), ()> {
+        if !self.pending.is_empty() {
+            if let Ok(s) = std::str::from_utf8(&self.pending) {
+                let owned = s.to_owned();
+                self.pending.clear();
+                if self.parser.push_str(&owned, &mut self.sink).is_err() {
+                    return Err(());
+                }
+            } else {
+                self.pending.clear();
+            }
+        }
+        self.parser.finish(&mut self.sink).map_err(|_| ())
+    }
+}
+
+/// Allocate a new UIKit-renderer state on the main thread.
+///
+/// Returns NULL if called off the main thread.
+#[unsafe(no_mangle)]
+pub extern "C" fn mw_uikit_state_new() -> *mut UIKitState {
+    let Some(mtm) = MainThreadMarker::new() else {
+        return core::ptr::null_mut();
+    };
+    Box::into_raw(Box::new(UIKitState::new(mtm)))
+}
+
+/// # Safety
+/// `state` must be a pointer returned by `mw_uikit_state_new`. `ptr` must
+/// point to `len` readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mw_uikit_state_push_chunk(
+    state: *mut UIKitState,
+    ptr: *const u8,
+    len: usize,
+) -> u32 {
+    if state.is_null() || (ptr.is_null() && len > 0) {
+        return 1;
+    }
+    let bytes = if len == 0 {
+        &[][..]
+    } else {
+        unsafe { core::slice::from_raw_parts(ptr, len) }
+    };
+    let s = unsafe { &mut *state };
+    if s.push_bytes(bytes).is_ok() { 0 } else { 1 }
+}
+
+/// # Safety
+/// `state` must be a pointer returned by `mw_uikit_state_new`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mw_uikit_state_finish(state: *mut UIKitState) -> u32 {
+    if state.is_null() {
+        return 1;
+    }
+    let s = unsafe { &mut *state };
+    if s.finish().is_ok() { 0 } else { 1 }
+}
+
+/// Returns a +1 retained `UIStackView*`. The caller takes ownership; in Swift
+/// use `Unmanaged.fromOpaque(ptr).takeRetainedValue()`. The sink keeps its own
+/// reference for continued in-place updates, so embedding the returned view in
+/// a hierarchy and continuing to push chunks both work.
+///
+/// # Safety
+/// `state` must be a pointer returned by `mw_uikit_state_new`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mw_uikit_state_stack_view(state: *const UIKitState) -> *mut c_void {
+    if state.is_null() {
+        return core::ptr::null_mut();
+    }
+    let s = unsafe { &*state };
+    let retained: Retained<UIStackView> = s.sink.stack_view().retain();
+    Retained::into_raw(retained).cast()
+}
+
+/// Returns a +1 retained `NSAttributedString*` snapshot of the whole document.
+/// Useful for putting the rendered text into a single UILabel/UITextView.
+///
+/// # Safety
+/// `state` must be a pointer returned by `mw_uikit_state_new`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mw_uikit_state_attributed_text(state: *const UIKitState) -> *mut c_void {
+    if state.is_null() {
+        return core::ptr::null_mut();
+    }
+    let s = unsafe { &*state };
+    Retained::into_raw(s.sink.attributed_text()).cast()
+}
+
+/// # Safety
+/// `state` must be a pointer returned by `mw_uikit_state_new` and not yet freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mw_uikit_state_free(state: *mut UIKitState) {
+    if state.is_null() {
+        return;
+    }
+    drop(unsafe { Box::from_raw(state) });
+}

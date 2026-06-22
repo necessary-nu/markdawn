@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>markdawn — streaming wasm demo</title>
+<!-- Arborium IIFE: lazy-loads per-language tree-sitter grammars from
+     jsDelivr the first time it sees a `<code class="language-X">`.
+     `data-manual` so it doesn't try to highlight on DOMContentLoaded
+     before the wasm has produced any output. -->
+<script src="https://cdn.jsdelivr.net/npm/@arborium/arborium@1/dist/arborium.iife.js" data-manual></script>
+<style>
+  :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
+  body { margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+  header { padding: 0.75rem 1rem; border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  header h1 { font-size: 1rem; margin: 0; }
+  header button { font: inherit; padding: 0.25rem 0.75rem; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); border-radius: 4px; background: color-mix(in srgb, currentColor 5%, transparent); color: inherit; cursor: pointer; }
+  header button:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+  header button[disabled] { opacity: 0.5; cursor: progress; }
+  header .status { font-family: ui-monospace, monospace; font-size: 0.8rem; opacity: 0.7; }
+  main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+  textarea, .preview { padding: 1rem; overflow: auto; border: 0; }
+  textarea { font-family: ui-monospace, monospace; font-size: 0.95rem; resize: none; outline: 0; border-right: 1px solid color-mix(in srgb, currentColor 20%, transparent); background: transparent; color: inherit; }
+  .preview { line-height: 1.45; background: #fafafa; color: #1a1a1a; color-scheme: light; }
+  .preview pre { background: #efefef; padding: 0.75rem; border-radius: 4px; overflow-x: auto; }
+  .preview code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+  .preview a { color: #0a58ca; }
+</style>
+</head>
+<body>
+<header>
+  <h1>markdawn — streaming wasm demo</h1>
+  <button id="generate" type="button" disabled>Generate</button>
+  <label style="font-size: 0.85rem; opacity: 0.8;">
+    <input type="checkbox" id="stream"> stream byte-by-byte
+  </label>
+  <span class="status" id="status">loading…</span>
+</header>
+<main>
+  <textarea id="src" spellcheck="false" placeholder="Type markdown here. Click Generate to render.">{{SAMPLE}}</textarea>
+  <div class="preview" id="preview"></div>
+</main>
+
+<script type="module">
+import createMarkdawn from "./markdawn_wasm_emscripten.js";
+
+const Module = await createMarkdawn();
+
+const mwStateNew    = Module.cwrap("mw_state_new",        "number", []);
+const mwPushByte    = Module.cwrap("mw_state_push_byte",  "number", ["number", "number"]);
+const mwPushChunk   = Module.cwrap("mw_state_push_chunk", "number", ["number", "number", "number"]);
+const mwFinish      = Module.cwrap("mw_state_finish",     "number", ["number"]);
+const mwRender      = Module.cwrap("mw_state_render",     "number", ["number"]);
+const mwStateFree   = Module.cwrap("mw_state_free",       null,     ["number"]);
+const mwStringFree  = Module.cwrap("mw_string_free",      null,     ["number"]);
+
+const $src = document.getElementById("src");
+const $preview = document.getElementById("preview");
+const $status = document.getElementById("status");
+
+const encoder = new TextEncoder();
+let state = 0;
+let lastFedBytes = new Uint8Array();
+let currentRun = 0;
+
+function reseed() {
+  if (state) mwStateFree(state);
+  state = mwStateNew();
+  lastFedBytes = new Uint8Array();
+}
+
+// Stream `bytes` through the parser one byte at a time, yielding to
+// the browser between batches so the preview pane visibly updates as
+// the document grows.
+async function feedByteByByteAnimated(bytes, runId) {
+  const BYTES_PER_TICK = 16;
+  for (let i = 0; i < bytes.length; i += BYTES_PER_TICK) {
+    if (runId !== currentRun) return false;
+    const end = Math.min(i + BYTES_PER_TICK, bytes.length);
+    for (let j = i; j < end; j++) {
+      if (mwPushByte(state, bytes[j]) !== 0) {
+        $status.textContent = "parser rejected input (cap exceeded?)";
+        return false;
+      }
+    }
+    $preview.innerHTML = renderHtml();
+    highlightPreview();
+    renderDiagrams();
+    const fromBottom = $preview.scrollHeight - $preview.scrollTop - $preview.clientHeight;
+    if (fromBottom < $preview.clientHeight) {
+      $preview.scrollTop = $preview.scrollHeight;
+    }
+    $status.textContent = `byte-stream · ${end} / ${bytes.length} B`;
+    await new Promise(r => requestAnimationFrame(r));
+  }
+  return true;
+}
+
+function feedBulk(bytes) {
+  if (bytes.length === 0) return true;
+  const ptr = Module._malloc(bytes.length);
+  Module.HEAPU8.set(bytes, ptr);
+  const rc = mwPushChunk(state, ptr, bytes.length);
+  Module._free(ptr);
+  if (rc !== 0) {
+    $status.textContent = "parser rejected input (cap exceeded?)";
+    return false;
+  }
+  return true;
+}
+
+function renderHtml() {
+  const ptr = mwRender(state);
+  if (!ptr) return "";
+  try {
+    return Module.UTF8ToString(ptr);
+  } finally {
+    mwStringFree(ptr);
+  }
+}
+
+// Trigger arborium's lazy-loading code-block highlighter on the
+// freshly-replaced preview subtree.
+function highlightPreview() {
+  window.arborium?.highlightAll?.($preview);
+}
+
+// Lazy-load + render diagram blocks. Each renderer is its own
+// emscripten module fetched on first encounter, then cached for the
+// life of the page.
+const diagramRenderers = {
+  dot:      { js: "./markdawn_render_graphviz.js", fn: "mw_render_dot" },
+  graphviz: { js: "./markdawn_render_graphviz.js", fn: "mw_render_dot" },
+  typst:    { js: "./markdawn_render_typst.js",    fn: "mw_render_typst" },
+  pikchr:   { js: "./markdawn_render_pikchr.js",   fn: "mw_render_pikchr" },
+};
+const moduleCache = {};
+
+async function loadRenderer(spec) {
+  if (!moduleCache[spec.js]) {
+    moduleCache[spec.js] = (async () => {
+      const mod = await import(spec.js);
+      const M = await mod.default();
+      const render = (source) => {
+        const bytes = new TextEncoder().encode(source);
+        const ptr = M._malloc(bytes.length);
+        M.HEAPU8.set(bytes, ptr);
+        const resultPtr = M.ccall(spec.fn, "number", ["number", "number"], [ptr, bytes.length]);
+        M._free(ptr);
+        if (!resultPtr) return null;
+        try {
+          return M.UTF8ToString(resultPtr);
+        } finally {
+          M.ccall("mw_string_free", null, ["number"], [resultPtr]);
+        }
+      };
+      return { render };
+    })();
+  }
+  return moduleCache[spec.js];
+}
+
+async function renderDiagrams() {
+  // Find every code block whose language matches a renderer and
+  // hasn't been rendered yet. Mark each before kicking off async
+  // work so a re-entrant render pass doesn't double-process.
+  const targets = [];
+  for (const lang of Object.keys(diagramRenderers)) {
+    for (const code of $preview.querySelectorAll(`code.language-${lang}:not([data-mw-rendered])`)) {
+      code.setAttribute("data-mw-rendered", "1");
+      targets.push({ code, lang });
+    }
+  }
+  await Promise.all(targets.map(async ({ code, lang }) => {
+    try {
+      const { render } = await loadRenderer(diagramRenderers[lang]);
+      const svg = render(code.textContent);
+      if (svg) {
+        const wrapper = code.closest("pre") ?? code;
+        const span = document.createElement("div");
+        span.className = `markdawn-diagram markdawn-diagram-${lang}`;
+        span.innerHTML = svg;
+        wrapper.replaceWith(span);
+      }
+    } catch (e) {
+      console.warn(`markdawn: ${lang} render failed`, e);
+    }
+  }));
+}
+
+function commonPrefixLen(a, b) {
+  const n = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < n && a[i] === b[i]) i++;
+  return i;
+}
+
+// Render the current textarea contents on demand. The user controls
+// when to spend cycles via the Generate button — there's no implicit
+// re-render on input. Rebuilds the parser state from scratch each
+// time (simpler than diffing, and the renderer is fast enough for
+// realistic documents that the saving doesn't matter).
+async function generate() {
+  const runId = ++currentRun;
+  const $btn = document.getElementById("generate");
+  $btn.disabled = true;
+  $btn.textContent = "Rendering…";
+  // Yield once so the disabled state paints before we go burn CPU.
+  await new Promise(r => requestAnimationFrame(r));
+  const t0 = performance.now();
+  const bytes = encoder.encode($src.value);
+  reseed();
+  const useStream = document.getElementById("stream").checked;
+  const ok = useStream
+    ? await feedByteByByteAnimated(bytes, runId)
+    : feedBulk(bytes);
+  if (runId !== currentRun) return; // a newer run took over
+  if (!ok) {
+    $btn.disabled = false;
+    $btn.textContent = "Generate";
+    return;
+  }
+  // Flush trailing state so the final block emits as final.
+  mwFinish(state);
+  lastFedBytes = bytes;
+  $preview.innerHTML = renderHtml();
+  highlightPreview();
+  renderDiagrams();
+  const ms = (performance.now() - t0).toFixed(1);
+  const mode = useStream ? `byte-stream` : `bulk`;
+  $status.textContent = `${bytes.length} B · ${mode} · ${ms} ms`;
+  $btn.disabled = false;
+  $btn.textContent = "Generate";
+}
+
+reseed();
+const $btn = document.getElementById("generate");
+$btn.disabled = false;
+$btn.textContent = "Generate";
+$btn.addEventListener("click", generate);
+// Render the pre-filled sample once on load.
+generate();
+</script>
+</body>
+</html>
