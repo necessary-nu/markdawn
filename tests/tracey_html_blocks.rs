@@ -1,4 +1,4 @@
-use markdawn::{HtmlAdapter, Parser, StreamItem, VecSink};
+use markdawn::{HtmlAdapter, HtmlFilter, Parser, StreamItem, VecSink};
 
 fn render_html(input: &str) -> String {
     let mut parser = Parser::<()>::builder().with_gfm().with_math().build();
@@ -6,7 +6,11 @@ fn render_html(input: &str) -> String {
     parser.push_str(input, &mut sink).unwrap();
     parser.finish(&mut sink).unwrap();
 
-    let adapter = HtmlAdapter::new();
+    // These cases verify GFM HTML-*block* parsing (where blocks start and
+    // end). GFM renders raw HTML verbatim, so observe the parse with the
+    // unrestricted filter — the default `safe()` sanitizer would rewrite
+    // doctypes/CDATA/PIs and obscure what's being tested.
+    let adapter = HtmlAdapter::new().with_html_filter(HtmlFilter::unrestricted());
     let mut order = Vec::new();
     let mut values = Vec::<(u64, String)>::new();
 

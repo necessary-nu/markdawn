@@ -68,6 +68,7 @@ int markdawn_gv_render_svg(const char *dot,
  * callers who run this inside heavily-threaded programs with
  * unusual allocators should prefer the non-forking entry point.
  */
+#ifndef MARKDAWN_GV_NO_FORK
 int markdawn_gv_render_svg_forked(const char *dot,
                                   char **out_svg,
                                   size_t *out_len,
@@ -79,6 +80,7 @@ int markdawn_gv_render_svg_forked(const char *dot,
                                   uint64_t *out_parse_ms,
                                   uint64_t *out_layout_ms,
                                   uint64_t *out_render_ms);
+#endif
 
 /*
  * Force libgraphviz plugin load + Objective-C `+initialize` in the

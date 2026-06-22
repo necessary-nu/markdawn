@@ -81,26 +81,37 @@ pub fn render_with_timeout(source: &str, timeout: Duration) -> Result<String, Pi
     }
 
     let owned = source.to_owned();
-    let (tx, rx) =
-        mpsc::channel::<Result<Result<String, PikchrError>, Box<dyn std::any::Any + Send>>>();
 
-    // adv[impl pikchr.render.timeout]
-    // adv[impl pikchr.render.panic-capture]
-    std::thread::Builder::new()
-        .stack_size(RENDER_STACK_BYTES)
-        .name("markdawn-pikchr-render".to_owned())
-        .spawn(move || {
-            let result =
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_inner(&owned)));
-            let _ = tx.send(result);
-        })
-        .map_err(|e| PikchrError::ThreadSpawn(e.to_string()))?;
+    // wasm has no real threads — call render_inner directly.
+    #[cfg(target_family = "wasm")]
+    {
+        let _ = timeout;
+        return render_inner(&owned);
+    }
 
-    match rx.recv_timeout(timeout) {
-        Ok(Ok(result)) => result,
-        Ok(Err(panic_payload)) => Err(PikchrError::Panicked(panic_message(&panic_payload))),
-        Err(mpsc::RecvTimeoutError::Timeout) => Err(PikchrError::TimedOut),
-        Err(mpsc::RecvTimeoutError::Disconnected) => Err(PikchrError::Panicked(String::new())),
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let (tx, rx) =
+            mpsc::channel::<Result<Result<String, PikchrError>, Box<dyn std::any::Any + Send>>>();
+
+        // adv[impl pikchr.render.timeout]
+        // adv[impl pikchr.render.panic-capture]
+        std::thread::Builder::new()
+            .stack_size(RENDER_STACK_BYTES)
+            .name("markdawn-pikchr-render".to_owned())
+            .spawn(move || {
+                let result =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_inner(&owned)));
+                let _ = tx.send(result);
+            })
+            .map_err(|e| PikchrError::ThreadSpawn(e.to_string()))?;
+
+        match rx.recv_timeout(timeout) {
+            Ok(Ok(result)) => result,
+            Ok(Err(panic_payload)) => Err(PikchrError::Panicked(panic_message(&panic_payload))),
+            Err(mpsc::RecvTimeoutError::Timeout) => Err(PikchrError::TimedOut),
+            Err(mpsc::RecvTimeoutError::Disconnected) => Err(PikchrError::Panicked(String::new())),
+        }
     }
 }
 

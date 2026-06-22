@@ -20,12 +20,23 @@ use typst::layout::{Abs, PagedDocument};
 use self::world::RenderWorld;
 
 /// Reject typst source larger than this many bytes before invoking the
-/// compiler. Same cap as pikchr — large enough for realistic diagrams,
-/// small enough that pathological inputs fail fast.
+/// compiler for **SVG** rendering. Sized for diagram-fence usage —
+/// large enough for realistic diagrams, small enough that pathological
+/// inputs fail fast. Mirrors pikchr.
 pub const MAX_TYPST_BYTES: usize = 256 * 1024;
 
-/// Wall-clock budget for a single typst render. Mirrors pikchr.
+/// Wall-clock budget for a single typst SVG render. Mirrors pikchr.
 pub const TYPST_RENDER_TIMEOUT_SECS: u64 = 10;
+
+/// Reject typst source larger than this many bytes before invoking the
+/// compiler for **PDF** rendering. Sized for whole-document usage
+/// (ebook chapters, articles) which are inherently larger than a
+/// per-fence diagram.
+pub const MAX_TYPST_PDF_BYTES: usize = 8 * 1024 * 1024;
+
+/// Wall-clock budget for a single typst PDF render. Higher than the
+/// SVG budget because PDF compiles a whole document, not one diagram.
+pub const TYPST_PDF_RENDER_TIMEOUT_SECS: u64 = 60;
 
 /// Padding around the merged-page SVG output (in points).
 const SVG_PADDING_PT: f64 = 4.0;
@@ -52,18 +63,14 @@ pub enum TypstRenderError {
 impl fmt::Display for TypstRenderError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InputTooLarge(n) => write!(
-                f,
-                "typst source is {n} bytes, exceeds cap of {MAX_TYPST_BYTES} bytes"
-            ),
+            Self::InputTooLarge(n) => {
+                write!(f, "typst source is {n} bytes, exceeds the configured cap")
+            }
             Self::Failed(msg) if msg.is_empty() => f.write_str("typst render failed"),
             Self::Failed(msg) => write!(f, "typst render failed:\n{msg}"),
             Self::Panicked(msg) if msg.is_empty() => f.write_str("typst render thread panicked"),
             Self::Panicked(msg) => write!(f, "typst render thread panicked: {msg}"),
-            Self::TimedOut => write!(
-                f,
-                "typst render exceeded {TYPST_RENDER_TIMEOUT_SECS}s wall-clock timeout"
-            ),
+            Self::TimedOut => f.write_str("typst render exceeded the wall-clock timeout"),
             Self::ThreadSpawn(msg) => write!(f, "could not spawn typst render thread: {msg}"),
         }
     }
@@ -87,17 +94,84 @@ pub fn render_with_timeout(source: &str, timeout: Duration) -> Result<String, Ty
     }
 
     let owned = wrap_with_preamble(source);
+
+    // wasm has no real threads — `std::thread::spawn` errors on
+    // wasm32-unknown-emscripten without `-pthread` and is a no-op on
+    // wasm32-unknown-unknown. The wasm host is single-threaded and
+    // already sandboxed, so just call render_inner directly. The
+    // pre-flight byte cap remains the line of defence.
+    #[cfg(target_family = "wasm")]
+    {
+        let _ = timeout;
+        return render_inner(owned);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let (tx, rx) = mpsc::channel::<
+            Result<Result<String, TypstRenderError>, Box<dyn std::any::Any + Send>>,
+        >();
+
+        // adv[impl typst.render.timeout]
+        // adv[impl typst.render.panic-capture]
+        std::thread::Builder::new()
+            .stack_size(RENDER_STACK_BYTES)
+            .name("markdawn-typst".to_owned())
+            .spawn(move || {
+                let result =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_inner(owned)));
+                let _ = tx.send(result);
+            })
+            .map_err(|e| TypstRenderError::ThreadSpawn(e.to_string()))?;
+
+        match rx.recv_timeout(timeout) {
+            Ok(Ok(result)) => result,
+            Ok(Err(panic_payload)) => {
+                Err(TypstRenderError::Panicked(panic_message(&panic_payload)))
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => Err(TypstRenderError::TimedOut),
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                Err(TypstRenderError::Panicked(String::new()))
+            }
+        }
+    }
+}
+
+/// Compile a typst source to a PDF byte stream with the default
+/// timeout. Unlike [`render`] (SVG), this path does **not** wrap the
+/// input with a `#set page(width: auto, ...)` preamble — PDF callers
+/// produce whole documents and supply their own `#set page(...)`,
+/// page numbers, TOC, etc.
+///
+/// Designed to replace shelling out to the external `typst compile`
+/// binary in markdown-to-PDF pipelines.
+pub fn render_pdf(source: &str) -> Result<Vec<u8>, TypstRenderError> {
+    render_pdf_with_timeout(source, Duration::from_secs(TYPST_PDF_RENDER_TIMEOUT_SECS))
+}
+
+/// Render a typst source as PDF with a caller-supplied wall-clock
+/// budget. Pre-flight input cap ([`MAX_TYPST_PDF_BYTES`]) is applied
+/// before the timer starts.
+pub fn render_pdf_with_timeout(
+    source: &str,
+    timeout: Duration,
+) -> Result<Vec<u8>, TypstRenderError> {
+    if source.len() > MAX_TYPST_PDF_BYTES {
+        return Err(TypstRenderError::InputTooLarge(source.len()));
+    }
+
+    let owned = source.to_owned();
     let (tx, rx) =
-        mpsc::channel::<Result<Result<String, TypstRenderError>, Box<dyn std::any::Any + Send>>>();
+        mpsc::channel::<Result<Result<Vec<u8>, TypstRenderError>, Box<dyn std::any::Any + Send>>>();
 
     // adv[impl typst.render.timeout]
     // adv[impl typst.render.panic-capture]
     std::thread::Builder::new()
         .stack_size(RENDER_STACK_BYTES)
-        .name("markdawn-typst".to_owned())
+        .name("markdawn-typst-pdf".to_owned())
         .spawn(move || {
             let result =
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_inner(owned)));
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_pdf_inner(owned)));
             let _ = tx.send(result);
         })
         .map_err(|e| TypstRenderError::ThreadSpawn(e.to_string()))?;
@@ -110,18 +184,37 @@ pub fn render_with_timeout(source: &str, timeout: Duration) -> Result<String, Ty
     }
 }
 
-fn render_inner(source: String) -> Result<String, TypstRenderError> {
-    let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+/// Build a `RenderWorld` from `source` and run the typst compiler to
+/// produce a `PagedDocument`. The world is returned alongside the
+/// document so the caller's export step can format diagnostics that
+/// reference source spans.
+///
+/// The caller must hold [`RENDER_LOCK`] for the duration of the
+/// compile, since typst's `comemo` cache is process-wide.
+fn compile_to_paged(source: String) -> Result<(RenderWorld, PagedDocument), TypstRenderError> {
     let world = RenderWorld::new(source);
     let warned = typst::compile::<PagedDocument>(&world);
     let document = warned
         .output
         .map_err(|diags| TypstRenderError::Failed(format_diagnostics(&diags, &world)))?;
+    Ok((world, document))
+}
+
+fn render_inner(source: String) -> Result<String, TypstRenderError> {
+    let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_world, document) = compile_to_paged(source)?;
     let svg = typst_svg::svg_merged(&document, Abs::pt(SVG_PADDING_PT));
     // typst-svg emits every glyph as <symbol>+<use xlink:href>; inline
     // those into plain <g>+<path> before sanitisation, since the W3C
     // safe baseline strips <use> wholesale.
     Ok(inline_uses::inline_uses(&svg))
+}
+
+fn render_pdf_inner(source: String) -> Result<Vec<u8>, TypstRenderError> {
+    let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (world, document) = compile_to_paged(source)?;
+    typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default())
+        .map_err(|diags| TypstRenderError::Failed(format_diagnostics(&diags, &world)))
 }
 
 /// Wrap user source in a tiny preamble so the page sizes to its content
@@ -263,6 +356,53 @@ mod tests {
             svg.contains("<path"),
             "expected <path> elements; got: {}",
             &svg[..svg.len().min(200)]
+        );
+    }
+
+    #[test]
+    fn render_pdf_emits_pdf_header() {
+        let pdf = render_pdf("= Hello\n\nbody").expect("pdf render ok");
+        assert!(
+            pdf.starts_with(b"%PDF-"),
+            "expected %PDF- magic, got first 16 bytes: {:?}",
+            &pdf[..pdf.len().min(16)]
+        );
+    }
+
+    #[test]
+    fn render_pdf_oversize_input_rejected() {
+        let huge = "a".repeat(MAX_TYPST_PDF_BYTES + 1);
+        let err = render_pdf(&huge).unwrap_err();
+        match err {
+            TypstRenderError::InputTooLarge(n) => assert_eq!(n, MAX_TYPST_PDF_BYTES + 1),
+            other => panic!("expected InputTooLarge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn render_pdf_timeout_fires_with_zero_budget() {
+        let err = render_pdf_with_timeout("= Hi", Duration::from_millis(0)).unwrap_err();
+        assert!(matches!(err, TypstRenderError::TimedOut), "got: {err:?}");
+    }
+
+    #[test]
+    fn render_pdf_malformed_source_returns_failed() {
+        let err = render_pdf("#let x = (").unwrap_err();
+        assert!(matches!(err, TypstRenderError::Failed(_)), "got: {err:?}");
+    }
+
+    #[test]
+    fn render_pdf_uses_bundled_packages() {
+        // Proof point for ebook authoring: bundled `@preview/syntree`
+        // is reachable from the PDF path too, not just the SVG path.
+        let src = r#"#import "@preview/syntree:0.2.1": syntree
+#syntree("[S [NP cat] [VP sat]]")"#;
+        let pdf = render_pdf(src).expect("syntree pdf ok");
+        assert!(pdf.starts_with(b"%PDF-"), "missing PDF header");
+        assert!(
+            pdf.len() > 4 * 1024,
+            "expected non-trivial PDF body, got {} bytes",
+            pdf.len()
         );
     }
 

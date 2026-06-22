@@ -175,7 +175,7 @@ impl Perform for HtmlWriter {
 
     fn osc_dispatch(&mut self, params: &[&[u8]], _bell_terminated: bool) {
         // OSC 8 hyperlinks: `ESC ] 8 ; params ; URL ST`.
-        if params.first().map(|p| p.as_ref()) != Some(b"8".as_ref()) {
+        if params.first().map(|p| p.as_ref()) != Some(b"8".as_slice()) {
             return;
         }
         // params = [b"8", <params>, <url>].

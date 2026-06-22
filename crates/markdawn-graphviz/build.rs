@@ -21,6 +21,15 @@ fn main() {
     println!("cargo:rerun-if-env-changed=GRAPHVIZ_LIB_DIR");
     println!("cargo:rerun-if-env-changed=MARKDAWN_GV_USE_SYSTEM");
 
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+    let is_wasm = target_arch == "wasm32" || target_os == "emscripten" || target_os == "wasi";
+    let is_emscripten = target_os == "emscripten";
+    // Mirror the Rust-side cfg gate (lib.rs gates the forked render
+    // path on `cfg(any(target_os = "linux", target_os = "macos"))`).
+    // Everywhere else, compile out the fork()/pipe()/waitpid() shim.
+    let no_fork = !matches!(target_os.as_str(), "linux" | "macos");
+
     let (includes, lib_dirs, link_libs, link_kind) = if env::var_os("MARKDAWN_GV_USE_SYSTEM")
         .is_some()
         || (env::var_os("GRAPHVIZ_INCLUDE_DIR").is_some()
@@ -28,7 +37,7 @@ fn main() {
     {
         resolve_system_graphviz()
     } else {
-        build_vendored_graphviz()
+        build_vendored_graphviz(is_emscripten)
     };
 
     let mut build = cc::Build::new();
@@ -36,7 +45,10 @@ fn main() {
     for inc in &includes {
         build.include(inc);
     }
-    apply_hardening_cflags(&mut build);
+    if no_fork {
+        build.define("MARKDAWN_GV_NO_FORK", None);
+    }
+    apply_hardening_cflags(&mut build, is_wasm);
     build.compile("markdawn_graphviz_wrapper");
 
     for dir in &lib_dirs {
@@ -47,16 +59,16 @@ fn main() {
     }
 
     // Transitive platform libs that graphviz's static build depends on.
-    // Only needed when link_kind == "static".
-    if link_kind == "static" {
+    // Only needed when link_kind == "static" and the host actually
+    // exposes them (skip wasm — emscripten bundles libc/libc++; we
+    // also build graphviz with WITH_ZLIB=OFF there).
+    if link_kind == "static" && !is_wasm {
         // zlib for gvdevice's compressed output streams.
         println!("cargo:rustc-link-lib=dylib=z");
-        #[cfg(target_os = "macos")]
-        {
+        if target_os == "macos" {
             println!("cargo:rustc-link-lib=dylib=c++");
         }
-        #[cfg(target_os = "linux")]
-        {
+        if target_os == "linux" {
             println!("cargo:rustc-link-lib=dylib=m");
             println!("cargo:rustc-link-lib=dylib=dl");
             println!("cargo:rustc-link-lib=dylib=stdc++");
@@ -95,7 +107,9 @@ fn resolve_system_graphviz() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<&'static str>, 
     (includes, lib_dirs, vec!["gvc", "cgraph", "cdt"], "dylib")
 }
 
-fn build_vendored_graphviz() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<&'static str>, &'static str) {
+fn build_vendored_graphviz(
+    is_emscripten: bool,
+) -> (Vec<PathBuf>, Vec<PathBuf>, Vec<&'static str>, &'static str) {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let graphviz_src = manifest_dir.join("vendor/graphviz");
     if !graphviz_src.join("CMakeLists.txt").exists() {
@@ -117,9 +131,22 @@ fn build_vendored_graphviz() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<&'static str>, 
         "flex",
         "install Flex (brew install flex / apt install flex)",
     );
+    if is_emscripten {
+        check_tool(
+            "emcmake",
+            "install Emscripten (brew install emscripten) — needed for cmake → wasm",
+        );
+    }
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let build_dir = out_dir.join("graphviz-build");
+    // Keep the emscripten build dir separate so switching targets doesn't
+    // try to reuse host-cmake CMakeCache.txt (which would force a stale
+    // host clang).
+    let build_dir = if is_emscripten {
+        out_dir.join("graphviz-build-emscripten")
+    } else {
+        out_dir.join("graphviz-build")
+    };
     let install_dir = out_dir.join("graphviz-install");
     std::fs::create_dir_all(&build_dir).expect("mkdir build_dir");
 
@@ -135,16 +162,24 @@ fn build_vendored_graphviz() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<&'static str>, 
     // - ENABLE_*=OFF: no language bindings (Tcl/Java/Python/etc).
     // - BUILD_SHARED_LIBS=OFF: static linking, no dylib loader cost.
     // - use_*_ON: use system flex/bison.
-    let mut cfg = Command::new("cmake");
+    let mut cfg = if is_emscripten {
+        let mut c = Command::new("emcmake");
+        c.arg("cmake");
+        c
+    } else {
+        Command::new("cmake")
+    };
     cfg.arg(&graphviz_src)
         .arg(format!("-DCMAKE_INSTALL_PREFIX={}", install_dir.display()))
         .arg("-DCMAKE_BUILD_TYPE=Release")
         .arg("-DBUILD_SHARED_LIBS=OFF")
         .arg("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
         // Hardened compile flags passed to graphviz's own sources.
+        // On emscripten skip the x86/linux-specific hardening flags;
+        // emcc rejects -fstack-clash-protection / -fcf-protection.
         .arg(format!(
             "-DCMAKE_C_FLAGS_RELEASE={}",
-            hardening_flags().join(" ")
+            portable_hardening_flags(is_emscripten).join(" ")
         ))
         // Minimal plugin set.
         .arg("-DWITH_QUARTZ=OFF")
@@ -170,7 +205,16 @@ fn build_vendored_graphviz() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<&'static str>, 
         .arg("-DWITH_LIBGD=OFF")
         .arg("-DWITH_WEBP=OFF")
         .arg("-DWITH_X=OFF")
-        .arg("-DWITH_ZLIB=ON") // Needed for compressed output paths used internally.
+        // zlib gates compressed output paths (gvdevice). We only emit
+        // uncompressed SVG via gvRenderData("svg"), so we can build
+        // without it. On emscripten the host zlib is invisible to
+        // find_package, so turn it off there. On native we keep it
+        // on for parity with previous behaviour.
+        .arg(if is_emscripten {
+            "-DWITH_ZLIB=OFF"
+        } else {
+            "-DWITH_ZLIB=ON"
+        })
         .arg("-DWITH_GVEDIT=OFF")
         .arg("-DWITH_SMYRNA=OFF")
         // Graphviz uses lowercase names for some options — match
@@ -198,6 +242,14 @@ fn build_vendored_graphviz() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<&'static str>, 
         // Tests and docs off.
         .arg("-DBUILD_TESTING=OFF")
         .arg("-DBUILD_SHARP_GVTEST=OFF");
+
+    if is_emscripten {
+        // Emscripten's libc subsumes libm; `find_library(m)` returns
+        // NOTFOUND. Force-feed the cache variable so graphviz's
+        // `link_libraries(${MATH_LIB})` resolves to a harmless `-lm`,
+        // which emcc accepts as a no-op.
+        cfg.arg("-DMATH_LIB=m");
+    }
 
     // Tell CMake where Homebrew's flex / bison live on macOS —
     // /usr/bin/flex on macOS is ancient and graphviz wants a newer one.
@@ -251,7 +303,13 @@ fn build_vendored_graphviz() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<&'static str>, 
         "gvplugin_dot_layout",
     ];
     let jobs = env::var("NUM_JOBS").unwrap_or_else(|_| "4".to_owned());
-    let mut build_cmd = Command::new("cmake");
+    let mut build_cmd = if is_emscripten {
+        let mut c = Command::new("emmake");
+        c.arg("cmake");
+        c
+    } else {
+        Command::new("cmake")
+    };
     build_cmd
         .arg("--build")
         .arg(".")
@@ -397,7 +455,8 @@ fn walk_archives(root: &Path) -> Vec<PathBuf> {
     out
 }
 
-fn hardening_flags() -> Vec<&'static str> {
+fn portable_hardening_flags(is_emscripten: bool) -> Vec<&'static str> {
+    // Baseline that emcc accepts.
     let mut v = vec![
         "-O2",
         "-fstack-protector-strong",
@@ -406,6 +465,9 @@ fn hardening_flags() -> Vec<&'static str> {
         "-Wformat-security",
         "-fPIC",
     ];
+    if is_emscripten {
+        return v;
+    }
     if cfg!(target_os = "linux") {
         v.push("-fstack-clash-protection");
     }
@@ -415,8 +477,8 @@ fn hardening_flags() -> Vec<&'static str> {
     v
 }
 
-fn apply_hardening_cflags(build: &mut cc::Build) {
-    for flag in hardening_flags() {
+fn apply_hardening_cflags(build: &mut cc::Build, is_wasm: bool) {
+    for flag in portable_hardening_flags(is_wasm) {
         build.flag_if_supported(flag);
     }
 }

@@ -68,6 +68,28 @@ pub fn is_safe_url(url: &str) -> bool {
     ALLOWED_SCHEMES.iter().any(|s| *s == lower)
 }
 
+/// Like [`is_safe_url`] but also accepts `data:image/<mime>;...` URIs.
+///
+/// Browsers do not execute scripts in SVG (or any other image format)
+/// loaded via `<img>` — that's a documented sandbox boundary in the
+/// HTML spec — so a `data:image/svg+xml` URL emitted into an `<img
+/// src>` cannot run JS the way `data:text/html` could. Restricting
+/// the relaxation to image MIME types keeps that property: a
+/// `data:text/html;…` URI still gets dropped.
+// adv[impl markdown.url-allowlist]
+pub fn is_safe_image_url(url: &str) -> bool {
+    if is_safe_url(url) {
+        return true;
+    }
+    if url.bytes().any(|b| b < 0x20 || b == 0x7F) {
+        return false;
+    }
+    let trimmed = url.trim_start();
+    let prefix = "data:image/";
+    trimmed.len() >= prefix.len()
+        && trimmed.as_bytes()[..prefix.len()].eq_ignore_ascii_case(prefix.as_bytes())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

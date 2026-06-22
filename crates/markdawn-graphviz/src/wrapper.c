@@ -1,13 +1,16 @@
 #include "wrapper.h"
 
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#ifndef MARKDAWN_GV_NO_FORK
 #include <errno.h>
 #include <poll.h>
 #include <signal.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
+#endif
 
 #include <graphviz/gvc.h>
 #include <graphviz/cgraph.h>
@@ -249,6 +252,7 @@ void markdawn_gv_free_error(char *ptr) {
     }
 }
 
+#ifndef MARKDAWN_GV_NO_FORK
 /*
  * Write `n` bytes from `buf` to `fd` ignoring short writes. Returns
  * 0 on success, -1 on error.
@@ -479,3 +483,4 @@ int markdawn_gv_render_svg_forked(const char *dot,
     free(buf);
     return (int)rc32;
 }
+#endif /* MARKDAWN_GV_NO_FORK */

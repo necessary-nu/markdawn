@@ -17,7 +17,9 @@
 
 use core::fmt;
 use std::ffi::{CString, c_char, c_int};
-use std::sync::{Mutex, Once, mpsc};
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use std::sync::Once;
+use std::sync::{Mutex, mpsc};
 use std::time::Duration;
 
 mod scrubber;
@@ -241,6 +243,7 @@ const MARKDAWN_GV_FORK_CRASHED: c_int = 6;
 const MARKDAWN_GV_FORK_SYSCALL_ERROR: c_int = 7;
 
 unsafe extern "C" {
+    #[allow(dead_code)] // unused on fork path; called via C-side fork pipeline
     fn markdawn_gv_render_svg(
         dot: *const c_char,
         out_svg: *mut *mut c_char,
@@ -267,7 +270,9 @@ unsafe extern "C" {
         out_layout_ms: *mut u64,
         out_render_ms: *mut u64,
     ) -> c_int;
+    #[allow(dead_code)] // only called on fork path
     fn markdawn_gv_prewarm();
+    #[allow(dead_code)] // unused on fork path; child side frees via gvFreeRenderData
     fn markdawn_gv_free_render_data(ptr: *mut c_char);
     fn markdawn_gv_free_error(ptr: *mut c_char);
 }
@@ -280,8 +285,10 @@ unsafe extern "C" {
 // it as unsafe and either deadlocks or crashes. Running the same
 // initialisation in the parent before fork() leaves the child with
 // fully-initialised classes in its inherited address space.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 static PREWARM: Once = Once::new();
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn ensure_prewarmed() {
     PREWARM.call_once(|| unsafe { markdawn_gv_prewarm() });
 }
@@ -326,6 +333,19 @@ fn render_inner_pipeline(source: &str, timeout: Duration) -> Result<String, Grap
         return Err(GraphvizError::TooManySubgraphs(report.subgraphs));
     }
 
+    // wasm has no real threads (`std::thread::spawn` errors at runtime
+    // on wasm32-unknown-emscripten without -pthread, and is a no-op on
+    // wasm32-unknown-unknown). The wasm host is single-threaded and
+    // already sandboxed, so just call render_inner directly — no
+    // wall-clock timeout, no panic isolation. The pre-flight input
+    // caps above remain the line of defence against pathological
+    // input.
+    #[cfg(target_family = "wasm")]
+    {
+        let _ = timeout;
+        return render_inner(&scrubbed);
+    }
+
     // adv[impl render.timeout] — spawn the worker, wait on a channel
     // with a wall-clock timeout. On timeout the worker is orphaned; it
     // keeps running until libgraphviz returns. Next caller's worker
@@ -333,28 +353,31 @@ fn render_inner_pipeline(source: &str, timeout: Duration) -> Result<String, Grap
     // adv[impl render.panic-capture] — std::panic::catch_unwind inside
     // the worker captures Rust panics; they arrive on the channel as
     // Err(panic_payload).
-    let owned = scrubbed;
-    let (tx, rx) =
-        mpsc::channel::<Result<Result<String, GraphvizError>, Box<dyn std::any::Any + Send>>>();
-    std::thread::Builder::new()
-        .stack_size(RENDER_STACK_BYTES)
-        .name("markdawn-graphviz-render".to_owned())
-        .spawn(move || {
-            let result =
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_inner(&owned)));
-            let _ = tx.send(result);
-        })
-        .map_err(|e| GraphvizError::ThreadSpawn(e.to_string()))?;
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let owned = scrubbed;
+        let (tx, rx) =
+            mpsc::channel::<Result<Result<String, GraphvizError>, Box<dyn std::any::Any + Send>>>();
+        std::thread::Builder::new()
+            .stack_size(RENDER_STACK_BYTES)
+            .name("markdawn-graphviz-render".to_owned())
+            .spawn(move || {
+                let result =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_inner(&owned)));
+                let _ = tx.send(result);
+            })
+            .map_err(|e| GraphvizError::ThreadSpawn(e.to_string()))?;
 
-    match rx.recv_timeout(timeout) {
-        Ok(Ok(result)) => result,
-        Ok(Err(panic_payload)) => Err(GraphvizError::Panicked(panic_message(&panic_payload))),
-        Err(mpsc::RecvTimeoutError::Timeout) => Err(GraphvizError::TimedOut),
-        Err(mpsc::RecvTimeoutError::Disconnected) => {
-            // Worker dropped the sender without sending — shouldn't
-            // happen because the closure always sends before returning.
-            // If it does, treat as a panic with no message.
-            Err(GraphvizError::Panicked(String::new()))
+        match rx.recv_timeout(timeout) {
+            Ok(Ok(result)) => result,
+            Ok(Err(panic_payload)) => Err(GraphvizError::Panicked(panic_message(&panic_payload))),
+            Err(mpsc::RecvTimeoutError::Timeout) => Err(GraphvizError::TimedOut),
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                // Worker dropped the sender without sending — shouldn't
+                // happen because the closure always sends before returning.
+                // If it does, treat as a panic with no message.
+                Err(GraphvizError::Panicked(String::new()))
+            }
         }
     }
 }
@@ -435,6 +458,7 @@ fn render_inner_forked(source: &str) -> Result<String, GraphvizError> {
     Err(err_from_rc(rc, diagnostic, parse_ms, layout_ms, render_ms))
 }
 
+#[allow(dead_code)] // unused on fork path
 fn render_inner_in_process(source: &str) -> Result<String, GraphvizError> {
     let dot = CString::new(source).map_err(|_| GraphvizError::InvalidInput)?;
 
