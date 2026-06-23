@@ -7,7 +7,7 @@ edition = "2024"
 crate-type = ["staticlib"]
 
 [dependencies]
-markdawn = { path = "../..", default-features = false, features = ["highlight"] }
+markdawn = { path = "../..", default-features = false, features = ["highlight", "pikchr"] }
 indexmap = "2"
 tree-sitter-language = "0.1"
 

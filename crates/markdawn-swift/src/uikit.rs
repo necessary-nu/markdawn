@@ -31,8 +31,10 @@ impl UIKitState {
         // Highlighter consults the process-global store, which is populated at
         // runtime by `mw_lang_*_init` plugins (see crate::grammar_store).
         // Languages not registered fall through to plain monospace rendering.
-        let sink =
-            BlockSink::new(mtm).with_highlighter(Highlighter::with_store(global_store().clone()));
+        // `with_pikchr` renders fenced `pikchr` blocks as inline diagrams.
+        let sink = BlockSink::new(mtm)
+            .with_highlighter(Highlighter::with_store(global_store().clone()))
+            .with_pikchr();
         Self {
             parser: Parser::builder().with_all().build(),
             sink,
