@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -132,11 +133,13 @@ private fun ListItemRow(ordered: Boolean, index: Int, li: Element) {
 
 @Composable
 private fun CodeBlock(pre: Element, modifier: Modifier) {
-    val code = pre.children.firstOrNull()
-    val text = when (code) {
-        is Element -> collectText(code)
-        is Raw -> stripTags(code.html)
-        else -> collectText(pre)
+    // pre > code(.language-x). Highlighted code's `code` holds a single Raw of
+    // arborium `<a-k>…</a-k>` spans; un-highlighted code holds Text children.
+    val code = pre.children.firstOrNull() as? Element
+    val inner = code?.children?.firstOrNull()
+    val content = when (inner) {
+        is Raw -> inlineHtmlToAnnotatedString(inner.html)
+        else -> AnnotatedString(collectText(code ?: pre))
     }
     Box(
         modifier
@@ -144,7 +147,7 @@ private fun CodeBlock(pre: Element, modifier: Modifier) {
             .padding(vertical = 4.dp)
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Text(text, Modifier.padding(8.dp), fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+        Text(content, Modifier.padding(8.dp), fontFamily = FontFamily.Monospace, fontSize = 13.sp)
     }
 }
 
@@ -194,9 +197,14 @@ private fun RawView(node: Raw, modifier: Modifier) {
             modifier = modifier.padding(vertical = 4.dp),
         )
     } else {
-        // Non-SVG raw HTML (e.g. highlighted code, filtered passthrough) has no
-        // structural form here — show its text, tags stripped.
-        Text(stripTags(html), modifier, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+        // Non-SVG raw HTML (highlighted code, filtered passthrough): render the
+        // subset of inline tags we understand; unknown tags drop to their text.
+        Text(
+            inlineHtmlToAnnotatedString(html),
+            modifier,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+        )
     }
 }
 
@@ -221,7 +229,7 @@ private fun AnnotatedString.Builder.appendInline(node: VNode) {
     when (node) {
         is Text -> append(node.text)
         is Fragment -> node.children.forEach { appendInline(it) }
-        is Raw -> append(stripTags(node.html))
+        is Raw -> append(inlineHtmlToAnnotatedString(node.html))
         is Element -> when (node.tag) {
             "em" -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
                 node.children.forEach { appendInline(it) }
@@ -266,15 +274,98 @@ private fun collectText(node: VNode): String = when (node) {
     is Text -> node.text
     is Element -> node.children.joinToString("") { collectText(it) }
     is Fragment -> node.children.joinToString("") { collectText(it) }
-    is Raw -> stripTags(node.html)
+    is Raw -> inlineHtmlToAnnotatedString(node.html).text
 }
 
-private val TAG_RE = Regex("<[^>]*>")
+/**
+ * Parse the small subset of inline HTML markdawn emits into a styled
+ * [AnnotatedString]:
+ *  - arborium syntax-highlight spans `<a-k>…</a-k>` (k=keyword, f=function, …)
+ *    map to a colour from [HIGHLIGHT_COLORS];
+ *  - `<strong>`/`<b>`, `<em>`/`<i>`, `<code>`, `<br>`;
+ *  - HTML entities are unescaped.
+ * Unknown tags are dropped but their text is kept. No base font family — the
+ * caller decides (code blocks render monospace).
+ */
+internal fun inlineHtmlToAnnotatedString(html: String): AnnotatedString {
+    val sb = StringBuilder()
+    val runs = ArrayList<Triple<Int, Int, SpanStyle>>()
+    val stack = ArrayDeque<SpanStyle>()
+    var i = 0
+    val n = html.length
+    while (i < n) {
+        if (html[i] == '<') {
+            val gt = html.indexOf('>', i)
+            if (gt < 0) {
+                sb.append(unescapeHtml(html.substring(i)))
+                break
+            }
+            val tag = html.substring(i + 1, gt).trim()
+            i = gt + 1
+            when {
+                tag.startsWith("/") -> if (stack.isNotEmpty()) stack.removeLast()
+                tag == "br" || tag == "br/" -> sb.append('\n')
+                else -> stack.addLast(styleForTag(tag))
+            }
+        } else {
+            val next = html.indexOf('<', i).let { if (it < 0) n else it }
+            val piece = unescapeHtml(html.substring(i, next))
+            if (piece.isNotEmpty()) {
+                val start = sb.length
+                sb.append(piece)
+                val merged = stack.fold(SpanStyle()) { acc, s -> acc.merge(s) }
+                if (merged != SpanStyle()) runs.add(Triple(start, sb.length, merged))
+            }
+            i = next
+        }
+    }
+    return buildAnnotatedString {
+        append(sb.toString())
+        runs.forEach { (start, end, style) -> addStyle(style, start, end) }
+    }
+}
 
-private fun stripTags(html: String): String =
-    TAG_RE.replace(html, "")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
-        .replace("&amp;", "&")
+private fun styleForTag(tag: String): SpanStyle = when {
+    tag.startsWith("a-") ->
+        HIGHLIGHT_COLORS[tag.substring(2)]?.let { SpanStyle(color = it) } ?: SpanStyle()
+    tag == "strong" || tag == "b" -> SpanStyle(fontWeight = FontWeight.Bold)
+    tag == "em" || tag == "i" -> SpanStyle(fontStyle = FontStyle.Italic)
+    tag == "code" -> SpanStyle(fontFamily = FontFamily.Monospace)
+    else -> SpanStyle()
+}
+
+/** arborium highlight kinds (short tag -> colour), a GitHub-light-ish palette. */
+private val HIGHLIGHT_COLORS: Map<String, Color> = mapOf(
+    "k" to Color(0xFFD73A49),   // keyword
+    "f" to Color(0xFF6F42C1),   // function
+    "s" to Color(0xFF032F62),   // string
+    "c" to Color(0xFF6A737D),   // comment
+    "t" to Color(0xFF005CC5),   // type
+    "v" to Color(0xFF24292E),   // variable
+    "co" to Color(0xFF005CC5),  // constant
+    "p" to Color(0xFF24292E),   // punctuation
+    "pr" to Color(0xFF005CC5),  // property
+    "at" to Color(0xFF6F42C1),  // attribute
+    "tg" to Color(0xFF22863A),  // tag
+    "m" to Color(0xFF6F42C1),   // macro
+    "l" to Color(0xFFE36209),   // label
+    "ns" to Color(0xFF6F42C1),  // namespace
+    "cr" to Color(0xFF6F42C1),  // constructor
+    "tt" to Color(0xFF005CC5),  // title
+    "st" to Color(0xFF24292E),  // strong
+    "em" to Color(0xFF24292E),  // emphasis
+    "da" to Color(0xFF22863A),  // diff addition
+    "dd" to Color(0xFFD73A49),  // diff deletion
+    "er" to Color(0xFFD73A49),  // error
+)
+
+private fun unescapeHtml(s: String): String =
+    if ('&' !in s) {
+        s
+    } else {
+        s.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&amp;", "&")
+    }

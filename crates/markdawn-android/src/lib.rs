@@ -565,6 +565,39 @@ mod tests {
         assert_eq!(streamed, one_shot, "streaming must converge to the one-shot render");
     }
 
+    /// Register the bundled rust grammar into the process-global store the
+    /// same way `mw_register_grammar` does — but in-process, so the highlight
+    /// path is exercised without a plugin `.so`.
+    fn register_rust_grammar() {
+        use markdawn::arborium::advanced::{CompiledGrammar, GrammarConfig};
+        use std::sync::Arc;
+        let config = GrammarConfig {
+            language: arborium_rust::language().into(),
+            highlights_query: arborium_rust::HIGHLIGHTS_QUERY,
+            injections_query: arborium_rust::INJECTIONS_QUERY,
+            locals_query: arborium_rust::LOCALS_QUERY,
+        };
+        let grammar = CompiledGrammar::new(config).expect("rust grammar compiles");
+        global_store().insert("rust".to_owned(), Arc::new(grammar));
+    }
+
+    #[test]
+    fn highlighted_code_emits_custom_element_html() {
+        register_rust_grammar();
+        let json = parse_to_vdom_json("```rust\nfn main() {}\n```\n", "{}").unwrap();
+        // Captured for the Kotlin parser fixture:
+        println!("HL_FIXTURE={json}");
+        let trees = blocks(&json);
+        let raw = trees
+            .iter()
+            .find_map(|t| find(t, &|n| n.get("html").is_some()))
+            .expect("a Raw html node for the highlighted code");
+        let html = raw.get("html").and_then(Value::as_str).unwrap_or_default();
+        // CustomElements format: <a-k>fn</a-k> etc. — `k` = keyword.
+        assert!(html.contains("<a-"), "expected custom-element spans, got: {html}");
+        assert!(html.contains("<a-k>"), "expected a keyword span, got: {html}");
+    }
+
     #[test]
     fn editor_edit_emits_events() {
         let mut doc = VdomDocument::new("{}");

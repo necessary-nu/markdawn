@@ -4601,6 +4601,7 @@ dependencies = [
 name = "markdawn-android"
 version = "0.1.0"
 dependencies = [
+ "arborium-rust",
  "indexmap",
  "jni 0.21.1",
  "libc",
