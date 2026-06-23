@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "markdawn-android"
 include(":markdawn")
+include(":app")

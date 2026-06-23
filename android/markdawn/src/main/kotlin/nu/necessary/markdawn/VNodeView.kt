@@ -21,6 +21,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -168,6 +169,12 @@ private fun TableView(table: Element, modifier: Modifier) {
                             .weight(1f)
                             .padding(horizontal = 6.dp, vertical = 3.dp),
                         fontWeight = if (header) FontWeight.Bold else null,
+                        textAlign = when (cell.props["align"]?.content) {
+                            "center" -> TextAlign.Center
+                            "right" -> TextAlign.End
+                            "left" -> TextAlign.Start
+                            else -> null
+                        },
                     )
                 }
             }
@@ -237,6 +244,9 @@ private fun AnnotatedString.Builder.appendInline(node: VNode) {
                 pop()
             }
             "br" -> append("\n")
+            // Inline images can't sit in a text run without InlineTextContent;
+            // keep the alt text so the content isn't silently dropped.
+            "img" -> node.props["alt"]?.content?.let { append(it) }
             else -> node.children.forEach { appendInline(it) }
         }
     }
