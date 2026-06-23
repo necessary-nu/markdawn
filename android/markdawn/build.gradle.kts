@@ -45,4 +45,6 @@ dependencies {
     // Raw SVG (math + future diagrams) renders via Coil's SVG decoder.
     implementation("io.coil-kt.coil3:coil-compose:3.0.4")
     implementation("io.coil-kt.coil3:coil-svg:3.0.4")
+
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.21")
 }
