@@ -43,7 +43,9 @@ terminal = ["ansi", "dep:vt100"]
 # serialization impls.
 serde = ["dep:serde"]
 tracey = ["dep:serde", "dep:serde_yaml", "dep:toml"]
-iced = ["dep:iced", "dep:iced_runtime", "dep:iced_graphics"]
+iced = ["dep:iced_core", "dep:iced_widget", "dep:iced_runtime", "dep:iced_graphics"]
+# The runnable demo also needs the umbrella `iced` (windowing/app runner).
+iced-app = ["iced", "dep:iced"]
 
 [dependencies]
 arborium = { path = "../arborium/crates/arborium", optional = true, default-features = false }
@@ -76,9 +78,18 @@ vt100 = { version = "0.16", optional = true }
 serde = { version = "1", optional = true, features = ["derive"] }
 serde_yaml = { version = "0.9", optional = true }
 toml = { version = "0.8", optional = true }
-iced = { version = "0.14", optional = true, default-features = false, features = ["advanced", "svg", "image", "tokio", "wgpu", "tiny-skia"] }
-iced_runtime = { version = "0.14", optional = true }
-iced_graphics = { version = "0.14", optional = true }
+# The markdown adapter builds `Element` trees, so it depends on iced's
+# widget-level crates — NOT the umbrella `iced`, whose unconditional
+# `iced_winit` dep drags in winit + a conflicting wasm-bindgen tree. Tracks the
+# same necessary-nu/iced fork branch ndesign's out/iced tracks so the `Element`
+# types unify (the fork carries the AccessKit bridge; [dec:nd:iced-accesskit]).
+iced_core = { git = "https://github.com/necessary-nu/iced", branch = "accesskit", optional = true, features = ["advanced"] }
+iced_widget = { git = "https://github.com/necessary-nu/iced", branch = "accesskit", optional = true, features = ["advanced", "svg", "image"] }
+iced_runtime = { git = "https://github.com/necessary-nu/iced", branch = "accesskit", optional = true }
+iced_graphics = { git = "https://github.com/necessary-nu/iced", branch = "accesskit", optional = true }
+# The umbrella `iced` (windowing + app runner) is only needed by the demo; gated
+# behind `iced-app` so the library resolution stays winit-free.
+iced = { git = "https://github.com/necessary-nu/iced", branch = "accesskit", optional = true }
 
 [dev-dependencies]
 dioxus-ssr = "0.7"
@@ -90,7 +101,7 @@ required-features = ["dioxus"]
 
 [[example]]
 name = "iced_demo"
-required-features = ["iced"]
+required-features = ["iced-app"]
 
 [target.'cfg(target_os = "ios")'.dependencies]
 objc2 = "0.6"
