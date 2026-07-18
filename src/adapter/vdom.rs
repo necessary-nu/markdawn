@@ -356,7 +356,7 @@ impl<R> VdomAdapter<R> {
         if !self.pikchr || lang != Some("pikchr") {
             return None;
         }
-        crate::render_pikchr_to_svg(literal).map(diagram_raw)
+        crate::render_pikchr_to_svg(literal).map(|svg| diagram_raw(svg, "Pikchr diagram"))
     }
 
     #[cfg(not(feature = "pikchr"))]
@@ -370,7 +370,7 @@ impl<R> VdomAdapter<R> {
         if !self.graphviz || !matches!(lang, Some("dot") | Some("graphviz")) {
             return None;
         }
-        crate::render_graphviz_to_svg(literal).map(diagram_raw)
+        crate::render_graphviz_to_svg(literal).map(|svg| diagram_raw(svg, "Graphviz diagram"))
     }
 
     #[cfg(not(feature = "graphviz"))]
@@ -384,7 +384,7 @@ impl<R> VdomAdapter<R> {
         if !self.typst || lang != Some("typst") {
             return None;
         }
-        crate::render_typst_to_svg(literal).map(diagram_raw)
+        crate::render_typst_to_svg(literal).map(|svg| diagram_raw(svg, "Typst diagram"))
     }
 
     #[cfg(not(feature = "typst"))]
@@ -951,11 +951,16 @@ fn task_input(checked: bool) -> VNode {
 /// node, matching the HTML adapter's "emit SVG verbatim, ensure one
 /// trailing newline" behavior.
 #[cfg(any(feature = "pikchr", feature = "graphviz", feature = "typst"))]
-fn diagram_raw(final_svg: String) -> VNode {
+fn diagram_raw(final_svg: String, accessible_description: &'static str) -> VNode {
     let nl_close = !final_svg.ends_with('\n');
+    let mut props = Props::new();
+    props.set(
+        "aria-label",
+        AttrVal::Lit(accessible_description.to_owned()),
+    );
     VNode::Raw {
         tag: None,
-        props: Props::new(),
+        props,
         html: final_svg,
         nl_close,
     }

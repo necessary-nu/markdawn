@@ -95,12 +95,12 @@ class ContractTest {
     fun deserializesRawAndFragmentAndDelete() {
         // Shapes not present in the fixtures above — same wire format.
         val raw = parseVNodeList(
-            """[{"tag":"span","props":{"class":"math math-inline"},"html":"<svg></svg>"}]""",
+            """[{"tag":null,"props":{"aria-label":"Pikchr diagram"},"html":"<svg></svg>"}]""",
         ).single()
         val r = assertIs<Raw>(raw)
-        assertEquals("span", r.tag)
+        assertNull(r.tag)
         assertEquals("<svg></svg>", r.html)
-        assertEquals("math math-inline", r.props["class"]?.content)
+        assertEquals("Pikchr diagram", r.props["aria-label"]?.content)
 
         val frag = parseVNodeList("""[{"children":[{"text":"x"}]}]""").single()
         assertIs<Fragment>(frag)

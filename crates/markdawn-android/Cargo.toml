@@ -10,12 +10,12 @@ crate-type = ["cdylib"]
 [dependencies]
 # Mirror markdawn-swift: the `highlight` machinery but zero baked grammars.
 # Grammars are dynamic plugin .so's (the markdawn-swift-lang-* cdylibs)
-# loaded at runtime and registered into the process-global store. No diagram
-# engines — math (mathml-core) is always-on; pikchr/graphviz/typst are
-# optional opt-ins added later as feature flags on this dep.
+# loaded at runtime and registered into the process-global store. Pikchr is
+# built into the core Android .so; math (mathml-core) remains always-on.
 markdawn = { path = "../..", default-features = false, features = [
     "serde",
     "highlight",
+    "pikchr",
 ] }
 jni = "0.21"
 serde = { version = "1", features = ["derive"] }

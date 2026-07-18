@@ -193,7 +193,7 @@ private fun RawView(node: Raw, modifier: Modifier) {
             model = ImageRequest.Builder(LocalContext.current)
                 .data(html.toByteArray())
                 .build(),
-            contentDescription = null,
+            contentDescription = node.props["aria-label"]?.content,
             modifier = modifier.padding(vertical = 4.dp),
         )
     } else {

@@ -79,7 +79,10 @@ impl VdomPipeline {
         Self {
             adapter: md::VdomAdapter::new()
                 .with_html_filter(html_filter)
-                .with_highlighter(md::arborium::Highlighter::with_store(global_store().clone())),
+                .with_pikchr()
+                .with_highlighter(md::arborium::Highlighter::with_store(
+                    global_store().clone(),
+                )),
             events: Vec::new(),
         }
     }
@@ -119,7 +122,8 @@ impl md::Sink<md::Node<()>> for VdomPipeline {
 fn parse_to_vdom_json(source: &str, options_json: &str) -> Result<String, String> {
     let mut p = md::Parser::<()>::builder().with_all().build();
     let mut pipeline = VdomPipeline::new(filter_from_options(options_json));
-    p.push_str(source, &mut pipeline).map_err(|e| e.to_string())?;
+    p.push_str(source, &mut pipeline)
+        .map_err(|e| e.to_string())?;
     p.finish(&mut pipeline).map_err(|e| e.to_string())?;
 
     let mut blocks: IndexMap<md::CorrelationId, md::VNode> = IndexMap::new();
@@ -480,15 +484,24 @@ mod tests {
         let trees = blocks(&parse_to_vdom_json("[x](https://example.com)", "{}").unwrap());
         let a = find_tag(&trees, "a").expect("an <a> node");
         let props = a.get("props").expect("props key");
-        assert!(props.is_object(), "props must be a JSON object, got {props}");
-        assert_eq!(props.get("href").and_then(Value::as_str), Some("https://example.com"));
+        assert!(
+            props.is_object(),
+            "props must be a JSON object, got {props}"
+        );
+        assert_eq!(
+            props.get("href").and_then(Value::as_str),
+            Some("https://example.com")
+        );
     }
 
     #[test]
     fn javascript_link_destination_is_neutralized() {
         let trees = blocks(&parse_to_vdom_json("[x](javascript:alert(1))", "{}").unwrap());
         let a = find_tag(&trees, "a").expect("an <a> node");
-        let href = a.get("props").and_then(|p| p.get("href")).and_then(Value::as_str);
+        let href = a
+            .get("props")
+            .and_then(|p| p.get("href"))
+            .and_then(Value::as_str);
         assert_eq!(href, Some(""), "javascript: href must be empty");
     }
 
@@ -496,7 +509,10 @@ mod tests {
     fn javascript_image_source_is_neutralized() {
         let trees = blocks(&parse_to_vdom_json("![x](javascript:alert(1))", "{}").unwrap());
         let img = find_tag(&trees, "img").expect("an <img> node");
-        let src = img.get("props").and_then(|p| p.get("src")).and_then(Value::as_str);
+        let src = img
+            .get("props")
+            .and_then(|p| p.get("src"))
+            .and_then(Value::as_str);
         assert_eq!(src, Some(""), "javascript: src must be empty");
     }
 
@@ -508,7 +524,28 @@ mod tests {
             .find_map(|t| find(t, &|n| n.get("html").is_some()))
             .expect("a node carrying raw html");
         let html = raw.get("html").and_then(Value::as_str).unwrap_or_default();
-        assert!(html.contains("<svg"), "math should render to inline SVG, got: {html}");
+        assert!(
+            html.contains("<svg"),
+            "math should render to inline SVG, got: {html}"
+        );
+    }
+
+    #[test]
+    fn pikchr_code_block_is_an_accessible_inline_svg() {
+        let trees = blocks(&parse_to_vdom_json("```pikchr\nbox \"Hello\"\n```\n", "{}").unwrap());
+        let raw = trees
+            .iter()
+            .find_map(|tree| find(tree, &|node| node.get("html").is_some()))
+            .expect("a raw SVG node for the pikchr diagram");
+        let html = raw.get("html").and_then(Value::as_str).unwrap_or_default();
+        assert!(
+            html.contains("<svg"),
+            "pikchr should render to SVG, got: {html}"
+        );
+        assert_eq!(
+            raw.pointer("/props/aria-label").and_then(Value::as_str),
+            Some("Pikchr diagram")
+        );
     }
 
     #[test]
@@ -549,7 +586,8 @@ mod tests {
     #[test]
     fn streaming_matches_static() {
         let src = "# Title\n\nA paragraph with **bold** and `code`.\n\n- one\n- two\n\n> a quote\n";
-        let one_shot: Vec<Value> = serde_json::from_str(&parse_to_vdom_json(src, "{}").unwrap()).unwrap();
+        let one_shot: Vec<Value> =
+            serde_json::from_str(&parse_to_vdom_json(src, "{}").unwrap()).unwrap();
 
         // Feed the source in small char-boundary chunks through the streaming
         // parser, then collapse its events.
@@ -562,7 +600,10 @@ mod tests {
         parser.finish().unwrap();
         let streamed = collapse_events(&parser.take_events().unwrap());
 
-        assert_eq!(streamed, one_shot, "streaming must converge to the one-shot render");
+        assert_eq!(
+            streamed, one_shot,
+            "streaming must converge to the one-shot render"
+        );
     }
 
     /// Register the bundled rust grammar into the process-global store the
@@ -594,8 +635,14 @@ mod tests {
             .expect("a Raw html node for the highlighted code");
         let html = raw.get("html").and_then(Value::as_str).unwrap_or_default();
         // CustomElements format: <a-k>fn</a-k> etc. — `k` = keyword.
-        assert!(html.contains("<a-"), "expected custom-element spans, got: {html}");
-        assert!(html.contains("<a-k>"), "expected a keyword span, got: {html}");
+        assert!(
+            html.contains("<a-"),
+            "expected custom-element spans, got: {html}"
+        );
+        assert!(
+            html.contains("<a-k>"),
+            "expected a keyword span, got: {html}"
+        );
     }
 
     #[test]
