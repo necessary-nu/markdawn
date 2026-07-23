@@ -80,7 +80,10 @@ pub unsafe extern "C" fn mw_lang_${sanitized}_init(register: RegisterFn) -> u32 
     let raw_fn = lang_fn.into_raw();
     let lang_fn_ptr = raw_fn as *const c_void;
 
-    let highlights = arborium_${sanitized}::HIGHLIGHTS_QUERY;
+    // Some Arborium grammars inherit queries and expose a LazyLock<String>;
+    // others expose a plain &'static str. Borrowing works for both and keeps
+    // the generated adapter from attempting to move a process-global query.
+    let highlights = &arborium_${sanitized}::HIGHLIGHTS_QUERY;
     let injections = arborium_${sanitized}::INJECTIONS_QUERY;
     let locals = arborium_${sanitized}::LOCALS_QUERY;
 
