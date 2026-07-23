@@ -28,6 +28,7 @@ typst = [
     "dep:typst",
     "dep:typst-svg",
     "dep:typst-pdf",
+    "dep:typst-layout",
     "dep:typst-library",
     "dep:typst-syntax",
     "dep:typst-assets",
@@ -62,12 +63,13 @@ percent-encoding = "2.3"
 ttf-parser = "0.25"
 pikru = { path = "../pikru", optional = true }
 markdawn-graphviz = { path = "crates/markdawn-graphviz", optional = true }
-typst = { version = "0.14", optional = true }
-typst-svg = { version = "0.14", optional = true }
-typst-pdf = { version = "0.14", optional = true }
-typst-library = { version = "0.14", optional = true }
-typst-syntax = { version = "0.14", optional = true }
-typst-assets = { version = "0.14", optional = true, features = ["fonts"] }
+typst = { version = "0.15", optional = true }
+typst-svg = { version = "0.15", optional = true }
+typst-pdf = { version = "0.15", optional = true }
+typst-layout = { version = "0.15", optional = true }
+typst-library = { version = "0.15", optional = true }
+typst-syntax = { version = "0.15", optional = true }
+typst-assets = { version = "0.15", optional = true, features = ["fonts"] }
 comemo = { version = "0.5", optional = true }
 ecow = { version = "0.2", optional = true }
 include_dir = { version = "0.7", optional = true }
@@ -89,7 +91,15 @@ iced_runtime = { git = "https://github.com/necessary-nu/iced", branch = "accessk
 iced_graphics = { git = "https://github.com/necessary-nu/iced", branch = "accesskit", optional = true }
 # The umbrella `iced` (windowing + app runner) is only needed by the demo; gated
 # behind `iced-app` so the library resolution stays winit-free.
-iced = { git = "https://github.com/necessary-nu/iced", branch = "accesskit", optional = true }
+iced = { git = "https://github.com/necessary-nu/iced", branch = "accesskit", optional = true, features = ["advanced", "tokio"] }
+
+[patch.crates-io]
+# Released citationberg 0.7.0 still selects vulnerable quick-xml 0.38;
+# upstream has moved the same version to the security-fixed 0.41 API.
+citationberg = { git = "https://github.com/typst/citationberg", rev = "06a591e2f237d25e1dfdedac3f3d1494c496c52d" }
+# Upstream security fix for RUSTSEC-2026-0194/0195; remove after a
+# wayland-scanner release newer than 0.31.10 includes d07c4f91.
+wayland-scanner = { git = "https://github.com/Smithay/wayland-rs", rev = "d07c4f91f28b42e5a485823ffd9d8d5a210b1053" }
 
 [dev-dependencies]
 dioxus-ssr = "0.7"
@@ -143,4 +153,3 @@ objc2-ui-kit = { version = "0.3", features = [
 block2 = "0.6"
 dispatch2 = "0.3"
 libc = "0.2"
-

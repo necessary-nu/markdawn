@@ -136,7 +136,7 @@ fn update(state: &mut State, message: Message) -> Task<Message> {
         Message::Copied(Some(s)) => {
             let preview: String = s.chars().take(60).collect();
             state.log = format!("copied {} chars: {preview}…", s.len());
-            return iced::clipboard::write::<Message>(s);
+            return iced::clipboard::write(s).discard();
         }
         Message::FromMarkdown(IcedUrl::Link(url)) => {
             state.log = format!("link clicked: {url}");

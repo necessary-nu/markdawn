@@ -15,7 +15,8 @@ use std::sync::{Mutex, mpsc};
 use std::time::Duration;
 
 use typst::WorldExt;
-use typst::layout::{Abs, PagedDocument};
+use typst::layout::Abs;
+use typst_layout::PagedDocument;
 
 use self::world::RenderWorld;
 
@@ -203,7 +204,11 @@ fn compile_to_paged(source: String) -> Result<(RenderWorld, PagedDocument), Typs
 fn render_inner(source: String) -> Result<String, TypstRenderError> {
     let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_world, document) = compile_to_paged(source)?;
-    let svg = typst_svg::svg_merged(&document, Abs::pt(SVG_PADDING_PT));
+    let svg = typst_svg::svg_merged(
+        &document,
+        &typst_svg::SvgOptions::default(),
+        Abs::pt(SVG_PADDING_PT),
+    );
     // typst-svg emits every glyph as <symbol>+<use xlink:href>; inline
     // those into plain <g>+<path> before sanitisation, since the W3C
     // safe baseline strips <use> wholesale.
@@ -251,7 +256,7 @@ fn format_diagnostics<W: typst::World>(
         }
         for hint in &diag.hints {
             s.push_str("\n  hint: ");
-            s.push_str(hint);
+            s.push_str(&hint.v);
         }
     }
     s

@@ -14,9 +14,9 @@ use std::sync::OnceLock;
 use ecow::EcoString;
 use include_dir::{Dir, include_dir};
 use typst::diag::{FileError, FileResult};
-use typst::foundations::{Bytes, Datetime};
+use typst::foundations::{Bytes, Datetime, Duration as TypstDuration};
 use typst::syntax::package::PackageSpec;
-use typst::syntax::{FileId, Source, VirtualPath};
+use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World};
@@ -63,7 +63,10 @@ pub(crate) struct RenderWorld {
 
 impl RenderWorld {
     pub(crate) fn new(source: String) -> Self {
-        let main_id = FileId::new(None, VirtualPath::new("main.typ"));
+        let main_id = FileId::new(RootedPath::new(
+            VirtualRoot::Project,
+            VirtualPath::new("main.typ").expect("static main path is valid"),
+        ));
         let main_source = Source::new(main_id, source);
         Self {
             main_id,
@@ -108,7 +111,7 @@ impl World for RenderWorld {
         shared().fonts.get(index).cloned()
     }
 
-    fn today(&self, _offset: Option<i64>) -> Option<Datetime> {
+    fn today(&self, _offset: Option<TypstDuration>) -> Option<Datetime> {
         // Fixed epoch keeps renders deterministic.
         Datetime::from_ymd(2024, 1, 1)
     }
@@ -117,11 +120,14 @@ impl World for RenderWorld {
 /// Resolve a `FileId` to bundled bytes. Only `@preview/...` packages we
 /// ship are reachable; everything else maps to `FileError::NotFound`.
 fn read_package_file(id: FileId) -> FileResult<&'static [u8]> {
-    let Some(spec) = id.package() else {
-        return Err(FileError::NotFound(id.vpath().as_rootless_path().into()));
+    let VirtualRoot::Package(spec) = id.root() else {
+        return Err(FileError::NotFound(
+            Path::new(id.vpath().get_without_slash()).into(),
+        ));
     };
-    let rel = bundled_package_relative_path(spec, id.vpath().as_rootless_path())
-        .ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().into()))?;
+    let inner = Path::new(id.vpath().get_without_slash());
+    let rel = bundled_package_relative_path(spec, inner)
+        .ok_or_else(|| FileError::NotFound(inner.into()))?;
     BUNDLED_PACKAGES
         .get_file(&rel)
         .map(|f| f.contents())
