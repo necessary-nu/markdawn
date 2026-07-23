@@ -10,7 +10,7 @@
 pub mod render;
 pub mod selectable;
 
-pub use render::{IcedOptions, RenderIcedCustom, Renderer, Url};
+pub use render::{IcedCodeStyle, IcedOptions, RenderIcedCustom, Renderer, Url};
 pub use selectable::selected_text;
 // Internal: SelectableRichText / selectable_rich_text are not re-exported
 // because they're used only by the renderer and aren't part of the

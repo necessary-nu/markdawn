@@ -1,4 +1,32 @@
 mod adapter;
+
+/// Reconstructs the umbrella `iced` crate's widget-level surface from the
+/// individual iced crates, so the adapter can keep its `iced::` paths without
+/// depending on the umbrella `iced` (whose unconditional `iced_winit`
+/// dependency drags in winit + a conflicting wasm-bindgen tree). The adapter
+/// refers to this as `crate::iced_shim`.
+#[cfg(feature = "iced")]
+pub(crate) mod iced_shim {
+    pub use iced_core::theme::Theme;
+    pub use iced_core::*;
+    pub use iced_runtime::Task;
+    pub use iced_widget as widget;
+    pub use iced_widget::Renderer;
+
+    /// `iced_core::Element` has no `Theme`/`Renderer` defaults; the umbrella
+    /// `iced::Element` did. Restore them so the adapter's `Element<'a, Message>`
+    /// keeps resolving, shadowing the glob-imported `iced_core::Element`.
+    pub type Element<'a, Message, Theme = self::Theme, Renderer = self::Renderer> =
+        iced_core::Element<'a, Message, Theme, Renderer>;
+
+    /// Mirrors `iced::advanced`.
+    pub mod advanced {
+        pub use iced_core::renderer::{self, Renderer};
+        pub use iced_core::text::Text;
+        pub use iced_core::{Shell, layout, overlay, svg, text, widget};
+    }
+}
+
 #[cfg(feature = "ansi")]
 mod ansi_style;
 #[cfg(feature = "ansi")]
@@ -63,7 +91,7 @@ pub use crate::adapter::{
 };
 pub use crate::adapter::{HtmlAdapter, HtmlError, HtmlSink, RenderHtmlCustom};
 #[cfg(feature = "iced")]
-pub use crate::adapter::{IcedOptions, IcedRenderer, IcedUrl, RenderIcedCustom};
+pub use crate::adapter::{IcedCodeStyle, IcedOptions, IcedRenderer, IcedUrl, RenderIcedCustom};
 #[cfg(feature = "typst")]
 pub use crate::adapter::{RenderTypstCustom, TypstAdapter, TypstError, TypstSink};
 pub use crate::editor::EditableDocument;

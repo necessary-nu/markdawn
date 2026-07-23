@@ -16,16 +16,16 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
-use ::iced::Task;
-use ::iced::advanced::layout::{self, Layout};
-use ::iced::advanced::renderer;
-use ::iced::advanced::svg;
-use ::iced::advanced::text::{self, Paragraph as _};
-use ::iced::advanced::widget::operation::{Operation, Outcome};
-use ::iced::advanced::widget::{Widget, tree};
-use ::iced::advanced::{Clipboard, Shell};
-use ::iced::widget::text::{Catalog, LineHeight, Shaping, Wrapping};
-use ::iced::{
+use crate::iced_shim::Task;
+use crate::iced_shim::advanced::Shell;
+use crate::iced_shim::advanced::layout::{self, Layout};
+use crate::iced_shim::advanced::renderer;
+use crate::iced_shim::advanced::svg;
+use crate::iced_shim::advanced::text::{self, Paragraph as _};
+use crate::iced_shim::advanced::widget::operation::{Operation, Outcome};
+use crate::iced_shim::advanced::widget::{Widget, tree};
+use crate::iced_shim::widget::text::{Catalog, LineHeight, Shaping, Wrapping};
+use crate::iced_shim::{
     Color, Element, Event, Length, Pixels, Point, Rectangle, Size, Vector, alignment, mouse,
 };
 
@@ -145,7 +145,7 @@ impl Selection {
 /// or a "replaced" atom — an inline image / SVG that occupies a fixed
 /// width in the text flow but renders as an arbitrary widget. Modeled
 /// after browsers' inline-block / Flutter's `WidgetSpan`.
-pub enum InlineAtom<'a, F = ::iced::Font> {
+pub enum InlineAtom<'a, F = crate::iced_shim::Font> {
     /// A regular text span — same as `text::Span` to `iced::widget::rich_text`.
     Span(text::Span<'a, String, F>),
     /// An inline replaced atom: rendered SVG inserted into the text
@@ -232,8 +232,12 @@ const COSMIC_LINE_DESCENT_FRACTION: f32 = 0.22;
 /// A rich-text block that supports drag-to-select, `selected_text()`
 /// copy-collection, AND inline replaced atoms (SVGs/images embedded
 /// in the text flow with proper line wrapping).
-pub struct SelectableRichText<'a, Message, Theme = ::iced::Theme, Renderer = ::iced::Renderer>
-where
+pub struct SelectableRichText<
+    'a,
+    Message,
+    Theme = crate::iced_shim::Theme,
+    Renderer = crate::iced_shim::Renderer,
+> where
     Theme: Catalog,
     Renderer: text::Renderer,
 {
@@ -469,7 +473,7 @@ where
             let size = self.size.unwrap_or_else(|| renderer.default_size());
             let font = self.font.unwrap_or_else(|| renderer.default_font());
 
-            let text_with_spans = || ::iced::advanced::Text {
+            let text_with_spans = || crate::iced_shim::advanced::Text {
                 content: self.spans.as_slice(),
                 bounds,
                 size,
@@ -479,6 +483,8 @@ where
                 align_y: self.align_y,
                 shaping: Shaping::Advanced,
                 wrapping: self.wrapping,
+                ellipsis: Default::default(),
+                hint_factor: None,
             };
 
             // Reuse iced's paragraph caching strategy: hash spans by
@@ -515,7 +521,7 @@ where
                     }
                 }
             } else {
-                match state.paragraph.compare(::iced::advanced::Text {
+                match state.paragraph.compare(crate::iced_shim::advanced::Text {
                     content: (),
                     bounds,
                     size,
@@ -525,6 +531,8 @@ where
                     align_y: self.align_y,
                     shaping: Shaping::Advanced,
                     wrapping: self.wrapping,
+                    ellipsis: Default::default(),
+                    hint_factor: None,
                 }) {
                     text::Difference::None => {}
                     text::Difference::Bounds => {
@@ -695,7 +703,7 @@ where
         // 3. Paint the glyphs themselves. Atom placeholders are
         //    color = TRANSPARENT, so they paint nothing visible —
         //    we'll overlay the SVG next.
-        ::iced::widget::text::draw(
+        crate::iced_shim::widget::text::draw(
             renderer,
             defaults,
             layout.bounds(),
@@ -727,7 +735,6 @@ where
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         _renderer: &Renderer,
-        _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
@@ -1262,7 +1269,7 @@ where
 
 pub struct SelectionGroup<'a, Message, Theme, Renderer>
 where
-    Renderer: ::iced::advanced::Renderer,
+    Renderer: crate::iced_shim::advanced::Renderer,
 {
     inner: Element<'a, Message, Theme, Renderer>,
     selection: Selection,
@@ -1273,7 +1280,7 @@ pub fn selection_group<'a, Message, Theme, Renderer>(
     selection: Selection,
 ) -> SelectionGroup<'a, Message, Theme, Renderer>
 where
-    Renderer: ::iced::advanced::Renderer,
+    Renderer: crate::iced_shim::advanced::Renderer,
 {
     SelectionGroup {
         inner: inner.into(),
@@ -1284,7 +1291,7 @@ where
 impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
     for SelectionGroup<'a, Message, Theme, Renderer>
 where
-    Renderer: ::iced::advanced::Renderer,
+    Renderer: crate::iced_shim::advanced::Renderer,
 {
     fn tag(&self) -> tree::Tag {
         self.inner.as_widget().tag()
@@ -1294,20 +1301,12 @@ where
         self.inner.as_widget().state()
     }
 
-    fn children(&self) -> Vec<tree::Tree> {
-        self.inner.as_widget().children()
-    }
-
-    fn diff(&self, tree: &mut tree::Tree) {
-        self.inner.as_widget().diff(tree);
+    fn diff(&mut self, tree: &mut tree::Tree) {
+        self.inner.as_widget_mut().diff(tree);
     }
 
     fn size(&self) -> Size<Length> {
         self.inner.as_widget().size()
-    }
-
-    fn size_hint(&self) -> Size<Length> {
-        self.inner.as_widget().size_hint()
     }
 
     fn layout(
@@ -1341,7 +1340,6 @@ where
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         renderer: &Renderer,
-        clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
@@ -1349,9 +1347,9 @@ where
         // SelectableRichText widgets can call `selection.start` from
         // their own bounds (which is the desired source for hit-tests
         // inside text). Then we step in to handle dead-space clicks.
-        self.inner.as_widget_mut().update(
-            tree, event, layout, cursor, renderer, clipboard, shell, viewport,
-        );
+        self.inner
+            .as_widget_mut()
+            .update(tree, event, layout, cursor, renderer, shell, viewport);
 
         let bounds = layout.bounds();
         match event {
@@ -1425,7 +1423,7 @@ where
         renderer: &Renderer,
         viewport: &Rectangle,
         translation: Vector,
-    ) -> Option<::iced::advanced::overlay::Element<'b, Message, Theme, Renderer>> {
+    ) -> Option<crate::iced_shim::advanced::overlay::Element<'b, Message, Theme, Renderer>> {
         self.inner
             .as_widget_mut()
             .overlay(tree, layout, renderer, viewport, translation)
@@ -1437,7 +1435,7 @@ impl<'a, Message, Theme, Renderer> From<SelectionGroup<'a, Message, Theme, Rende
 where
     Message: 'a,
     Theme: 'a,
-    Renderer: ::iced::advanced::Renderer + 'a,
+    Renderer: crate::iced_shim::advanced::Renderer + 'a,
 {
     fn from(widget: SelectionGroup<'a, Message, Theme, Renderer>) -> Self {
         Element::new(widget)
@@ -1461,7 +1459,7 @@ fn collect_selected() -> impl Operation<Option<String>> {
 
         fn custom(
             &mut self,
-            _id: Option<&::iced::advanced::widget::Id>,
+            _id: Option<&crate::iced_shim::advanced::widget::Id>,
             _bounds: Rectangle,
             state: &mut dyn Any,
         ) {

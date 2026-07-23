@@ -28,11 +28,13 @@
 
 use core::cell::Cell;
 
-use ::iced::font::Weight;
-use ::iced::widget::{
-    Column, button, column, container, image as iced_image, row, rule, span, svg as iced_svg, text,
+use crate::iced_shim::font::Weight;
+use crate::iced_shim::widget::{
+    Column, column, container, image as iced_image, row, rule, span, svg as iced_svg, text,
 };
-use ::iced::{Background, Border, Color, Element, Font, Length, Padding, Pixels, Theme, alignment};
+use crate::iced_shim::{
+    Background, Border, Color, Element, Font, Length, Padding, Pixels, Theme, alignment,
+};
 
 use crate::adapter::iced::selectable::{
     InlineAtom, Selection, selectable_rich_content, selectable_rich_text, selection_group,
@@ -48,8 +50,39 @@ const BOLD: Font = Font {
 
 const LINK_COLOR: Color = Color::from_rgb(0.10, 0.40, 0.85);
 const HIGHLIGHT_BG: Color = Color::from_rgb(1.0, 0.95, 0.50);
-const CODE_BG: Color = Color::from_rgb(0.95, 0.95, 0.97);
 const QUOTE_BAR: Color = Color::from_rgb(0.80, 0.80, 0.82);
+
+/// Colours used for inline and fenced code in the iced adapter.
+///
+/// The renderer cannot infer an application's design tokens while it builds
+/// inline rich-text spans, so hosts with dark or custom themes should provide
+/// both foreground and background colours explicitly with
+/// [`Renderer::with_code_style`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct IcedCodeStyle {
+    /// Fenced-code surface colour.
+    pub block_background: Color,
+    /// Fenced-code text colour.
+    pub block_foreground: Color,
+    /// Fenced-code border colour.
+    pub block_border: Color,
+    /// Inline-code span background.
+    pub inline_background: Color,
+    /// Inline-code span foreground.
+    pub inline_foreground: Color,
+}
+
+impl Default for IcedCodeStyle {
+    fn default() -> Self {
+        Self {
+            block_background: Color::from_rgb(0.95, 0.95, 0.97),
+            block_foreground: Color::from_rgb(0.12, 0.12, 0.14),
+            block_border: Color::from_rgb(0.85, 0.85, 0.88),
+            inline_background: Color::from_rgb(0.95, 0.95, 0.97),
+            inline_foreground: Color::from_rgb(0.12, 0.12, 0.14),
+        }
+    }
+}
 
 /// Parser + renderer configuration. Mirrors the parser feature flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -95,7 +128,7 @@ impl IcedOptions {
 }
 
 /// Events emitted by the rendered widget tree. Use
-/// [`Element::map`](::iced::Element::map) to lift these into the host
+/// [`Element::map`](crate::iced_shim::Element::map) to lift these into the host
 /// application's message enum.
 #[non_exhaustive]
 #[derive(Debug, Clone)]
@@ -145,6 +178,7 @@ pub(crate) struct MathMetrics {
 /// optional syntax highlighter, and an optional custom-extension renderer.
 pub struct Renderer<R = ()> {
     options: IcedOptions,
+    code_style: IcedCodeStyle,
     custom: R,
     html_filter: crate::HtmlFilter,
     #[cfg(feature = "highlight")]
@@ -176,6 +210,7 @@ impl<R> Renderer<R> {
     pub fn new(custom: R) -> Self {
         Self {
             options: IcedOptions::default(),
+            code_style: IcedCodeStyle::default(),
             custom,
             html_filter: crate::HtmlFilter::safe(),
             #[cfg(feature = "highlight")]
@@ -190,6 +225,12 @@ impl<R> Renderer<R> {
 
     pub fn with_options(mut self, options: IcedOptions) -> Self {
         self.options = options;
+        self
+    }
+
+    /// Set explicit, contrast-safe inline and fenced-code colours.
+    pub fn with_code_style(mut self, code_style: IcedCodeStyle) -> Self {
+        self.code_style = code_style;
         self
     }
 
@@ -573,13 +614,14 @@ impl<R> Renderer<R> {
                 next
             };
             let target = !checked;
-            let toggle = ::iced::widget::checkbox(checked).on_toggle(move |_| Url::TaskToggle {
-                id,
-                checked: target,
-            });
+            let toggle =
+                crate::iced_shim::widget::checkbox(checked).on_toggle(move |_| Url::TaskToggle {
+                    id,
+                    checked: target,
+                });
             row![toggle, col]
                 .spacing(6)
-                .align_y(::iced::Alignment::Center)
+                .align_y(crate::iced_shim::Alignment::Center)
                 .into()
         } else {
             col.into()
@@ -624,7 +666,7 @@ impl<R> Renderer<R> {
         R: RenderIcedCustom<Ext>,
     {
         let _ = task_id;
-        let mut r = ::iced::widget::Row::new().spacing(8);
+        let mut r = crate::iced_shim::widget::Row::new().spacing(8);
         for (i, c) in cells.iter().enumerate() {
             let alignment = alignments.get(i).copied().flatten();
             if let Node::TableCell {
@@ -729,7 +771,7 @@ impl<R> Renderer<R> {
             };
             return match entry {
                 CachedSvg::Ok { svg, .. } => {
-                    iced_svg(::iced::widget::svg::Handle::from_memory(svg)).into()
+                    iced_svg(crate::iced_shim::widget::svg::Handle::from_memory(svg)).into()
                 }
                 CachedSvg::Err(msg) => {
                     render_diagram_error("pikchr", &msg, literal, self.selection.clone())
@@ -766,7 +808,7 @@ impl<R> Renderer<R> {
             };
             return match entry {
                 CachedSvg::Ok { svg, .. } => {
-                    iced_svg(::iced::widget::svg::Handle::from_memory(svg)).into()
+                    iced_svg(crate::iced_shim::widget::svg::Handle::from_memory(svg)).into()
                 }
                 CachedSvg::Err(msg) => {
                     render_diagram_error("typst", &msg, literal, self.selection.clone())
@@ -803,7 +845,7 @@ impl<R> Renderer<R> {
             };
             return match entry {
                 CachedSvg::Ok { svg, .. } => {
-                    iced_svg(::iced::widget::svg::Handle::from_memory(svg)).into()
+                    iced_svg(crate::iced_shim::widget::svg::Handle::from_memory(svg)).into()
                 }
                 CachedSvg::Err(msg) => {
                     render_diagram_error("graphviz", &msg, literal, self.selection.clone())
@@ -832,12 +874,13 @@ impl<R> Renderer<R> {
             };
             if let Some(spans) = spans_opt {
                 let rich = highlight_to_spans(literal, &spans);
+                let code_style = self.code_style;
                 return container(
                     selectable_rich_text(rich, self.selection.clone())
                         .on_link_click(Url::Link as fn(String) -> Url),
                 )
                 .padding(Padding::default().left(8).right(8).top(4).bottom(4))
-                .style(code_block_style)
+                .style(move |_theme| code_block_style(code_style))
                 .width(Length::Fill)
                 .into();
             }
@@ -849,9 +892,10 @@ impl<R> Renderer<R> {
             vec![span(literal.to_string()).font(MONOSPACE)],
             self.selection.clone(),
         );
+        let code_style = self.code_style;
         container(body)
             .padding(Padding::default().left(8).right(8).top(4).bottom(4))
-            .style(code_block_style)
+            .style(move |_theme| code_block_style(code_style))
             .width(Length::Fill)
             .into()
     }
@@ -899,7 +943,7 @@ impl<R> Renderer<R> {
     fn collect_inline_spans<Ext>(
         &self,
         nodes: &[Node<Ext>],
-        out: &mut Vec<::iced::widget::text::Span<'static, String>>,
+        out: &mut Vec<crate::iced_shim::widget::text::Span<'static, String>>,
         base_font: Font,
     ) where
         R: RenderIcedCustom<Ext>,
@@ -996,7 +1040,10 @@ impl<R> Renderer<R> {
             }
             Node::CodeSpan { code, .. } => {
                 out.push(InlineAtom::Span(
-                    span(code.clone()).font(MONOSPACE).background(CODE_BG),
+                    span(code.clone())
+                        .font(MONOSPACE)
+                        .color(self.code_style.inline_foreground)
+                        .background(self.code_style.inline_background),
                 ));
             }
             Node::Link {
@@ -1126,8 +1173,8 @@ impl<R> Renderer<R> {
 fn atom_map_span<F>(atom: InlineAtom<'static>, f: F) -> InlineAtom<'static>
 where
     F: FnOnce(
-        ::iced::widget::text::Span<'static, String>,
-    ) -> ::iced::widget::text::Span<'static, String>,
+        crate::iced_shim::widget::text::Span<'static, String>,
+    ) -> crate::iced_shim::widget::text::Span<'static, String>,
 {
     match atom {
         InlineAtom::Span(s) => InlineAtom::Span(f(s)),
@@ -1176,16 +1223,17 @@ fn blend_bold(base: Font) -> Font {
 
 fn blend_italic(base: Font) -> Font {
     Font {
-        style: ::iced::font::Style::Italic,
+        style: crate::iced_shim::font::Style::Italic,
         ..base
     }
 }
 
-fn code_block_style(_theme: &Theme) -> container::Style {
+fn code_block_style(code_style: IcedCodeStyle) -> container::Style {
     let mut style = container::Style::default();
-    style.background = Some(Background::Color(CODE_BG));
+    style.background = Some(Background::Color(code_style.block_background));
+    style.text_color = Some(code_style.block_foreground);
     style.border = Border {
-        color: Color::from_rgb(0.85, 0.85, 0.88),
+        color: code_style.block_border,
         width: 1.0,
         radius: 3.0.into(),
     };
@@ -1197,10 +1245,10 @@ fn render_image(destination: &str, _title: Option<&str>, alt: &str) -> Element<'
         return text(alt.to_string()).into();
     }
     if let Some(bytes) = decode_data_uri(destination) {
-        return iced_image(::iced::widget::image::Handle::from_bytes(bytes)).into();
+        return iced_image(crate::iced_shim::widget::image::Handle::from_bytes(bytes)).into();
     }
     if !destination.contains("://") {
-        return iced_image(::iced::widget::image::Handle::from_path(
+        return iced_image(crate::iced_shim::widget::image::Handle::from_path(
             destination.to_string(),
         ))
         .into();
@@ -1517,7 +1565,7 @@ fn strip_ansi_escapes_simple(s: &str) -> String {
 fn render_math(math: &str, display: bool) -> Element<'static, Url> {
     let size = if display { 22.0 } else { 16.0 };
     match mathml_core::latex_to_svg(math, size) {
-        Ok(svg_src) => iced_svg(::iced::widget::svg::Handle::from_memory(
+        Ok(svg_src) => iced_svg(crate::iced_shim::widget::svg::Handle::from_memory(
             svg_src.into_bytes(),
         ))
         .into(),
@@ -1551,7 +1599,7 @@ fn render_footnote_ref(
 fn highlight_to_spans(
     src: &str,
     spans: &[arborium::advanced::Span],
-) -> Vec<::iced::widget::text::Span<'static, String>> {
+) -> Vec<crate::iced_shim::widget::text::Span<'static, String>> {
     // arborium emits potentially OVERLAPPING / nested spans (an
     // identifier inside a function-call inside a statement, etc.).
     // The naive sequential walker emitted overlapping bytes multiple

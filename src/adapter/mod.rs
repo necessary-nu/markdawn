@@ -18,7 +18,9 @@ pub use self::ansi::{
 };
 pub use self::html::{HtmlAdapter, HtmlError, HtmlSink, RenderHtmlCustom};
 #[cfg(feature = "iced")]
-pub use self::iced::{IcedOptions, RenderIcedCustom, Renderer as IcedRenderer, Url as IcedUrl};
+pub use self::iced::{
+    IcedCodeStyle, IcedOptions, RenderIcedCustom, Renderer as IcedRenderer, Url as IcedUrl,
+};
 #[cfg(feature = "typst")]
 pub use self::typst::{RenderTypstCustom, TypstAdapter, TypstError, TypstSink};
 #[cfg(target_os = "ios")]
