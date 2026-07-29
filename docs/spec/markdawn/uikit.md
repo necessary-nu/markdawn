@@ -362,19 +362,37 @@ font, colour, and spacing decision is resolved.
 > literal text in the monospaced face, so an unparseable formula
 > shows its own LaTeX rather than vanishing.
 
-> [spec:mw:req:uikit.diagram.view-factory]
+> [spec:mw:req:uikit.diagram.view-factory+1]
 > Fenced code blocks tagged `pikchr`, `dot`/`graphviz` or `typst`
 > are rendered as diagrams when the matching opt-in is set on the
-> sink. Each dispatches to a factory that runs its engine to SVG,
-> rasterises it, and returns a `UIImageView` in aspect-fit mode
-> carrying a height-to-width constraint equal to the image's
-> intrinsic ratio — the image is vector, so that constraint is what
-> gives the view a height at any width — and an accessibility label
-> naming the diagram kind. A factory MUST yield nothing, rather
-> than an error or an empty view, when its engine fails or the SVG
-> does not rasterise, and the sink MUST then fall through to the
-> ordinary code-block view, so a malformed diagram displays as its
-> own highlighted source. Dispatch MUST be skipped while the code
-> block is provisional: a mid-stream fence has not yet received its
-> closing delimiter, and feeding partial source to an engine only
-> yields a fresh syntax error per token.
+> sink. Each dispatches to a factory that obtains SVG from the
+> crate's shared entry point for that engine, rasterises it, and
+> returns a `UIImageView` in aspect-fit mode carrying a
+> height-to-width constraint equal to the image's intrinsic ratio —
+> the image is vector, so that constraint is what gives the view a
+> height at any width — and an accessibility label naming the
+> diagram kind.
+>
+> Going through the shared entry point is a requirement, not a
+> convenience. Engine input is document text, so engine output is
+> attacker-shaped, and that shared tail is where the output size
+> cap, the SVG sanitiser and text-to-path outlining apply. A
+> factory MUST NOT call its engine directly; it MUST obtain the
+> same bytes any other adapter would for the same source. Because
+> those bytes are the sanitiser's own output they are handed to the
+> plain rasteriser rather than the sanitising one — re-sanitising
+> SVG this crate just sanitised would only buy a second parse.
+> Outlining means diagram glyphs are drawn as paths instead of
+> being resolved against a font when CoreSVG rasterises, which both
+> drops that font dependency and costs nothing: the product is an
+> image with no selectable text either way.
+>
+> A factory MUST yield nothing, rather than an error or an empty
+> view, when its engine fails, when the rendered SVG exceeds the
+> size cap, or when the SVG does not rasterise, and the sink MUST
+> then fall through to the ordinary code-block view, so a malformed
+> or oversized diagram displays as its own highlighted source.
+> Dispatch MUST be skipped while the code block is provisional: a
+> mid-stream fence has not yet received its closing delimiter, and
+> feeding partial source to an engine only yields a fresh syntax
+> error per token.

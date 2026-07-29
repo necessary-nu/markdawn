@@ -99,4 +99,27 @@ mod tests {
         let out = HtmlFilter::safe().filter(input);
         assert!(out.contains("—"));
     }
+
+    // [spec:mw:req:core.html-filter.fail-closed/test]
+    #[test]
+    fn sanitizer_failure_drops_the_input_rather_than_passing_it_through() {
+        // A config that declares both an element allow-list and an element
+        // remove-list is rejected by `SanitizerConfig::validate`, which is
+        // the "invalid config" failure path `filter` has to close over.
+        let mut config = SanitizerConfig::safe_default();
+        config.elements = Some(Vec::new());
+        config.remove_elements = Some(Vec::new());
+
+        let input = "<p>secret <b>markup</b> that must not leak</p>";
+        assert!(
+            config.sanitize(input).is_err(),
+            "test setup: expected the mixed element lists to fail validation"
+        );
+
+        let out = HtmlFilter::custom(config).filter(input);
+        assert_eq!(out, "");
+        // Explicitly: the failure mode is loss, not pass-through.
+        assert_ne!(out, input);
+        assert!(!out.contains("markup"));
+    }
 }

@@ -25,6 +25,20 @@ children (
                 kind @status
                 text "Todo → Doing (nplan start)"
             }
+
+            {
+                at 2026-07-29T19:22:36.683666Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Scope widened by the operator to include migrating the grammar backend from arborium to ntreesitter (../ntreesitter, described as a saner port of arborium). Rationale: this node already owns highlighting.arborium-transition, and the renderer-neutral SyntaxHighlighter / SyntaxSpan / HighlightError seam it establishes is exactly the boundary a backend swap goes through — doing the swap as a separate node would mean touching every renderer twice. Footprint at the time of this decision: 26 first-party arborium call sites (src/highlight.rs, src/lib.rs, src/tracey/render.rs, crates/markdawn-android/{lib,grammar_store}.rs), 104 generated markdawn-swift-lang-* crates which are gitignored and produced by crates/markdawn-swift/generate-plugins.sh (so the template is the real edit, not 104 crates), plus the highlight / highlight-all-languages cargo features and the path dependency on ../arborium. ntreesitter is structured differently — nine crates including -plugin, -provider, -catalog, -runtime and -wire — so the plugin registration protocol spec'd as ffi.plugin.grammar-registration (mw_lang_&lt;name&gt;_init(RegisterFn)) is expected to change shape rather than just names. A read-only API survey was commissioned before any code change; plan the migration from its findings. Note this node is claimed by a different session, so the scope change was recorded here rather than acted on unilaterally."
+            }
+
+            {
+                at 2026-07-29T19:27:32.101127Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Read-only API survey of ntreesitter vs arborium, findings for planning the backend swap.\n\nBLOCKER — grammar coverage. arborium ships 104 grammars; ntreesitter-catalog ships 11 (c, cpp, html, javascript, json, lean, markdown, rust, silo, tsx, typescript). 93 missing, including bash, python, go, java, ruby, php, swift, kotlin, css, yaml, toml, sql. imports/inventory.json shows a deliberate staged import from arborium at revision 2d7ac7f1 with blake3-pinned provenance, so this is a backlog rather than an oversight — but the import cadence is not determinable from the repos and no schedule is credible until it is answered.\n\nPLUGIN PROTOCOL IS A REDESIGN, NOT A RENAME. Per-language `mw_lang_<name>_init(RegisterFn)` becomes one universal `ntreesitter_provider_v1()` returning a repr(C) descriptor; the callback handoff inverts (host pulls a descriptor rather than the plugin calling mw_register_grammar, which has no counterpart). The single-symbol model breaks the current loader design — you cannot dlsym the same symbol from 104 cdylibs without per-handle resolution, so the Swift and JNI loaders need reworking. Descriptor surface is much wider than the current template emits: aliases, extensions, exact filenames, injection targets, parser ABI and provenance hashes, none of which exist in arborium's per-language crates. ntreesitter defines the ABI but ships no dynamic loader — that stays markdawn's job.\n\nNO HTML EMITTER. arborium::advanced::spans_to_html has no ntreesitter equivalent; markdawn must own a span-to-HTML serializer (src/highlight.rs:118-127).\n\nSPAN SEMANTICS — one real divergence. Byte offsets, half-open ranges, raw capture names and nesting all survive. But `priority` is NOT arborium's `pattern_index`: it is a monotonic emission-order counter assigned after the upstream engine resolves query precedence, not highlights.scm line order. Losing captures are never surfaced, so re-deciding equal-range captures by query order is gone rather than renamed. Partially-overlapping non-nested spans cannot occur (strict stack), making the word \"overlapping\" in highlighting.span-semantics inaccurate.\n\nOTHER DESIGN DECISIONS NEEDED. Registry construction is fallible and rejects ambiguous aliases at build time, where arborium tolerated collisions — with 104 merged alias sets, collisions are likely and unpredictable until descriptors exist. DynamicRegistry hands out immutable generation-tracked snapshots, so VdomPipeline pinning a store at construction will silently not see late-registered languages. HighlightOutput carries a new `diagnostics` vec for non-fatal partial-injection failures that the current boundary cannot express. ntreesitter vendors tree-sitter 0.26.8 with links = \"tree-sitter\" and pins tree-sitter-language =0.1.7, while markdawn's swift lang crates depend on 0.1 — check for a links collision early.\n\nSPEC RULES NEEDING REWRITE: highlighting.span-semantics (priority and overlapping wording), uikit.syntax.span-priority (names pattern_index explicitly), highlighting.arborium-transition (retire or generalise to provider-transition), highlighting.api (needs a diagnostics clause). uikit.syntax.capture-fallback and span-bounds are unaffected.\n\nBUILD: ntreesitter generates parsers at build time from grammar.json + scanner.c with blake3 verification rather than shipping ~100 MB of pre-generated static data, so build time rises and artifact size falls, per-crate. Feature story maps cleanly (catalog has one feature per language, default all). wasm is first-class and spec'd, unlike arborium."
+            }
         )
     }
 
@@ -1195,6 +1209,14 @@ children (
                         kind @status
                         text "Todo → Done (nplan complete)"
                     }
+
+                    {
+                        at 2026-07-29T21:48:25.018984Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Correction to the deployment caveat in the previous note: the emscripten artifacts HAVE now been rebuilt. emcc was available via Homebrew and both wasm targets were installed, so the four release builds ran and web/markdawn_render_{graphviz,pikchr,typst}.{js,wasm} plus markdawn_wasm_emscripten.{js,wasm} were regenerated, and web/index.html was rebuilt from index.template.html. Verified: each render module exports mw_render_<engine>_string_free with zero remaining references to the old mw_string_free, and the core module retains the generic name as designed. The demo page works again. Caveat that still stands: these artifacts are gitignored build outputs, so they are not in the commit — any other checkout or CI job needs crates/markdawn-wasm-emscripten/serve.sh (or the equivalent build+copy steps) run once before the demo page will load, otherwise it will throw at the free call against stale artifacts."
+                        after_done true
+                    }
                 )
             }
 
@@ -1350,6 +1372,22 @@ children (
                 id defects.test-coverage-gaps
                 title "Rules with implementation but no honest verify site"
                 priority 2
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T22:39:13.542489Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Closing with 28 of 203 mw rules still impl-only, deliberately. mw tested coverage went 128/203 (63%) to 175/203 (86%) — 46 rules closed by 112 new tests; the 47th was closed concurrently by the highlighter session. Configured suite 837 to 914 passing.\n\nZero were closed by annotating a pre-existing test. Every mod tests in the tree was swept. The ~12 url_safety.rs tests and the markdawn-android ones that an earlier review flagged as unannotated had already been annotated earlier in this session, so that free coverage was gone before this pass started.\n\nThe residual 28 break down as: 16 uikit (whole subtree is cfg(target_os = \"ios\"), never executes under cargo nextest, and all 16 additionally need live Apple runtime objects — UIFont, NSURLSession, UIStackView, CoreSVG, UIColor trait collections — not merely an iOS build); 9 iced (need a text::Renderer + svg::Renderer instance, a widget Tree/Shell, or an event loop; iced's own null renderer sets Paragraph = () so it cannot exercise any cosmic-text path); 2 ffi (ffi.host.wasm-bindgen is entirely about generated JS glue and needs a wasm-pack/node harness; ffi.ownership.retained-objc needs a live UIKit runtime to observe +1 retain counts); 1 core (core.error.location, whose body is wrong about the implementation — see defects.spec-bodies-inaccurate).\n\nThree of those 28 are actionable rather than blocked and are filed as defects.uikit-syntax-logic-apple-bound. One, iced.renderer.parse-failure-empty, describes unreachable code. Deliberately no uikit tests were written: a test that type-checks but never executes would report coverage that does not exist."
+                    }
+
+                    {
+                        at 2026-07-29T22:39:25.842578Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
@@ -1519,12 +1557,97 @@ children (
                 id defects.uikit-diagram-engine-output-unsanitised
                 title "UIKit diagram views pass raw engine SVG to the rasteriser"
                 priority 1
+                sealed true
                 log (
                     {
                         at 2026-07-29T19:12:16.986668Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found while fixing defects.uikit-svg-sanitiser-bypass; same class, separate site. views/graphviz.rs:23, views/pikchr.rs:23 and views/typst.rs:23 call the engines directly (markdawn_graphviz::render_dot_to_svg, crate::pikchr_render::render, crate::typst::render) and hand the output straight to render_svg — no sanitiser, no MAX_SVG_BYTES. Every other adapter funnels engine output through lib.rs::finalize_diagram_svg, which sanitises and outlines text. Engine input is attacker-controlled markdown, so the exposure is the same class as the three paths already fixed. Left alone deliberately: it is governed by uikit.diagram.view-factory, which that task was not authorised to bump, and routing through render_pikchr_to_svg / render_graphviz_to_svg / render_typst_to_svg would additionally apply text-to-path outlining — a visual change that should be a deliberate decision rather than a side effect of a security fix. math.rs:56 also uses raw render_svg but on mathml-core output from our own renderer, which is not attacker-shaped in the same way. Decide whether these views should use the shared finalize path (accepting the outlining change) or gain a sanitise-only variant."
+                    }
+
+                    {
+                        at 2026-07-29T21:53:59.62493Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Fixed by routing all three views through the crate's shared entry points — render_graphviz_to_svg / render_pikchr_to_svg / render_typst_to_svg, each of which is finalize_diagram_svg(engine(source)): MAX_SVG_BYTES cap, then svg_sanitize::sanitize_svg, then svg_text_to_paths. Operator accepted the text-to-path outlining consequence.\n\nUsed render_svg rather than render_svg_sanitized: by that point the bytes ARE the sanitiser's output, so the wrapper would re-run html5ever parse + allow-list + serialise over the crate's own just-sanitised document on the main thread per diagram — cost with no new guarantee. Honest nuance recorded: the cap inside finalize_diagram_svg is applied pre-outline, so outlining could in principle push the result past MAX_SVG_BYTES where the wrapper's cap would have caught it. That is what vdom, dioxus and iced all already do, so it is a pre-existing crate-wide property rather than something this fix introduced.\n\nmath.rs:56 deliberately left on render_svg, on two independent grounds. Generator shape: mathml-core builds an SVG DOM with xmlem and serialises it, only ever emitting svg/g/path/text/rect with numeric coordinates and colour values, with escaping done by the serialiser rather than string concatenation — there is no element or attribute in that alphabet that can carry script or a URL. The diagram engines are the opposite: string builders that deliberately forward document-supplied attributes, and graphviz turns URL= straight into xlink:href. Consistency: all four adapters treat mathml output as trusted and none sanitise it, so UIKit's math path was never the outlier — the diagram views were. Caveat for the future: if mathml-core ever emits <a xlink:href> or raw passthrough, the conclusion flips for all four adapters at once and belongs as a crate-wide change, not a UIKit patch.\n\nuikit.diagram.view-factory bumped v0 to v1 across the marker and four annotation sites. uikit.media.svg-raster deliberately not bumped — the entry-point split it describes is unchanged and its text stays literally true."
+                    }
+
+                    {
+                        at 2026-07-29T21:54:36.84092Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id defects.wasm-demo-build-undocumented
+                title "README never mentions serve.sh, so the demo page cannot be built from a clone"
+                priority 2
+                log (
+                    {
+                        at 2026-07-29T21:49:25.392491Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "crates/markdawn-wasm-emscripten/.gitignore excludes web/index.html and all eight web/*.{js,wasm} artifacts, and README.md contains no reference to serve.sh anywhere. So a fresh clone has web/index.template.html but no way to discover that crates/markdawn-wasm-emscripten/serve.sh is what turns it into a working page — it builds the four crates for wasm32-unknown-emscripten, copies the artifacts, inlines examples/sample.md into the template, and serves on :8000. The README's emscripten section documents the raw cargo build command but not the demo workflow. Made worse by the free-symbol rename in this batch: a stale artifact set now throws at the free call rather than merely being out of date, so someone with old artifacts sees a broken page rather than an old one. Fix is a few lines in README.md pointing at serve.sh and noting the artifacts are generated. Surfaced while rebuilding the artifacts after the mw_render_&lt;engine&gt;_string_free rename."
+                    }
+                )
+            }
+
+            {
+                id defects.lint-command-feature-coverage
+                title "Declared lint check runs default features, so feature-gated modules are never linted"
+                priority 1
+                log (
+                    {
+                        at 2026-07-29T21:54:31.405713Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Direct sibling of defects.test-command-feature-coverage, which was fixed by adding the seven headless-safe features to the test command. The lint command has the identical hole and was not fixed at the same time: `cargo clippy --no-deps -p markdawn -p markdawn-graphviz --all-targets -- -D warnings` runs under default features (highlight-all-languages), so every module behind ansi, terminal, dioxus, pikchr, graphviz, typst, serde or tracey is compiled out and never linted. Adding the same feature set surfaces 12 pre-existing clippy errors in src/adapter/typst.rs, src/svg_sanitize.rs, src/svg_text_to_paths.rs, src/typst/world.rs and src/typst/mod.rs — single_char_add_str, collapsible_if, needless_borrow, useless_conversion, assertions_on_constants. None are new; they have simply never been visible to the gate. Fixing means clearing those 12 first, then extending the lint command to match the test command's feature set, otherwise the gate goes red on landing. Note the iced features stay out of both commands (iced-app needs a window and GPU surface), so iced remains unlinted by design and carries its own known clippy debt. Surfaced by the agent fixing defects.uikit-diagram-engine-output-unsanitised, which ran clippy with features on to check its own work."
+                    }
+                )
+            }
+
+            {
+                id defects.spec-bodies-inaccurate
+                title "Four rule bodies describe behaviour the code does not have"
+                priority 1
+                log (
+                    {
+                        at 2026-07-29T22:38:37.799129Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found while closing defects.test-coverage-gaps: four rule bodies assert things the implementation does not do. Each was caught by someone trying to write the test the rule implies and finding it fail.\n\n1. core.error.location — says byte_offset is \"an offset into the parser's normalized buffer — after line-ending and tab normalization\". Both halves false. Every top-level InlineParser is constructed with base_offset: 0 (src/parser.rs:1979, :5300), so the offset is relative to the containing block's inline run, not the buffer — a CRLF document with an error on line 3 reports offset 1 where the normalized-buffer offset is 6. And normalize_chunk (src/parser.rs:2253) maps only NUL to U+FFFD and CR/CRLF to LF; there is no tab normalization anywhere. Left impl-only rather than annotated, because a verify site would attest to a contract the code does not honour.\n\n2. editing.serialize.round-trip v1 — one clause stale: \"Subscript and Superscript come back as Html\". They do not. promote_semantic_html (src/parser.rs:1993) unconditionally promotes <sub>/<sup> back to Node::Subscript/Superscript, so they round-trip faithfully. Every other documented loss in that rule was verified and is real.\n\n3. iced.hit-test.outside-glyphs — the bidi clause is wrong. It says a point right of every glyph is the logical end of the line's byte coverage \"under LTR, RTL and mixed-bidi layout alike\". For a pure-RTL line, buffer().hit(5000, y) resolves to 0 — the logical start. The LTR clauses are all verified and correct.\n\n4. iced.renderer.parse-failure-empty — describes dead code, not merely hard-to-reach code. Renderer::render builds its own parser with no extensions and no max_input_bytes, and the only three Error variants a parse can yield are InputTooLarge (needs a cap), InvalidExtensionMatch (needs an extension) and MalformedEventStream (an Option::ok_or on str::chars().next() that cannot fire for valid UTF-8). The Err(_) => column![] arm is unreachable under the public API. Either the rule should say so, or the arm should go.\n\nFixing these means rewriting the bodies and bumping versions; for (4) it may mean deleting code instead."
+                    }
+                )
+            }
+
+            {
+                id defects.iced-excluded-from-gate
+                title "iced feature is in neither the test nor the lint check"
+                priority 1
+                log (
+                    {
+                        at 2026-07-29T22:38:41.978601Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Third instance of the same class as defects.test-command-feature-coverage and defects.lint-command-feature-coverage. `--features markdawn/iced` appears in neither the test nor the lint command in .config/nplan/config.styx, so every iced test — including 36 written while closing defects.test-coverage-gaps — never runs under the gate, and src/adapter/iced/ is never linted. Both are green-or-fixable rather than blocked: `cargo nextest run --workspace --features markdawn/iced` passes with 881 tests, but `cargo clippy --features iced --all-targets -- -D warnings` fails with 17 pre-existing lints in render.rs and selectable.rs (explicit_counter_loop, collapsible_if, field_reassign_with_default, one dead_code). The original reason for excluding iced was that iced-app needs a window and a GPU surface — but note that is `iced-app`, not `iced`. A useful discovery from the test work: iced_graphics::text::Paragraph shapes through a process-global FontSystem, so real cosmic-text glyph layout IS available headless, which is how the hit-test rules got genuinely tested. So `iced` alone may well be gate-safe; verify, clear the 17 lints, then add it to both commands. Keep iced-app out."
+                    }
+                )
+            }
+
+            {
+                id defects.uikit-syntax-logic-apple-bound
+                title "Pure span logic is Apple-bound only by its return type, blocking host tests"
+                priority 2
+                log (
+                    {
+                        at 2026-07-29T22:39:08.401994Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "uikit.syntax.capture-fallback, uikit.syntax.span-bounds and uikit.syntax.span-priority are pure data transformations — dotted-prefix capture-name fallback, UTF-8 to UTF-16 offset conversion with clamping, and a widest-first span sort. None of them needs Apple runtime objects to compute. They are untestable on this host only because capture_default_color returns Retained&lt;UIColor&gt; and the sort and bounds logic is inlined into build_highlighted, inside a subtree gated on cfg(target_os = \"ios\"). Extracting a platform-neutral capture_color_name(&amp;str) -&gt; Option&lt;&amp;str&gt;, the span-ordering comparator, and utf16_offset into a module that is not cfg-gated would make all three host-testable and would let the same logic be shared with any future non-Apple renderer that consumes spans. This is a refactor rather than a test gap, which is why it was filed separately instead of being done under defects.test-coverage-gaps. Worth noting span-bounds is the clamping rule — the review that first surfaced the uikit gaps called it \"the sharpest gap\" precisely because stale spans after an edit are a real failure mode and nothing verifies the clamp."
                     }
                 )
             }

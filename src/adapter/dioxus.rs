@@ -964,5 +964,9 @@ fn render_footnote_backrefs(label: &str, number: u32, count: u32) -> Element {
 mod tests;
 
 #[cfg(test)]
+#[path = "dioxus_surface_tests.rs"]
+mod surface_tests;
+
+#[cfg(test)]
 #[path = "dioxus_vdom_parity_tests.rs"]
 mod vdom_parity_tests;

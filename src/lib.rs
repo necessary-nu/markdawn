@@ -232,3 +232,49 @@ pub fn render_graphviz_to_svg(source: &str) -> Option<String> {
 pub fn render_typst_to_svg(source: &str) -> Option<String> {
     finalize_diagram_svg(typst::render(source).ok()?)
 }
+
+#[cfg(all(test, feature = "graphviz"))]
+mod diagram_svg_tests {
+    /// Every adapter takes its diagram SVG from the shared entry points
+    /// above rather than from the engine, because the engine forwards
+    /// document-supplied strings into its output: graphviz turns a
+    /// `URL=` attribute straight into an `xlink:href`. Assert the
+    /// difference between the two calls, not just the end state, so the
+    /// test still means something if the sanitiser stops finding
+    /// anything to strip.
+    ///
+    /// The UIKit view factories are the reason this is a hard
+    /// requirement — they hand these bytes to CoreSVG, a private XML
+    /// parser — but that path is `target_os = "ios"` and cannot run
+    /// here, so this covers the guarantee they inherit, not the view
+    /// construction itself.
+    // [spec:mw:req:uikit.diagram.view-factory+1/test]
+    #[test]
+    fn shared_graphviz_entry_point_sanitises_and_outlines() {
+        let dot = r#"digraph { a [label="hello", URL="javascript:alert(1)"]; }"#;
+
+        let raw = markdawn_graphviz::render_dot_to_svg(dot).expect("dot lays out");
+        assert!(
+            raw.contains("javascript:"),
+            "engine output carries the URL verbatim: {raw}"
+        );
+        assert!(
+            raw.contains("<text"),
+            "engine draws the label as text: {raw}"
+        );
+
+        let shared = crate::render_graphviz_to_svg(dot).expect("shared entry point renders");
+        assert!(
+            !shared.contains("javascript:"),
+            "sanitiser drops the scripting URL: {shared}"
+        );
+        assert!(
+            shared.contains("<path"),
+            "label glyphs are outlined to paths: {shared}"
+        );
+        assert!(
+            shared.contains("fill=\"transparent\""),
+            "outlining leaves an invisible text overlay: {shared}"
+        );
+    }
+}

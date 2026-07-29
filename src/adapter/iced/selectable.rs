@@ -1543,6 +1543,14 @@ pub fn selected_text() -> Task<Option<String>> {
 }
 
 #[cfg(test)]
+#[path = "selectable_contract_tests.rs"]
+mod contract_tests;
+
+#[cfg(test)]
+#[path = "selectable_hit_test_tests.rs"]
+mod hit_test_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

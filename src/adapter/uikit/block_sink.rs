@@ -340,7 +340,7 @@ impl<R> BlockSink<R> {
         Ok(())
     }
 
-    // [spec:mw:req:uikit.diagram.view-factory]
+    // [spec:mw:req:uikit.diagram.view-factory+1]
     fn build_block_view<Ext>(
         &mut self,
         node: &Node<Ext>,

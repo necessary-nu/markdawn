@@ -437,4 +437,91 @@ mod tests {
             assert!(svg.contains("<svg"), "got: {svg}");
         }
     }
+    // [spec:mw:req:typst.preamble.svg-auto-page/test]
+    #[test]
+    fn the_preamble_is_exactly_two_lines_of_auto_page_and_eleven_point_text() {
+        assert_eq!(
+            wrap_with_preamble("body"),
+            "#set page(width: auto, height: auto, margin: 0.5em, fill: none)\n\
+             #set text(size: 11pt)\n\
+             body"
+        );
+        assert_eq!(wrap_with_preamble("body").lines().count(), 3);
+    }
+
+    // [spec:mw:req:typst.preamble.svg-auto-page/test]
+    #[test]
+    fn the_svg_path_prepends_the_preamble_and_the_pdf_path_does_not() {
+        // The preamble becomes part of the compiled source, so an error on
+        // the caller's first line is reported two lines further down on the
+        // SVG path. The PDF path reports it unshifted, which is how we know
+        // it compiled the source as written.
+        let svg = render("#nope()").unwrap_err();
+        let pdf = render_pdf("#nope()").unwrap_err();
+        match (&svg, &pdf) {
+            (TypstRenderError::Failed(svg), TypstRenderError::Failed(pdf)) => {
+                assert!(svg.contains("(line 3, col 2)"), "svg diagnostic: {svg}");
+                assert!(pdf.contains("(line 1, col 2)"), "pdf diagnostic: {pdf}");
+            }
+            other => panic!("expected two Failed diagnostics, got {other:?}"),
+        }
+    }
+
+    // [spec:mw:req:typst.preamble.svg-auto-page/test]
+    #[test]
+    fn the_svg_page_sizes_to_its_content_instead_of_a_blank_a4_sheet() {
+        let svg = render("= T\n\ncontent").unwrap();
+        let width = svg_root_length(&svg, "width");
+        let height = svg_root_length(&svg, "height");
+        // A4 is 595.28 x 841.89pt; a one-line fence must be nowhere near it.
+        assert!(width < 200.0, "width {width}pt is not content-sized");
+        assert!(height < 100.0, "height {height}pt is not content-sized");
+        assert!(width > 0.0 && height > 0.0);
+    }
+
+    // [spec:mw:req:typst.preamble.svg-auto-page/test]
+    #[test]
+    fn the_svg_page_has_no_opaque_background() {
+        // `fill: none` means typst emits no page-background path at all.
+        let transparent = render("content").unwrap();
+        assert!(
+            !transparent.contains("fill=\"#ffffff\""),
+            "opaque background leaked into the figure: {transparent}"
+        );
+        // A caller who overrides the fill gets the background back, which is
+        // what shows the preamble's `fill: none` is doing the work.
+        let opaque = render("#set page(fill: white)\ncontent").unwrap();
+        assert!(opaque.contains("fill=\"#ffffff\""), "{opaque}");
+    }
+
+    // [spec:mw:req:typst.preamble.svg-auto-page/test]
+    #[test]
+    fn compiled_pages_merge_into_one_svg_with_four_points_of_padding() {
+        assert_eq!(SVG_PADDING_PT, 4.0);
+
+        let two_pages =
+            render("#set page(width: 50pt, height: 30pt, margin: 0pt)\na\n#pagebreak()\nb")
+                .unwrap();
+        assert_eq!(
+            two_pages.matches("<svg").count(),
+            1,
+            "pages were not merged: {two_pages}"
+        );
+        // Two 30pt pages stacked with 4pt between them.
+        assert_eq!(svg_root_length(&two_pages, "height"), 64.0);
+        assert_eq!(svg_root_length(&two_pages, "width"), 50.0);
+    }
+
+    /// Parse a `pt`-suffixed length attribute off the `<svg>` root.
+    fn svg_root_length(svg: &str, attribute: &str) -> f64 {
+        let needle = format!("{attribute}=\"");
+        let start = svg.find(&needle).expect("attribute present") + needle.len();
+        let rest = &svg[start..];
+        let end = rest.find('"').expect("closing quote");
+        rest[..end]
+            .strip_suffix("pt")
+            .expect("pt-suffixed length")
+            .parse()
+            .expect("numeric length")
+    }
 }

@@ -223,6 +223,10 @@ pub unsafe extern "C" fn mw_state_free(state: *mut State) {
 }
 
 #[cfg(test)]
+#[path = "html_ffi_tests.rs"]
+mod ffi_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::ffi::CStr;

@@ -1020,6 +1020,8 @@ assertions (
     {id defects.highlighting-rules-misfiled, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:15:56.342543Z}
     {id defects.verb-misassignment, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:16:00.938296Z}
     {id defects.core-spec-padding, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:16:04.836944Z}
+    {id defects.uikit-diagram-engine-output-unsanitised, kind @complete, author "brendan@necessary.nu", at 2026-07-29T21:54:36.84092Z}
+    {id defects.test-coverage-gaps, kind @complete, author "brendan@necessary.nu", at 2026-07-29T22:39:25.842578Z}
 )
 
 impl_evidence (

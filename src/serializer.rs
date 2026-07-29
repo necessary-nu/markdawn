@@ -501,6 +501,10 @@ fn ensure_blank_line(out: &mut String) {
 }
 
 #[cfg(test)]
+#[path = "serializer_tests.rs"]
+mod contract_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::node::{AlertKind, SourceSpan, TableAlignment};

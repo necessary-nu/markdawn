@@ -616,4 +616,106 @@ mod tests {
         };
         assert_eq!(emission.node, "<p><span class=\"math\">x^2</span></p>\n");
     }
+
+    // [spec:mw:req:html.escape.attribute-contexts/test]
+    #[test]
+    fn each_attr_val_variant_selects_its_own_encoding() {
+        use crate::adapter::vdom::{AttrVal, Props};
+
+        let mut props = Props::new();
+        props.set("data-esc", AttrVal::Esc("a<b>&\"c".to_owned()));
+        props.set("href", AttrVal::Url("/p?a=1&b=2 x\"".to_owned()));
+        props.set("class", AttrVal::Lit("a<b>&\"c".to_owned()));
+        props.set("data-footnotes", AttrVal::Flag);
+        props.set("disabled", AttrVal::Empty);
+
+        let mut out = String::new();
+        super::write_attrs(&props, &mut out);
+
+        assert_eq!(
+            out,
+            concat!(
+                // Esc: through the HTML escaper.
+                " data-esc=\"a&lt;b&gt;&amp;&quot;c\"",
+                // Url: through the percent-encoder, keeping `&` and `=`.
+                " href=\"/p?a=1&b=2%20x%22\"",
+                // Lit: copied with no transformation at all.
+                " class=\"a<b>&\"c\"",
+                // Flag: bare key, no `=`, no quotes.
+                " data-footnotes",
+                // Empty: key=""
+                " disabled=\"\"",
+            )
+        );
+    }
+
+    // [spec:mw:req:html.escape.attribute-contexts/test]
+    #[test]
+    fn attributes_are_emitted_in_props_insertion_order() {
+        use crate::adapter::vdom::{AttrVal, Props};
+
+        let mut forward = Props::new();
+        forward.set("a", AttrVal::Lit("1".to_owned()));
+        forward.set("b", AttrVal::Lit("2".to_owned()));
+        let mut reverse = Props::new();
+        reverse.set("b", AttrVal::Lit("2".to_owned()));
+        reverse.set("a", AttrVal::Lit("1".to_owned()));
+
+        let mut forward_out = String::new();
+        super::write_attrs(&forward, &mut forward_out);
+        let mut reverse_out = String::new();
+        super::write_attrs(&reverse, &mut reverse_out);
+
+        assert_eq!(forward_out, " a=\"1\" b=\"2\"");
+        assert_eq!(reverse_out, " b=\"2\" a=\"1\"");
+    }
+
+    // [spec:mw:req:html.escape.attribute-contexts/test]
+    #[test]
+    fn document_derived_attribute_values_reach_the_output_encoded() {
+        // Whole-document check that the adapter routes each real attribute
+        // through the variant the rule requires: `Esc` for the image title,
+        // `Url` for its destination, `Lit` for the alignment class, `Flag`
+        // for `data-footnotes`, `Empty` for the task checkbox.
+        let mut parser = crate::Parser::<()>::builder().with_all().build();
+        let blocks = parser
+            .parse_full_at(
+                "| a |\n|:-:|\n| 1 |\n\n\
+                 - [ ] todo\n\n\
+                 ![alt <b>](</img a.png> 'ti\"tle <b>')\n\n\
+                 note[^1]\n\n[^1]: body\n",
+                0,
+            )
+            .expect("parse");
+
+        let adapter = HtmlAdapter::new();
+        let mut html = String::new();
+        for block in &blocks {
+            let StreamItem::Upsert(emission) = adapter
+                .render(StreamItem::Upsert(Emission {
+                    id: 0,
+                    provisional: false,
+                    node: block.node.clone(),
+                }))
+                .unwrap()
+            else {
+                panic!("expected upsert")
+            };
+            html.push_str(&emission.node);
+        }
+
+        // Lit: the crate-controlled alignment class, verbatim.
+        assert!(html.contains("align=\"center\""), "{html}");
+        // Empty: valueless-with-quotes.
+        assert!(html.contains("disabled=\"\""), "{html}");
+        // Flag: bare key, no `=` and no quotes.
+        assert!(html.contains(" data-footnotes>"), "{html}");
+        assert!(!html.contains("data-footnotes=\""), "{html}");
+        // Url: the space is percent-escaped, not HTML-escaped.
+        assert!(html.contains("src=\"/img%20a.png\""), "{html}");
+        // Esc: the title's quote and angle brackets are entity-escaped, so
+        // they cannot terminate the attribute or open a tag.
+        assert!(html.contains("title=\"ti&quot;tle &lt;b&gt;\""), "{html}");
+        assert!(html.contains("alt=\"alt &lt;b&gt;\""), "{html}");
+    }
 }

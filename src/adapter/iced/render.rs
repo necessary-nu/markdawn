@@ -1698,6 +1698,10 @@ fn scope_color(scope: &str) -> Option<(f32, f32, f32)> {
 }
 
 #[cfg(test)]
+#[path = "render_contract_tests.rs"]
+mod contract_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::node::Node;

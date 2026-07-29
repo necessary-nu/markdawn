@@ -459,3 +459,7 @@ impl<Ext> Node<Ext> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "node_tests.rs"]
+mod tests;

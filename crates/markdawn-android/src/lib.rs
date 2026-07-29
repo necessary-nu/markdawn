@@ -14,6 +14,7 @@
 
 mod core_tests;
 mod grammar_store;
+mod jni_surface_tests;
 
 use std::ffi::{c_char, c_void};
 

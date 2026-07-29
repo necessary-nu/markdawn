@@ -127,8 +127,11 @@ pub fn render_svg_sanitized(data: &[u8]) -> Option<Retained<UIImage>> {
 
 /// Render SVG data to a vector `UIImage` via CoreSVG.
 ///
-/// Only for SVG this crate generated itself; anything derived from the
-/// document goes through [`render_svg_sanitized`].
+/// Only for SVG this crate generated itself: math typesetting, and the
+/// diagram views via `crate::render_*_to_svg`, whose output the shared
+/// diagram tail has already capped and sanitised. SVG that arrived from
+/// the document — a raw HTML chunk, a `data:` payload, a fetch response
+/// — goes through [`render_svg_sanitized`].
 ///
 /// Returns `None` if CoreSVG symbols are unavailable, the data fails to parse,
 /// or the resulting image is too large (> [`MAX_SVG_DIMENSION`] in either axis).
