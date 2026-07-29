@@ -1,8 +1,9 @@
 use core::fmt;
 
-/// Byte offset into the parser's normalized buffer where an issue was
-/// detected.
-// [spec:mw:sem:core.error.location]
+/// Byte offset within the inline run the parser was consuming when it
+/// refused — block markers already stripped, so not an index into the
+/// caller's input or into the parser's buffer.
+// [spec:mw:sem:core.error.location+1]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ErrorLocation {
     pub byte_offset: usize,

@@ -285,7 +285,7 @@ where
 {
     /// Parse `source` and render the resulting block list as a single
     /// `Element`. Returns an empty column on parse failure.
-    // [spec:mw:req:iced.renderer.parse-failure-empty]
+    // [spec:mw:req:iced.renderer.parse-failure-empty+1]
     // [spec:mw:req:iced.renderer.selection-group-wrap]
     pub fn render(&self, source: &str) -> Element<'static, Url> {
         let mut builder = Parser::<()>::builder();
@@ -307,6 +307,10 @@ where
         let mut parser = builder.build();
         let blocks = match parser.parse_full_at(source, 0) {
             Ok(blocks) => blocks,
+            // Unreachable as long as the parser above is built without a
+            // byte cap and without host extensions; kept because the
+            // alternative to a graceful empty render is an `unwrap` that
+            // panics the host's render pass.
             Err(_) => return column![].into(),
         };
         let nodes: Vec<Node<()>> = blocks

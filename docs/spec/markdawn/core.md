@@ -390,12 +390,31 @@ its source spans, the `StreamItem` streaming protocol, the `Sink` and
 > three are `Option<ErrorLocation>`-carrying; none of them are
 > recoverable mid-parse.
 
-> [spec:mw:sem:core.error.location]
-> `ErrorLocation.byte_offset` is an offset into the parser's *normalized*
-> buffer — after line-ending and tab normalization — not into the bytes
-> the caller pushed, so it is not in general a valid index into the
-> caller's original input. It is optional because not every failure site
-> can attribute a position.
+> [spec:mw:sem:core.error.location+1]
+> `ErrorLocation.byte_offset` is a byte offset into the *inline run* the
+> parser was consuming when it refused — the string handed to the inline
+> tokenizer for one block — not into the bytes the caller pushed and not
+> into the parser's normalized buffer. An inline run is derived from the
+> block's normalized lines (CR and CRLF collapsed to LF, NUL replaced by
+> U+FFFD; tabs are left exactly as written) with the block's own structure
+> already removed: blockquote `>` prefixes, list markers, ATX `#` runs and
+> the surrounding whitespace are gone, and continuation lines are rejoined
+> with a single `\n`. So `> a@b` reports 1 rather than the 3 the same
+> character sits at in the buffer, and a refusal in the third line of a
+> CRLF document reports an offset within that block, not within the
+> document. Sub-parsers for emphasis, strong, strikethrough and highlight
+> interiors add their own start back on, so a refusal inside
+> `x ~~y@z~~ w` still reports 5 — an offset in the enclosing run. Table
+> cells and link/image labels are each their own run, counting from 0.
+>
+> The offset is therefore diagnostic, not a cursor: it is not in general a
+> valid index into anything the caller holds, and the error carries nothing
+> that would let a caller map it back to a document position. Code that
+> needs document coordinates MUST take them from the `source` spans of a
+> successful parse instead. Only the two variants declaring the field —
+> `InvalidExtensionMatch` and `MalformedEventStream` — ever carry a
+> location, and both always populate it; the `Option` exists so a future
+> refusal with no attributable position can still use the same taxonomy.
 
 > [spec:mw:def:core.error.stream-error]
 > `StreamError<E>` separates the two failure sources of a sink-driven

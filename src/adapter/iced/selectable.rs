@@ -1225,7 +1225,7 @@ fn emit_atom_svg<R: svg::Renderer>(
 /// the full Cursor (line + index) and add the line offset.
 // [spec:mw:req:iced.hit-test.global-byte-offset]
 // [spec:mw:sem:iced.hit-test.half-advance]
-// [spec:mw:sem:iced.hit-test.outside-glyphs]
+// [spec:mw:sem:iced.hit-test.outside-glyphs+1]
 // [spec:mw:req:iced.hit-test.paragraph-downcast-fallback]
 fn hit_test_global_byte<P: text::Paragraph + 'static>(
     paragraph: &P,

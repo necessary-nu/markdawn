@@ -200,7 +200,7 @@ rendering of a `Node` tree back to markdown source (`src/serializer.rs`).
 
 ## Round-trip fidelity
 
-> [spec:mw:req:editing.serialize.round-trip+1]
+> [spec:mw:req:editing.serialize.round-trip+2]
 > Serialisation is canonicalising, not source-preserving: callers MUST NOT
 > assume `serialize_blocks(parse(src))` equals `src`. Normalisation is
 > permitted, and applied, in marker choice, indentation, inter-block spacing,
@@ -221,8 +221,13 @@ rendering of a `Node` tree back to markdown source (`src/serializer.rs`).
 > and its children emitted as bare blocks, so a footnote definition comes
 > back as ordinary prose with any `[^label]` reference left dangling;
 > `TaskItem` always emits a bullet marker, so a task item inside an ordered
-> list comes back unordered; `Subscript` and `Superscript` come back as
-> `Html`; `TableCell`'s `header` and `alignment` are dropped, alignment being
+> list comes back unordered; `Subscript` and `Superscript` are written as
+> `<sub>` / `<sup>` and survive only where the re-parse promotes those tags
+> back, which is the top level of a block's inline run — nested inside
+> another inline (emphasis, strong, strikethrough, highlight, or a link
+> label) the promotion does not reach them and they come back as an `Html`
+> open tag, the content, and an `Html` close tag; `TableCell`'s `header` and
+> `alignment` are dropped, alignment being
 > reconstructed only from the table's `alignments` list; heading levels
 > are clamped to six; and the payloads `editing.serialize.escaping` leaves
 > verbatim come back altered when they hold markup. Fidelity is also

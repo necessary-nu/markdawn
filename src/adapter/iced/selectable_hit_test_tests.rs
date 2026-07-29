@@ -144,7 +144,7 @@ fn a_point_resolves_by_which_half_of_the_glyph_it_falls_in() {
     }
 }
 
-// [spec:mw:sem:iced.hit-test.outside-glyphs/test]
+// [spec:mw:sem:iced.hit-test.outside-glyphs+1/test]
 #[test]
 fn points_above_below_and_beside_the_glyphs_still_resolve() {
     let content = "abc\ndefgh";
@@ -179,6 +179,48 @@ fn points_above_below_and_beside_the_glyphs_still_resolve() {
         hit_test_global_byte(&paragraph, &offsets, Point::new(4.0, 5_000.0)),
         Some(content.len())
     );
+}
+
+// [spec:mw:sem:iced.hit-test.outside-glyphs+1/test]
+#[test]
+fn which_side_is_the_line_start_follows_the_lines_base_direction() {
+    // Hebrew alef-bet-gimel: 3 code points, 2 bytes each.
+    const RTL: &str = "\u{5d0}\u{5d1}\u{5d2}";
+
+    // `far` is (offset far left, offset far right) for a one-line paragraph.
+    let far = |content: &str| -> (Option<usize>, Option<usize>) {
+        let (paragraph, offsets) = laid_out(content);
+        let y = y_of(&paragraph, 0);
+        (
+            hit_test_global_byte(&paragraph, &offsets, Point::new(-5_000.0, y)),
+            hit_test_global_byte(&paragraph, &offsets, Point::new(5_000.0, y)),
+        )
+    };
+    let base_rtl = |content: &str| -> bool {
+        laid_out(content)
+            .0
+            .buffer()
+            .layout_runs()
+            .next()
+            .expect("a line")
+            .rtl
+    };
+
+    // Base-LTR: left is the logical start, right the logical end. True for
+    // pure LTR and for a mixed line whose base direction is still LTR.
+    assert!(!base_rtl("abc"));
+    assert_eq!(far("abc"), (Some(0), Some(3)));
+    let mixed_ltr = format!("abc {RTL}");
+    assert!(!base_rtl(&mixed_ltr));
+    assert_eq!(far(&mixed_ltr), (Some(0), Some(mixed_ltr.len())));
+
+    // Base-RTL: mirrored. A point far right is offset 0, NOT the end — the
+    // failure this rule exists to warn about.
+    assert!(base_rtl(RTL));
+    assert_eq!(far(RTL), (Some(RTL.len()), Some(0)));
+    let mixed_rtl = format!("{RTL} abc");
+    assert!(base_rtl(&mixed_rtl));
+    assert_eq!(far(&mixed_rtl), (Some(mixed_rtl.len()), Some(0)));
 }
 
 // ----- selected-text extraction -----------------------------------------

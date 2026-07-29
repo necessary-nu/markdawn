@@ -189,18 +189,32 @@ line they belong to.
 > cosmic-text's rule, applied unchanged — the widget performs no
 > rounding of its own.
 
-> [spec:mw:sem:iced.hit-test.outside-glyphs]
+> [spec:mw:sem:iced.hit-test.outside-glyphs+1]
 > Points outside every glyph still resolve, so drags into margins
 > and gutters behave. A point above the first visual line resolves
-> to offset 0 of that line; a point left of the first glyph of an
-> LTR line resolves to the start of that line; a point right of
-> every glyph on a line resolves to the greatest glyph end on that
-> line, which is the logical end of the line's byte coverage under
-> LTR, RTL and mixed-bidi layout alike; and a point below the last
-> visual line resolves to the end of the last line. A point in the
-> vertical gutter between two blocks belongs to no widget's glyphs
-> and is resolved by clipping, not by hit-testing: the blocks above
-> it clip as `Whole` or `Partial`, the blocks below as `Outside`.
+> to offset 0 of that line, and a point below the last visual line
+> resolves to the end of the last line.
+>
+> Horizontally, which side means "start" is decided by the visual
+> line's own base direction (cosmic-text's `LayoutRun::rtl`, taken
+> from the line's bidi paragraph level) — not by whether the line
+> happens to contain RTL text. Outside the glyphs on the side the
+> line *begins* on, the offset resolves to the line's logical start;
+> outside them on the side the line *ends* on, it resolves to the
+> greatest glyph end on that line, which is the logical end of the
+> line's byte coverage. For a base-LTR line that means left resolves
+> to the start and right to the end, and it still holds when the
+> line mixes scripts: `"abc אבג"` is base-LTR, so a point far right
+> resolves to its logical end. For a base-RTL line the two are
+> mirrored: `"אבג"` and `"אבג abc"` are both base-RTL, so a point
+> far right resolves to offset 0 — the logical *start* — and a point
+> far left to the logical end. Consumers MUST NOT treat a
+> far-right hit as "end of line" unconditionally.
+>
+> A point in the vertical gutter between two blocks belongs to no
+> widget's glyphs and is resolved by clipping, not by hit-testing:
+> the blocks above it clip as `Whole` or `Partial`, the blocks below
+> as `Outside`.
 
 > [spec:mw:req:iced.hit-test.degenerate-range]
 > When the two hit-tests of a `Partial` widget resolve to the same
@@ -399,10 +413,34 @@ line they belong to.
 > built without an extension drops custom nodes silently rather than
 > failing.
 
-> [spec:mw:req:iced.renderer.parse-failure-empty]
-> A parse failure MUST yield an empty column rather than a panic or
-> a partially built tree, so a host re-rendering on every keystroke
-> of a streaming document never has to handle a render error.
+> [spec:mw:req:iced.renderer.parse-failure-empty+1]
+> `Renderer::render` matches on the parse `Result`, and its failure arm
+> MUST yield an empty column rather than a panic or a partially built
+> tree, so a host re-rendering on every keystroke of a streaming
+> document never has to handle a render error.
+>
+> That arm is, today, unreachable through the public API — it is a
+> retained guard, not a routinely exercised path, and readers should
+> not infer otherwise from its presence. `render` constructs its own
+> `Parser` from `IcedOptions`, which carries only the built-in
+> extension flags (GFM, math, alerts, highlights, definition lists)
+> and the diagram toggles: there is no way for a host to register an
+> `Extension` or to set a `with_max_input_bytes` cap on that parser,
+> and `parse_full_at` clears the finished flag before parsing. That
+> eliminates three of `Error`'s four variants outright —
+> `InvalidExtensionMatch` requires a registered extension,
+> `InputTooLarge` requires a cap, `AlreadyFinished` cannot arise — and
+> the fourth, `MalformedEventStream`, is an `ok_or` on
+> `str::chars().next()` guarded by `index < input.len()`, which cannot
+> yield `None` for a `&str`.
+>
+> The arm MUST nevertheless be kept. It is matching a `Result`, so
+> deleting it makes the match non-exhaustive and forces an `unwrap` or
+> `expect` — converting a graceful empty render into a panic, which is
+> strictly worse than a branch that never runs. It becomes live the
+> moment that constructor gains a byte cap or accepts a host
+> extension, which is precisely when a streaming host would most need
+> the failure to stay silent.
 
 > [spec:mw:sem:iced.renderer.block-widgets]
 > Blocks map to widgets as follows. Paragraph and heading each

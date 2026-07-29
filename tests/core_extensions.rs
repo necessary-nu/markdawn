@@ -102,6 +102,60 @@ fn a_bad_match_aborts_rather_than_being_clamped_or_skipped() {
     assert!(!sink.items().is_empty());
 }
 
+// [spec:mw:sem:core.error.location+1/test]
+#[test]
+fn the_reported_offset_counts_from_the_start_of_the_blocks_inline_run() {
+    // The three candidate coordinate spaces disagree here: '@' is byte 6 of
+    // the pushed input, byte 4 of the normalized buffer, and byte 1 of the
+    // paragraph's inline run. The reported offset is the last of those.
+    let source = "a\r\n\r\nb@c\r\n";
+    assert_eq!(source.find('@'), Some(6));
+    assert_eq!(source.replace("\r\n", "\n").find('@'), Some(4));
+    let error = push_document(AtSign(0), source).expect_err("bad match");
+    assert_eq!(invalid_match_offset(error), 1);
+
+    // Block structure is stripped before the run is built, so markers,
+    // quote prefixes and leading indentation are not counted.
+    for (source, expected) in [
+        ("> a@b\n", 1usize),
+        ("- a@b\n", 1),
+        ("### c@d\n", 1),
+        ("  - xy a@b\n", 4),
+        ("first\n\nc@d\n", 1),
+        // Continuation lines are rejoined with a single `\n`, so a lazy
+        // paragraph counts across them: "a\nb\nc@d".
+        ("a\r\nb\r\nc@d\r\n", 5),
+    ] {
+        let error = push_document(AtSign(0), source).expect_err("bad match");
+        assert_eq!(invalid_match_offset(error), expected, "{source:?}");
+    }
+}
+
+// [spec:mw:sem:core.error.location+1/test]
+#[test]
+fn sub_runs_report_against_the_enclosing_run_and_cells_start_their_own() {
+    let offset_with_gfm = |source: &str| -> usize {
+        let mut parser = Parser::<Ext>::builder()
+            .with_gfm()
+            .with_extension(AtSign(0))
+            .build();
+        let mut sink = VecSink::new();
+        match parser.push_str(source, &mut sink) {
+            Err(StreamError::Parser(error)) => invalid_match_offset(error),
+            other => panic!("expected a parser refusal, got {other:?}"),
+        }
+    };
+
+    // Strikethrough content is consumed by a nested inline parser whose
+    // own input is just "y@z", but it adds its start back on, so the
+    // reported offset is 5 — the position of '@' in the enclosing run.
+    assert_eq!(offset_with_gfm("x ~~y@z~~ w\n"), 5);
+
+    // A table cell is its own run, counting from 0 rather than from the
+    // start of the row or of the table.
+    assert_eq!(offset_with_gfm("| h |\n|---|\n| a@b |\n"), 1);
+}
+
 // ----- block extensions -------------------------------------------------
 
 /// Claims the trigger line but reports consuming nothing.

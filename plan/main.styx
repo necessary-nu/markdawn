@@ -1636,12 +1636,27 @@ children (
                 id defects.spec-bodies-inaccurate
                 title "Four rule bodies describe behaviour the code does not have"
                 priority 1
+                sealed true
                 log (
                     {
                         at 2026-07-29T22:38:37.799129Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found while closing defects.test-coverage-gaps: four rule bodies assert things the implementation does not do. Each was caught by someone trying to write the test the rule implies and finding it fail.\n\n1. core.error.location — says byte_offset is \"an offset into the parser's normalized buffer — after line-ending and tab normalization\". Both halves false. Every top-level InlineParser is constructed with base_offset: 0 (src/parser.rs:1979, :5300), so the offset is relative to the containing block's inline run, not the buffer — a CRLF document with an error on line 3 reports offset 1 where the normalized-buffer offset is 6. And normalize_chunk (src/parser.rs:2253) maps only NUL to U+FFFD and CR/CRLF to LF; there is no tab normalization anywhere. Left impl-only rather than annotated, because a verify site would attest to a contract the code does not honour.\n\n2. editing.serialize.round-trip v1 — one clause stale: \"Subscript and Superscript come back as Html\". They do not. promote_semantic_html (src/parser.rs:1993) unconditionally promotes <sub>/<sup> back to Node::Subscript/Superscript, so they round-trip faithfully. Every other documented loss in that rule was verified and is real.\n\n3. iced.hit-test.outside-glyphs — the bidi clause is wrong. It says a point right of every glyph is the logical end of the line's byte coverage \"under LTR, RTL and mixed-bidi layout alike\". For a pure-RTL line, buffer().hit(5000, y) resolves to 0 — the logical start. The LTR clauses are all verified and correct.\n\n4. iced.renderer.parse-failure-empty — describes dead code, not merely hard-to-reach code. Renderer::render builds its own parser with no extensions and no max_input_bytes, and the only three Error variants a parse can yield are InputTooLarge (needs a cap), InvalidExtensionMatch (needs an extension) and MalformedEventStream (an Option::ok_or on str::chars().next() that cannot fire for valid UTF-8). The Err(_) => column![] arm is unreachable under the public API. Either the rule should say so, or the arm should go.\n\nFixing these means rewriting the bodies and bumping versions; for (4) it may mean deleting code instead."
+                    }
+
+                    {
+                        at 2026-07-29T23:20:34.972718Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-07-29T23:37:32.547901Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -1656,6 +1671,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "uikit.syntax.capture-fallback, uikit.syntax.span-bounds and uikit.syntax.span-priority are pure data transformations — dotted-prefix capture-name fallback, UTF-8 to UTF-16 offset conversion with clamping, and a widest-first span sort. None of them needs Apple runtime objects to compute. They are untestable on this host only because capture_default_color returns Retained&lt;UIColor&gt; and the sort and bounds logic is inlined into build_highlighted, inside a subtree gated on cfg(target_os = \"ios\"). Extracting a platform-neutral capture_color_name(&amp;str) -&gt; Option&lt;&amp;str&gt;, the span-ordering comparator, and utf16_offset into a module that is not cfg-gated would make all three host-testable and would let the same logic be shared with any future non-Apple renderer that consumes spans. This is a refactor rather than a test gap, which is why it was filed separately instead of being done under defects.test-coverage-gaps. Worth noting span-bounds is the clamping rule — the review that first surfaced the uikit gaps called it \"the sharpest gap\" precisely because stale spans after an edit are a real failure mode and nothing verifies the clamp."
+                    }
+                )
+            }
+
+            {
+                id defects.iced-bidi-doc-misattached
+                title "Bidi paint doc sits above the wrong function and misstates glyph order"
+                priority 2
+                log (
+                    {
+                        at 2026-07-29T23:37:00.341604Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "src/adapter/iced/selectable.rs:1203-1225 has two /// blocks glued together: the \"Paint a selection highlight per UAX #9...\" doc belonging to paint_bidi_selection sits directly above hit_test_global_byte's own doc, so it documents the wrong function. Two consequences. First, a reader of hit_test_global_byte gets paint semantics. Second, the stray block asserts glyphs are \"in screen-left-to-right visual order\", which is false: a probe with real cosmic-text layout on the RTL string אבג puts glyphs[0] at x=15.05 and glyphs[2] at x=0.0 — logical order with descending x. That claim governs iced.paint.bidi-runs, so fixing it likely means correcting that rule body and bumping it, not just moving a comment. Found while closing defects.spec-bodies-inaccurate, which established that the hit-test discriminator is the line's base direction (LayoutRun::rtl) rather than whether the line contains RTL — the same confusion is probably what produced this doc."
                     }
                 )
             }

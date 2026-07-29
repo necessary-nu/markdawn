@@ -239,7 +239,7 @@ fn writers_are_pure_functions_of_the_tree_and_ignore_source_spans() {
 
 // ----- documented round-trip losses ------------------------------------
 
-// [spec:mw:req:editing.serialize.round-trip+1/test]
+// [spec:mw:req:editing.serialize.round-trip+2/test]
 #[test]
 fn only_the_span_erased_shape_round_trips() {
     // Setext + underscore emphasis, so the canonical form differs from the
@@ -276,7 +276,7 @@ fn only_the_span_erased_shape_round_trips() {
     );
 }
 
-// [spec:mw:req:editing.serialize.round-trip+1/test]
+// [spec:mw:req:editing.serialize.round-trip+2/test]
 #[test]
 fn tight_lists_come_back_loose() {
     let tight = reparse("- a\n- b\n");
@@ -298,7 +298,7 @@ fn tight_lists_come_back_loose() {
     );
 }
 
-// [spec:mw:req:editing.serialize.round-trip+1/test]
+// [spec:mw:req:editing.serialize.round-trip+2/test]
 #[test]
 fn footnote_definitions_come_back_as_prose_with_a_dangling_reference() {
     let original = reparse("see[^a]\n\n[^a]: the note\n");
@@ -339,7 +339,44 @@ fn footnote_definitions_come_back_as_prose_with_a_dangling_reference() {
     );
 }
 
-// [spec:mw:req:editing.serialize.round-trip+1/test]
+// [spec:mw:req:editing.serialize.round-trip+2/test]
+#[test]
+fn sub_and_superscript_survive_at_the_top_level_but_not_inside_another_inline() {
+    // Collect the promoted / unpromoted inline kinds after a cycle.
+    let cycle = |source: &str| -> Vec<&'static str> {
+        let markdown = serialize_blocks(&reparse(source));
+        let mut kinds = Vec::new();
+        for block in &reparse(&markdown) {
+            block.walk(&mut |node| match node {
+                Node::Subscript { .. } => kinds.push("sub"),
+                Node::Superscript { .. } => kinds.push("sup"),
+                Node::Html { .. } => kinds.push("html"),
+                _ => {}
+            });
+        }
+        kinds
+    };
+
+    // Directly in a block's inline run the `<sub>` / `<sup>` the writer
+    // emits are promoted back, so the node survives.
+    assert_eq!(cycle("H<sub>2</sub>O\n"), vec!["sub"]);
+    assert_eq!(cycle("x<sup>2</sup>\n"), vec!["sup"]);
+    assert_eq!(cycle("<sub>a <sup>b</sup></sub>\n"), vec!["sub", "sup"]);
+
+    // Nested inside another inline the promotion does not reach them, and
+    // they come back as the open tag, the content, and the close tag.
+    for source in [
+        "*<sub>2</sub>*\n",
+        "**<sub>2</sub>**\n",
+        "~~<sub>2</sub>~~\n",
+        "==<sub>2</sub>==\n",
+        "[<sub>2</sub>](https://example.com)\n",
+    ] {
+        assert_eq!(cycle(source), vec!["html", "html"], "{source:?}");
+    }
+}
+
+// [spec:mw:req:editing.serialize.round-trip+2/test]
 #[test]
 fn a_task_item_in_an_ordered_list_comes_back_unordered() {
     let original: Node<()> = Node::List {
@@ -363,7 +400,7 @@ fn a_task_item_in_an_ordered_list_comes_back_unordered() {
     );
 }
 
-// [spec:mw:req:editing.serialize.round-trip+1/test]
+// [spec:mw:req:editing.serialize.round-trip+2/test]
 #[test]
 fn table_cell_header_and_alignment_are_rebuilt_only_from_the_table() {
     // A cell whose own `alignment` disagrees with the table's `alignments`
@@ -425,7 +462,7 @@ fn table_cell_header_and_alignment_are_rebuilt_only_from_the_table() {
     assert!(!header_flag(&rows[0]));
 }
 
-// [spec:mw:req:editing.serialize.round-trip+1/test]
+// [spec:mw:req:editing.serialize.round-trip+2/test]
 #[test]
 fn heading_levels_are_clamped_to_six() {
     let deep: Node<()> = Node::Heading {
@@ -442,7 +479,7 @@ fn heading_levels_are_clamped_to_six() {
     );
 }
 
-// [spec:mw:req:editing.serialize.round-trip+1/test]
+// [spec:mw:req:editing.serialize.round-trip+2/test]
 #[test]
 fn serialisation_normalises_markers_indentation_spacing_and_numbering() {
     let source = "Setext\n======\n\n\
@@ -471,7 +508,7 @@ fn serialisation_normalises_markers_indentation_spacing_and_numbering() {
     assert!(!markdown.contains("\n\n\n"), "{markdown}");
 }
 
-// [spec:mw:req:editing.serialize.round-trip+1/test]
+// [spec:mw:req:editing.serialize.round-trip+2/test]
 #[test]
 fn fidelity_is_conditional_on_the_reparsing_parser_having_the_same_extensions() {
     let alert: Node<()> = Node::Alert {

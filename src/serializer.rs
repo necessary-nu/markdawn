@@ -20,7 +20,7 @@ use block::write_block;
 
 /// Serialize a single node (block or inline) to canonical markdown.
 // [spec:mw:def:editing.serialize.entry-points]
-// [spec:mw:req:editing.serialize.round-trip+1]
+// [spec:mw:req:editing.serialize.round-trip+2]
 pub fn serialize<Ext>(node: &Node<Ext>) -> String {
     let mut out = String::new();
     write_block(node, &mut out, &mut WriteCtx::default());
@@ -30,7 +30,7 @@ pub fn serialize<Ext>(node: &Node<Ext>) -> String {
 /// Serialize a sequence of top-level blocks to canonical markdown, joined
 /// with blank-line separators.
 // [spec:mw:def:editing.serialize.entry-points]
-// [spec:mw:req:editing.serialize.round-trip+1]
+// [spec:mw:req:editing.serialize.round-trip+2]
 pub fn serialize_blocks<Ext>(blocks: &[Node<Ext>]) -> String {
     let mut out = String::new();
     let mut ctx = WriteCtx::default();
