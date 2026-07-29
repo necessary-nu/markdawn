@@ -1001,6 +1001,8 @@ rule_versions (
 
 assertions (
     {id defects.ansi-osc8-url-filtering, kind @complete, author "brendan@necessary.nu", at 2026-07-29T14:36:48.631524Z}
+    {id defects.example-required-features, kind @complete, author "brendan@necessary.nu", at 2026-07-29T17:17:40.716178Z}
+    {id defects.test-command-feature-coverage, kind @complete, author "brendan@necessary.nu", at 2026-07-29T17:17:43.820619Z}
 )
 
 impl_evidence (

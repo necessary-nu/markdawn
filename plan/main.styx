@@ -1206,6 +1206,14 @@ children (
                 id defects.dioxus-vdom-drift
                 title "Dioxus adapter has drifted from the vdom adapter"
                 priority 1
+                log (
+                    {
+                        at 2026-07-29T17:17:27.532045Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "A fix pass reached the `<dl>` wrapper for DefinitionList and started adding a `typst` option to DioxusOptions before being cut short. Reverted rather than landed: the typst option had no dispatch behind it (a public field that does nothing), and two rule versions were bumped at the annotation sites without the corresponding rule bodies being rewritten, which would leave the spec describing behaviour the code no longer had. The remaining divergences from the vdom adapter are unchanged and still listed on this node."
+                    }
+                )
             }
 
             {
@@ -1272,18 +1280,42 @@ children (
                 id defects.example-required-features
                 title "Repo lint and test checks were red: ansi_demo lacked required-features"
                 priority 2
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T17:17:31.005191Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Resolved during the adoption scaffold commit (7a76436): `[[example]] name = \"ansi_demo\" required-features = [\"ansi\"]` added to Cargo.toml, matching the existing declarations for ssg_blog and iced_demo. `cargo clippy --all-targets` and `cargo nextest run --workspace` both went green as a result."
+                    }
+
+                    {
+                        at 2026-07-29T17:17:40.716178Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id defects.test-command-feature-coverage
                 title "Declared test check skips feature-gated code"
                 priority 1
+                sealed true
                 log (
                     {
                         at 2026-07-29T14:34:53.975755Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "`cargo nextest run --workspace` runs 667 tests under default features (`highlight-all-languages`). The `ansi` feature is not enabled, so `src/ansi_to_html.rs` and `src/adapter/ansi.rs` tests never execute in the gate — including the OSC 8 scheme-allowlist test added for defects.ansi-osc8-url-filtering, which passes only under `--features ansi`. Same exposure applies to any other feature-gated module whose feature is not pulled in by workspace feature unification. Picking the right feature set is a judgement call: `--all-features` pulls in `iced-app` and the iOS/UIKit paths, which may not run headlessly."
+                    }
+
+                    {
+                        at 2026-07-29T17:17:43.820619Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }

@@ -11,7 +11,7 @@ platforms (
                 cmd "cargo clippy --no-deps -p markdawn -p markdawn-graphviz --all-targets -- -D warnings"
             }
             test {
-                cmd "cargo nextest run --workspace"
+                cmd "cargo nextest run --workspace --features markdawn/ansi,markdawn/terminal,markdawn/dioxus,markdawn/pikchr,markdawn/graphviz,markdawn/typst,markdawn/serde,markdawn/tracey"
             }
         }
     }
