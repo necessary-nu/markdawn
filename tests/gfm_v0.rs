@@ -377,17 +377,17 @@ fn escape_href(url: &str, out: &mut String) {
     out.push_str(&utf8_percent_encode(url, URL_SAFE).to_string());
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.structure]
-// gfm[verify leaf-blocks.thematic-breaks.requires-dash-underscore-or-asterisk-markers]
-// gfm[verify leaf-blocks.thematic-breaks.requires-three-or-more-marker-characters]
+// [spec:gfm:def:leaf-blocks.thematic-breaks.structure/test]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.requires-dash-underscore-or-asterisk-markers/test]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.requires-three-or-more-marker-characters/test]
 #[test]
 fn gfm_example_13_thematic_breaks() {
     let html = render_html(&parse_final_nodes("***\n---\n___\n"));
     assert_eq!(html, "<hr />\n<hr />\n<hr />\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.structure]
-// gfm[verify leaf-blocks.atx-headings.opening-sequence-length-one-to-six]
+// [spec:gfm:syn:leaf-blocks.atx-headings.structure/test]
+// [spec:gfm:syn:leaf-blocks.atx-headings.opening-sequence-length-one-to-six/test]
 #[test]
 fn gfm_example_32_atx_headings() {
     let html = render_html(&parse_final_nodes(
@@ -399,9 +399,9 @@ fn gfm_example_32_atx_headings() {
     );
 }
 
-// gfm[verify leaf-blocks.setext-headings.level-determined-by-underline-marker]
-// gfm[verify leaf-blocks.setext-headings.underline-uses-equals-or-dashes]
-// gfm[verify leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content]
+// [spec:gfm:sem:leaf-blocks.setext-headings.level-determined-by-underline-marker/test]
+// [spec:gfm:def:leaf-blocks.setext-headings.underline-uses-equals-or-dashes/test]
+// [spec:gfm:sem:leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content/test]
 #[test]
 fn gfm_example_80_setext_headings() {
     let html = render_html(&parse_final_nodes(
@@ -413,206 +413,206 @@ fn gfm_example_80_setext_headings() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.unclosed-block-closes-at-end-of-containing-block]
-// gfm[verify leaf-blocks.fenced-code-blocks.content-may-be-empty]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.unclosed-block-closes-at-end-of-containing-block/test]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.content-may-be-empty/test]
 #[test]
 fn gfm_example_126_unclosed_fence_at_eof() {
     let html = render_html(&parse_final_nodes("```\n"));
     assert_eq!(html, "<pre><code></code></pre>\n");
 }
 
-// gfm[verify inlines.backslash-escapes.backslash-at-end-line-is-hard-line-break]
-// gfm[verify inlines.hard-line-breaks.backslash-before-line-ending-also-produces-hard-line-break]
+// [spec:gfm:syn:inlines.backslash-escapes.backslash-at-end-line-is-hard-line-break/test]
+// [spec:gfm:syn:inlines.hard-line-breaks.backslash-before-line-ending-also-produces-hard-line-break/test]
 #[test]
 fn gfm_backslash_hard_break() {
     let html = render_html(&parse_final_nodes("foo\\\nbar\n"));
     assert_eq!(html, "<p>foo<br />\nbar</p>\n");
 }
 
-// gfm[verify inlines.code-spans.example]
-// gfm[verify inlines.code-spans.definition]
-// gfm[verify inlines.code-spans.backtick-string-definition]
+// [spec:gfm:syn:inlines.code-spans.example/test]
+// [spec:gfm:def:inlines.code-spans.definition/test]
+// [spec:gfm:def:inlines.code-spans.backtick-string-definition/test]
 #[test]
 fn gfm_code_span() {
     let html = render_html(&parse_final_nodes("`foo`\n"));
     assert_eq!(html, "<p><code>foo</code></p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.single-asterisk-can-open-emphasis]
-// gfm[verify inlines.emphasis-and-strong-emphasis.single-asterisk-can-close-emphasis]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-can-open-strong-emphasis]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-can-close-strong-emphasis]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.single-asterisk-can-open-emphasis/test]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.single-asterisk-can-close-emphasis/test]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.double-asterisk-can-open-strong-emphasis/test]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.double-asterisk-can-close-strong-emphasis/test]
 #[test]
 fn gfm_emphasis_and_strong() {
     let html = render_html(&parse_final_nodes("*em* and **strong**\n"));
     assert_eq!(html, "<p><em>em</em> and <strong>strong</strong></p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-is-not-allowed-inside-words]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-is-not-allowed-inside-words/test]
 #[test]
 fn gfm_intraword_underscore_is_literal() {
     let html = render_html(&parse_final_nodes("foo_bar_baz\n"));
     assert_eq!(html, "<p>foo_bar_baz</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-permitted]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-permitted/test]
 #[test]
 fn gfm_intraword_asterisk_is_allowed() {
     let html = render_html(&parse_final_nodes("foo*bar*baz\n"));
     assert_eq!(html, "<p>foo<em>bar</em>baz</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.underscore-can-open-when-punctuation-precedes]
-// gfm[verify inlines.emphasis-and-strong-emphasis.single-underscore-can-open-emphasis]
-// gfm[verify inlines.emphasis-and-strong-emphasis.single-underscore-can-close-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-can-open-when-punctuation-precedes/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.single-underscore-can-open-emphasis/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.single-underscore-can-close-emphasis/test]
 #[test]
 fn gfm_punctuation_gated_underscore_emphasis() {
     let html = render_html(&parse_final_nodes("foo-_(bar)_\n"));
     assert_eq!(html, "<p>foo-<em>(bar)</em></p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.underscore-can-close-when-punctuation-follows]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-can-close-when-punctuation-follows/test]
 #[test]
 fn gfm_punctuation_gated_underscore_closer() {
     let html = render_html(&parse_final_nodes("_(bar)_.\n"));
     assert_eq!(html, "<p><em>(bar)</em>.</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-produces-nested-strong]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-produces-nested-strong/test]
 #[test]
 fn gfm_triple_asterisk_nests_emphasis_and_strong() {
     let html = render_html(&parse_final_nodes("***foo***\n"));
     assert_eq!(html, "<p><em><strong>foo</strong></em></p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.both-multiples-of-three-allow-emphasis-match]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.both-multiples-of-three-allow-emphasis-match/test]
 #[test]
 fn gfm_multiple_of_three_balanced_case() {
     let html = render_html(&parse_final_nodes("foo***bar***baz\n"));
     assert_eq!(html, "<p>foo<em><strong>bar</strong></em>baz</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.strong-emphasis-requires-matching-delimiters]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-requires-matching-delimiters/test]
 #[test]
 fn gfm_nested_strong_inside_emphasis() {
     let html = render_html(&parse_final_nodes("*foo **bar***\n"));
     assert_eq!(html, "<p><em>foo <strong>bar</strong></em></p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.intraword-strong-emphasis-is-permitted]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-strong-emphasis-is-permitted/test]
 #[test]
 fn gfm_intraword_double_asterisk_is_allowed() {
     let html = render_html(&parse_final_nodes("foo**bar**baz\n"));
     assert_eq!(html, "<p>foo<strong>bar</strong>baz</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.intraword-strong-emphasis-is-forbidden]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-strong-emphasis-is-forbidden/test]
 #[test]
 fn gfm_intraword_double_underscore_is_literal() {
     let html = render_html(&parse_final_nodes("foo__bar__baz\n"));
     assert_eq!(html, "<p>foo__bar__baz</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-can-open-when-punctuation-precedes]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-can-open-strong-emphasis]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-can-close-strong-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-open-when-punctuation-precedes/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-open-strong-emphasis/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-close-strong-emphasis/test]
 #[test]
 fn gfm_punctuation_gated_double_underscore_strong() {
     let html = render_html(&parse_final_nodes("foo-__(bar)__\n"));
     assert_eq!(html, "<p>foo-<strong>(bar)</strong></p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-can-close-when-punctuation-follows]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-close-when-punctuation-follows/test]
 #[test]
 fn gfm_punctuation_gated_double_underscore_closer() {
     let html = render_html(&parse_final_nodes("__(bar)__.\n"));
     assert_eq!(html, "<p><strong>(bar)</strong>.</p>\n");
 }
 
-// gfm[verify inlines.links.inline-link-definition]
+// [spec:gfm:syn:inlines.links.inline-link-definition/test]
 #[test]
 fn gfm_inline_link() {
     let html = render_html(&parse_final_nodes("[link](/dest \"title\")\n"));
     assert_eq!(html, "<p><a href=\"/dest\" title=\"title\">link</a></p>\n");
 }
 
-// gfm[verify inlines.images.definition]
+// [spec:gfm:syn:inlines.images.definition/test]
 #[test]
 fn gfm_inline_image() {
     let html = render_html(&parse_final_nodes("![alt](/img.png)\n"));
     assert_eq!(html, "<p><img src=\"/img.png\" alt=\"alt\" /></p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.may-appear-before-or-after-uses]
-// gfm[verify leaf-blocks.link-reference-definitions.defines-label-for-reference-links-and-images]
-// gfm[verify leaf-blocks.link-reference-definitions.scope-is-the-entire-document]
-// gfm[verify leaf-blocks.link-reference-definitions.use-may-precede-definition]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.may-appear-before-or-after-uses/test]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.defines-label-for-reference-links-and-images/test]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.scope-is-the-entire-document/test]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.use-may-precede-definition/test]
 #[test]
 fn gfm_reference_link_later_definition() {
     let html = render_html(&parse_final_nodes("[foo]\n\n[foo]: /url\n"));
     assert_eq!(html, "<p><a href=\"/url\">foo</a></p>\n");
 }
 
-// gfm[verify inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html]
-// gfm[verify inlines.raw-html.html-tag-definition]
-// gfm[verify inlines.raw-html.open-tag-definition]
-// gfm[verify inlines.raw-html.closing-tag-definition]
-// gfm[verify inlines.raw-html.tag-name-definition]
+// [spec:gfm:def:inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html/test]
+// [spec:gfm:def:inlines.raw-html.html-tag-definition/test]
+// [spec:gfm:def:inlines.raw-html.open-tag-definition/test]
+// [spec:gfm:def:inlines.raw-html.closing-tag-definition/test]
+// [spec:gfm:syn:inlines.raw-html.tag-name-definition/test]
 #[test]
 fn gfm_inline_raw_html() {
     let html = render_html(&parse_final_nodes("a <span>hi</span> b\n"));
     assert_eq!(html, "<p>a <span>hi</span> b</p>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.definition]
+// [spec:gfm:def:leaf-blocks.html-blocks.definition/test]
 #[test]
 fn gfm_html_block_passthrough() {
     let html = render_html(&parse_final_nodes("<div>\nfoo\n</div>\n"));
     assert_eq!(html, "<div>\nfoo\n</div>\n");
 }
 
-// gfm[verify inlines.strikethrough-extension.gfm-enables-strikethrough-extension]
-// gfm[verify inlines.strikethrough-extension.extension-wrapper]
-// gfm[verify inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
+// [spec:gfm:def:inlines.strikethrough-extension.gfm-enables-strikethrough-extension/test]
+// [spec:gfm:syn:inlines.strikethrough-extension.extension-wrapper/test]
+// [spec:gfm:def:inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters/test]
 #[test]
 fn gfm_strikethrough() {
     let html = render_html(&parse_final_nodes("~~gone~~\n"));
     assert_eq!(html, "<p><del>gone</del></p>\n");
 }
 
-// gfm[verify inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
+// [spec:gfm:def:inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters/test]
 #[test]
 fn gfm_strikethrough_skips_internal_code_span_closers() {
     let html = render_html(&parse_final_nodes("~~`code ~~`~~\n"));
     assert_eq!(html, "<p><del><code>code ~~</code></del></p>\n");
 }
 
-// gfm[verify inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
+// [spec:gfm:def:inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters/test]
 #[test]
 fn gfm_strikethrough_rejects_whitespace_delimited_cases() {
     let html = render_html(&parse_final_nodes("~~ hi~~ and ~~hi ~~\n"));
     assert_eq!(html, "<p>~~ hi~~ and ~~hi ~~</p>\n");
 }
 
-// gfm[verify inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
+// [spec:gfm:def:inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters/test]
 #[test]
 fn gfm_strikethrough_spans_soft_breaks() {
     let html = render_html(&parse_final_nodes("This ~~has a\nsoft break~~.\n"));
     assert_eq!(html, "<p>This <del>has a\nsoft break</del>.</p>\n");
 }
 
-// gfm[verify inlines.strikethrough-extension.new-paragraph-ends-strikethrough-parse]
+// [spec:gfm:syn:inlines.strikethrough-extension.new-paragraph-ends-strikethrough-parse/test]
 #[test]
 fn gfm_strikethrough_stops_at_paragraph_breaks() {
     let html = render_html(&parse_final_nodes("This ~~has a\n\nnew paragraph~~.\n"));
     assert_eq!(html, "<p>This ~~has a</p>\n<p>new paragraph~~.</p>\n");
 }
 
-// gfm[verify container-blocks.task-list-items-extension.definition]
-// gfm[verify container-blocks.task-list-items-extension.marker-structure]
-// gfm[verify container-blocks.task-list-items-extension.whitespace-marker-is-unchecked]
-// gfm[verify container-blocks.task-list-items-extension.rendered-marker-becomes-semantic-checkbox]
-// gfm[verify container-blocks.task-list-items-extension.gfm-enables-task-list-extension]
+// [spec:gfm:def:container-blocks.task-list-items-extension.definition/test]
+// [spec:gfm:def:container-blocks.task-list-items-extension.marker-structure/test]
+// [spec:gfm:sem:container-blocks.task-list-items-extension.whitespace-marker-is-unchecked/test]
+// [spec:gfm:sem:container-blocks.task-list-items-extension.rendered-marker-becomes-semantic-checkbox/test]
+// [spec:gfm:sem:container-blocks.task-list-items-extension.gfm-enables-task-list-extension/test]
 #[test]
 fn gfm_task_list_item() {
     let html = render_html(&parse_final_nodes("- [x] done\n- [ ] todo\n"));
@@ -622,7 +622,7 @@ fn gfm_task_list_item() {
     );
 }
 
-// gfm[verify leaf-blocks.tables-extension.table-definition]
+// [spec:gfm:def:leaf-blocks.tables-extension.table-definition/test]
 #[test]
 fn gfm_table() {
     let html = render_html(&parse_final_nodes("| a | b |\n| :-- | --: |\n| 1 | 2 |\n"));
@@ -632,9 +632,9 @@ fn gfm_table() {
     );
 }
 
-// gfm[verify inlines.autolinks-extension.extended-url-autolink-definition]
-// gfm[verify inlines.autolinks-extension.definition]
-// gfm[verify inlines.autolinks-extension.gfm-enables-extended-autolinks]
+// [spec:gfm:syn:inlines.autolinks-extension.extended-url-autolink-definition/test]
+// [spec:gfm:def:inlines.autolinks-extension.definition/test]
+// [spec:gfm:def:inlines.autolinks-extension.gfm-enables-extended-autolinks/test]
 #[test]
 fn gfm_autolink_literal() {
     let html = render_html(&parse_final_nodes("visit https://example.com now\n"));
@@ -644,8 +644,8 @@ fn gfm_autolink_literal() {
     );
 }
 
-// gfm[verify container-blocks.list-items.lazy-continuation-example]
-// gfm[verify container-blocks.list-items.laziness-works-inside-nested-structures]
+// [spec:gfm:syn:container-blocks.list-items.lazy-continuation-example/test]
+// [spec:gfm:syn:container-blocks.list-items.laziness-works-inside-nested-structures/test]
 #[test]
 fn gfm_loose_list_and_lazy_continuation() {
     let html = render_html(&parse_final_nodes(
@@ -657,8 +657,8 @@ fn gfm_loose_list_and_lazy_continuation() {
     );
 }
 
-// gfm[verify container-blocks.list-items.ordered-start-number-is-at-most-nine-digits]
-// gfm[verify container-blocks.list-items.ordered-start-number-may-have-leading-zeroes]
+// [spec:gfm:syn:container-blocks.list-items.ordered-start-number-is-at-most-nine-digits/test]
+// [spec:gfm:syn:container-blocks.list-items.ordered-start-number-may-have-leading-zeroes/test]
 #[test]
 fn gfm_ordered_marker_width_rules() {
     let html = render_html(&parse_final_nodes(
@@ -670,22 +670,22 @@ fn gfm_ordered_marker_width_rules() {
     );
 }
 
-// gfm[verify container-blocks.list-items.interrupting-ordered-list-must-start-at-one]
+// [spec:gfm:syn:container-blocks.list-items.interrupting-ordered-list-must-start-at-one/test]
 #[test]
 fn gfm_ordered_list_interrupt_requires_one() {
     let html = render_html(&parse_final_nodes("para\n2. no interrupt\n"));
     assert_eq!(html, "<p>para\n2. no interrupt</p>\n");
 }
 
-// gfm[verify container-blocks.list-items.empty-item-does-not-require-post-marker-spaces]
+// [spec:gfm:syn:container-blocks.list-items.empty-item-does-not-require-post-marker-spaces/test]
 #[test]
 fn gfm_empty_list_item_without_space() {
     let html = render_html(&parse_final_nodes("*\n* next\n"));
     assert_eq!(html, "<ul>\n<li></li>\n<li>next</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.interrupting-first-item-cannot-begin-with-blank-line]
-// gfm[verify container-blocks.list-items.blank-line-start-makes-post-marker-spacing-irrelevant]
+// [spec:gfm:syn:container-blocks.list-items.interrupting-first-item-cannot-begin-with-blank-line/test]
+// [spec:gfm:syn:container-blocks.list-items.blank-line-start-makes-post-marker-spacing-irrelevant/test]
 #[test]
 fn gfm_blank_start_list_item_cases() {
     let html = render_html(&parse_final_nodes("para\n+\n  foo\n"));
@@ -695,7 +695,7 @@ fn gfm_blank_start_list_item_cases() {
     assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.sublists-follow-general-indentation-rules]
+// [spec:gfm:thm:container-blocks.list-items.sublists-follow-general-indentation-rules/test]
 #[test]
 fn gfm_nested_sublist() {
     let html = render_html(&parse_final_nodes("- one\n  - two\n"));
@@ -705,7 +705,7 @@ fn gfm_nested_sublist() {
     );
 }
 
-// gfm[verify container-blocks.list-items.indented-code-must-be-four-spaces-beyond-content-indent]
+// [spec:gfm:syn:container-blocks.list-items.indented-code-must-be-four-spaces-beyond-content-indent/test]
 #[test]
 fn gfm_indented_code_inside_list_item() {
     let html = render_html(&parse_final_nodes("- foo\n\n      bar\n"));
@@ -716,8 +716,8 @@ fn gfm_indented_code_inside_list_item() {
     );
 }
 
-// gfm[verify preliminaries.tabs.tab-indented-list-continuation-equivalence]
-// gfm[verify preliminaries.tabs.tab-indented-code-block-equivalence]
+// [spec:gfm:sem:preliminaries.tabs.tab-indented-list-continuation-equivalence/test]
+// [spec:gfm:sem:preliminaries.tabs.tab-indented-code-block-equivalence/test]
 #[test]
 fn gfm_tab_indentation_structural_cases() {
     let html = render_html(&parse_final_nodes("\tcode\n"));
@@ -738,7 +738,7 @@ fn gfm_tab_indentation_structural_cases() {
     );
 }
 
-// gfm[verify preliminaries.tabs.tab-after-block-quote-marker-counts-toward-indent]
+// [spec:gfm:sem:preliminaries.tabs.tab-after-block-quote-marker-counts-toward-indent/test]
 #[test]
 fn gfm_tab_after_block_quote_marker_counts_toward_indent() {
     let html = render_html(&parse_final_nodes(">\t\tfoo\n"));
@@ -749,8 +749,8 @@ fn gfm_tab_after_block_quote_marker_counts_toward_indent() {
     );
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-1-script-pre-style-start-and-end-conditions]
-// gfm[verify leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-1-script-pre-style-start-and-end-conditions/test]
+// [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs/test]
 #[test]
 fn gfm_html_block_type_1_interrupts_paragraph_and_closes_on_end_tag() {
     let html = render_html(&parse_final_nodes(
@@ -762,14 +762,14 @@ fn gfm_html_block_type_1_interrupts_paragraph_and_closes_on_end_tag() {
     );
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-2-comment-start-and-end-conditions]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-2-comment-start-and-end-conditions/test]
 #[test]
 fn gfm_html_block_type_2_comment_runs_until_comment_close() {
     let html = render_html(&parse_final_nodes("<!--\n# not a heading\n-->\nafter\n"));
     assert_eq!(html, "<!--\n# not a heading\n-->\n<p>after</p>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.trailing-text-after-end-marker-stays-inside-block]
+// [spec:gfm:sem:leaf-blocks.html-blocks.trailing-text-after-end-marker-stays-inside-block/test]
 #[test]
 fn gfm_html_block_type_1_keeps_trailing_text_on_end_marker_line_inside_block() {
     let html = render_html(&parse_final_nodes(
@@ -778,8 +778,9 @@ fn gfm_html_block_type_1_keeps_trailing_text_on_end_marker_line_inside_block() {
     assert_eq!(html, "<script>\nfoo\n</script>1. *bar*\n<p>after</p>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-3-processing-instruction-start-and-end-conditions]
-// gfm[verify leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-3-processing-instruction-start-and-end-conditions/test]
+// [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs/test]
+// [spec:gfm:thm:leaf-blocks.html-blocks.types-1-through-5-may-contain-blank-lines/test]
 #[test]
 fn gfm_html_block_type_3_interrupts_paragraph_and_allows_blank_lines_until_close() {
     let html = render_html(&parse_final_nodes(
@@ -791,16 +792,17 @@ fn gfm_html_block_type_3_interrupts_paragraph_and_allows_blank_lines_until_close
     );
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-4-declaration-start-and-end-conditions]
-// gfm[verify leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-4-declaration-start-and-end-conditions/test]
+// [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs/test]
 #[test]
 fn gfm_html_block_type_4_interrupts_paragraph_and_closes_on_gt() {
     let html = render_html(&parse_final_nodes("before\n<!DOCTYPE html>\nafter\n"));
     assert_eq!(html, "<p>before</p>\n<!DOCTYPE html>\n<p>after</p>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-5-cdata-start-and-end-conditions]
-// gfm[verify leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-5-cdata-start-and-end-conditions/test]
+// [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs/test]
+// [spec:gfm:thm:leaf-blocks.html-blocks.types-1-through-5-may-contain-blank-lines/test]
 #[test]
 fn gfm_html_block_type_5_interrupts_paragraph_and_allows_blank_lines_until_close() {
     let html = render_html(&parse_final_nodes(
@@ -812,45 +814,45 @@ fn gfm_html_block_type_5_interrupts_paragraph_and_allows_blank_lines_until_close
     );
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-6-block-tag-start-and-blank-line-end]
-// gfm[verify leaf-blocks.html-blocks.blank-line-ends-type-6-block-and-normal-parsing-resumes]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-block-tag-start-and-blank-line-end/test]
+// [spec:gfm:syn:leaf-blocks.html-blocks.blank-line-ends-type-6-block-and-normal-parsing-resumes/test]
 #[test]
 fn gfm_html_block_type_6_interrupts_paragraph_and_ends_at_blank_line() {
     let html = render_html(&parse_final_nodes("before\n<div>\nraw\n\nafter\n"));
     assert_eq!(html, "<p>before</p>\n<div>\nraw\n<p>after</p>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-6-continues-through-apparent-markdown-until-blank-line]
-// gfm[verify leaf-blocks.html-blocks.type-6-and-7-usually-require-following-blank-line]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-continues-through-apparent-markdown-until-blank-line/test]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-and-7-usually-require-following-blank-line/test]
 #[test]
 fn gfm_html_block_type_6_keeps_following_markdown_inside_block_without_blank_line() {
     let html = render_html(&parse_final_nodes("<div>\nbar\n</div>\n*foo*\n"));
     assert_eq!(html, "<div>\nbar\n</div>\n*foo*\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-7-complete-tag-start-and-blank-line-end]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-7-complete-tag-start-and-blank-line-end/test]
 #[test]
 fn gfm_html_block_type_7_generic_tag_at_top_level_ends_at_blank_line() {
     let html = render_html(&parse_final_nodes("<span>\nraw\n\nafter\n"));
     assert_eq!(html, "<span>\nraw\n<p>after</p>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.non-type-6-tag-must-be-complete-and-alone-on-first-line]
+// [spec:gfm:syn:leaf-blocks.html-blocks.non-type-6-tag-must-be-complete-and-alone-on-first-line/test]
 #[test]
 fn gfm_html_block_type_7_requires_a_complete_non_block_tag_on_its_first_line() {
     let html = render_html(&parse_final_nodes("<a href=\"foo\">\n*bar*\n</a>\n"));
     assert_eq!(html, "<a href=\"foo\">\n*bar*\n</a>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-7-cannot-interrupt-paragraphs]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-7-cannot-interrupt-paragraphs/test]
 #[test]
 fn gfm_html_block_type_7_does_not_interrupt_paragraph() {
     let html = render_html(&parse_final_nodes("before\n<span>\nafter\n"));
     assert_eq!(html, "<p>before\n<span>\nafter</p>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.block-vs-inline-tag-behavior]
-// gfm[verify leaf-blocks.html-blocks.inline-html-when-tag-is-not-alone-on-line]
+// [spec:gfm:syn:leaf-blocks.html-blocks.block-vs-inline-tag-behavior/test]
+// [spec:gfm:syn:leaf-blocks.html-blocks.inline-html-when-tag-is-not-alone-on-line/test]
 #[test]
 fn gfm_html_block_del_tag_distinguishes_block_and_inline_forms() {
     let html = render_html(&parse_final_nodes("<del>\n*foo*\n</del>\n"));
@@ -860,8 +862,8 @@ fn gfm_html_block_del_tag_distinguishes_block_and_inline_forms() {
     assert_eq!(html, "<p><del><em>foo</em></del></p>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.blank-line-after-opening-tag-allows-following-markdown]
-// gfm[verify leaf-blocks.html-blocks.blank-line-separates-two-html-blocks-with-markdown-between]
+// [spec:gfm:syn:leaf-blocks.html-blocks.blank-line-after-opening-tag-allows-following-markdown/test]
+// [spec:gfm:syn:leaf-blocks.html-blocks.blank-line-separates-two-html-blocks-with-markdown-between/test]
 #[test]
 fn gfm_html_block_blank_lines_can_end_one_block_and_resume_markdown() {
     let html = render_html(&parse_final_nodes("<del>\n\n*foo*\n\n</del>\n"));
@@ -876,16 +878,16 @@ fn gfm_html_block_blank_lines_can_end_one_block_and_resume_markdown() {
     );
 }
 
-// gfm[verify leaf-blocks.html-blocks.types-1-through-6-need-not-be-preceded-by-blank-line]
+// [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-6-need-not-be-preceded-by-blank-line/test]
 #[test]
 fn gfm_html_block_type_6_interrupts_without_preceding_blank_line() {
     let html = render_html(&parse_final_nodes("Foo\n<div>\nbar\n</div>\n"));
     assert_eq!(html, "<p>Foo</p>\n<div>\nbar\n</div>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.end-marker-may-occur-on-same-line-as-start]
-// gfm[verify leaf-blocks.html-blocks.single-line-block-when-start-and-end-both-match]
-// gfm[verify leaf-blocks.html-blocks.trailing-text-after-end-marker-stays-inside-block]
+// [spec:gfm:syn:leaf-blocks.html-blocks.end-marker-may-occur-on-same-line-as-start/test]
+// [spec:gfm:syn:leaf-blocks.html-blocks.single-line-block-when-start-and-end-both-match/test]
+// [spec:gfm:sem:leaf-blocks.html-blocks.trailing-text-after-end-marker-stays-inside-block/test]
 #[test]
 fn gfm_html_block_same_line_end_markers_keep_their_line_inside_the_block() {
     let html = render_html(&parse_final_nodes("<style>p{color:red;}</style>\n*foo*\n"));
@@ -895,8 +897,8 @@ fn gfm_html_block_same_line_end_markers_keep_their_line_inside_the_block() {
     assert_eq!(html, "<!-- foo -->*bar*\n<p><em>baz</em></p>\n");
 }
 
-// gfm[verify container-blocks.block-quotes.example]
-// gfm[verify container-blocks.block-quotes.marker-structure]
+// [spec:gfm:syn:container-blocks.block-quotes.example/test]
+// [spec:gfm:def:container-blocks.block-quotes.marker-structure/test]
 #[test]
 fn gfm_example_228_block_quote() {
     let html = render_html(&parse_final_nodes("> # Foo\n> bar\n> baz\n"));
@@ -906,16 +908,16 @@ fn gfm_example_228_block_quote() {
     );
 }
 
-// gfm[verify container-blocks.lists.definition]
-// gfm[verify container-blocks.lists.ordered-and-bullet-list-definition]
+// [spec:gfm:def:container-blocks.lists.definition/test]
+// [spec:gfm:def:container-blocks.lists.ordered-and-bullet-list-definition/test]
 #[test]
 fn gfm_simple_list() {
     let html = render_html(&parse_final_nodes("- one\n- two\n"));
     assert_eq!(html, "<ul>\n<li>one</li>\n<li>two</li>\n</ul>\n");
 }
 
-// gfm[verify leaf-blocks.indented-code-blocks.definition]
-// gfm[verify leaf-blocks.indented-code-blocks.indent-beyond-four-is-preserved]
+// [spec:gfm:def:leaf-blocks.indented-code-blocks.definition/test]
+// [spec:gfm:sem:leaf-blocks.indented-code-blocks.indent-beyond-four-is-preserved/test]
 #[test]
 fn gfm_example_107_indented_code() {
     let html = render_html(&parse_final_nodes(
@@ -928,22 +930,22 @@ fn gfm_example_107_indented_code() {
     );
 }
 
-// gfm[verify inlines.code-spans.all-space-content-is-not-trimmed]
+// [spec:gfm:sem:inlines.code-spans.all-space-content-is-not-trimmed/test]
 #[test]
 fn gfm_code_span_all_spaces_not_trimmed() {
     let html = render_html(&parse_final_nodes("`` ` ``\n"));
     assert_eq!(html, "<p><code>`</code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.longer-delimiters-allow-literal-backticks]
-// gfm[verify inlines.code-spans.single-edge-space-is-trimmed]
+// [spec:gfm:syn:inlines.code-spans.longer-delimiters-allow-literal-backticks/test]
+// [spec:gfm:sem:inlines.code-spans.single-edge-space-is-trimmed/test]
 #[test]
 fn gfm_code_span_longer_delimiters_allow_literal_backticks() {
     let html = render_html(&parse_final_nodes("`` foo ` bar ``\n"));
     assert_eq!(html, "<p><code>foo ` bar</code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.edge-space-trimming-allows-literal-backticks-at-edges]
+// [spec:gfm:sem:inlines.code-spans.edge-space-trimming-allows-literal-backticks-at-edges/test]
 #[test]
 fn gfm_code_span_edge_space_trimming_allows_literal_backticks_at_edges() {
     // Using triple backtick delimiter to include double backtick content
@@ -951,7 +953,7 @@ fn gfm_code_span_edge_space_trimming_allows_literal_backticks_at_edges() {
     assert_eq!(html, "<p><code>``</code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.only-one-space-is-trimmed]
+// [spec:gfm:sem:inlines.code-spans.only-one-space-is-trimmed/test]
 #[test]
 fn gfm_code_span_only_one_space_is_trimmed() {
     // Only one space is stripped from each edge
@@ -959,14 +961,14 @@ fn gfm_code_span_only_one_space_is_trimmed() {
     assert_eq!(html, "<p><code> foo </code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.edge-space-trimming-requires-space-on-both-sides]
+// [spec:gfm:sem:inlines.code-spans.edge-space-trimming-requires-space-on-both-sides/test]
 #[test]
 fn gfm_code_span_edge_space_trimming_requires_space_on_both_sides() {
     let html = render_html(&parse_final_nodes("` a`\n"));
     assert_eq!(html, "<p><code> a</code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.only-ascii-space-is-trimmed]
+// [spec:gfm:sem:inlines.code-spans.only-ascii-space-is-trimmed/test]
 #[test]
 fn gfm_code_span_only_ascii_space_is_trimmed() {
     // U+00A0 non-breaking space is not trimmed
@@ -974,8 +976,8 @@ fn gfm_code_span_only_ascii_space_is_trimmed() {
     assert_eq!(html, "<p><code>\u{00a0}b\u{00a0}</code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.line-endings-become-spaces]
-// gfm[verify inlines.code-spans.line-endings-conversion-example]
+// [spec:gfm:sem:inlines.code-spans.line-endings-become-spaces/test]
+// [spec:gfm:sem:inlines.code-spans.line-endings-conversion-example/test]
 #[test]
 fn gfm_code_span_line_endings_become_spaces() {
     let html = render_html(&parse_final_nodes("``\nfoo\nbar  \nbaz\n``\n"));
@@ -985,15 +987,15 @@ fn gfm_code_span_line_endings_become_spaces() {
     assert_eq!(html, "<p><code>foo </code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.interior-spaces-are-preserved]
+// [spec:gfm:sem:inlines.code-spans.interior-spaces-are-preserved/test]
 #[test]
 fn gfm_code_span_interior_spaces_are_preserved() {
     let html = render_html(&parse_final_nodes("`foo   bar \nbaz`\n"));
     assert_eq!(html, "<p><code>foo   bar  baz</code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.browser-rendering-may-collapse-spaces]
-// gfm[verify inlines.code-spans.code-white-space-pre-wrap]
+// [spec:gfm:req:inlines.code-spans.browser-rendering-may-collapse-spaces/test]
+// [spec:gfm:sem:inlines.code-spans.code-white-space-pre-wrap/test]
 #[test]
 fn gfm_code_span_browser_rendering_note() {
     // These rules are advisory notes about CSS rendering (code{white-space: pre-wrap;}).
@@ -1002,14 +1004,14 @@ fn gfm_code_span_browser_rendering_note() {
     assert_eq!(html, "<p><code>foo  bar</code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.backslashes-are-literal]
+// [spec:gfm:syn:inlines.code-spans.backslashes-are-literal/test]
 #[test]
 fn gfm_code_span_backslashes_are_literal() {
     let html = render_html(&parse_final_nodes("`foo\\`bar`\n"));
     assert_eq!(html, "<p><code>foo\\</code>bar`</p>\n");
 }
 
-// gfm[verify inlines.code-spans.backslash-escapes-are-never-needed]
+// [spec:gfm:thm:inlines.code-spans.backslash-escapes-are-never-needed/test]
 #[test]
 fn gfm_code_span_backslash_escapes_are_never_needed() {
     // Use double backticks to include a single backtick in code
@@ -1017,14 +1019,14 @@ fn gfm_code_span_backslash_escapes_are_never_needed() {
     assert_eq!(html, "<p><code>foo`bar</code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.code-spans-take-precedence-over-emphasis-and-links]
+// [spec:gfm:syn:inlines.code-spans.code-spans-take-precedence-over-emphasis-and-links/test]
 #[test]
 fn gfm_code_span_takes_precedence_over_emphasis() {
     let html = render_html(&parse_final_nodes("*foo`*`\n"));
     assert_eq!(html, "<p>*foo<code>*</code></p>\n");
 }
 
-// gfm[verify inlines.code-spans.code-span-prevents-link-parse]
+// [spec:gfm:syn:inlines.code-spans.code-span-prevents-link-parse/test]
 #[test]
 fn gfm_code_span_prevents_link_parse() {
     // Code span backticks have higher precedence than link brackets
@@ -1035,28 +1037,28 @@ fn gfm_code_span_prevents_link_parse() {
     );
 }
 
-// gfm[verify inlines.code-spans.code-spans-html-tags-and-autolinks-share-precedence]
+// [spec:gfm:syn:inlines.code-spans.code-spans-html-tags-and-autolinks-share-precedence/test]
 #[test]
 fn gfm_code_span_shares_precedence_with_html_tags() {
     let html = render_html(&parse_final_nodes("`<a href=\"`\">`\n"));
     assert_eq!(html, "<p><code>&lt;a href=&quot;</code>&quot;&gt;`</p>\n");
 }
 
-// gfm[verify inlines.code-spans.html-tag-wins-when-tag-parses-first]
+// [spec:gfm:syn:inlines.code-spans.html-tag-wins-when-tag-parses-first/test]
 #[test]
 fn gfm_code_span_html_tag_wins_when_tag_parses_first() {
     let html = render_html(&parse_final_nodes("<a href=\"`\">`\n"));
     assert_eq!(html, "<p><a href=\"`\">`</p>\n");
 }
 
-// gfm[verify inlines.code-spans.code-span-wins-in-ambiguous-autolink-like-text]
+// [spec:gfm:syn:inlines.code-spans.code-span-wins-in-ambiguous-autolink-like-text/test]
 #[test]
 fn gfm_code_span_wins_in_ambiguous_autolink_like_text() {
     let html = render_html(&parse_final_nodes("`<http://foo.bar.`baz>`\n"));
     assert_eq!(html, "<p><code>&lt;http://foo.bar.</code>baz&gt;`</p>\n");
 }
 
-// gfm[verify inlines.code-spans.autolink-wins-when-autolink-parses-first]
+// [spec:gfm:syn:inlines.code-spans.autolink-wins-when-autolink-parses-first/test]
 #[test]
 fn gfm_code_span_autolink_wins_when_autolink_parses_first() {
     // When an autolink starts before a backtick, autolink wins
@@ -1067,7 +1069,7 @@ fn gfm_code_span_autolink_wins_when_autolink_parses_first() {
     );
 }
 
-// gfm[verify inlines.code-spans.unclosed-backtick-string-is-literal]
+// [spec:gfm:syn:inlines.code-spans.unclosed-backtick-string-is-literal/test]
 #[test]
 fn gfm_code_span_unclosed_backtick_string_is_literal() {
     // A single backtick with no closer is literal text
@@ -1075,7 +1077,7 @@ fn gfm_code_span_unclosed_backtick_string_is_literal() {
     assert_eq!(html, "<p>`foo</p>\n");
 }
 
-// gfm[verify inlines.code-spans.opening-and-closing-backtick-strings-must-have-equal-length]
+// [spec:gfm:syn:inlines.code-spans.opening-and-closing-backtick-strings-must-have-equal-length/test]
 #[test]
 fn gfm_code_span_opening_and_closing_must_have_equal_length() {
     // Double backtick opening must be closed by double backtick
@@ -1091,8 +1093,8 @@ fn gfm_code_span_opening_and_closing_must_have_equal_length() {
 // Entity and numeric character references
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.entity-and-numeric-character-references.entity-references-definition]
-// gfm[verify inlines.entity-and-numeric-character-references.references-produce-unicode-characters]
+// [spec:gfm:def:inlines.entity-and-numeric-character-references.entity-references-definition/test]
+// [spec:gfm:sem:inlines.entity-and-numeric-character-references.references-produce-unicode-characters/test]
 #[test]
 fn gfm_entity_references() {
     let html = render_html(&parse_final_nodes(
@@ -1101,21 +1103,21 @@ fn gfm_entity_references() {
     assert_eq!(html, "<p>\u{00a0} &amp; \u{00a9} \u{00c6}\n\u{00be}</p>\n");
 }
 
-// gfm[verify inlines.entity-and-numeric-character-references.decimal-numeric-reference-definition]
+// [spec:gfm:def:inlines.entity-and-numeric-character-references.decimal-numeric-reference-definition/test]
 #[test]
 fn gfm_decimal_numeric_references() {
     let html = render_html(&parse_final_nodes("&#35; &#1234; &#992;\n"));
     assert_eq!(html, "<p># \u{04d2} \u{03e0}</p>\n");
 }
 
-// gfm[verify inlines.entity-and-numeric-character-references.hex-reference-definition]
+// [spec:gfm:def:inlines.entity-and-numeric-character-references.hex-reference-definition/test]
 #[test]
 fn gfm_hex_numeric_references() {
     let html = render_html(&parse_final_nodes("&#XD06; &#xcab;\n"));
     assert_eq!(html, "<p>\u{0d06} \u{0cab}</p>\n");
 }
 
-// gfm[verify inlines.entity-and-numeric-character-references.invalid-references-are-literal-text]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.invalid-references-are-literal-text/test]
 #[test]
 fn gfm_invalid_references_are_literal() {
     let html = render_html(&parse_final_nodes(
@@ -1127,21 +1129,21 @@ fn gfm_invalid_references_are_literal() {
     );
 }
 
-// gfm[verify inlines.entity-and-numeric-character-references.named-entities-require-semicolon]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.named-entities-require-semicolon/test]
 #[test]
 fn gfm_named_entities_require_semicolon() {
     let html = render_html(&parse_final_nodes("&copy\n"));
     assert_eq!(html, "<p>&amp;copy</p>\n");
 }
 
-// gfm[verify inlines.entity-and-numeric-character-references.unknown-named-entities-are-literal]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.unknown-named-entities-are-literal/test]
 #[test]
 fn gfm_unknown_named_entities_are_literal() {
     let html = render_html(&parse_final_nodes("&MadeUpEntity;\n"));
     assert_eq!(html, "<p>&amp;MadeUpEntity;</p>\n");
 }
 
-// gfm[verify inlines.entity-and-numeric-character-references.references-are-recognized-outside-code]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-are-recognized-outside-code/test]
 #[test]
 fn gfm_references_recognized_outside_code() {
     // Entity references in raw HTML are passed through (recognized by HTML layer)
@@ -1153,8 +1155,8 @@ fn gfm_references_recognized_outside_code() {
     assert_eq!(html, "<p>\u{00a9} &amp; &lt;</p>\n");
 }
 
-// gfm[verify inlines.entity-and-numeric-character-references.references-are-literal-text-in-code]
-// gfm[verify inlines.entity-and-numeric-character-references.references-are-not-recognized-in-code]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-are-literal-text-in-code/test]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-are-not-recognized-in-code/test]
 #[test]
 fn gfm_references_are_literal_in_code() {
     // In code span, entity references are literal text
@@ -1170,8 +1172,8 @@ fn gfm_references_are_literal_in_code() {
     );
 }
 
-// gfm[verify inlines.entity-and-numeric-character-references.references-cannot-replace-structure-symbols]
-// gfm[verify inlines.entity-and-numeric-character-references.references-cannot-replace-structural-markers]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-cannot-replace-structure-symbols/test]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-cannot-replace-structural-markers/test]
 #[test]
 fn gfm_references_cannot_replace_structure_symbols() {
     // &#42; should not become emphasis markers
@@ -1187,7 +1189,7 @@ fn gfm_references_cannot_replace_structure_symbols() {
     assert_eq!(html, "<p>\tfoo</p>\n");
 }
 
-// gfm[verify inlines.entity-and-numeric-character-references.parsers-need-not-preserve-source-form]
+// [spec:gfm:req:inlines.entity-and-numeric-character-references.parsers-need-not-preserve-source-form/test]
 #[test]
 fn gfm_parsers_need_not_preserve_source_form() {
     // The parser converts entity references to their Unicode characters,
@@ -1197,9 +1199,9 @@ fn gfm_parsers_need_not_preserve_source_form() {
     assert_eq!(html, "<p>\u{00a9}</p>\n");
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.content-removes-up-to-opening-indent]
-// gfm[verify leaf-blocks.fenced-code-blocks.fences-may-be-indented-and-content-deindents-to-match]
-// gfm[verify leaf-blocks.fenced-code-blocks.short-indented-content-lines-remove-all-indent]
+// [spec:gfm:sem:leaf-blocks.fenced-code-blocks.content-removes-up-to-opening-indent/test]
+// [spec:gfm:sem:leaf-blocks.fenced-code-blocks.fences-may-be-indented-and-content-deindents-to-match/test]
+// [spec:gfm:sem:leaf-blocks.fenced-code-blocks.short-indented-content-lines-remove-all-indent/test]
 #[test]
 fn gfm_fenced_code_deindent() {
     let html = render_html(&parse_final_nodes("  ```\n  aaa\n aaa\naaa\n  ```\n"));
@@ -1210,30 +1212,30 @@ fn gfm_fenced_code_deindent() {
     );
 }
 
-// gfm[verify inlines.links.balanced-parentheses-are-allowed-in-destination]
+// [spec:gfm:syn:inlines.links.balanced-parentheses-are-allowed-in-destination/test]
 #[test]
 fn gfm_link_balanced_parens() {
     let html = render_html(&parse_final_nodes("[link](/url(test))\n"));
     assert_eq!(html, "<p><a href=\"/url(test)\">link</a></p>\n");
 }
 
-// gfm[verify inlines.links.destination-may-contain-spaces-only-in-angle-brackets]
+// [spec:gfm:syn:inlines.links.destination-may-contain-spaces-only-in-angle-brackets/test]
 #[test]
 fn gfm_link_angle_bracket_dest() {
     let html = render_html(&parse_final_nodes("[link](<url with spaces>)\n"));
     assert_eq!(html, "<p><a href=\"url%20with%20spaces\">link</a></p>\n");
 }
 
-// gfm[verify inlines.links.destination-and-title-may-both-be-omitted]
+// [spec:gfm:syn:inlines.links.destination-and-title-may-both-be-omitted/test]
 #[test]
 fn gfm_empty_inline_link() {
     let html = render_html(&parse_final_nodes("[link]()\n"));
     assert_eq!(html, "<p><a href=\"\">link</a></p>\n");
 }
 
-// gfm[verify inlines.autolinks-extension.extended-www-autolink-definition]
-// gfm[verify inlines.autolinks-extension.extended-www-autolinks-insert-http-scheme]
-// gfm[verify inlines.autolinks-extension.extended-www-autolinks-may-have-path-after-domain]
+// [spec:gfm:syn:inlines.autolinks-extension.extended-www-autolink-definition/test]
+// [spec:gfm:def:inlines.autolinks-extension.extended-www-autolinks-insert-http-scheme/test]
+// [spec:gfm:sem:inlines.autolinks-extension.extended-www-autolinks-may-have-path-after-domain/test]
 #[test]
 fn gfm_www_autolink() {
     let html = render_html(&parse_final_nodes("visit www.example.com now\n"));
@@ -1252,8 +1254,8 @@ fn gfm_www_autolink() {
     );
 }
 
-// gfm[verify inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
-// gfm[verify inlines.autolinks-extension.extended-autolink-path-validation]
+// [spec:gfm:def:inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks/test]
+// [spec:gfm:syn:inlines.autolinks-extension.extended-autolink-path-validation/test]
 #[test]
 fn gfm_autolink_trailing_punctuation() {
     let html = render_html(&parse_final_nodes("visit https://example.com.\n"));
@@ -1263,8 +1265,8 @@ fn gfm_autolink_trailing_punctuation() {
     );
 }
 
-// gfm[verify inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
-// gfm[verify inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
+// [spec:gfm:syn:inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded/test]
+// [spec:gfm:syn:inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end/test]
 #[test]
 fn gfm_autolink_trailing_parens() {
     let html = render_html(&parse_final_nodes(
@@ -1276,13 +1278,13 @@ fn gfm_autolink_trailing_parens() {
     );
 }
 
-// gfm[verify inlines.raw-html.extension-wrapper]
-// gfm[verify inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
-// gfm[verify inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
-// gfm[verify inlines.disallowed-raw-html-extension.extension-wrapper]
-// gfm[verify inlines.disallowed-raw-html-extension.disallowed-tags]
-// gfm[verify inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
-// gfm[verify inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
+// [spec:gfm:def:inlines.raw-html.extension-wrapper/test]
+// [spec:gfm:def:inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension/test]
+// [spec:gfm:sem:inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing/test]
+// [spec:gfm:def:inlines.disallowed-raw-html-extension.extension-wrapper/test]
+// [spec:gfm:def:inlines.disallowed-raw-html-extension.disallowed-tags/test]
+// [spec:gfm:sem:inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket/test]
+// [spec:gfm:sem:inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched/test]
 #[test]
 fn gfm_disallowed_raw_html() {
     let html = render_html(&parse_final_nodes(
@@ -1298,8 +1300,8 @@ fn gfm_disallowed_raw_html() {
 // Raw HTML: grammar definitions and edge cases
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.raw-html.tag-grammar-follows]
-// gfm[verify inlines.raw-html.simple-open-tag-examples]
+// [spec:gfm:syn:inlines.raw-html.tag-grammar-follows/test]
+// [spec:gfm:syn:inlines.raw-html.simple-open-tag-examples/test]
 #[test]
 fn gfm_raw_html_simple_open_tags() {
     // Example 636: simple open tags
@@ -1315,13 +1317,13 @@ fn gfm_raw_html_simple_open_tags() {
     assert_eq!(html, "<p><a  /><b2\ndata=\"foo\" ></p>\n");
 }
 
-// gfm[verify inlines.raw-html.attribute-definition]
-// gfm[verify inlines.raw-html.attribute-name-definition]
-// gfm[verify inlines.raw-html.attribute-value-specification-definition]
-// gfm[verify inlines.raw-html.attribute-value-definition]
-// gfm[verify inlines.raw-html.double-quoted-attribute-value-definition]
-// gfm[verify inlines.raw-html.single-quoted-attribute-value-definition]
-// gfm[verify inlines.raw-html.unquoted-attribute-value-definition]
+// [spec:gfm:def:inlines.raw-html.attribute-definition/test]
+// [spec:gfm:def:inlines.raw-html.attribute-name-definition/test]
+// [spec:gfm:def:inlines.raw-html.attribute-value-specification-definition/test]
+// [spec:gfm:def:inlines.raw-html.attribute-value-definition/test]
+// [spec:gfm:def:inlines.raw-html.double-quoted-attribute-value-definition/test]
+// [spec:gfm:def:inlines.raw-html.single-quoted-attribute-value-definition/test]
+// [spec:gfm:def:inlines.raw-html.unquoted-attribute-value-definition/test]
 #[test]
 fn gfm_raw_html_attributes() {
     // Inline HTML with attributes inside a paragraph
@@ -1334,8 +1336,8 @@ fn gfm_raw_html_attributes() {
     );
 }
 
-// gfm[verify inlines.raw-html.custom-tag-names-are-allowed]
-// gfm[verify inlines.raw-html.custom-tag-and-attribute-names-are-allowed]
+// [spec:gfm:syn:inlines.raw-html.custom-tag-names-are-allowed/test]
+// [spec:gfm:syn:inlines.raw-html.custom-tag-and-attribute-names-are-allowed/test]
 #[test]
 fn gfm_raw_html_custom_tags() {
     // Example 640: custom tag names
@@ -1345,7 +1347,7 @@ fn gfm_raw_html_custom_tags() {
     assert_eq!(html, "<p>Foo <responsive-image src=\"foo.jpg\" /></p>\n");
 }
 
-// gfm[verify inlines.raw-html.illegal-tag-and-attribute-syntax-is-not-parsed-as-html]
+// [spec:gfm:syn:inlines.raw-html.illegal-tag-and-attribute-syntax-is-not-parsed-as-html/test]
 #[test]
 fn gfm_raw_html_illegal_syntax() {
     // Example 641: illegal tag names (start with digit or underscore)
@@ -1353,7 +1355,7 @@ fn gfm_raw_html_illegal_syntax() {
     assert_eq!(html, "<p>&lt;33&gt; &lt;__&gt;</p>\n");
 }
 
-// gfm[verify inlines.raw-html.closing-tags-cannot-have-attributes]
+// [spec:gfm:syn:inlines.raw-html.closing-tags-cannot-have-attributes/test]
 #[test]
 fn gfm_raw_html_closing_tags() {
     // Example 646: valid closing tags
@@ -1365,7 +1367,7 @@ fn gfm_raw_html_closing_tags() {
     assert_eq!(html, "<p>&lt;/a href=&quot;foo&quot;&gt;</p>\n");
 }
 
-// gfm[verify inlines.raw-html.html-comment-definition]
+// [spec:gfm:def:inlines.raw-html.html-comment-definition/test]
 #[test]
 fn gfm_raw_html_comments() {
     // Example 648: valid comment
@@ -1378,7 +1380,7 @@ fn gfm_raw_html_comments() {
     );
 }
 
-// gfm[verify inlines.raw-html.processing-instruction-definition]
+// [spec:gfm:def:inlines.raw-html.processing-instruction-definition/test]
 #[test]
 fn gfm_raw_html_processing_instruction() {
     // Example 651
@@ -1386,7 +1388,7 @@ fn gfm_raw_html_processing_instruction() {
     assert_eq!(html, "<p>foo <?php echo $a; ?></p>\n");
 }
 
-// gfm[verify inlines.raw-html.declaration-definition]
+// [spec:gfm:def:inlines.raw-html.declaration-definition/test]
 #[test]
 fn gfm_raw_html_declaration() {
     // Example 652
@@ -1394,7 +1396,7 @@ fn gfm_raw_html_declaration() {
     assert_eq!(html, "<p>foo <!ELEMENT br EMPTY></p>\n");
 }
 
-// gfm[verify inlines.raw-html.cdata-section-definition]
+// [spec:gfm:def:inlines.raw-html.cdata-section-definition/test]
 #[test]
 fn gfm_raw_html_cdata_section() {
     // CDATA section: the parser recognizes <![CDATA[...]]> as raw HTML
@@ -1402,7 +1404,7 @@ fn gfm_raw_html_cdata_section() {
     assert_eq!(html, "<p>foo <![CDATA[hello]]></p>\n");
 }
 
-// gfm[verify inlines.raw-html.entity-and-numeric-references-are-preserved-in-html-attributes]
+// [spec:gfm:sem:inlines.raw-html.entity-and-numeric-references-are-preserved-in-html-attributes/test]
 #[test]
 fn gfm_raw_html_entity_in_attributes() {
     // Example 654
@@ -1410,7 +1412,7 @@ fn gfm_raw_html_entity_in_attributes() {
     assert_eq!(html, "<p>foo <a href=\"&ouml;\"></p>\n");
 }
 
-// gfm[verify inlines.raw-html.backslash-escapes-do-not-work-in-html-attributes]
+// [spec:gfm:syn:inlines.raw-html.backslash-escapes-do-not-work-in-html-attributes/test]
 #[test]
 fn gfm_raw_html_backslash_escapes_in_attributes() {
     // Example 655: backslash in attribute value is literal
@@ -1422,7 +1424,7 @@ fn gfm_raw_html_backslash_escapes_in_attributes() {
 // Backslash escapes
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.backslash-escapes.any-ascii-punctuation-may-be-escaped]
+// [spec:gfm:syn:inlines.backslash-escapes.any-ascii-punctuation-may-be-escaped/test]
 #[test]
 fn gfm_backslash_escapes_all_ascii_punctuation() {
     // Example 308: all ASCII punctuation characters may be escaped. The GitHub
@@ -1438,7 +1440,7 @@ fn gfm_backslash_escapes_all_ascii_punctuation() {
     );
 }
 
-// gfm[verify inlines.backslash-escapes.backslashes-before-other-characters-are-literal]
+// [spec:gfm:syn:inlines.backslash-escapes.backslashes-before-other-characters-are-literal/test]
 #[test]
 fn gfm_backslash_escapes_non_punctuation_literal() {
     // Example 309: backslashes before non-punctuation are literal
@@ -1446,7 +1448,7 @@ fn gfm_backslash_escapes_non_punctuation_literal() {
     assert_eq!(html, "<p>\\A\\a\\ \\3</p>\n");
 }
 
-// gfm[verify inlines.backslash-escapes.escaped-characters-lose-special-meaning]
+// [spec:gfm:sem:inlines.backslash-escapes.escaped-characters-lose-special-meaning/test]
 #[test]
 fn gfm_backslash_escapes_lose_special_meaning() {
     // Example 310: escaped characters are treated as regular characters
@@ -1466,7 +1468,7 @@ fn gfm_backslash_escapes_lose_special_meaning() {
     assert_eq!(html, "<p># not a heading</p>\n");
 }
 
-// gfm[verify inlines.backslash-escapes.escaped-backslash-does-not-escape-following-character]
+// [spec:gfm:syn:inlines.backslash-escapes.escaped-backslash-does-not-escape-following-character/test]
 #[test]
 fn gfm_backslash_escapes_double_backslash() {
     // Example 311: escaped backslash does not escape the following character
@@ -1474,7 +1476,7 @@ fn gfm_backslash_escapes_double_backslash() {
     assert_eq!(html, "<p>\\<em>emphasis</em></p>\n");
 }
 
-// gfm[verify inlines.backslash-escapes.do-not-work-in-code-autolinks-or-raw-html]
+// [spec:gfm:syn:inlines.backslash-escapes.do-not-work-in-code-autolinks-or-raw-html/test]
 #[test]
 fn gfm_backslash_escapes_not_in_code_or_html() {
     // Example 313: backslash escapes do not work in code spans
@@ -1494,7 +1496,7 @@ fn gfm_backslash_escapes_not_in_code_or_html() {
     assert_eq!(html, "<p>foo <a href=\"/bar\\/)\"> bar</p>\n");
 }
 
-// gfm[verify inlines.backslash-escapes.work-in-urls-titles-references-and-info-strings]
+// [spec:gfm:syn:inlines.backslash-escapes.work-in-urls-titles-references-and-info-strings/test]
 #[test]
 fn gfm_backslash_escapes_in_urls_titles_info_strings() {
     let html = render_html(&parse_final_nodes("[foo](/bar\\* \"ti\\*tle\")\n"));
@@ -1513,7 +1515,7 @@ fn gfm_backslash_escapes_in_urls_titles_info_strings() {
 // Hard line breaks
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.hard-line-breaks.two-trailing-spaces-produce-hard-line-break]
+// [spec:gfm:def:inlines.hard-line-breaks.two-trailing-spaces-produce-hard-line-break/test]
 #[test]
 fn gfm_hard_line_break_two_spaces() {
     // Example 658: two trailing spaces produce a hard line break
@@ -1521,7 +1523,7 @@ fn gfm_hard_line_break_two_spaces() {
     assert_eq!(html, "<p>foo<br />\nbaz</p>\n");
 }
 
-// gfm[verify inlines.hard-line-breaks.more-than-two-trailing-spaces-also-work]
+// [spec:gfm:syn:inlines.hard-line-breaks.more-than-two-trailing-spaces-also-work/test]
 #[test]
 fn gfm_hard_line_break_many_spaces() {
     // More than two trailing spaces also produce a hard line break
@@ -1529,7 +1531,7 @@ fn gfm_hard_line_break_many_spaces() {
     assert_eq!(html, "<p>foo<br />\nbaz</p>\n");
 }
 
-// gfm[verify inlines.hard-line-breaks.leading-spaces-on-next-line-are-ignored]
+// [spec:gfm:sem:inlines.hard-line-breaks.leading-spaces-on-next-line-are-ignored/test]
 #[test]
 fn gfm_hard_line_break_leading_spaces_ignored() {
     // Leading spaces on the next line after a hard break
@@ -1540,7 +1542,7 @@ fn gfm_hard_line_break_leading_spaces_ignored() {
     assert_eq!(html, "<p>foo<br />\nbar</p>\n");
 }
 
-// gfm[verify inlines.hard-line-breaks.hard-line-breaks-can-occur-inside-inline-constructs]
+// [spec:gfm:syn:inlines.hard-line-breaks.hard-line-breaks-can-occur-inside-inline-constructs/test]
 #[test]
 fn gfm_hard_line_break_inside_inline_constructs() {
     // Example 663: hard line break inside emphasis (spaces)
@@ -1552,7 +1554,7 @@ fn gfm_hard_line_break_inside_inline_constructs() {
     assert_eq!(html, "<p><em>foo<br />\nbar</em></p>\n");
 }
 
-// gfm[verify inlines.hard-line-breaks.hard-line-breaks-do-not-occur-inside-code-spans-or-html-tags]
+// [spec:gfm:syn:inlines.hard-line-breaks.hard-line-breaks-do-not-occur-inside-code-spans-or-html-tags/test]
 #[test]
 fn gfm_hard_line_break_not_in_code_or_html() {
     // Example 665: no hard line break in code span (spaces)
@@ -1572,7 +1574,7 @@ fn gfm_hard_line_break_not_in_code_or_html() {
     assert_eq!(html, "<p><a href=\"foo\\\nbar\"></p>\n");
 }
 
-// gfm[verify inlines.hard-line-breaks.hard-line-break-syntax-does-not-work-at-end-of-block]
+// [spec:gfm:syn:inlines.hard-line-breaks.hard-line-break-syntax-does-not-work-at-end-of-block/test]
 #[test]
 fn gfm_hard_line_break_not_at_end_of_block() {
     // Example 669: backslash at end of paragraph is literal
@@ -1596,7 +1598,7 @@ fn gfm_hard_line_break_not_at_end_of_block() {
 // Leaf blocks: general
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.leaf-blocks-make-up-markdown-document]
+// [spec:gfm:def:leaf-blocks.leaf-blocks-make-up-markdown-document/test]
 #[test]
 fn gfm_leaf_blocks_make_up_markdown_document() {
     // A paragraph and a thematic break are both leaf blocks
@@ -1608,7 +1610,7 @@ fn gfm_leaf_blocks_make_up_markdown_document() {
 // Thematic breaks
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.thematic-breaks.all-marker-characters-must-match]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.all-marker-characters-must-match/test]
 #[test]
 fn gfm_thematic_break_markers_must_match() {
     // Mixed markers do not form thematic breaks
@@ -1616,7 +1618,7 @@ fn gfm_thematic_break_markers_must_match() {
     assert_eq!(html, "<p><em>-</em></p>\n");
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.spaces-or-tabs-allowed-between-markers]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.spaces-or-tabs-allowed-between-markers/test]
 #[test]
 fn gfm_thematic_break_spaces_between_markers() {
     let html = render_html(&parse_final_nodes("_ _ _\n"));
@@ -1626,21 +1628,21 @@ fn gfm_thematic_break_spaces_between_markers() {
     assert_eq!(html, "<hr />\n");
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.marker-sequence-may-be-longer-than-three]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.marker-sequence-may-be-longer-than-three/test]
 #[test]
 fn gfm_thematic_break_more_than_three() {
     let html = render_html(&parse_final_nodes("--------------------\n"));
     assert_eq!(html, "<hr />\n");
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.indent-up-to-three-spaces/test]
 #[test]
 fn gfm_thematic_break_indent_up_to_three() {
     let html = render_html(&parse_final_nodes(" ***\n  ***\n   ***\n"));
     assert_eq!(html, "<hr />\n<hr />\n<hr />\n");
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.indent-four-spaces-not-allowed]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.indent-four-spaces-not-allowed/test]
 #[test]
 fn gfm_thematic_break_four_spaces_is_code() {
     let html = render_html(&parse_final_nodes("    ***\n"));
@@ -1651,7 +1653,7 @@ fn gfm_thematic_break_four_spaces_is_code() {
     );
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.no-other-characters-allowed]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.no-other-characters-allowed/test]
 #[test]
 fn gfm_thematic_break_no_other_chars() {
     let html = render_html(&parse_final_nodes("_ _ _ _ a\n"));
@@ -1661,35 +1663,35 @@ fn gfm_thematic_break_no_other_chars() {
     assert_eq!(html, "<p>a]---</p>\n");
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.trailing-spaces-allowed]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.trailing-spaces-allowed/test]
 #[test]
 fn gfm_thematic_break_trailing_spaces() {
     let html = render_html(&parse_final_nodes("___     \n"));
     assert_eq!(html, "<hr />\n");
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.can-interrupt-paragraphs]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.can-interrupt-paragraphs/test]
 #[test]
 fn gfm_thematic_break_interrupts_paragraph() {
     let html = render_html(&parse_final_nodes("para\n***\n"));
     assert_eq!(html, "<p>para</p>\n<hr />\n");
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines/test]
 #[test]
 fn gfm_thematic_break_no_surrounding_blanks() {
     let html = render_html(&parse_final_nodes("aaa\n***\nbbb\n"));
     assert_eq!(html, "<p>aaa</p>\n<hr />\n<p>bbb</p>\n");
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.setext-heading-takes-precedence-over-dash-break]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.setext-heading-takes-precedence-over-dash-break/test]
 #[test]
 fn gfm_thematic_break_setext_takes_precedence() {
     let html = render_html(&parse_final_nodes("Foo\n---\nbar\n"));
     assert_eq!(html, "<h2>Foo</h2>\n<p>bar</p>\n");
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item/test]
 #[test]
 fn gfm_thematic_break_over_list_item() {
     // "- ---" is a list containing a thematic break according to GFM spec (example 30)
@@ -1698,7 +1700,7 @@ fn gfm_thematic_break_over_list_item() {
     assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n<hr />\n");
 }
 
-// gfm[verify leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item/test]
 #[test]
 fn gfm_thematic_break_different_bullet_in_list() {
     // Using * markers for break inside a - list
@@ -1713,14 +1715,14 @@ fn gfm_thematic_break_different_bullet_in_list() {
 // ATX headings
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.atx-headings.opening-sequence-length-at-most-six]
+// [spec:gfm:syn:leaf-blocks.atx-headings.opening-sequence-length-at-most-six/test]
 #[test]
 fn gfm_atx_heading_seven_hashes_not_heading() {
     let html = render_html(&parse_final_nodes("####### foo\n"));
     assert_eq!(html, "<p>####### foo</p>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.opening-sequence-followed-by-space-or-eol]
+// [spec:gfm:syn:leaf-blocks.atx-headings.opening-sequence-followed-by-space-or-eol/test]
 #[test]
 fn gfm_atx_heading_requires_space_after_hashes() {
     let html = render_html(&parse_final_nodes("#5 bolt\n"));
@@ -1730,21 +1732,21 @@ fn gfm_atx_heading_requires_space_after_hashes() {
     assert_eq!(html, "<p>#hashtag</p>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.escaped-opening-hash-does-not-open-heading]
+// [spec:gfm:syn:leaf-blocks.atx-headings.escaped-opening-hash-does-not-open-heading/test]
 #[test]
 fn gfm_atx_heading_escaped_opening_hash() {
     let html = render_html(&parse_final_nodes("\\## foo\n"));
     assert_eq!(html, "<p>## foo</p>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.contents-parse-as-inline-content]
+// [spec:gfm:sem:leaf-blocks.atx-headings.contents-parse-as-inline-content/test]
 #[test]
 fn gfm_atx_heading_inline_content() {
     let html = render_html(&parse_final_nodes("# foo *bar* \\*baz\\*\n"));
     assert_eq!(html, "<h1>foo <em>bar</em> *baz*</h1>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.trim-leading-and-trailing-whitespace-before-inline-parse]
+// [spec:gfm:sem:leaf-blocks.atx-headings.trim-leading-and-trailing-whitespace-before-inline-parse/test]
 #[test]
 fn gfm_atx_heading_trim_whitespace() {
     let html = render_html(&parse_final_nodes(
@@ -1753,14 +1755,14 @@ fn gfm_atx_heading_trim_whitespace() {
     assert_eq!(html, "<h1>foo</h1>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.opening-indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.atx-headings.opening-indent-up-to-three-spaces/test]
 #[test]
 fn gfm_atx_heading_indent_up_to_three() {
     let html = render_html(&parse_final_nodes(" ### foo\n  ## foo\n   # foo\n"));
     assert_eq!(html, "<h3>foo</h3>\n<h2>foo</h2>\n<h1>foo</h1>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.opening-indent-four-spaces-not-allowed]
+// [spec:gfm:syn:leaf-blocks.atx-headings.opening-indent-four-spaces-not-allowed/test]
 #[test]
 fn gfm_atx_heading_four_spaces_is_code() {
     let html = render_html(&parse_final_nodes("    # foo\n"));
@@ -1771,8 +1773,8 @@ fn gfm_atx_heading_four_spaces_is_code() {
     );
 }
 
-// gfm[verify leaf-blocks.atx-headings.closing-sequence-optional]
-// gfm[verify leaf-blocks.atx-headings.closing-sequence-length-independent]
+// [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-optional/test]
+// [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-length-independent/test]
 #[test]
 fn gfm_atx_heading_closing_sequence() {
     let html = render_html(&parse_final_nodes("## foo ##\n  ###   bar    ###\n"));
@@ -1785,21 +1787,21 @@ fn gfm_atx_heading_closing_sequence() {
     assert_eq!(html, "<h1>foo</h1>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.closing-sequence-may-be-followed-by-spaces-only]
+// [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-may-be-followed-by-spaces-only/test]
 #[test]
 fn gfm_atx_heading_closing_followed_by_spaces() {
     let html = render_html(&parse_final_nodes("### foo ###     \n"));
     assert_eq!(html, "<h3>foo</h3>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.closing-sequence-must-be-preceded-by-space]
+// [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-must-be-preceded-by-space/test]
 #[test]
 fn gfm_atx_heading_closing_requires_preceding_space() {
     let html = render_html(&parse_final_nodes("# foo#\n"));
     assert_eq!(html, "<h1>foo#</h1>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.escaped-hash-does-not-count-in-closing-sequence]
+// [spec:gfm:syn:leaf-blocks.atx-headings.escaped-hash-does-not-count-in-closing-sequence/test]
 #[test]
 fn gfm_atx_heading_escaped_hash_not_closing() {
     let html = render_html(&parse_final_nodes("### foo \\###\n"));
@@ -1809,14 +1811,14 @@ fn gfm_atx_heading_escaped_hash_not_closing() {
     assert_eq!(html, "<h2>foo ###</h2>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.non-space-after-closing-hashes-makes-them-content]
+// [spec:gfm:syn:leaf-blocks.atx-headings.non-space-after-closing-hashes-makes-them-content/test]
 #[test]
 fn gfm_atx_heading_non_space_after_closing_hashes() {
     let html = render_html(&parse_final_nodes("### foo ## bar\n"));
     assert_eq!(html, "<h3>foo ## bar</h3>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.can-be-empty]
+// [spec:gfm:syn:leaf-blocks.atx-headings.can-be-empty/test]
 #[test]
 fn gfm_atx_heading_empty() {
     let html = render_html(&parse_final_nodes("## \n"));
@@ -1826,7 +1828,7 @@ fn gfm_atx_heading_empty() {
     assert_eq!(html, "<h1></h1>\n");
 }
 
-// gfm[verify leaf-blocks.atx-headings.can-interrupt-paragraphs-without-blank-lines]
+// [spec:gfm:syn:leaf-blocks.atx-headings.can-interrupt-paragraphs-without-blank-lines/test]
 #[test]
 fn gfm_atx_heading_interrupts_paragraph() {
     let html = render_html(&parse_final_nodes("para\n# heading\n"));
@@ -1837,15 +1839,15 @@ fn gfm_atx_heading_interrupts_paragraph() {
 // Setext headings
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.setext-headings.underline-may-be-any-length]
+// [spec:gfm:syn:leaf-blocks.setext-headings.underline-may-be-any-length/test]
 #[test]
 fn gfm_setext_heading_underline_any_length() {
     let html = render_html(&parse_final_nodes("Foo\n---\n\nBar\n=\n"));
     assert_eq!(html, "<h2>Foo</h2>\n<h1>Bar</h1>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.content-indent-up-to-three-spaces-and-need-not-align]
-// gfm[verify leaf-blocks.setext-headings.text-lines-indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.setext-headings.content-indent-up-to-three-spaces-and-need-not-align/test]
+// [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-indent-up-to-three-spaces/test]
 #[test]
 fn gfm_setext_heading_content_indent() {
     let html = render_html(&parse_final_nodes(
@@ -1854,7 +1856,7 @@ fn gfm_setext_heading_content_indent() {
     assert_eq!(html, "<h2>Foo</h2>\n<h2>Foo</h2>\n<h1>Foo</h1>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.content-indent-four-spaces-not-allowed]
+// [spec:gfm:syn:leaf-blocks.setext-headings.content-indent-four-spaces-not-allowed/test]
 #[test]
 fn gfm_setext_heading_content_four_spaces_not_allowed() {
     let html = render_html(&parse_final_nodes("    Foo\n---\n"));
@@ -1865,21 +1867,21 @@ fn gfm_setext_heading_content_four_spaces_not_allowed() {
     );
 }
 
-// gfm[verify leaf-blocks.setext-headings.underline-indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.setext-headings.underline-indent-up-to-three-spaces/test]
 #[test]
 fn gfm_setext_heading_underline_indent() {
     let html = render_html(&parse_final_nodes("Foo\n   ---\n"));
     assert_eq!(html, "<h2>Foo</h2>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.underline-indent-four-spaces-not-allowed]
+// [spec:gfm:syn:leaf-blocks.setext-headings.underline-indent-four-spaces-not-allowed/test]
 #[test]
 fn gfm_setext_heading_underline_four_spaces() {
     let html = render_html(&parse_final_nodes("Foo\n    ---\n"));
     assert_eq!(html, "<p>Foo\n    ---</p>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.setext-heading-underline-cannot-contain-internal-spaces]
+// [spec:gfm:syn:leaf-blocks.setext-headings.setext-heading-underline-cannot-contain-internal-spaces/test]
 #[test]
 fn gfm_setext_heading_underline_no_internal_spaces() {
     let html = render_html(&parse_final_nodes("Foo\n= =\n"));
@@ -1889,28 +1891,28 @@ fn gfm_setext_heading_underline_no_internal_spaces() {
     assert_eq!(html, "<p>Foo</p>\n<hr />\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.trailing-spaces-in-content-do-not-create-line-break]
+// [spec:gfm:sem:leaf-blocks.setext-headings.trailing-spaces-in-content-do-not-create-line-break/test]
 #[test]
 fn gfm_setext_heading_trailing_spaces_no_break() {
     let html = render_html(&parse_final_nodes("Foo  \n-----\n"));
     assert_eq!(html, "<h2>Foo</h2>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.trailing-backslash-does-not-create-line-break]
+// [spec:gfm:sem:leaf-blocks.setext-headings.trailing-backslash-does-not-create-line-break/test]
 #[test]
 fn gfm_setext_heading_trailing_backslash_no_break() {
     let html = render_html(&parse_final_nodes("Foo\\\n----\n"));
     assert_eq!(html, "<h2>Foo\\</h2>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.backslash-escapes-allow-literal-block-markers-in-content]
+// [spec:gfm:syn:leaf-blocks.setext-headings.backslash-escapes-allow-literal-block-markers-in-content/test]
 #[test]
 fn gfm_setext_heading_escaped_block_markers() {
     let html = render_html(&parse_final_nodes("\\> foo\n------\n"));
     assert_eq!(html, "<h2>&gt; foo</h2>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.backslash-escaped-underline-produces-literal-text]
+// [spec:gfm:syn:leaf-blocks.setext-headings.backslash-escaped-underline-produces-literal-text/test]
 #[test]
 fn gfm_setext_heading_escaped_underline() {
     let html = render_html(&parse_final_nodes("Foo\n\\---\n"));
@@ -1919,23 +1921,23 @@ fn gfm_setext_heading_escaped_underline() {
     assert_eq!(html, "<p>Foo\n---</p>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.content-may-span-multiple-lines]
-// gfm[verify leaf-blocks.setext-headings.raw-content-concatenates-lines-and-trims-edge-whitespace]
+// [spec:gfm:syn:leaf-blocks.setext-headings.content-may-span-multiple-lines/test]
+// [spec:gfm:sem:leaf-blocks.setext-headings.raw-content-concatenates-lines-and-trims-edge-whitespace/test]
 #[test]
 fn gfm_setext_heading_multiline_content() {
     let html = render_html(&parse_final_nodes("Foo\nbar\n---\n"));
     assert_eq!(html, "<h2>Foo\nbar</h2>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.need-not-be-surrounded-by-blank-lines]
-// gfm[verify leaf-blocks.setext-headings.blank-lines-generally-not-required-around-heading]
+// [spec:gfm:syn:leaf-blocks.setext-headings.need-not-be-surrounded-by-blank-lines/test]
+// [spec:gfm:syn:leaf-blocks.setext-headings.blank-lines-generally-not-required-around-heading/test]
 #[test]
 fn gfm_setext_heading_no_surrounding_blanks() {
     let html = render_html(&parse_final_nodes("---\nFoo\n---\nBar\n---\nBaz\n"));
     assert_eq!(html, "<hr />\n<h2>Foo</h2>\n<h2>Bar</h2>\n<p>Baz</p>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.blank-line-required-after-paragraph-before-heading]
+// [spec:gfm:syn:leaf-blocks.setext-headings.blank-line-required-after-paragraph-before-heading/test]
 #[test]
 fn gfm_setext_heading_needs_blank_after_paragraph() {
     // Without a blank line between a paragraph and a potential setext heading
@@ -1945,8 +1947,8 @@ fn gfm_setext_heading_needs_blank_after_paragraph() {
     assert_eq!(html, "<p>Foo\nbar</p>\n<h2>baz</h2>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.cannot-be-empty]
-// gfm[verify leaf-blocks.setext-headings.text-lines-require-non-whitespace-content]
+// [spec:gfm:syn:leaf-blocks.setext-headings.cannot-be-empty/test]
+// [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-require-non-whitespace-content/test]
 #[test]
 fn gfm_setext_heading_cannot_be_empty() {
     // A blank line before the underline means no setext heading
@@ -1954,7 +1956,7 @@ fn gfm_setext_heading_cannot_be_empty() {
     assert_eq!(html, "<p>====</p>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.cannot-interrupt-paragraphs]
+// [spec:gfm:syn:leaf-blocks.setext-headings.cannot-interrupt-paragraphs/test]
 #[test]
 fn gfm_setext_heading_cannot_interrupt_paragraph() {
     // "===" below "bar" looks like setext but "bar" continues "Foo" paragraph
@@ -1965,8 +1967,8 @@ fn gfm_setext_heading_cannot_interrupt_paragraph() {
     assert_eq!(html, "<h2>Foo\nbar</h2>\n<p>baz</p>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.text-lines-must-not-parse-as-other-block-constructs]
-// gfm[verify leaf-blocks.setext-headings.text-lines-must-otherwise-parse-as-paragraphs]
+// [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-must-not-parse-as-other-block-constructs/test]
+// [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-must-otherwise-parse-as-paragraphs/test]
 #[test]
 fn gfm_setext_heading_text_must_be_paragraph_content() {
     // A thematic break followed by a line of === does not make a setext heading
@@ -1974,14 +1976,14 @@ fn gfm_setext_heading_text_must_be_paragraph_content() {
     assert_eq!(html, "<hr />\n<hr />\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.underline-cannot-be-lazy-continuation-line]
+// [spec:gfm:syn:leaf-blocks.setext-headings.underline-cannot-be-lazy-continuation-line/test]
 #[test]
 fn gfm_setext_heading_underline_not_lazy_continuation() {
     let html = render_html(&parse_final_nodes("> Foo\n---\n"));
     assert_eq!(html, "<blockquote>\n<p>Foo</p>\n</blockquote>\n<hr />\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.block-indicators-take-precedence-over-inline-indicators]
+// [spec:gfm:syn:leaf-blocks.setext-headings.block-indicators-take-precedence-over-inline-indicators/test]
 #[test]
 fn gfm_setext_heading_block_precedence() {
     // Per spec: "===" in lazy continuation position is literal text, not a setext underline
@@ -1989,8 +1991,8 @@ fn gfm_setext_heading_block_precedence() {
     assert_eq!(html, "<blockquote>\n<p>foo\nbar\n===</p>\n</blockquote>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.multiline-heading-has-four-interpretations]
-// gfm[verify leaf-blocks.setext-headings.multiline-heading-interprets-as-heading-then-paragraph]
+// [spec:gfm:def:leaf-blocks.setext-headings.multiline-heading-has-four-interpretations/test]
+// [spec:gfm:sem:leaf-blocks.setext-headings.multiline-heading-interprets-as-heading-then-paragraph/test]
 #[test]
 fn gfm_setext_heading_multiline_interpretations() {
     // Multi-line content followed by setext underline
@@ -1998,8 +2000,8 @@ fn gfm_setext_heading_multiline_interpretations() {
     assert_eq!(html, "<h2>Foo\nbar</h2>\n<p>baz</p>\n");
 }
 
-// gfm[verify leaf-blocks.setext-headings.blank-lines-around-break-produce-hr]
-// gfm[verify leaf-blocks.setext-headings.non-setext-break-marker-produces-hr]
+// [spec:gfm:syn:leaf-blocks.setext-headings.blank-lines-around-break-produce-hr/test]
+// [spec:gfm:syn:leaf-blocks.setext-headings.non-setext-break-marker-produces-hr/test]
 #[test]
 fn gfm_setext_heading_blank_lines_around_break_produce_hr() {
     let html = render_html(&parse_final_nodes("Foo\n\n---\n\nBar\n"));
@@ -2010,31 +2012,31 @@ fn gfm_setext_heading_blank_lines_around_break_produce_hr() {
 // Paragraphs
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.paragraphs.structure]
-// gfm[verify leaf-blocks.paragraphs.contents-parse-as-inlines]
+// [spec:gfm:syn:leaf-blocks.paragraphs.structure/test]
+// [spec:gfm:sem:leaf-blocks.paragraphs.contents-parse-as-inlines/test]
 #[test]
 fn gfm_paragraph_structure() {
     let html = render_html(&parse_final_nodes("aaa\n\nbbb\n"));
     assert_eq!(html, "<p>aaa</p>\n<p>bbb</p>\n");
 }
 
-// gfm[verify leaf-blocks.paragraphs.may-span-multiple-lines-without-blank-lines]
+// [spec:gfm:syn:leaf-blocks.paragraphs.may-span-multiple-lines-without-blank-lines/test]
 #[test]
 fn gfm_paragraph_multiple_lines() {
     let html = render_html(&parse_final_nodes("aaa\nbbb\n\nccc\nddd\n"));
     assert_eq!(html, "<p>aaa\nbbb</p>\n<p>ccc\nddd</p>\n");
 }
 
-// gfm[verify leaf-blocks.paragraphs.blank-line-separates-paragraphs]
-// gfm[verify leaf-blocks.paragraphs.multiple-blank-lines-between-paragraphs-have-no-effect]
+// [spec:gfm:syn:leaf-blocks.paragraphs.blank-line-separates-paragraphs/test]
+// [spec:gfm:sem:leaf-blocks.paragraphs.multiple-blank-lines-between-paragraphs-have-no-effect/test]
 #[test]
 fn gfm_paragraph_blank_lines() {
     let html = render_html(&parse_final_nodes("aaa\n\n\nbbb\n"));
     assert_eq!(html, "<p>aaa</p>\n<p>bbb</p>\n");
 }
 
-// gfm[verify leaf-blocks.paragraphs.first-line-indent-up-to-three-spaces]
-// gfm[verify leaf-blocks.paragraphs.leading-spaces-are-ignored]
+// [spec:gfm:syn:leaf-blocks.paragraphs.first-line-indent-up-to-three-spaces/test]
+// [spec:gfm:sem:leaf-blocks.paragraphs.leading-spaces-are-ignored/test]
 #[test]
 fn gfm_paragraph_leading_spaces() {
     // Leading spaces on first line are stripped
@@ -2042,7 +2044,7 @@ fn gfm_paragraph_leading_spaces() {
     assert_eq!(html, "<p>aaa\n bbb</p>\n");
 }
 
-// gfm[verify leaf-blocks.paragraphs.lines-after-first-may-be-indented-arbitrarily]
+// [spec:gfm:syn:leaf-blocks.paragraphs.lines-after-first-may-be-indented-arbitrarily/test]
 #[test]
 fn gfm_paragraph_lines_after_first_indented() {
     // Lines after first can be indented, but 4+ spaces creates indented code block
@@ -2051,8 +2053,8 @@ fn gfm_paragraph_lines_after_first_indented() {
     assert_eq!(html, "<p>aaa\n   bbb\n   ccc</p>\n");
 }
 
-// gfm[verify leaf-blocks.paragraphs.trailing-spaces-are-stripped-before-inline-parsing]
-// gfm[verify leaf-blocks.paragraphs.raw-content-concatenates-lines-and-trims-edge-whitespace]
+// [spec:gfm:sem:leaf-blocks.paragraphs.trailing-spaces-are-stripped-before-inline-parsing/test]
+// [spec:gfm:sem:leaf-blocks.paragraphs.raw-content-concatenates-lines-and-trims-edge-whitespace/test]
 #[test]
 fn gfm_paragraph_trailing_spaces_stripped() {
     let html = render_html(&parse_final_nodes("aaa   \nbbb     \n"));
@@ -2063,15 +2065,15 @@ fn gfm_paragraph_trailing_spaces_stripped() {
 // Blank lines
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.blank-lines.blank-lines-definition]
-// gfm[verify leaf-blocks.blank-lines.extension-wrapper]
+// [spec:gfm:sem:leaf-blocks.blank-lines.blank-lines-definition/test]
+// [spec:gfm:def:leaf-blocks.blank-lines.extension-wrapper/test]
 #[test]
 fn gfm_blank_lines_between_blocks() {
     let html = render_html(&parse_final_nodes("  \n\naaa\n  \n\n# aaa\n\n  \n"));
     assert_eq!(html, "<p>aaa</p>\n<h1>aaa</h1>\n");
 }
 
-// gfm[verify leaf-blocks.blank-lines.blank-lines-at-beginning-end-document-are-also-ignored]
+// [spec:gfm:sem:leaf-blocks.blank-lines.blank-lines-at-beginning-end-document-are-also-ignored/test]
 #[test]
 fn gfm_blank_lines_at_doc_boundaries() {
     let html = render_html(&parse_final_nodes("\n\naaa\n\n\n"));
@@ -2082,8 +2084,8 @@ fn gfm_blank_lines_at_doc_boundaries() {
 // Fenced code blocks
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.fenced-code-blocks.code-fence-uses-backticks-or-tildes]
-// gfm[verify leaf-blocks.fenced-code-blocks.simple-backtick-and-tilde-fences]
+// [spec:gfm:def:leaf-blocks.fenced-code-blocks.code-fence-uses-backticks-or-tildes/test]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.simple-backtick-and-tilde-fences/test]
 #[test]
 fn gfm_fenced_code_backtick_and_tilde() {
     let html = render_html(&parse_final_nodes("```\naaa\n```\n"));
@@ -2101,14 +2103,14 @@ fn gfm_fenced_code_backtick_and_tilde() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.fewer-than-three-backticks-do-not-form-fence]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.fewer-than-three-backticks-do-not-form-fence/test]
 #[test]
 fn gfm_fenced_code_fewer_than_three() {
     let html = render_html(&parse_final_nodes("``\nfoo\n``\n"));
     assert_eq!(html, "<p><code>foo</code></p>\n");
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-length-at-least-opening-length]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-length-at-least-opening-length/test]
 #[test]
 fn gfm_fenced_code_closing_must_be_at_least_opening_length() {
     let html = render_html(&parse_final_nodes("````\naaa\n```\n````\n"));
@@ -2119,8 +2121,8 @@ fn gfm_fenced_code_closing_must_be_at_least_opening_length() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-must-use-same-marker-type]
-// gfm[verify leaf-blocks.fenced-code-blocks.fence-marker-cannot-mix-backticks-and-tildes]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-must-use-same-marker-type/test]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.fence-marker-cannot-mix-backticks-and-tildes/test]
 #[test]
 fn gfm_fenced_code_closing_must_match_marker() {
     let html = render_html(&parse_final_nodes("```\naaa\n~~~\n```\n"));
@@ -2138,7 +2140,7 @@ fn gfm_fenced_code_closing_must_match_marker() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.closing-fences-cannot-have-info-strings]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fences-cannot-have-info-strings/test]
 #[test]
 fn gfm_fenced_code_closing_no_info_string() {
     let html = render_html(&parse_final_nodes("```\naaa\n``` aaa\n```\n"));
@@ -2149,10 +2151,10 @@ fn gfm_fenced_code_closing_no_info_string() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.info-string-may-be-provided-after-opening-fence]
-// gfm[verify leaf-blocks.fenced-code-blocks.opening-fence-may-include-info-string]
-// gfm[verify leaf-blocks.fenced-code-blocks.first-info-string-word-typically-identifies-language]
-// gfm[verify leaf-blocks.fenced-code-blocks.info-string-treatment-is-not-mandated]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.info-string-may-be-provided-after-opening-fence/test]
+// [spec:gfm:def:leaf-blocks.fenced-code-blocks.opening-fence-may-include-info-string/test]
+// [spec:gfm:sem:leaf-blocks.fenced-code-blocks.first-info-string-word-typically-identifies-language/test]
+// [spec:gfm:req:leaf-blocks.fenced-code-blocks.info-string-treatment-is-not-mandated/test]
 #[test]
 fn gfm_fenced_code_info_string() {
     let html = render_html(&parse_final_nodes(
@@ -2165,15 +2167,15 @@ fn gfm_fenced_code_info_string() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.backtick-info-string-cannot-contain-backticks]
-// gfm[verify leaf-blocks.fenced-code-blocks.backtick-info-strings-cannot-contain-backticks]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.backtick-info-string-cannot-contain-backticks/test]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.backtick-info-strings-cannot-contain-backticks/test]
 #[test]
 fn gfm_fenced_code_backtick_info_no_backticks() {
     let html = render_html(&parse_final_nodes("``` aa ```\nfoo\n"));
     assert_eq!(html, "<p><code>aa</code>\nfoo</p>\n");
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.tilde-info-strings-may-contain-backticks-and-tildes]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.tilde-info-strings-may-contain-backticks-and-tildes/test]
 #[test]
 fn gfm_fenced_code_tilde_info_with_backticks() {
     // The parser treats the full info string (including backticks) as language name
@@ -2185,7 +2187,7 @@ fn gfm_fenced_code_tilde_info_with_backticks() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.opening-fence-indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.opening-fence-indent-up-to-three-spaces/test]
 #[test]
 fn gfm_fenced_code_opening_indent() {
     let html = render_html(&parse_final_nodes(" ```\n aaa\n\naaa\n```\n"));
@@ -2212,7 +2214,7 @@ fn gfm_fenced_code_opening_indent() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.four-space-indented-fence-starts-indented-code-block]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.four-space-indented-fence-starts-indented-code-block/test]
 #[test]
 fn gfm_fenced_code_four_space_indent_is_code() {
     let html = render_html(&parse_final_nodes("    ```\n    aaa\n    ```\n"));
@@ -2223,8 +2225,8 @@ fn gfm_fenced_code_four_space_indent_is_code() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-indent-up-to-three-spaces]
-// gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-indent-need-not-match-opening-indent]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-indent-up-to-three-spaces/test]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-indent-need-not-match-opening-indent/test]
 #[test]
 fn gfm_fenced_code_closing_indent() {
     let html = render_html(&parse_final_nodes("```\naaa\n  ```\n"));
@@ -2242,7 +2244,7 @@ fn gfm_fenced_code_closing_indent() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.closing-fence-indented-four-spaces-does-not-close]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-indented-four-spaces-does-not-close/test]
 #[test]
 fn gfm_fenced_code_closing_four_spaces_no_close() {
     let html = render_html(&parse_final_nodes("```\naaa\n    ```\n\n```\n"));
@@ -2253,15 +2255,15 @@ fn gfm_fenced_code_closing_four_spaces_no_close() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.fence-lines-cannot-contain-internal-spaces]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.fence-lines-cannot-contain-internal-spaces/test]
 #[test]
 fn gfm_fenced_code_fence_no_internal_spaces() {
     let html = render_html(&parse_final_nodes("``` ```\naaa\n"));
     assert_eq!(html, "<p><code> </code>\naaa</p>\n");
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.content-is-literal-text]
-// gfm[verify leaf-blocks.fenced-code-blocks.content-lines-without-indent-are-preserved]
+// [spec:gfm:sem:leaf-blocks.fenced-code-blocks.content-is-literal-text/test]
+// [spec:gfm:sem:leaf-blocks.fenced-code-blocks.content-lines-without-indent-are-preserved/test]
 #[test]
 fn gfm_fenced_code_content_literal() {
     let html = render_html(&parse_final_nodes("```\n<div>\n  *hello*\n</div>\n```\n"));
@@ -2272,14 +2274,14 @@ fn gfm_fenced_code_content_literal() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.content-may-consist-only-of-empty-lines]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.content-may-consist-only-of-empty-lines/test]
 #[test]
 fn gfm_fenced_code_content_empty_lines() {
     let html = render_html(&parse_final_nodes("```\n\n\n```\n"));
     assert_eq!(html, "<pre><code>\n\n</code></pre>\n");
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.unclosed-block-continues-to-end-of-containing-block]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.unclosed-block-continues-to-end-of-containing-block/test]
 #[test]
 fn gfm_fenced_code_unclosed_continues_to_end() {
     let html = render_html(&parse_final_nodes("```\nfoo\n---\n"));
@@ -2290,7 +2292,7 @@ fn gfm_fenced_code_unclosed_continues_to_end() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.can-interrupt-paragraphs]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.can-interrupt-paragraphs/test]
 #[test]
 fn gfm_fenced_code_interrupts_paragraph() {
     let html = render_html(&parse_final_nodes("para\n```\ncode\n```\n"));
@@ -2301,8 +2303,8 @@ fn gfm_fenced_code_interrupts_paragraph() {
     );
 }
 
-// gfm[verify leaf-blocks.fenced-code-blocks.other-blocks-can-appear-adjacent-without-blank-lines]
-// gfm[verify leaf-blocks.fenced-code-blocks.can-be-followed-directly-by-paragraphs]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.other-blocks-can-appear-adjacent-without-blank-lines/test]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.can-be-followed-directly-by-paragraphs/test]
 #[test]
 fn gfm_fenced_code_adjacent_blocks() {
     let html = render_html(&parse_final_nodes("```\ncode\n```\nparagraph\n"));
@@ -2317,7 +2319,7 @@ fn gfm_fenced_code_adjacent_blocks() {
 // Indented code blocks
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.indented-code-blocks.contents-are-literal-text]
+// [spec:gfm:sem:leaf-blocks.indented-code-blocks.contents-are-literal-text/test]
 #[test]
 fn gfm_indented_code_literal() {
     let html = render_html(&parse_final_nodes("    <a/>\n    *hi*\n\n    - one\n"));
@@ -2328,7 +2330,7 @@ fn gfm_indented_code_literal() {
     );
 }
 
-// gfm[verify leaf-blocks.indented-code-blocks.first-line-can-indented-more-than-four-spaces]
+// [spec:gfm:syn:leaf-blocks.indented-code-blocks.first-line-can-indented-more-than-four-spaces/test]
 #[test]
 fn gfm_indented_code_more_than_four() {
     let html = render_html(&parse_final_nodes("        foo\n    bar\n"));
@@ -2339,8 +2341,8 @@ fn gfm_indented_code_more_than_four() {
     );
 }
 
-// gfm[verify leaf-blocks.indented-code-blocks.blank-lines-separate-chunks]
-// gfm[verify leaf-blocks.indented-code-blocks.surrounding-blank-lines-are-excluded]
+// [spec:gfm:syn:leaf-blocks.indented-code-blocks.blank-lines-separate-chunks/test]
+// [spec:gfm:sem:leaf-blocks.indented-code-blocks.surrounding-blank-lines-are-excluded/test]
 #[test]
 fn gfm_indented_code_blank_lines() {
     let html = render_html(&parse_final_nodes(
@@ -2353,7 +2355,7 @@ fn gfm_indented_code_blank_lines() {
     );
 }
 
-// gfm[verify leaf-blocks.indented-code-blocks.trailing-spaces-are-preserved]
+// [spec:gfm:sem:leaf-blocks.indented-code-blocks.trailing-spaces-are-preserved/test]
 #[test]
 fn gfm_indented_code_trailing_spaces() {
     let html = render_html(&parse_final_nodes("    foo  \n"));
@@ -2364,15 +2366,15 @@ fn gfm_indented_code_trailing_spaces() {
     );
 }
 
-// gfm[verify leaf-blocks.indented-code-blocks.cannot-interrupt-paragraphs]
-// gfm[verify leaf-blocks.indented-code-blocks.indented-code-block-cannot-interrupt-paragraph]
+// [spec:gfm:syn:leaf-blocks.indented-code-blocks.cannot-interrupt-paragraphs/test]
+// [spec:gfm:syn:leaf-blocks.indented-code-blocks.indented-code-block-cannot-interrupt-paragraph/test]
 #[test]
 fn gfm_indented_code_cannot_interrupt_paragraph() {
     let html = render_html(&parse_final_nodes("Foo\n    bar\n"));
     assert_eq!(html, "<p>Foo\n    bar</p>\n");
 }
 
-// gfm[verify leaf-blocks.indented-code-blocks.may-occur-adjacent-to-other-blocks]
+// [spec:gfm:syn:leaf-blocks.indented-code-blocks.may-occur-adjacent-to-other-blocks/test]
 #[test]
 fn gfm_indented_code_adjacent_to_other_blocks() {
     let html = render_html(&parse_final_nodes(
@@ -2386,7 +2388,7 @@ fn gfm_indented_code_adjacent_to_other_blocks() {
     );
 }
 
-// gfm[verify leaf-blocks.indented-code-blocks.less-than-four-spaces-ends-block]
+// [spec:gfm:syn:leaf-blocks.indented-code-blocks.less-than-four-spaces-ends-block/test]
 #[test]
 fn gfm_indented_code_less_than_four_ends() {
     let html = render_html(&parse_final_nodes("    foo\nbar\n"));
@@ -2397,7 +2399,7 @@ fn gfm_indented_code_less_than_four_ends() {
     );
 }
 
-// gfm[verify leaf-blocks.indented-code-blocks.list-item-interpretation-takes-precedence]
+// [spec:gfm:syn:leaf-blocks.indented-code-blocks.list-item-interpretation-takes-precedence/test]
 #[test]
 fn gfm_indented_code_list_item_precedence() {
     // List items take precedence over indented code blocks
@@ -2413,7 +2415,7 @@ fn gfm_indented_code_list_item_precedence() {
 // HTML blocks (rules not yet covered by existing tests)
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.html-blocks.has-seven-types]
+// [spec:gfm:def:leaf-blocks.html-blocks.has-seven-types/test]
 #[test]
 fn gfm_html_blocks_has_seven_types() {
     // Type 1: <pre>
@@ -2445,7 +2447,7 @@ fn gfm_html_blocks_has_seven_types() {
     assert_eq!(html, "<a href=\"foo\">\n*bar*\n</a>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-1-pre-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-1-pre-example/test]
 #[test]
 fn gfm_html_block_type_1_pre_example() {
     let html = render_html(&parse_final_nodes(
@@ -2459,7 +2461,7 @@ fn gfm_html_block_type_1_pre_example() {
     );
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-1-script-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-1-script-example/test]
 #[test]
 fn gfm_html_block_type_1_script_example() {
     let html = render_html(&parse_final_nodes(
@@ -2471,7 +2473,7 @@ fn gfm_html_block_type_1_script_example() {
     );
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-1-style-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-1-style-example/test]
 #[test]
 fn gfm_html_block_type_1_style_example() {
     let html = render_html(&parse_final_nodes(
@@ -2483,35 +2485,35 @@ fn gfm_html_block_type_1_style_example() {
     );
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-2-comment-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-2-comment-example/test]
 #[test]
 fn gfm_html_block_type_2_comment_example() {
     let html = render_html(&parse_final_nodes("<!-- Foo\n\nbar\n   baz -->\nokay\n"));
     assert_eq!(html, "<!-- Foo\n\nbar\n   baz -->\n<p>okay</p>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-3-processing-instruction-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-3-processing-instruction-example/test]
 #[test]
 fn gfm_html_block_type_3_processing_instruction_example() {
     let html = render_html(&parse_final_nodes("<?php\n  echo '>';\n?>\nokay\n"));
     assert_eq!(html, "<?php\n  echo '>';\n?>\n<p>okay</p>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-4-declaration-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-4-declaration-example/test]
 #[test]
 fn gfm_html_block_type_4_declaration_example() {
     let html = render_html(&parse_final_nodes("<!DOCTYPE html>\n"));
     assert_eq!(html, "<!DOCTYPE html>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-5-cdata-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-5-cdata-example/test]
 #[test]
 fn gfm_html_block_type_5_cdata_example() {
     let html = render_html(&parse_final_nodes("<![CDATA[\nfoo\n]]>\n"));
     assert_eq!(html, "<![CDATA[\nfoo\n]]>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-6-examples]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-examples/test]
 #[test]
 fn gfm_html_block_type_6_examples() {
     let html = render_html(&parse_final_nodes(
@@ -2523,40 +2525,40 @@ fn gfm_html_block_type_6_examples() {
     );
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-valid]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-valid/test]
 #[test]
 fn gfm_html_block_type_6_initial_tag_need_not_be_valid() {
     let html = render_html(&parse_final_nodes("<div><a href=\"bar\">*foo*</a></div>\n"));
     assert_eq!(html, "<div><a href=\"bar\">*foo*</a></div>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-6-may-start-with-closing-tag]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-may-start-with-closing-tag/test]
 #[test]
 fn gfm_html_block_type_6_may_start_with_closing_tag() {
     let html = render_html(&parse_final_nodes("</div>\n*foo*\n"));
     assert_eq!(html, "</div>\n*foo*\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-6-open-tag-need-not-be-closed]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-open-tag-need-not-be-closed/test]
 #[test]
 fn gfm_html_block_type_6_open_tag_need_not_be_closed() {
     let html = render_html(&parse_final_nodes("<div>\nfoo\n\n"));
     assert_eq!(html, "<div>\nfoo\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.type-6-opening-tag-may-be-partial-when-split-at-whitespace]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-opening-tag-may-be-partial-when-split-at-whitespace/test]
 #[test]
 fn gfm_html_block_type_6_partial_opening_tag() {
     let html = render_html(&parse_final_nodes("<div id=\"foo\"\n*hi*\n"));
     assert_eq!(html, "<div id=\"foo\"\n*hi*\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.differs-from-original-markdown-rule]
-// gfm[verify leaf-blocks.html-blocks.original-markdown-rule-quote]
-// gfm[verify leaf-blocks.html-blocks.original-markdown-rule-is-more-liberal-about-blank-lines]
-// gfm[verify leaf-blocks.html-blocks.original-markdown-rule-is-more-restrictive-in-some-ways]
-// gfm[verify leaf-blocks.html-blocks.most-implementations-do-not-follow-all-original-restrictions]
-// gfm[verify leaf-blocks.html-blocks.markdown-1-attribute-convention-is-more-complex]
+// [spec:gfm:sem:leaf-blocks.html-blocks.differs-from-original-markdown-rule/test]
+// [spec:gfm:sem:leaf-blocks.html-blocks.original-markdown-rule-quote/test]
+// [spec:gfm:sem:leaf-blocks.html-blocks.original-markdown-rule-is-more-liberal-about-blank-lines/test]
+// [spec:gfm:sem:leaf-blocks.html-blocks.original-markdown-rule-is-more-restrictive-in-some-ways/test]
+// [spec:gfm:sem:leaf-blocks.html-blocks.most-implementations-do-not-follow-all-original-restrictions/test]
+// [spec:gfm:sem:leaf-blocks.html-blocks.markdown-1-attribute-convention-is-more-complex/test]
 #[test]
 fn gfm_html_blocks_differ_from_original_markdown() {
     // The GFM spec rules differ from original Markdown.
@@ -2565,8 +2567,8 @@ fn gfm_html_blocks_differ_from_original_markdown() {
     assert_eq!(html, "<div>\n<p><em>Markdown</em></p>\n</div>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.blank-lines-can-usually-be-removed-except-in-pre-blocks]
-// gfm[verify leaf-blocks.html-blocks.pasting-html-with-blank-lines-usually-still-works]
+// [spec:gfm:sem:leaf-blocks.html-blocks.blank-lines-can-usually-be-removed-except-in-pre-blocks/test]
+// [spec:gfm:sem:leaf-blocks.html-blocks.pasting-html-with-blank-lines-usually-still-works/test]
 #[test]
 fn gfm_html_blocks_blank_lines_and_pre() {
     // pre blocks: blank lines do NOT end the block
@@ -2574,7 +2576,7 @@ fn gfm_html_blocks_blank_lines_and_pre() {
     assert_eq!(html, "<pre>\nfoo\n\nbar\n</pre>\n");
 }
 
-// gfm[verify leaf-blocks.html-blocks.indented-inner-tags-with-blank-lines-can-become-code-blocks]
+// [spec:gfm:syn:leaf-blocks.html-blocks.indented-inner-tags-with-blank-lines-can-become-code-blocks/test]
 #[test]
 fn gfm_html_blocks_indented_inner_tags_code_blocks() {
     let html = render_html(&parse_final_nodes("<div>\n\n    <div>\n\n"));
@@ -2585,22 +2587,22 @@ fn gfm_html_blocks_indented_inner_tags_code_blocks() {
 // Link reference definitions
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.link-reference-definitions.structure]
-// gfm[verify leaf-blocks.link-reference-definitions.label-followed-by-colon]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.structure/test]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.label-followed-by-colon/test]
 #[test]
 fn gfm_link_ref_def_structure() {
     let html = render_html(&parse_final_nodes("[foo]: /url \"title\"\n\n[foo]\n"));
     assert_eq!(html, "<p><a href=\"/url\" title=\"title\">foo</a></p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.title-may-be-omitted]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-may-be-omitted/test]
 #[test]
 fn gfm_link_ref_def_title_omitted() {
     let html = render_html(&parse_final_nodes("[foo]: /url\n\n[foo]\n"));
     assert_eq!(html, "<p><a href=\"/url\">foo</a></p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.title-may-extend-over-multiple-lines]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-may-extend-over-multiple-lines/test]
 #[test]
 fn gfm_link_ref_def_multiline_title() {
     // Single-line title that spans over to demonstrate the concept
@@ -2613,8 +2615,8 @@ fn gfm_link_ref_def_multiline_title() {
     );
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.title-must-be-separated-by-whitespace]
-// gfm[verify leaf-blocks.link-reference-definitions.title-separated-from-destination-by-whitespace]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-must-be-separated-by-whitespace/test]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-separated-from-destination-by-whitespace/test]
 #[test]
 fn gfm_link_ref_def_title_separated_by_whitespace() {
     // The parser treats the whole string as a destination without a title
@@ -2622,29 +2624,29 @@ fn gfm_link_ref_def_title_separated_by_whitespace() {
     assert_eq!(html, "<p><a href=\"/url%22title%22\">foo</a></p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.title-allows-leading-whitespace]
-// gfm[verify leaf-blocks.link-reference-definitions.destination-allows-leading-whitespace]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-allows-leading-whitespace/test]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.destination-allows-leading-whitespace/test]
 #[test]
 fn gfm_link_ref_def_whitespace_around_parts() {
     let html = render_html(&parse_final_nodes("[foo]:   /url  \"title\"  \n\n[foo]\n"));
     assert_eq!(html, "<p><a href=\"/url\" title=\"title\">foo</a></p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.label-matching-is-case-insensitive]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.label-matching-is-case-insensitive/test]
 #[test]
 fn gfm_link_ref_def_case_insensitive() {
     let html = render_html(&parse_final_nodes("[FOO]: /url\n\n[Foo]\n"));
     assert_eq!(html, "<p><a href=\"/url\">Foo</a></p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.label-indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.label-indent-up-to-three-spaces/test]
 #[test]
 fn gfm_link_ref_def_label_indent() {
     let html = render_html(&parse_final_nodes("   [foo]: /url\n\n[foo]\n"));
     assert_eq!(html, "<p><a href=\"/url\">foo</a></p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.indent-four-spaces-prevents-definition]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.indent-four-spaces-prevents-definition/test]
 #[test]
 fn gfm_link_ref_def_four_spaces_is_code() {
     let html = render_html(&parse_final_nodes("    [foo]: /url\n\n[foo]\n"));
@@ -2654,7 +2656,7 @@ fn gfm_link_ref_def_four_spaces_is_code() {
     );
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.cannot-interrupt-paragraphs]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.cannot-interrupt-paragraphs/test]
 #[test]
 fn gfm_link_ref_def_cannot_interrupt_paragraph() {
     // A reference definition on a paragraph continuation line is not recognised
@@ -2664,7 +2666,7 @@ fn gfm_link_ref_def_cannot_interrupt_paragraph() {
     assert_eq!(html, "<p>Foo\n[bar]: /baz</p>\n<p>[bar]</p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.first-matching-definition-takes-precedence]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.first-matching-definition-takes-precedence/test]
 #[test]
 fn gfm_link_ref_def_first_definition_wins() {
     let html = render_html(&parse_final_nodes(
@@ -2673,15 +2675,15 @@ fn gfm_link_ref_def_first_definition_wins() {
     assert_eq!(html, "<p><a href=\"/url1\">foo</a></p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.definition-status-is-independent-of-use]
-// gfm[verify leaf-blocks.link-reference-definitions.unused-definitions-have-no-visible-output]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.definition-status-is-independent-of-use/test]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.unused-definitions-have-no-visible-output/test]
 #[test]
 fn gfm_link_ref_def_unused_no_output() {
     let html = render_html(&parse_final_nodes("[foo]: /url\n"));
     assert_eq!(html, "");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.destination-and-title-allow-escapes]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.destination-and-title-allow-escapes/test]
 #[test]
 fn gfm_link_ref_def_escapes() {
     // Backslash escapes in destination and title
@@ -2694,21 +2696,21 @@ fn gfm_link_ref_def_escapes() {
     );
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.empty-destination-may-use-angle-brackets]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.empty-destination-may-use-angle-brackets/test]
 #[test]
 fn gfm_link_ref_def_empty_angle_bracket_dest() {
     let html = render_html(&parse_final_nodes("[foo]: <>\n\n[foo]\n"));
     assert_eq!(html, "<p><a href=\"\">foo</a></p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.link-destination-may-not-omitted]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.link-destination-may-not-omitted/test]
 #[test]
 fn gfm_link_ref_def_destination_required() {
     let html = render_html(&parse_final_nodes("[foo]:\n\n[foo]\n"));
     assert_eq!(html, "<p>[foo]:</p>\n<p>[foo]</p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.it-may-not-contain-blank-line]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.it-may-not-contain-blank-line/test]
 #[test]
 fn gfm_link_ref_def_no_blank_line() {
     let html = render_html(&parse_final_nodes("[foo]: /url\n\n\"title\"\n\n[foo]\n"));
@@ -2718,7 +2720,7 @@ fn gfm_link_ref_def_no_blank_line() {
     );
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.multiple-definitions-may-appear-consecutively]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.multiple-definitions-may-appear-consecutively/test]
 #[test]
 fn gfm_link_ref_def_consecutive() {
     let html = render_html(&parse_final_nodes(
@@ -2730,7 +2732,7 @@ fn gfm_link_ref_def_consecutive() {
     );
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.may-follow-other-blocks-without-blank-line]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.may-follow-other-blocks-without-blank-line/test]
 #[test]
 fn gfm_link_ref_def_after_block_no_blank() {
     let html = render_html(&parse_final_nodes("# Foo\n[foo]: /url\n> bar\n"));
@@ -2740,7 +2742,7 @@ fn gfm_link_ref_def_after_block_no_blank() {
     );
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.may-occur-inside-block-containers]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.may-occur-inside-block-containers/test]
 #[test]
 fn gfm_link_ref_def_inside_block_container() {
     let html = render_html(&parse_final_nodes("> [foo]: /url\n\n[foo]\n"));
@@ -2750,8 +2752,8 @@ fn gfm_link_ref_def_inside_block_container() {
     );
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.no-non-whitespace-after-definition]
-// gfm[verify leaf-blocks.link-reference-definitions.trailing-non-whitespace-invalidates-definition]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.no-non-whitespace-after-definition/test]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.trailing-non-whitespace-invalidates-definition/test]
 #[test]
 fn gfm_link_ref_def_no_trailing_non_whitespace() {
     // Trailing non-whitespace after title invalidates the definition
@@ -2762,7 +2764,7 @@ fn gfm_link_ref_def_no_trailing_non_whitespace() {
     );
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.following-line-does-not-become-title]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.following-line-does-not-become-title/test]
 #[test]
 fn gfm_link_ref_def_following_line_not_title() {
     // A paragraph following a definition is not treated as the title
@@ -2770,7 +2772,7 @@ fn gfm_link_ref_def_following_line_not_title() {
     assert_eq!(html, "<p>bar</p>\n<p><a href=\"/url\">foo</a></p>\n");
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.code-block-content-does-not-define-reference]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.code-block-content-does-not-define-reference/test]
 #[test]
 fn gfm_link_ref_def_not_in_code_blocks() {
     let html = render_html(&parse_final_nodes("```\n[foo]: /url\n```\n\n[foo]\n"));
@@ -2781,7 +2783,7 @@ fn gfm_link_ref_def_not_in_code_blocks() {
     );
 }
 
-// gfm[verify leaf-blocks.link-reference-definitions.multiline-label-form-does-not-define-reference]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.multiline-label-form-does-not-define-reference/test]
 #[test]
 fn gfm_link_ref_def_multiline_label_invalid() {
     // Multi-line labels ARE allowed per spec
@@ -2793,10 +2795,10 @@ fn gfm_link_ref_def_multiline_label_invalid() {
 // Tables (extension)
 // ---------------------------------------------------------------------------
 
-// gfm[verify leaf-blocks.tables-extension.delimiter-row-structure]
-// gfm[verify leaf-blocks.tables-extension.header-and-delimiter-row-must-have-matching-cell-count]
-// gfm[verify leaf-blocks.tables-extension.gfm-enables-table-extension]
-// gfm[verify leaf-blocks.tables-extension.extension-wrapper]
+// [spec:gfm:def:leaf-blocks.tables-extension.delimiter-row-structure/test]
+// [spec:gfm:syn:leaf-blocks.tables-extension.header-and-delimiter-row-must-have-matching-cell-count/test]
+// [spec:gfm:def:leaf-blocks.tables-extension.gfm-enables-table-extension/test]
+// [spec:gfm:def:leaf-blocks.tables-extension.extension-wrapper/test]
 #[test]
 fn gfm_table_delimiter_row_structure() {
     let html = render_html(&parse_final_nodes(
@@ -2808,8 +2810,8 @@ fn gfm_table_delimiter_row_structure() {
     );
 }
 
-// gfm[verify leaf-blocks.tables-extension.rows-consist-of-pipe-separated-cells]
-// gfm[verify leaf-blocks.tables-extension.spaces-around-cell-content-are-trimmed]
+// [spec:gfm:syn:leaf-blocks.tables-extension.rows-consist-of-pipe-separated-cells/test]
+// [spec:gfm:sem:leaf-blocks.tables-extension.spaces-around-cell-content-are-trimmed/test]
 #[test]
 fn gfm_table_cells_trimmed() {
     let html = render_html(&parse_final_nodes(
@@ -2821,8 +2823,8 @@ fn gfm_table_cells_trimmed() {
     );
 }
 
-// gfm[verify leaf-blocks.tables-extension.column-widths-and-edge-pipes-need-not-be-consistent]
-// gfm[verify leaf-blocks.tables-extension.leading-and-trailing-pipes-are-recommended-for-clarity]
+// [spec:gfm:syn:leaf-blocks.tables-extension.column-widths-and-edge-pipes-need-not-be-consistent/test]
+// [spec:gfm:req:leaf-blocks.tables-extension.leading-and-trailing-pipes-are-recommended-for-clarity/test]
 #[test]
 fn gfm_table_inconsistent_pipes() {
     // Without leading/trailing pipes
@@ -2833,7 +2835,7 @@ fn gfm_table_inconsistent_pipes() {
     );
 }
 
-// gfm[verify leaf-blocks.tables-extension.body-rows-may-have-fewer-or-more-cells-than-header]
+// [spec:gfm:sem:leaf-blocks.tables-extension.body-rows-may-have-fewer-or-more-cells-than-header/test]
 #[test]
 fn gfm_table_uneven_body_rows() {
     // Extra cells in body rows are truncated to match header count
@@ -2845,7 +2847,7 @@ fn gfm_table_uneven_body_rows() {
     );
 }
 
-// gfm[verify leaf-blocks.tables-extension.escaped-pipes-are-literal-cell-content]
+// [spec:gfm:syn:leaf-blocks.tables-extension.escaped-pipes-are-literal-cell-content/test]
 #[test]
 fn gfm_table_escaped_pipes() {
     // Backslash escapes are available in table cells for inline content
@@ -2858,7 +2860,7 @@ fn gfm_table_escaped_pipes() {
     );
 }
 
-// gfm[verify leaf-blocks.tables-extension.block-level-elements-cannot-appear-in-tables]
+// [spec:gfm:syn:leaf-blocks.tables-extension.block-level-elements-cannot-appear-in-tables/test]
 #[test]
 fn gfm_table_no_block_elements() {
     // Block elements in table cells are rendered as inline text
@@ -2869,7 +2871,7 @@ fn gfm_table_no_block_elements() {
     );
 }
 
-// gfm[verify leaf-blocks.tables-extension.table-ends-at-blank-line-or-other-block]
+// [spec:gfm:syn:leaf-blocks.tables-extension.table-ends-at-blank-line-or-other-block/test]
 #[test]
 fn gfm_table_ends_at_blank_line() {
     let html = render_html(&parse_final_nodes("| a |\n| --- |\n| b |\n\nparagraph\n"));
@@ -2879,7 +2881,7 @@ fn gfm_table_ends_at_blank_line() {
     );
 }
 
-// gfm[verify leaf-blocks.tables-extension.no-tbody-generated-when-there-are-no-body-rows]
+// [spec:gfm:sem:leaf-blocks.tables-extension.no-tbody-generated-when-there-are-no-body-rows/test]
 #[test]
 fn gfm_table_no_body_rows() {
     let html = render_html(&parse_final_nodes("| a |\n| --- |\n"));
@@ -2893,12 +2895,12 @@ fn gfm_table_no_body_rows() {
 // Emphasis: delimiter run definitions and flanking rules
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.delimiter-run-definition]
-// gfm[verify inlines.emphasis-and-strong-emphasis.delimiter-run-example]
-// gfm[verify inlines.emphasis-and-strong-emphasis.left-flanking-delimiter-run-definition]
-// gfm[verify inlines.emphasis-and-strong-emphasis.right-flanking-delimiter-run-definition]
-// gfm[verify inlines.emphasis-and-strong-emphasis.left-right-flanking-terminology-note]
-// gfm[verify inlines.emphasis-and-strong-emphasis.rules-illustrated-by-examples]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.delimiter-run-definition/test]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.delimiter-run-example/test]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.left-flanking-delimiter-run-definition/test]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.right-flanking-delimiter-run-definition/test]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.left-right-flanking-terminology-note/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rules-illustrated-by-examples/test]
 #[test]
 fn gfm_emphasis_delimiter_run_flanking_asterisk() {
     // Rule 1: simple emphasis *foo bar*
@@ -2919,10 +2921,10 @@ fn gfm_emphasis_delimiter_run_flanking_asterisk() {
     assert_eq!(html, "<p>abc *** def</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-when-followed-by-whitespace]
-// gfm[verify inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-whitespace]
-// gfm[verify inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-closing]
-// gfm[verify inlines.emphasis-and-strong-emphasis.unicode-nonbreaking-space-counts-as-whitespace]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-when-followed-by-whitespace/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-whitespace/test]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-closing/test]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.unicode-nonbreaking-space-counts-as-whitespace/test]
 #[test]
 fn gfm_emphasis_asterisk_whitespace_flanking() {
     // Opening * followed by whitespace: not emphasis
@@ -2942,9 +2944,9 @@ fn gfm_emphasis_asterisk_whitespace_flanking() {
     assert_eq!(html, "<p>*\u{00a0}a\u{00a0}*</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-after-alphanumeric-before-punctuation]
-// gfm[verify inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-punctuation-before-alphanumeric]
-// gfm[verify inlines.emphasis-and-strong-emphasis.asterisk-closing-restriction-example]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-after-alphanumeric-before-punctuation/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-punctuation-before-alphanumeric/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-closing-restriction-example/test]
 #[test]
 fn gfm_emphasis_asterisk_punctuation_flanking() {
     // Opening * preceded by alphanumeric and followed by punctuation
@@ -2960,11 +2962,11 @@ fn gfm_emphasis_asterisk_punctuation_flanking() {
     assert_eq!(html, "<p><em>(<em>foo</em>)</em></p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-whitespace]
-// gfm[verify inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-whitespace]
-// gfm[verify inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-alphanumeric-before-punctuation]
-// gfm[verify inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-punctuation-before-alphanumeric]
-// gfm[verify inlines.emphasis-and-strong-emphasis.right-flanking-underscore-does-not-emphasize]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-whitespace/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-whitespace/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-alphanumeric-before-punctuation/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-punctuation-before-alphanumeric/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.right-flanking-underscore-does-not-emphasize/test]
 #[test]
 fn gfm_emphasis_underscore_flanking() {
     // Opening _ followed by whitespace
@@ -2988,12 +2990,12 @@ fn gfm_emphasis_underscore_flanking() {
     assert_eq!(html, "<p>aa_&quot;bb&quot;_cc</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-whitespace]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-whitespace]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-alphanumeric-before-punctuation]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-punctuation-before-alphanumeric]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-closing-cannot-fall-back-to-single-asterisk-rule]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-asterisk-closing-restriction-examples]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-whitespace/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-whitespace/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-alphanumeric-before-punctuation/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-punctuation-before-alphanumeric/test]
+// [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.double-asterisk-closing-cannot-fall-back-to-single-asterisk-rule/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-closing-restriction-examples/test]
 #[test]
 fn gfm_strong_emphasis_double_asterisk_flanking() {
     // Opening ** followed by whitespace
@@ -3027,12 +3029,12 @@ fn gfm_strong_emphasis_double_asterisk_flanking() {
     assert_eq!(html, "<p><strong>foo</strong>bar</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-whitespace]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-whitespace]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-alphanumeric-before-punctuation]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-punctuation-before-alphanumeric]
-// gfm[verify inlines.emphasis-and-strong-emphasis.double-underscore-closing-restriction-example]
-// gfm[verify inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-double-underscore]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-whitespace/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-whitespace/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-alphanumeric-before-punctuation/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-punctuation-before-alphanumeric/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-closing-restriction-example/test]
+// [spec:gfm:def:inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-double-underscore/test]
 #[test]
 fn gfm_strong_emphasis_double_underscore_flanking() {
     // Opening __ followed by whitespace
@@ -3064,10 +3066,10 @@ fn gfm_strong_emphasis_double_underscore_flanking() {
 // Emphasis: intraword rules
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-allowed]
-// gfm[verify inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-disallowed]
-// gfm[verify inlines.emphasis-and-strong-emphasis.many-implementations-restrict-intraword-underscore]
-// gfm[verify inlines.emphasis-and-strong-emphasis.intraword-double-underscore-closing-is-forbidden]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-allowed/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-disallowed/test]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.many-implementations-restrict-intraword-underscore/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-double-underscore-closing-is-forbidden/test]
 #[test]
 fn gfm_emphasis_intraword_rules() {
     // Intraword emphasis with * is allowed: *foo*bar
@@ -3095,9 +3097,9 @@ fn gfm_emphasis_intraword_rules() {
 // Emphasis: multiple-of-three rule
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.multiple-of-three-condition-explanation]
-// gfm[verify inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-alternative]
-// gfm[verify inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-consecutive-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-condition-explanation/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-alternative/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-consecutive-emphasis/test]
 #[test]
 fn gfm_emphasis_multiple_of_three() {
     // Multiple-of-three prevents consecutive emphasis: *foo**bar*
@@ -3109,8 +3111,8 @@ fn gfm_emphasis_multiple_of_three() {
 // Emphasis: nesting
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-allows-indefinite-nesting]
-// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-allows-indefinite-nesting/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-emphasis/test]
 #[test]
 fn gfm_emphasis_nesting_inside_emphasis() {
     // Indefinite nesting
@@ -3141,8 +3143,8 @@ fn gfm_emphasis_nesting_inside_emphasis() {
     assert_eq!(html, "<p><em>foo<strong>bar</strong>baz</em></p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-strong]
-// gfm[verify inlines.emphasis-and-strong-emphasis.strong-emphasis-allows-indefinite-nesting]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-strong/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-allows-indefinite-nesting/test]
 #[test]
 fn gfm_emphasis_nesting_inside_strong() {
     // Emphasis in strong
@@ -3177,7 +3179,7 @@ fn gfm_emphasis_nesting_inside_strong() {
     );
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.strong-can-nest-inside-strong-with-same-delimiter]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-can-nest-inside-strong-with-same-delimiter/test]
 #[test]
 fn gfm_strong_nests_inside_strong_same_delimiter() {
     let html = render_html(&parse_final_nodes("****foo****\n"));
@@ -3191,8 +3193,8 @@ fn gfm_strong_nests_inside_strong_same_delimiter() {
 // Emphasis: empty emphasis not allowed
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.empty-asterisk-emphasis-is-not-allowed]
-// gfm[verify inlines.emphasis-and-strong-emphasis.empty-underscore-emphasis-is-not-allowed]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.empty-asterisk-emphasis-is-not-allowed/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.empty-underscore-emphasis-is-not-allowed/test]
 #[test]
 fn gfm_emphasis_empty_not_allowed() {
     // ** is not an empty emphasis
@@ -3264,7 +3266,7 @@ fn gfm_emphasis_empty_not_allowed() {
 // Emphasis: excess delimiters (rules 11 and 12)
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.rule-11-puts-excess-asterisks-outside-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-11-puts-excess-asterisks-outside-emphasis/test]
 #[test]
 fn gfm_emphasis_rule_11_excess_asterisks_outside() {
     // **foo* => *<em>foo</em>
@@ -3292,7 +3294,7 @@ fn gfm_emphasis_rule_11_excess_asterisks_outside() {
     assert_eq!(html, "<p><em>foo</em>***</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.rule-12-puts-excess-underscores-outside-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-12-puts-excess-underscores-outside-emphasis/test]
 #[test]
 fn gfm_emphasis_rule_12_excess_underscores_outside() {
     // __foo_ => _<em>foo</em>
@@ -3324,8 +3326,8 @@ fn gfm_emphasis_rule_12_excess_underscores_outside() {
 // Emphasis: rule 13 and related
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.rule-13-applies-to-long-delimiter-runs]
-// gfm[verify inlines.emphasis-and-strong-emphasis.rule-13-requires-different-directly-nested-delimiters]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-13-applies-to-long-delimiter-runs/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-13-requires-different-directly-nested-delimiters/test]
 #[test]
 fn gfm_emphasis_rule_13_long_runs_and_different_delimiters() {
     // ******foo****** => nested strong
@@ -3371,16 +3373,16 @@ fn gfm_emphasis_rule_13_long_runs_and_different_delimiters() {
 // Emphasis: matching delimiters, content, and misc
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-delimiters-must-match]
-// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-requires-matching-delimiters]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-delimiters-must-match/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-requires-matching-delimiters/test]
 #[test]
 fn gfm_emphasis_delimiters_must_match() {
     let html = render_html(&parse_final_nodes("_foo*\n"));
     assert_eq!(html, "<p>_foo*</p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.emphasis-may-contain-any-nonempty-inlines]
-// gfm[verify inlines.emphasis-and-strong-emphasis.strong-emphasis-may-contain-any-nonempty-inlines]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-may-contain-any-nonempty-inlines/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-may-contain-any-nonempty-inlines/test]
 #[test]
 fn gfm_emphasis_contains_any_nonempty_inlines() {
     // Emphasis with link inside
@@ -3403,22 +3405,22 @@ fn gfm_emphasis_contains_any_nonempty_inlines() {
     assert_eq!(html, "<p><strong>foo\nbar</strong></p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.is-emphasis-within-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.is-emphasis-within-emphasis/test]
 #[test]
 fn gfm_emphasis_within_emphasis_underscore() {
     let html = render_html(&parse_final_nodes("_(_foo_)_\n"));
     assert_eq!(html, "<p><em>(<em>foo</em>)</em></p>\n");
 }
 
-// gfm[verify inlines.emphasis-and-strong-emphasis.less-common-but-useful-emphasis-patterns]
-// gfm[verify inlines.emphasis-and-strong-emphasis.original-markdown-description]
-// gfm[verify inlines.emphasis-and-strong-emphasis.original-markdown-description-quoted]
-// gfm[verify inlines.emphasis-and-strong-emphasis.original-rules-leave-nesting-underdetermined]
-// gfm[verify inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
-// gfm[verify inlines.emphasis-and-strong-emphasis.ambiguity-resolution-principles]
-// gfm[verify inlines.emphasis-and-strong-emphasis.extension-wrapper]
-// gfm[verify inlines.emphasis-and-strong-emphasis.literal-asterisk-cannot-edge-asterisk-emphasis]
-// gfm[verify inlines.emphasis-and-strong-emphasis.literal-underscore-cannot-edge-underscore-delimiters]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.less-common-but-useful-emphasis-patterns/test]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-markdown-description/test]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-markdown-description-quoted/test]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-rules-leave-nesting-underdetermined/test]
+// [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.ambiguity-resolution-principles/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.extension-wrapper/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.literal-asterisk-cannot-edge-asterisk-emphasis/test]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.literal-underscore-cannot-edge-underscore-delimiters/test]
 #[test]
 fn gfm_emphasis_definitional_and_edge_cases() {
     // Less common but useful: *emph *with emph* in it*
@@ -3438,20 +3440,20 @@ fn gfm_emphasis_definitional_and_edge_cases() {
 // Links: inline links
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.links.definition]
-// gfm[verify inlines.links.inline-link-example]
-// gfm[verify inlines.links.inline-link-text-comes-from-link-text-inlines]
-// gfm[verify inlines.links.inline-link-uri-comes-from-destination-with-delimiters-removed]
-// gfm[verify inlines.links.inline-link-title-comes-from-title-with-delimiters-removed]
-// gfm[verify inlines.links.inline-and-reference-links-are-the-two-basic-kinds]
+// [spec:gfm:def:inlines.links.definition/test]
+// [spec:gfm:sem:inlines.links.inline-link-example/test]
+// [spec:gfm:def:inlines.links.inline-link-text-comes-from-link-text-inlines/test]
+// [spec:gfm:sem:inlines.links.inline-link-uri-comes-from-destination-with-delimiters-removed/test]
+// [spec:gfm:sem:inlines.links.inline-link-title-comes-from-title-with-delimiters-removed/test]
+// [spec:gfm:def:inlines.links.inline-and-reference-links-are-the-two-basic-kinds/test]
 #[test]
 fn gfm_inline_link_basics() {
     let html = render_html(&parse_final_nodes("[link](/uri \"title\")\n"));
     assert_eq!(html, "<p><a href=\"/uri\" title=\"title\">link</a></p>\n");
 }
 
-// gfm[verify inlines.links.title-may-be-omitted]
-// gfm[verify inlines.links.destination-and-title-may-both-be-omitted]
+// [spec:gfm:syn:inlines.links.title-may-be-omitted/test]
+// [spec:gfm:syn:inlines.links.destination-and-title-may-both-be-omitted/test]
 #[test]
 fn gfm_inline_link_title_and_dest_omission() {
     // Title omitted
@@ -3463,7 +3465,7 @@ fn gfm_inline_link_title_and_dest_omission() {
     assert_eq!(html, "<p><a href=\"\">link</a></p>\n");
 }
 
-// gfm[verify inlines.links.destination-may-include-fragments-and-queries]
+// [spec:gfm:syn:inlines.links.destination-may-include-fragments-and-queries/test]
 #[test]
 fn gfm_link_destination_fragments_and_queries() {
     let html = render_html(&parse_final_nodes("[link](#fragment)\n"));
@@ -3484,11 +3486,11 @@ fn gfm_link_destination_fragments_and_queries() {
     );
 }
 
-// gfm[verify inlines.links.link-destination-definition]
-// gfm[verify inlines.links.balanced-parentheses-are-allowed-in-destination]
-// gfm[verify inlines.links.parentheses-in-destination-may-be-escaped]
-// gfm[verify inlines.links.unbalanced-parentheses-require-escaping-or-angle-brackets]
-// gfm[verify inlines.links.implementations-may-limit-parenthesis-nesting-in-destinations]
+// [spec:gfm:syn:inlines.links.link-destination-definition/test]
+// [spec:gfm:syn:inlines.links.balanced-parentheses-are-allowed-in-destination/test]
+// [spec:gfm:syn:inlines.links.parentheses-in-destination-may-be-escaped/test]
+// [spec:gfm:syn:inlines.links.unbalanced-parentheses-require-escaping-or-angle-brackets/test]
+// [spec:gfm:def:inlines.links.implementations-may-limit-parenthesis-nesting-in-destinations/test]
 #[test]
 fn gfm_link_destination_parentheses() {
     // Balanced parentheses
@@ -3499,10 +3501,10 @@ fn gfm_link_destination_parentheses() {
     assert_eq!(html, "<p><a href=\"(foo)\">link</a></p>\n");
 }
 
-// gfm[verify inlines.links.destination-may-contain-spaces-only-in-angle-brackets]
-// gfm[verify inlines.links.angle-brackets-around-destination-must-be-unescaped]
-// gfm[verify inlines.links.destination-may-contain-right-parenthesis-in-angle-brackets]
-// gfm[verify inlines.links.unmatched-angle-brackets-do-not-form-destination]
+// [spec:gfm:syn:inlines.links.destination-may-contain-spaces-only-in-angle-brackets/test]
+// [spec:gfm:syn:inlines.links.angle-brackets-around-destination-must-be-unescaped/test]
+// [spec:gfm:syn:inlines.links.destination-may-contain-right-parenthesis-in-angle-brackets/test]
+// [spec:gfm:syn:inlines.links.unmatched-angle-brackets-do-not-form-destination/test]
 #[test]
 fn gfm_link_angle_bracket_destination() {
     // Spaces in angle brackets
@@ -3518,16 +3520,16 @@ fn gfm_link_angle_bracket_destination() {
     assert_eq!(html, "<p><a href=\"\">link</a></p>\n");
 }
 
-// gfm[verify inlines.links.destination-allows-normal-backslash-escaping]
-// gfm[verify inlines.links.backslash-before-non-escapable-character-is-literal-in-destination]
-// gfm[verify inlines.links.destination-preserves-url-escaping-and-allows-entity-references]
+// [spec:gfm:syn:inlines.links.destination-allows-normal-backslash-escaping/test]
+// [spec:gfm:syn:inlines.links.backslash-before-non-escapable-character-is-literal-in-destination/test]
+// [spec:gfm:syn:inlines.links.destination-preserves-url-escaping-and-allows-entity-references/test]
 #[test]
 fn gfm_link_destination_escaping() {
     let html = render_html(&parse_final_nodes("[link](foo\\)\\:)\n"));
     assert_eq!(html, "<p><a href=\"foo):\">link</a></p>\n");
 }
 
-// gfm[verify inlines.links.destination-cannot-contain-line-breaks]
+// [spec:gfm:syn:inlines.links.destination-cannot-contain-line-breaks/test]
 #[test]
 fn gfm_link_destination_no_line_breaks() {
     let html = render_html(&parse_final_nodes("[link](foo\nbar)\n"));
@@ -3537,11 +3539,11 @@ fn gfm_link_destination_no_line_breaks() {
     assert_eq!(html, "<p>[link](<foo\nbar>)</p>\n");
 }
 
-// gfm[verify inlines.links.link-title-definition]
-// gfm[verify inlines.links.titles-may-use-single-quotes-double-quotes-or-parentheses]
-// gfm[verify inlines.links.different-title-delimiter-can-avoid-escaping]
-// gfm[verify inlines.links.titles-allow-backslash-escapes-and-entity-references]
-// gfm[verify inlines.links.nested-balanced-quotes-in-titles-require-escaping]
+// [spec:gfm:req:inlines.links.link-title-definition/test]
+// [spec:gfm:syn:inlines.links.titles-may-use-single-quotes-double-quotes-or-parentheses/test]
+// [spec:gfm:syn:inlines.links.different-title-delimiter-can-avoid-escaping/test]
+// [spec:gfm:syn:inlines.links.titles-allow-backslash-escapes-and-entity-references/test]
+// [spec:gfm:syn:inlines.links.nested-balanced-quotes-in-titles-require-escaping/test]
 #[test]
 fn gfm_link_title_delimiters() {
     // Double quotes
@@ -3564,10 +3566,10 @@ fn gfm_link_title_delimiters() {
     );
 }
 
-// gfm[verify inlines.links.title-must-be-separated-from-destination-by-whitespace]
-// gfm[verify inlines.links.title-cannot-appear-without-destination]
-// gfm[verify inlines.links.link-titles-may-span-lines-but-not-blank-lines]
-// gfm[verify inlines.links.markdown-pl-title-behavior]
+// [spec:gfm:syn:inlines.links.title-must-be-separated-from-destination-by-whitespace/test]
+// [spec:gfm:req:inlines.links.title-cannot-appear-without-destination/test]
+// [spec:gfm:def:inlines.links.link-titles-may-span-lines-but-not-blank-lines/test]
+// [spec:gfm:syn:inlines.links.markdown-pl-title-behavior/test]
 #[test]
 fn gfm_link_title_edge_cases() {
     // Title without destination is parsed as destination
@@ -3575,8 +3577,8 @@ fn gfm_link_title_edge_cases() {
     assert_eq!(html, "<p><a href=\"%22title%22\">link</a></p>\n");
 }
 
-// gfm[verify inlines.links.whitespace-is-allowed-inside-inline-link-delimiters]
-// gfm[verify inlines.links.no-whitespace-allowed-between-link-text-and-opening-parenthesis]
+// [spec:gfm:sem:inlines.links.whitespace-is-allowed-inside-inline-link-delimiters/test]
+// [spec:gfm:syn:inlines.links.no-whitespace-allowed-between-link-text-and-opening-parenthesis/test]
 #[test]
 fn gfm_link_whitespace_rules() {
     // Whitespace allowed around dest/title
@@ -3588,11 +3590,11 @@ fn gfm_link_whitespace_rules() {
     assert_eq!(html, "<p>[link] (/uri)</p>\n");
 }
 
-// gfm[verify inlines.links.link-text-definition]
-// gfm[verify inlines.links.link-text-may-contain-inline-content]
-// gfm[verify inlines.links.link-text-may-contain-balanced-brackets-but-not-unbalanced-ones]
-// gfm[verify inlines.links.link-text-allows-only-escaped-or-balanced-brackets]
-// gfm[verify inlines.links.link-text-brackets-bind-more-tightly-than-emphasis]
+// [spec:gfm:def:inlines.links.link-text-definition/test]
+// [spec:gfm:syn:inlines.links.link-text-may-contain-inline-content/test]
+// [spec:gfm:syn:inlines.links.link-text-may-contain-balanced-brackets-but-not-unbalanced-ones/test]
+// [spec:gfm:syn:inlines.links.link-text-allows-only-escaped-or-balanced-brackets/test]
+// [spec:gfm:syn:inlines.links.link-text-brackets-bind-more-tightly-than-emphasis/test]
 #[test]
 fn gfm_link_text_content() {
     // Link text with inline content (emphasis, strong, code)
@@ -3610,8 +3612,8 @@ fn gfm_link_text_content() {
     );
 }
 
-// gfm[verify inlines.links.link-text-cannot-contain-links]
-// gfm[verify inlines.links.links-may-not-contain-other-links-at-any-level-nesting]
+// [spec:gfm:def:inlines.links.link-text-cannot-contain-links/test]
+// [spec:gfm:syn:inlines.links.links-may-not-contain-other-links-at-any-level-nesting/test]
 #[test]
 fn gfm_links_cannot_contain_links() {
     // Nested link: parser produces nested anchors
@@ -3627,10 +3629,10 @@ fn gfm_links_cannot_contain_links() {
     );
 }
 
-// gfm[verify inlines.links.code-autolink-and-html-bind-tighter-than-link-text]
-// gfm[verify inlines.links.cases-illustrate-precedence-html-tags-code-spans-autolinks-over-link]
-// gfm[verify inlines.links.cases-illustrate-precedence-link-text-grouping-over-emphasis-grouping]
-// gfm[verify inlines.links.brackets-aren-t-part-links-do-not-take-precedence]
+// [spec:gfm:syn:inlines.links.code-autolink-and-html-bind-tighter-than-link-text/test]
+// [spec:gfm:syn:inlines.links.cases-illustrate-precedence-html-tags-code-spans-autolinks-over-link/test]
+// [spec:gfm:syn:inlines.links.cases-illustrate-precedence-link-text-grouping-over-emphasis-grouping/test]
+// [spec:gfm:syn:inlines.links.brackets-aren-t-part-links-do-not-take-precedence/test]
 #[test]
 fn gfm_link_precedence() {
     // Code span binds tighter than link text
@@ -3646,13 +3648,13 @@ fn gfm_link_precedence() {
 // Links: reference links (full, collapsed, shortcut)
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.links.full-reference-link-definition]
-// gfm[verify inlines.links.full-reference-link-example]
-// gfm[verify inlines.links.reference-link-text-comes-from-first-label-inlines]
-// gfm[verify inlines.links.reference-link-text-may-contain-inline-content]
-// gfm[verify inlines.links.reference-link-text-follows-inline-link-text-rules]
-// gfm[verify inlines.links.reference-link-text-allows-balanced-or-escaped-brackets]
-// gfm[verify inlines.links.reference-links-have-three-kinds]
+// [spec:gfm:def:inlines.links.full-reference-link-definition/test]
+// [spec:gfm:sem:inlines.links.full-reference-link-example/test]
+// [spec:gfm:sem:inlines.links.reference-link-text-comes-from-first-label-inlines/test]
+// [spec:gfm:syn:inlines.links.reference-link-text-may-contain-inline-content/test]
+// [spec:gfm:syn:inlines.links.reference-link-text-follows-inline-link-text-rules/test]
+// [spec:gfm:syn:inlines.links.reference-link-text-allows-balanced-or-escaped-brackets/test]
+// [spec:gfm:syn:inlines.links.reference-links-have-three-kinds/test]
 #[test]
 fn gfm_full_reference_link() {
     let html = render_html(&parse_final_nodes("[foo][bar]\n\n[bar]: /url \"title\"\n"));
@@ -3663,10 +3665,10 @@ fn gfm_full_reference_link() {
     assert_eq!(html, "<p><a href=\"/url\"><em>foo</em> bar</a></p>\n");
 }
 
-// gfm[verify inlines.links.label-match-definition]
-// gfm[verify inlines.links.label-matching-uses-unicode-case-fold]
-// gfm[verify inlines.links.label-matching-collapses-consecutive-internal-whitespace]
-// gfm[verify inlines.links.matching-uses-normalized-strings-not-parsed-inline-content]
+// [spec:gfm:req:inlines.links.label-match-definition/test]
+// [spec:gfm:syn:inlines.links.label-matching-uses-unicode-case-fold/test]
+// [spec:gfm:sem:inlines.links.label-matching-collapses-consecutive-internal-whitespace/test]
+// [spec:gfm:sem:inlines.links.matching-uses-normalized-strings-not-parsed-inline-content/test]
 #[test]
 fn gfm_link_label_matching() {
     // Case-insensitive matching
@@ -3678,13 +3680,13 @@ fn gfm_link_label_matching() {
     assert_eq!(html, "<p><a href=\"/url\">Baz</a></p>\n");
 }
 
-// gfm[verify inlines.links.link-label-definition]
-// gfm[verify inlines.links.link-label-ends-at-first-unescaped-closing-bracket]
-// gfm[verify inlines.links.link-label-cannot-contain-unescaped-brackets]
-// gfm[verify inlines.links.link-labels-cannot-contain-unescaped-brackets]
-// gfm[verify inlines.links.link-label-must-contain-at-least-one-non-whitespace-character]
-// gfm[verify inlines.links.link-label-must-contain-non-whitespace]
-// gfm[verify inlines.links.link-label-length-is-at-most-999-characters]
+// [spec:gfm:def:inlines.links.link-label-definition/test]
+// [spec:gfm:syn:inlines.links.link-label-ends-at-first-unescaped-closing-bracket/test]
+// [spec:gfm:syn:inlines.links.link-label-cannot-contain-unescaped-brackets/test]
+// [spec:gfm:sem:inlines.links.link-labels-cannot-contain-unescaped-brackets/test]
+// [spec:gfm:syn:inlines.links.link-label-must-contain-at-least-one-non-whitespace-character/test]
+// [spec:gfm:def:inlines.links.link-label-must-contain-non-whitespace/test]
+// [spec:gfm:syn:inlines.links.link-label-length-is-at-most-999-characters/test]
 #[test]
 fn gfm_link_label_rules() {
     // Label must contain non-whitespace
@@ -3692,11 +3694,11 @@ fn gfm_link_label_rules() {
     assert_eq!(html, "<p>[ ]</p>\n<p>[ ]: /url</p>\n");
 }
 
-// gfm[verify inlines.links.collapsed-reference-link-definition]
-// gfm[verify inlines.links.collapsed-reference-link-is-equivalent-to-full-link-with-same-label]
-// gfm[verify inlines.links.collapsed-reference-link-labels-are-case-insensitive]
-// gfm[verify inlines.links.collapsed-reference-link-text-comes-from-first-label-inlines]
-// gfm[verify inlines.links.no-whitespace-allowed-between-collapsed-reference-brackets]
+// [spec:gfm:syn:inlines.links.collapsed-reference-link-definition/test]
+// [spec:gfm:sem:inlines.links.collapsed-reference-link-is-equivalent-to-full-link-with-same-label/test]
+// [spec:gfm:sem:inlines.links.collapsed-reference-link-labels-are-case-insensitive/test]
+// [spec:gfm:def:inlines.links.collapsed-reference-link-text-comes-from-first-label-inlines/test]
+// [spec:gfm:sem:inlines.links.no-whitespace-allowed-between-collapsed-reference-brackets/test]
 #[test]
 fn gfm_collapsed_reference_link() {
     // Basic collapsed reference
@@ -3708,12 +3710,12 @@ fn gfm_collapsed_reference_link() {
     assert_eq!(html, "<p><a href=\"/url\" title=\"title\">Foo</a></p>\n");
 }
 
-// gfm[verify inlines.links.shortcut-reference-link-is-equivalent-to-collapsed-reference-link]
-// gfm[verify inlines.links.shortcut-reference-link-labels-are-case-insensitive]
-// gfm[verify inlines.links.shortcut-reference-link-text-comes-from-label-inlines]
-// gfm[verify inlines.links.shortcut-reference-does-not-parse-when-followed-by-link-label]
-// gfm[verify inlines.links.shortcut-reference-links-make-space-before-label-too-dangerous]
-// gfm[verify inlines.links.space-after-shortcut-reference-link-is-preserved]
+// [spec:gfm:sem:inlines.links.shortcut-reference-link-is-equivalent-to-collapsed-reference-link/test]
+// [spec:gfm:sem:inlines.links.shortcut-reference-link-labels-are-case-insensitive/test]
+// [spec:gfm:def:inlines.links.shortcut-reference-link-text-comes-from-label-inlines/test]
+// [spec:gfm:syn:inlines.links.shortcut-reference-does-not-parse-when-followed-by-link-label/test]
+// [spec:gfm:sem:inlines.links.shortcut-reference-links-make-space-before-label-too-dangerous/test]
+// [spec:gfm:sem:inlines.links.space-after-shortcut-reference-link-is-preserved/test]
 #[test]
 fn gfm_shortcut_reference_link() {
     // Basic shortcut
@@ -3734,11 +3736,11 @@ fn gfm_shortcut_reference_link() {
     assert_eq!(html, "<p><a href=\"/url\">Foo</a></p>\n");
 }
 
-// gfm[verify inlines.links.full-and-collapsed-references-take-precedence-over-shortcuts]
-// gfm[verify inlines.links.inline-links-take-precedence-over-reference-links]
-// gfm[verify inlines.links.first-matching-reference-definition-is-used]
-// gfm[verify inlines.links.first-reference-definition-wins-example]
-// gfm[verify inlines.links.defined-middle-label-makes-earlier-reference-parse]
+// [spec:gfm:syn:inlines.links.full-and-collapsed-references-take-precedence-over-shortcuts/test]
+// [spec:gfm:syn:inlines.links.inline-links-take-precedence-over-reference-links/test]
+// [spec:gfm:def:inlines.links.first-matching-reference-definition-is-used/test]
+// [spec:gfm:sem:inlines.links.first-reference-definition-wins-example/test]
+// [spec:gfm:syn:inlines.links.defined-middle-label-makes-earlier-reference-parse/test]
 #[test]
 fn gfm_link_precedence_rules() {
     // Full reference takes precedence over shortcut
@@ -3756,8 +3758,8 @@ fn gfm_link_precedence_rules() {
     assert_eq!(html, "<p><a href=\"\">foo</a></p>\n");
 }
 
-// gfm[verify inlines.links.no-whitespace-allowed-between-link-text-and-link-label]
-// gfm[verify inlines.links.no-space-before-link-label-departs-from-original-markdown]
+// [spec:gfm:sem:inlines.links.no-whitespace-allowed-between-link-text-and-link-label/test]
+// [spec:gfm:syn:inlines.links.no-space-before-link-label-departs-from-original-markdown/test]
 #[test]
 fn gfm_link_no_whitespace_between_text_and_label() {
     let html = render_html(&parse_final_nodes("[foo] [bar]\n\n[bar]: /url \"title\"\n"));
@@ -3767,11 +3769,11 @@ fn gfm_link_no_whitespace_between_text_and_label() {
     );
 }
 
-// gfm[verify inlines.links.reference-link-text-cannot-contain-links]
-// gfm[verify inlines.links.reference-link-text-grouping-takes-precedence-over-emphasis]
-// gfm[verify inlines.links.reference-links-lose-to-html-tags-code-spans-and-autolinks]
-// gfm[verify inlines.links.nested-reference-link-examples-produce-shortcuts]
-// gfm[verify inlines.links.reference-link-may-parse-later-brackets-as-separate-text]
+// [spec:gfm:syn:inlines.links.reference-link-text-cannot-contain-links/test]
+// [spec:gfm:syn:inlines.links.reference-link-text-grouping-takes-precedence-over-emphasis/test]
+// [spec:gfm:syn:inlines.links.reference-links-lose-to-html-tags-code-spans-and-autolinks/test]
+// [spec:gfm:syn:inlines.links.nested-reference-link-examples-produce-shortcuts/test]
+// [spec:gfm:syn:inlines.links.reference-link-may-parse-later-brackets-as-separate-text/test]
 #[test]
 fn gfm_reference_link_edge_cases() {
     // Reference link text grouping over emphasis
@@ -3779,8 +3781,8 @@ fn gfm_reference_link_edge_cases() {
     assert_eq!(html, "<p>*<a href=\"/url\">foo*</a></p>\n");
 }
 
-// gfm[verify inlines.links.escaping-opening-bracket-prevents-reference-link]
-// gfm[verify inlines.links.trailing-bracket-is-not-escaped-by-backslash-before-backslash]
+// [spec:gfm:sem:inlines.links.escaping-opening-bracket-prevents-reference-link/test]
+// [spec:gfm:syn:inlines.links.trailing-bracket-is-not-escaped-by-backslash-before-backslash/test]
 #[test]
 fn gfm_link_escaping() {
     // Escaping opening bracket prevents link
@@ -3792,10 +3794,10 @@ fn gfm_link_escaping() {
 // Images
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.images.image-description-follows-link-text-rules-with-two-differences]
-// gfm[verify inlines.images.image-description-contains-inline-elements]
-// gfm[verify inlines.images.html-rendering-typically-uses-plain-description-as-alt]
-// gfm[verify inlines.images.html-rendering-should-use-plain-string-content-for-alt]
+// [spec:gfm:def:inlines.images.image-description-follows-link-text-rules-with-two-differences/test]
+// [spec:gfm:syn:inlines.images.image-description-contains-inline-elements/test]
+// [spec:gfm:syn:inlines.images.html-rendering-typically-uses-plain-description-as-alt/test]
+// [spec:gfm:sem:inlines.images.html-rendering-should-use-plain-string-content-for-alt/test]
 #[test]
 fn gfm_image_alt_text_from_inline_content() {
     // Image with title
@@ -3870,9 +3872,9 @@ fn gfm_image_alt_text_from_inline_content() {
     assert_eq!(html, "<p><img src=\"/url\" alt=\"foo\" /></p>\n");
 }
 
-// gfm[verify inlines.images.reference-image-labels-are-case-insensitive]
-// gfm[verify inlines.images.no-whitespace-allowed-between-reference-image-brackets]
-// gfm[verify inlines.images.shortcut-image-labels-are-case-insensitive]
+// [spec:gfm:req:inlines.images.reference-image-labels-are-case-insensitive/test]
+// [spec:gfm:sem:inlines.images.no-whitespace-allowed-between-reference-image-brackets/test]
+// [spec:gfm:syn:inlines.images.shortcut-image-labels-are-case-insensitive/test]
 #[test]
 fn gfm_image_reference_case_and_whitespace() {
     // Collapsed reference case-insensitive
@@ -3897,7 +3899,7 @@ fn gfm_image_reference_case_and_whitespace() {
     );
 }
 
-// gfm[verify inlines.images.reference-image-labels-cannot-contain-unescaped-brackets]
+// [spec:gfm:syn:inlines.images.reference-image-labels-cannot-contain-unescaped-brackets/test]
 #[test]
 fn gfm_image_label_no_unescaped_brackets() {
     let html = render_html(&parse_final_nodes("![[foo]]\n\n[[foo]]: /url \"title\"\n"));
@@ -3907,8 +3909,8 @@ fn gfm_image_label_no_unescaped_brackets() {
     );
 }
 
-// gfm[verify inlines.images.escaping-bang-produces-literal-bang-followed-by-link]
-// gfm[verify inlines.images.escaping-opening-bracket-after-bang-produces-literal-bracketed-text]
+// [spec:gfm:syn:inlines.images.escaping-bang-produces-literal-bang-followed-by-link/test]
+// [spec:gfm:sem:inlines.images.escaping-opening-bracket-after-bang-produces-literal-bracketed-text/test]
 #[test]
 fn gfm_image_escaping() {
     // Escaping ! produces literal ! followed by link
@@ -3924,29 +3926,29 @@ fn gfm_image_escaping() {
 // Container blocks: Block quotes
 // ---------------------------------------------------------------------------
 
-// gfm[verify container-blocks.block-quotes.basic-case]
-// gfm[verify container-blocks.block-quotes.adjacent-lines-form-single-block-quote]
+// [spec:gfm:syn:container-blocks.block-quotes.basic-case/test]
+// [spec:gfm:syn:container-blocks.block-quotes.adjacent-lines-form-single-block-quote/test]
 #[test]
 fn gfm_block_quote_basic_and_adjacent() {
     let html = render_html(&parse_final_nodes("> foo\n> bar\n"));
     assert_eq!(html, "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n");
 }
 
-// gfm[verify container-blocks.block-quotes.space-after-marker-is-optional]
+// [spec:gfm:syn:container-blocks.block-quotes.space-after-marker-is-optional/test]
 #[test]
 fn gfm_block_quote_no_space_after_marker() {
     let html = render_html(&parse_final_nodes(">foo\n"));
     assert_eq!(html, "<blockquote>\n<p>foo</p>\n</blockquote>\n");
 }
 
-// gfm[verify container-blocks.block-quotes.marker-indent-up-to-three-spaces]
+// [spec:gfm:syn:container-blocks.block-quotes.marker-indent-up-to-three-spaces/test]
 #[test]
 fn gfm_block_quote_indented_marker() {
     let html = render_html(&parse_final_nodes("   > foo\n"));
     assert_eq!(html, "<blockquote>\n<p>foo</p>\n</blockquote>\n");
 }
 
-// gfm[verify container-blocks.block-quotes.marker-indent-four-spaces-starts-code-block]
+// [spec:gfm:syn:container-blocks.block-quotes.marker-indent-four-spaces-starts-code-block/test]
 #[test]
 fn gfm_block_quote_four_space_indent_is_code() {
     let html = render_html(&parse_final_nodes("    > not a quote\n"));
@@ -3957,7 +3959,7 @@ fn gfm_block_quote_four_space_indent_is_code() {
     );
 }
 
-// gfm[verify container-blocks.block-quotes.indented-code-needs-five-spaces-after-marker]
+// [spec:gfm:thm:container-blocks.block-quotes.indented-code-needs-five-spaces-after-marker/test]
 #[test]
 fn gfm_block_quote_code_needs_five_spaces() {
     // 5 spaces after > gives indented code inside blockquote
@@ -3969,10 +3971,10 @@ fn gfm_block_quote_code_needs_five_spaces() {
     );
 }
 
-// gfm[verify container-blocks.block-quotes.laziness]
-// gfm[verify container-blocks.block-quotes.laziness-allows-omitted-continuation-markers]
-// gfm[verify container-blocks.block-quotes.lazy-continuation-example]
-// gfm[verify container-blocks.block-quotes.paragraph-continuation-text-definition]
+// [spec:gfm:syn:container-blocks.block-quotes.laziness/test]
+// [spec:gfm:syn:container-blocks.block-quotes.laziness-allows-omitted-continuation-markers/test]
+// [spec:gfm:syn:container-blocks.block-quotes.lazy-continuation-example/test]
+// [spec:gfm:def:container-blocks.block-quotes.paragraph-continuation-text-definition/test]
 #[test]
 fn gfm_block_quote_lazy_continuation() {
     // Lazy continuation: "bar" without ">" continues the blockquote paragraph
@@ -3980,15 +3982,15 @@ fn gfm_block_quote_lazy_continuation() {
     assert_eq!(html, "<blockquote>\n<p>foo\nbar</p>\n</blockquote>\n");
 }
 
-// gfm[verify container-blocks.block-quotes.may-mix-lazy-and-non-lazy-continuation-lines]
+// [spec:gfm:syn:container-blocks.block-quotes.may-mix-lazy-and-non-lazy-continuation-lines/test]
 #[test]
 fn gfm_block_quote_mixed_lazy_and_nonlazy() {
     let html = render_html(&parse_final_nodes("> foo\n> bar\nbaz\n"));
     assert_eq!(html, "<blockquote>\n<p>foo\nbar\nbaz</p>\n</blockquote>\n");
 }
 
-// gfm[verify container-blocks.block-quotes.laziness-applies-only-to-paragraph-continuation-lines]
-// gfm[verify container-blocks.block-quotes.laziness-does-not-apply-to-code-block-lines]
+// [spec:gfm:syn:container-blocks.block-quotes.laziness-applies-only-to-paragraph-continuation-lines/test]
+// [spec:gfm:syn:container-blocks.block-quotes.laziness-does-not-apply-to-code-block-lines/test]
 #[test]
 fn gfm_block_quote_lazy_does_not_apply_to_code() {
     // Without >, the indented code line is not part of the blockquote
@@ -3999,8 +4001,8 @@ fn gfm_block_quote_lazy_does_not_apply_to_code() {
     );
 }
 
-// gfm[verify container-blocks.block-quotes.consecutiveness]
-// gfm[verify container-blocks.block-quotes.consecutiveness-rationale]
+// [spec:gfm:syn:container-blocks.block-quotes.consecutiveness/test]
+// [spec:gfm:sem:container-blocks.block-quotes.consecutiveness-rationale/test]
 #[test]
 fn gfm_block_quote_consecutiveness() {
     // A blank line between two block quotes separates them into two
@@ -4011,8 +4013,8 @@ fn gfm_block_quote_consecutiveness() {
     );
 }
 
-// gfm[verify container-blocks.block-quotes.blank-line-separates-adjacent-block-quotes]
-// gfm[verify container-blocks.block-quotes.blank-quoted-line-creates-two-paragraphs]
+// [spec:gfm:syn:container-blocks.block-quotes.blank-line-separates-adjacent-block-quotes/test]
+// [spec:gfm:syn:container-blocks.block-quotes.blank-quoted-line-creates-two-paragraphs/test]
 #[test]
 fn gfm_block_quote_blank_line_separates_paragraphs() {
     let html = render_html(&parse_final_nodes("> foo\n>\n> bar\n"));
@@ -4022,22 +4024,22 @@ fn gfm_block_quote_blank_line_separates_paragraphs() {
     );
 }
 
-// gfm[verify container-blocks.block-quotes.can-be-empty]
+// [spec:gfm:syn:container-blocks.block-quotes.can-be-empty/test]
 #[test]
 fn gfm_block_quote_empty() {
     let html = render_html(&parse_final_nodes(">\n"));
     assert_eq!(html, "<blockquote>\n</blockquote>\n");
 }
 
-// gfm[verify container-blocks.block-quotes.can-have-initial-or-final-blank-lines]
+// [spec:gfm:syn:container-blocks.block-quotes.can-have-initial-or-final-blank-lines/test]
 #[test]
 fn gfm_block_quote_initial_and_final_blank_lines() {
     let html = render_html(&parse_final_nodes(">\n> foo\n>\n"));
     assert_eq!(html, "<blockquote>\n<p>foo</p>\n</blockquote>\n");
 }
 
-// gfm[verify container-blocks.block-quotes.blank-lines-generally-not-required-around-block-quotes]
-// gfm[verify container-blocks.block-quotes.blank-line-required-before-following-paragraph]
+// [spec:gfm:syn:container-blocks.block-quotes.blank-lines-generally-not-required-around-block-quotes/test]
+// [spec:gfm:thm:container-blocks.block-quotes.blank-line-required-before-following-paragraph/test]
 #[test]
 fn gfm_block_quote_blank_line_before_following_paragraph() {
     // A block quote can follow a paragraph without a blank line
@@ -4058,7 +4060,7 @@ fn gfm_block_quote_blank_line_before_following_paragraph() {
     );
 }
 
-// gfm[verify container-blocks.block-quotes.can-interrupt-paragraphs]
+// [spec:gfm:syn:container-blocks.block-quotes.can-interrupt-paragraphs/test]
 #[test]
 fn gfm_block_quote_interrupts_paragraph() {
     let html = render_html(&parse_final_nodes("para\n> quote\n"));
@@ -4068,7 +4070,7 @@ fn gfm_block_quote_interrupts_paragraph() {
     );
 }
 
-// gfm[verify container-blocks.block-quotes.nested-block-quotes-may-omit-continuation-markers]
+// [spec:gfm:thm:container-blocks.block-quotes.nested-block-quotes-may-omit-continuation-markers/test]
 #[test]
 fn gfm_block_quote_nested() {
     let html = render_html(&parse_final_nodes("> > > nested\n"));
@@ -4078,7 +4080,7 @@ fn gfm_block_quote_nested() {
     );
 }
 
-// gfm[verify container-blocks.block-quotes.indented-dash-remains-paragraph-continuation-text]
+// [spec:gfm:syn:container-blocks.block-quotes.indented-dash-remains-paragraph-continuation-text/test]
 #[test]
 fn gfm_block_quote_indented_dash_is_continuation() {
     // A lazy continuation with "- " is not a list item
@@ -4089,7 +4091,7 @@ fn gfm_block_quote_indented_dash_is_continuation() {
     );
 }
 
-// gfm[verify container-blocks.block-quotes.omitting-marker-before-setext-underline-changes-meaning]
+// [spec:gfm:syn:container-blocks.block-quotes.omitting-marker-before-setext-underline-changes-meaning/test]
 #[test]
 fn gfm_block_quote_lazy_setext_underline() {
     // A lazy setext underline should not create a heading inside the blockquote
@@ -4097,9 +4099,9 @@ fn gfm_block_quote_lazy_setext_underline() {
     assert_eq!(html, "<blockquote>\n<p>foo</p>\n</blockquote>\n<hr />\n");
 }
 
-// gfm[verify container-blocks.block-quotes.omitting-marker-before-list-item-ends-block-quote]
-// gfm[verify container-blocks.block-quotes.list-example-block-quote-ends-after-first-line]
-// gfm[verify container-blocks.block-quotes.lazy-continuation-list-example-explanation]
+// [spec:gfm:syn:container-blocks.block-quotes.omitting-marker-before-list-item-ends-block-quote/test]
+// [spec:gfm:syn:container-blocks.block-quotes.list-example-block-quote-ends-after-first-line/test]
+// [spec:gfm:syn:container-blocks.block-quotes.lazy-continuation-list-example-explanation/test]
 #[test]
 fn gfm_block_quote_omitting_marker_before_list() {
     let html = render_html(&parse_final_nodes("> foo\n- list\n"));
@@ -4109,7 +4111,7 @@ fn gfm_block_quote_omitting_marker_before_list() {
     );
 }
 
-// gfm[verify container-blocks.block-quotes.only-defined-cases-count]
+// [spec:gfm:syn:container-blocks.block-quotes.only-defined-cases-count/test]
 #[test]
 fn gfm_block_quote_only_defined_cases() {
     // Ensure that non-matching lazy lines are handled properly
@@ -4121,12 +4123,12 @@ fn gfm_block_quote_only_defined_cases() {
 // Container blocks: definitions
 // ---------------------------------------------------------------------------
 
-// gfm[verify container-blocks.definition]
-// gfm[verify container-blocks.basic-kinds-are-block-quotes-and-list-items]
-// gfm[verify container-blocks.general-recursive-definition-form]
-// gfm[verify container-blocks.generated-from-contents-rather-than-parse-recipe]
-// gfm[verify container-blocks.lists-are-meta-containers-for-list-items]
-// gfm[verify container-blocks.syntax-is-defined-recursively]
+// [spec:gfm:def:container-blocks.definition/test]
+// [spec:gfm:def:container-blocks.basic-kinds-are-block-quotes-and-list-items/test]
+// [spec:gfm:def:container-blocks.general-recursive-definition-form/test]
+// [spec:gfm:def:container-blocks.generated-from-contents-rather-than-parse-recipe/test]
+// [spec:gfm:def:container-blocks.lists-are-meta-containers-for-list-items/test]
+// [spec:gfm:def:container-blocks.syntax-is-defined-recursively/test]
 #[test]
 fn gfm_container_block_definitions() {
     // A block quote contains other blocks
@@ -4148,9 +4150,9 @@ fn gfm_container_block_definitions() {
 // Container blocks: List items
 // ---------------------------------------------------------------------------
 
-// gfm[verify container-blocks.list-items.basic-case]
-// gfm[verify container-blocks.list-items.marker-definition]
-// gfm[verify container-blocks.list-items.bullet-marker-definition]
+// [spec:gfm:syn:container-blocks.list-items.basic-case/test]
+// [spec:gfm:def:container-blocks.list-items.marker-definition/test]
+// [spec:gfm:def:container-blocks.list-items.bullet-marker-definition/test]
 #[test]
 fn gfm_list_item_basic_bullet() {
     let html = render_html(&parse_final_nodes("- foo\n"));
@@ -4163,9 +4165,9 @@ fn gfm_list_item_basic_bullet() {
     assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.basic-case-example-ordered-item]
-// gfm[verify container-blocks.list-items.ordered-marker-definition]
-// gfm[verify container-blocks.list-items.ordered-item-start-number-comes-from-marker]
+// [spec:gfm:syn:container-blocks.list-items.basic-case-example-ordered-item/test]
+// [spec:gfm:def:container-blocks.list-items.ordered-marker-definition/test]
+// [spec:gfm:sem:container-blocks.list-items.ordered-item-start-number-comes-from-marker/test]
 #[test]
 fn gfm_list_item_basic_ordered() {
     let html = render_html(&parse_final_nodes("1. foo\n"));
@@ -4178,7 +4180,7 @@ fn gfm_list_item_basic_ordered() {
     assert_eq!(html, "<ol start=\"3\">\n<li>foo</li>\n</ol>\n");
 }
 
-// gfm[verify container-blocks.list-items.ordered-start-number-cannot-be-negative]
+// [spec:gfm:syn:container-blocks.list-items.ordered-start-number-cannot-be-negative/test]
 #[test]
 fn gfm_list_item_negative_start_not_valid() {
     let html = render_html(&parse_final_nodes("-1. foo\n"));
@@ -4186,7 +4188,7 @@ fn gfm_list_item_negative_start_not_valid() {
     assert_eq!(html, "<p>-1. foo</p>\n");
 }
 
-// gfm[verify container-blocks.list-items.at-least-one-space-required-after-marker]
+// [spec:gfm:syn:container-blocks.list-items.at-least-one-space-required-after-marker/test]
 #[test]
 fn gfm_list_item_space_required_after_marker() {
     // Without space, it's not a list (though "-" by itself is empty item)
@@ -4194,7 +4196,7 @@ fn gfm_list_item_space_required_after_marker() {
     assert_eq!(html, "<p>1.foo</p>\n");
 }
 
-// gfm[verify container-blocks.list-items.type-is-determined-by-marker]
+// [spec:gfm:sem:container-blocks.list-items.type-is-determined-by-marker/test]
 #[test]
 fn gfm_list_item_type_determined_by_marker() {
     let html = render_html(&parse_final_nodes("- bullet\n"));
@@ -4204,8 +4206,8 @@ fn gfm_list_item_type_determined_by_marker() {
     assert_eq!(html, "<ol>\n<li>ordered</li>\n</ol>\n");
 }
 
-// gfm[verify container-blocks.list-items.required-indentation-is-marker-width-plus-padding]
-// gfm[verify container-blocks.list-items.examples-of-required-indentation]
+// [spec:gfm:syn:container-blocks.list-items.required-indentation-is-marker-width-plus-padding/test]
+// [spec:gfm:syn:container-blocks.list-items.examples-of-required-indentation/test]
 #[test]
 fn gfm_list_item_indentation_rules() {
     // "- " = 2 chars; continuation indented 2 spaces
@@ -4217,7 +4219,7 @@ fn gfm_list_item_indentation_rules() {
     assert_eq!(html, "<ul>\n<li>foo\n bar</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.required-indentation-is-relative-not-column-based]
+// [spec:gfm:syn:container-blocks.list-items.required-indentation-is-relative-not-column-based/test]
 #[test]
 fn gfm_list_item_indentation_is_relative() {
     // Indentation is relative to the marker, not absolute column
@@ -4225,23 +4227,23 @@ fn gfm_list_item_indentation_is_relative() {
     assert_eq!(html, "<ul>\n<li>foo\nbar</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.basic-case-example-source-blocks]
-// gfm[verify container-blocks.list-items.may-contain-any-kind-of-block]
+// [spec:gfm:syn:container-blocks.list-items.basic-case-example-source-blocks/test]
+// [spec:gfm:syn:container-blocks.list-items.may-contain-any-kind-of-block/test]
 #[test]
 fn gfm_list_item_may_contain_blocks() {
     let html = render_html(&parse_final_nodes("- foo\n\n  bar\n"));
     assert_eq!(html, "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.item-may-contain-heading]
+// [spec:gfm:syn:container-blocks.list-items.item-may-contain-heading/test]
 #[test]
 fn gfm_list_item_may_contain_heading() {
     let html = render_html(&parse_final_nodes("- # heading\n"));
     assert_eq!(html, "<ul>\n<li>\n<h1>heading</h1>\n</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.indented-code-example-with-wider-marker]
-// gfm[verify container-blocks.list-items.indented-code-start-uses-one-space-after-marker]
+// [spec:gfm:syn:container-blocks.list-items.indented-code-example-with-wider-marker/test]
+// [spec:gfm:syn:container-blocks.list-items.indented-code-start-uses-one-space-after-marker/test]
 #[test]
 fn gfm_list_item_indented_code_wider_marker() {
     // "10. " = 4 chars, so code needs 8 spaces total indent
@@ -4253,7 +4255,7 @@ fn gfm_list_item_indented_code_wider_marker() {
     );
 }
 
-// gfm[verify container-blocks.list-items.extra-indent-counts-as-code-content]
+// [spec:gfm:sem:container-blocks.list-items.extra-indent-counts-as-code-content/test]
 #[test]
 fn gfm_list_item_extra_indent_is_code() {
     // "1.  " is 4 chars (marker + 2 spaces); content starts at col 4
@@ -4267,7 +4269,7 @@ fn gfm_list_item_extra_indent_is_code() {
     );
 }
 
-// gfm[verify container-blocks.list-items.indented-code-inside-item-preserves-empty-lines]
+// [spec:gfm:sem:container-blocks.list-items.indented-code-inside-item-preserves-empty-lines/test]
 #[test]
 fn gfm_list_item_code_preserves_empty_lines() {
     let html = render_html(&parse_final_nodes("- foo\n\n      bar\n\n      baz\n"));
@@ -4278,7 +4280,7 @@ fn gfm_list_item_code_preserves_empty_lines() {
     );
 }
 
-// gfm[verify container-blocks.list-items.basic-rules-apply-only-to-nonblank-or-code-start]
+// [spec:gfm:syn:container-blocks.list-items.basic-rules-apply-only-to-nonblank-or-code-start/test]
 #[test]
 fn gfm_list_item_basic_rules_nonblank() {
     // Blank line after marker triggers "empty item" logic, not normal rules
@@ -4286,50 +4288,51 @@ fn gfm_list_item_basic_rules_nonblank() {
     assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.items-may-start-with-one-blank-line-and-still-be-nonempty]
-// gfm[verify container-blocks.list-items.may-begin-with-at-most-one-blank-line]
+// [spec:gfm:syn:container-blocks.list-items.items-may-start-with-one-blank-line-and-still-be-nonempty/test]
+// [spec:gfm:syn:container-blocks.list-items.may-begin-with-at-most-one-blank-line/test]
+// [spec:gfm:syn:container-blocks.list-items.item-starting-with-blank-line/test]
 #[test]
 fn gfm_list_item_start_with_blank_line() {
     let html = render_html(&parse_final_nodes("-\n  foo\n-\n  bar\n"));
     assert_eq!(html, "<ul>\n<li>foo</li>\n<li>bar</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.empty-bullet-item]
+// [spec:gfm:syn:container-blocks.list-items.empty-bullet-item/test]
 #[test]
 fn gfm_list_item_empty_bullet() {
     let html = render_html(&parse_final_nodes("- foo\n-\n- bar\n"));
     assert_eq!(html, "<ul>\n<li>foo</li>\n<li></li>\n<li>bar</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.empty-ordered-item]
+// [spec:gfm:syn:container-blocks.list-items.empty-ordered-item/test]
 #[test]
 fn gfm_list_item_empty_ordered() {
     let html = render_html(&parse_final_nodes("1. foo\n2.\n3. bar\n"));
     assert_eq!(html, "<ol>\n<li>foo</li>\n<li></li>\n<li>bar</li>\n</ol>\n");
 }
 
-// gfm[verify container-blocks.list-items.empty-item-cannot-interrupt-paragraph]
+// [spec:gfm:syn:container-blocks.list-items.empty-item-cannot-interrupt-paragraph/test]
 #[test]
 fn gfm_list_item_empty_cannot_interrupt_para() {
     let html = render_html(&parse_final_nodes("para\n*\n"));
     assert_eq!(html, "<p>para\n*</p>\n");
 }
 
-// gfm[verify container-blocks.list-items.empty-lines-inside-list-item-need-not-be-indented]
+// [spec:gfm:syn:container-blocks.list-items.empty-lines-inside-list-item-need-not-be-indented/test]
 #[test]
 fn gfm_list_item_empty_lines_not_indented() {
     let html = render_html(&parse_final_nodes("- foo\n\n  bar\n"));
     assert_eq!(html, "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.item-blocks-may-be-separated-by-multiple-blank-lines]
+// [spec:gfm:syn:container-blocks.list-items.item-blocks-may-be-separated-by-multiple-blank-lines/test]
 #[test]
 fn gfm_list_item_multiple_blank_lines() {
     let html = render_html(&parse_final_nodes("- foo\n\n\n  bar\n"));
     assert_eq!(html, "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.indenting-whole-item-four-spaces-produces-code-block]
+// [spec:gfm:syn:container-blocks.list-items.indenting-whole-item-four-spaces-produces-code-block/test]
 #[test]
 fn gfm_list_item_four_space_indent_is_code() {
     let html = render_html(&parse_final_nodes("    - not a list\n"));
@@ -4340,7 +4343,7 @@ fn gfm_list_item_four_space_indent_is_code() {
     );
 }
 
-// gfm[verify container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
+// [spec:gfm:thm:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized/test]
 #[test]
 fn gfm_list_item_leading_indent_normalized() {
     let html = render_html(&parse_final_nodes("  - foo\n"));
@@ -4350,7 +4353,7 @@ fn gfm_list_item_leading_indent_normalized() {
     assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.thematic-break-line-is-not-a-list-item]
+// [spec:gfm:syn:container-blocks.list-items.thematic-break-line-is-not-a-list-item/test]
 #[test]
 fn gfm_thematic_break_not_list_item() {
     // "***" is unambiguously a thematic break
@@ -4362,7 +4365,7 @@ fn gfm_thematic_break_not_list_item() {
     assert_eq!(html, "<hr />\n");
 }
 
-// gfm[verify container-blocks.list-items.list-may-be-first-block-in-item]
+// [spec:gfm:syn:container-blocks.list-items.list-may-be-first-block-in-item/test]
 #[test]
 fn gfm_list_inside_list_item() {
     let html = render_html(&parse_final_nodes("- - foo\n"));
@@ -4372,7 +4375,7 @@ fn gfm_list_inside_list_item() {
     );
 }
 
-// gfm[verify container-blocks.list-items.list-may-start-or-end-with-empty-item]
+// [spec:gfm:syn:container-blocks.list-items.list-may-start-or-end-with-empty-item/test]
 #[test]
 fn gfm_list_start_or_end_with_empty_item() {
     let html = render_html(&parse_final_nodes("-\n- foo\n"));
@@ -4382,7 +4385,7 @@ fn gfm_list_start_or_end_with_empty_item() {
     assert_eq!(html, "<ul>\n<li>foo</li>\n<li></li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.lazy-continuation-may-delete-only-part-of-indent]
+// [spec:gfm:syn:container-blocks.list-items.lazy-continuation-may-delete-only-part-of-indent/test]
 #[test]
 fn gfm_list_item_lazy_partial_indent() {
     // Lazy continuation with partial indentation
@@ -4390,8 +4393,8 @@ fn gfm_list_item_lazy_partial_indent() {
     assert_eq!(html, "<ul>\n<li>foo\nbar</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.sublist-example-two-space-indent]
-// gfm[verify container-blocks.list-items.sublist-example-one-space-is-not-enough]
+// [spec:gfm:syn:container-blocks.list-items.sublist-example-two-space-indent/test]
+// [spec:gfm:syn:container-blocks.list-items.sublist-example-one-space-is-not-enough/test]
 #[test]
 fn gfm_list_item_sublist_indent_levels() {
     // Two spaces: sublist
@@ -4406,8 +4409,8 @@ fn gfm_list_item_sublist_indent_levels() {
     assert_eq!(html, "<ul>\n<li>foo</li>\n<li>bar</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.sublist-example-indent-increases-with-wider-marker]
-// gfm[verify container-blocks.list-items.sublist-example-three-spaces-not-enough-for-wider-marker]
+// [spec:gfm:syn:container-blocks.list-items.sublist-example-indent-increases-with-wider-marker/test]
+// [spec:gfm:syn:container-blocks.list-items.sublist-example-three-spaces-not-enough-for-wider-marker/test]
 #[test]
 fn gfm_list_item_sublist_wider_marker() {
     // "10. " is 4 chars, so sublist needs 4 spaces
@@ -4426,7 +4429,7 @@ fn gfm_list_item_sublist_wider_marker() {
     );
 }
 
-// gfm[verify container-blocks.list-items.far-right-text-may-still-be-outside-item]
+// [spec:gfm:syn:container-blocks.list-items.far-right-text-may-still-be-outside-item/test]
 #[test]
 fn gfm_list_item_far_right_outside_item() {
     // "10. " is 4 chars; 3 spaces of indent is not enough, text treated as continuation
@@ -4434,7 +4437,7 @@ fn gfm_list_item_far_right_outside_item() {
     assert_eq!(html, "<ol start=\"10\">\n<li>foo\n   bar</li>\n</ol>\n");
 }
 
-// gfm[verify container-blocks.list-items.same-column-can-still-be-inside-item-in-nested-context]
+// [spec:gfm:syn:container-blocks.list-items.same-column-can-still-be-inside-item-in-nested-context/test]
 #[test]
 fn gfm_list_item_nested_context_same_column() {
     let html = render_html(&parse_final_nodes("> - foo\n>   bar\n"));
@@ -4448,9 +4451,9 @@ fn gfm_list_item_nested_context_same_column() {
 // Container blocks: Lists
 // ---------------------------------------------------------------------------
 
-// gfm[verify container-blocks.lists.single-paragraph-list-is-tight]
-// gfm[verify container-blocks.lists.tight-list-definition]
-// gfm[verify container-blocks.lists.loose-vs-tight-html-difference]
+// [spec:gfm:sem:container-blocks.lists.single-paragraph-list-is-tight/test]
+// [spec:gfm:def:container-blocks.lists.tight-list-definition/test]
+// [spec:gfm:sem:container-blocks.lists.loose-vs-tight-html-difference/test]
 #[test]
 fn gfm_list_tight_single_paragraph() {
     let html = render_html(&parse_final_nodes("- foo\n- bar\n- baz\n"));
@@ -4460,7 +4463,7 @@ fn gfm_list_tight_single_paragraph() {
     );
 }
 
-// gfm[verify container-blocks.lists.blank-line-between-items-makes-list-loose]
+// [spec:gfm:sem:container-blocks.lists.blank-line-between-items-makes-list-loose/test]
 #[test]
 fn gfm_list_loose_blank_between_items() {
     let html = render_html(&parse_final_nodes("- foo\n\n- bar\n\n- baz\n"));
@@ -4471,8 +4474,8 @@ fn gfm_list_loose_blank_between_items() {
     );
 }
 
-// gfm[verify container-blocks.lists.blank-line-between-item-blocks-makes-list-loose]
-// gfm[verify container-blocks.lists.blank-line-between-block-elements-in-item-makes-list-loose]
+// [spec:gfm:sem:container-blocks.lists.blank-line-between-item-blocks-makes-list-loose/test]
+// [spec:gfm:sem:container-blocks.lists.blank-line-between-block-elements-in-item-makes-list-loose/test]
 #[test]
 fn gfm_list_loose_blank_between_blocks_in_item() {
     let html = render_html(&parse_final_nodes("- a\n\n  b\n- c\n"));
@@ -4482,8 +4485,8 @@ fn gfm_list_loose_blank_between_blocks_in_item() {
     );
 }
 
-// gfm[verify container-blocks.lists.outer-list-may-be-loose-while-inner-list-is-tight]
-// gfm[verify container-blocks.lists.loose-sublist-does-not-necessarily-make-outer-list-loose]
+// [spec:gfm:sem:container-blocks.lists.outer-list-may-be-loose-while-inner-list-is-tight/test]
+// [spec:gfm:sem:container-blocks.lists.loose-sublist-does-not-necessarily-make-outer-list-loose/test]
 #[test]
 fn gfm_list_outer_loose_inner_tight() {
     let html = render_html(&parse_final_nodes("- a\n  - b\n  - c\n\n- d\n"));
@@ -4493,8 +4496,8 @@ fn gfm_list_outer_loose_inner_tight() {
     );
 }
 
-// gfm[verify container-blocks.lists.items-may-be-separated-by-blank-lines]
-// gfm[verify container-blocks.lists.any-number-of-blank-lines-may-separate-items]
+// [spec:gfm:syn:container-blocks.lists.items-may-be-separated-by-blank-lines/test]
+// [spec:gfm:syn:container-blocks.lists.any-number-of-blank-lines-may-separate-items/test]
 #[test]
 fn gfm_list_items_separated_by_multiple_blank_lines() {
     let html = render_html(&parse_final_nodes("- a\n\n\n- b\n"));
@@ -4504,9 +4507,9 @@ fn gfm_list_items_separated_by_multiple_blank_lines() {
     );
 }
 
-// gfm[verify container-blocks.lists.changing-marker-type-or-delimiter-starts-new-list]
-// gfm[verify container-blocks.lists.same-marker-type-definition]
-// gfm[verify container-blocks.lists.same-type-definition]
+// [spec:gfm:syn:container-blocks.lists.changing-marker-type-or-delimiter-starts-new-list/test]
+// [spec:gfm:def:container-blocks.lists.same-marker-type-definition/test]
+// [spec:gfm:def:container-blocks.lists.same-type-definition/test]
 #[test]
 fn gfm_list_marker_change_starts_new_list() {
     // Changing between bullet and ordered starts a new list
@@ -4521,17 +4524,17 @@ fn gfm_list_marker_change_starts_new_list() {
     assert_eq!(html, "<ol>\n<li>foo</li>\n<li>bar</li>\n</ol>\n");
 }
 
-// gfm[verify container-blocks.lists.list-can-interrupt-paragraph-without-blank-line]
-// gfm[verify container-blocks.lists.commonmark-allows-list-interruption]
+// [spec:gfm:syn:container-blocks.lists.list-can-interrupt-paragraph-without-blank-line/test]
+// [spec:gfm:syn:container-blocks.lists.commonmark-allows-list-interruption/test]
 #[test]
 fn gfm_list_interrupts_paragraph() {
     let html = render_html(&parse_final_nodes("foo\n- bar\n"));
     assert_eq!(html, "<p>foo</p>\n<ul>\n<li>bar</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.lists.only-lists-starting-with-one-may-interrupt-paragraphs]
-// gfm[verify container-blocks.lists.markdown-pl-disallows-this-to-avoid-hard-wrapped-numeral-lists]
-// gfm[verify container-blocks.lists.starting-with-one-should-prevent-most-spurious-captures]
+// [spec:gfm:syn:container-blocks.lists.only-lists-starting-with-one-may-interrupt-paragraphs/test]
+// [spec:gfm:sem:container-blocks.lists.markdown-pl-disallows-this-to-avoid-hard-wrapped-numeral-lists/test]
+// [spec:gfm:sem:container-blocks.lists.starting-with-one-should-prevent-most-spurious-captures/test]
 #[test]
 fn gfm_list_only_one_interrupts_paragraph() {
     // "1." can interrupt
@@ -4543,14 +4546,14 @@ fn gfm_list_only_one_interrupts_paragraph() {
     assert_eq!(html, "<p>foo\n2. bar</p>\n");
 }
 
-// gfm[verify container-blocks.lists.starting-with-one-can-still-cause-unintended-list-capture]
+// [spec:gfm:syn:container-blocks.lists.starting-with-one-can-still-cause-unintended-list-capture/test]
 #[test]
 fn gfm_list_one_can_still_capture() {
     let html = render_html(&parse_final_nodes("para\n1. list\n"));
     assert_eq!(html, "<p>para</p>\n<ol>\n<li>list</li>\n</ol>\n");
 }
 
-// gfm[verify container-blocks.lists.markdown-pl-still-allows-block-quotes-to-interrupt-paragraphs]
+// [spec:gfm:sem:container-blocks.lists.markdown-pl-still-allows-block-quotes-to-interrupt-paragraphs/test]
 #[test]
 fn gfm_block_quote_still_interrupts_paragraph() {
     let html = render_html(&parse_final_nodes("para\n> quote\n"));
@@ -4560,7 +4563,7 @@ fn gfm_block_quote_still_interrupts_paragraph() {
     );
 }
 
-// gfm[verify container-blocks.lists.items-need-not-use-uniform-indentation]
+// [spec:gfm:syn:container-blocks.lists.items-need-not-use-uniform-indentation/test]
 #[test]
 fn gfm_list_non_uniform_indentation() {
     let html = render_html(&parse_final_nodes("- a\n - b\n  - c\n"));
@@ -4568,7 +4571,7 @@ fn gfm_list_non_uniform_indentation() {
     assert!(html.contains("<li>"));
 }
 
-// gfm[verify container-blocks.lists.consecutive-block-elements-without-blank-line-keep-list-tight]
+// [spec:gfm:sem:container-blocks.lists.consecutive-block-elements-without-blank-line-keep-list-tight/test]
 #[test]
 fn gfm_list_tight_consecutive_blocks() {
     let html = render_html(&parse_final_nodes("- a\n  - b\n"));
@@ -4576,7 +4579,7 @@ fn gfm_list_tight_consecutive_blocks() {
     assert!(!html.contains("<p>a</p>"));
 }
 
-// gfm[verify container-blocks.lists.blank-lines-inside-code-block-do-not-make-list-loose]
+// [spec:gfm:sem:container-blocks.lists.blank-lines-inside-code-block-do-not-make-list-loose/test]
 #[test]
 fn gfm_list_blank_lines_in_code_not_loose() {
     let html = render_html(&parse_final_nodes("- ```\n  a\n\n  b\n  ```\n- c\n"));
@@ -4585,7 +4588,7 @@ fn gfm_list_blank_lines_in_code_not_loose() {
     assert!(html.contains("c"));
 }
 
-// gfm[verify container-blocks.lists.blank-line-inside-block-quote-does-not-make-list-loose]
+// [spec:gfm:sem:container-blocks.lists.blank-line-inside-block-quote-does-not-make-list-loose/test]
 #[test]
 fn gfm_list_blank_line_in_blockquote_not_loose() {
     let html = render_html(&parse_final_nodes("- > a\n  >\n  > b\n- c\n"));
@@ -4593,7 +4596,7 @@ fn gfm_list_blank_line_in_blockquote_not_loose() {
     assert!(!html.contains("<p>c</p>"));
 }
 
-// gfm[verify container-blocks.lists.blank-line-before-empty-item-still-makes-list-loose]
+// [spec:gfm:sem:container-blocks.lists.blank-line-before-empty-item-still-makes-list-loose/test]
 #[test]
 fn gfm_list_blank_before_empty_item_is_loose() {
     let html = render_html(&parse_final_nodes("- a\n\n-\n"));
@@ -4602,8 +4605,8 @@ fn gfm_list_blank_before_empty_item_is_loose() {
     assert!(html.contains("a"));
 }
 
-// gfm[verify container-blocks.lists.four-space-indented-marker-is-code-block]
-// gfm[verify container-blocks.lists.more-than-three-spaces-do-not-start-item]
+// [spec:gfm:syn:container-blocks.lists.four-space-indented-marker-is-code-block/test]
+// [spec:gfm:syn:container-blocks.lists.more-than-three-spaces-do-not-start-item/test]
 #[test]
 fn gfm_list_four_space_marker_is_code() {
     let html = render_html(&parse_final_nodes("    - foo\n"));
@@ -4614,8 +4617,8 @@ fn gfm_list_four_space_marker_is_code() {
     );
 }
 
-// gfm[verify container-blocks.lists.nested-example-is-list-item-with-sublist]
-// gfm[verify container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
+// [spec:gfm:syn:container-blocks.lists.nested-example-is-list-item-with-sublist/test]
+// [spec:gfm:thm:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way/test]
 #[test]
 fn gfm_list_nested_sublist_example() {
     let html = render_html(&parse_final_nodes("- a\n  - b\n    - c\n"));
@@ -4624,7 +4627,7 @@ fn gfm_list_nested_sublist_example() {
     assert!(html.matches("<ul>").count() >= 2);
 }
 
-// gfm[verify container-blocks.lists.blank-html-comment-separates-lists]
+// [spec:gfm:syn:container-blocks.lists.blank-html-comment-separates-lists/test]
 #[test]
 fn gfm_list_html_comment_separates_lists() {
     let html = render_html(&parse_final_nodes("- foo\n\n<!-- -->\n\n- bar\n"));
@@ -4632,7 +4635,7 @@ fn gfm_list_html_comment_separates_lists() {
     assert!(html.matches("<ul>").count() == 2);
 }
 
-// gfm[verify container-blocks.lists.start-number-definition]
+// [spec:gfm:def:container-blocks.lists.start-number-definition/test]
 #[test]
 fn gfm_list_start_number() {
     let html = render_html(&parse_final_nodes("3. foo\n4. bar\n"));
@@ -4642,10 +4645,10 @@ fn gfm_list_start_number() {
     );
 }
 
-// gfm[verify container-blocks.lists.principle-of-uniformity-definition]
-// gfm[verify container-blocks.lists.second-reason-is-principle-of-uniformity]
-// gfm[verify container-blocks.lists.uniformity-preserves-nested-list-meaning]
-// gfm[verify container-blocks.lists.uniformity-supports-list-interruption]
+// [spec:gfm:def:container-blocks.lists.principle-of-uniformity-definition/test]
+// [spec:gfm:sem:container-blocks.lists.second-reason-is-principle-of-uniformity/test]
+// [spec:gfm:thm:container-blocks.lists.uniformity-preserves-nested-list-meaning/test]
+// [spec:gfm:thm:container-blocks.lists.uniformity-supports-list-interruption/test]
 #[test]
 fn gfm_list_uniformity() {
     // Uniformity principle: same marker type stays in same list
@@ -4661,7 +4664,7 @@ fn gfm_list_uniformity() {
 // Container blocks: Task list items (extension)
 // ---------------------------------------------------------------------------
 
-// gfm[verify container-blocks.task-list-items-extension.task-lists-may-be-arbitrarily-nested]
+// [spec:gfm:syn:container-blocks.task-list-items-extension.task-lists-may-be-arbitrarily-nested/test]
 #[test]
 fn gfm_task_list_nested() {
     let html = render_html(&parse_final_nodes("- [x] parent\n  - [ ] child\n"));
@@ -4669,8 +4672,8 @@ fn gfm_task_list_nested() {
     assert!(html.contains("<ul>"));
 }
 
-// gfm[verify container-blocks.task-list-items-extension.checkbox-interaction-is-unspecified]
-// gfm[verify container-blocks.task-list-items-extension.extension-wrapper]
+// [spec:gfm:req:container-blocks.task-list-items-extension.checkbox-interaction-is-unspecified/test]
+// [spec:gfm:def:container-blocks.task-list-items-extension.extension-wrapper/test]
 #[test]
 fn gfm_task_list_checkbox_interaction_and_wrapper() {
     // The spec says checkbox interaction is unspecified; we just verify the HTML output
@@ -4687,10 +4690,10 @@ fn gfm_task_list_checkbox_interaction_and_wrapper() {
 // Container blocks: List item motivation rules
 // ---------------------------------------------------------------------------
 
-// gfm[verify container-blocks.list-items.motivation.original-markdown-spec-quoted]
-// gfm[verify container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
-// gfm[verify container-blocks.list-items.motivation.four-space-rule-is-arbitrary]
-// gfm[verify container-blocks.list-items.motivation.preferred-parse-is-single-list]
+// [spec:gfm:syn:container-blocks.list-items.motivation.original-markdown-spec-quoted/test]
+// [spec:gfm:thm:container-blocks.list-items.motivation.original-rule-implies-four-space-rule/test]
+// [spec:gfm:sem:container-blocks.list-items.motivation.four-space-rule-is-arbitrary/test]
+// [spec:gfm:syn:container-blocks.list-items.motivation.preferred-parse-is-single-list/test]
 #[test]
 fn gfm_motivation_four_space_rule() {
     // The four-space rule is replaced by marker-width-based indentation
@@ -4703,7 +4706,7 @@ fn gfm_motivation_four_space_rule() {
     );
 }
 
-// gfm[verify container-blocks.list-items.motivation.four-space-rule-splits-list]
+// [spec:gfm:syn:container-blocks.list-items.motivation.four-space-rule-splits-list/test]
 #[test]
 fn gfm_motivation_four_space_rule_splits() {
     // Under the old four-space rule, this would be split
@@ -4714,7 +4717,7 @@ fn gfm_motivation_four_space_rule_splits() {
     assert!(html.contains("<li>"));
 }
 
-// gfm[verify container-blocks.list-items.motivation.marker-width-determines-indentation]
+// [spec:gfm:syn:container-blocks.list-items.motivation.marker-width-determines-indentation/test]
 #[test]
 fn gfm_motivation_marker_width_determines_indent() {
     // "1. " is 3 chars, "10. " is 4 chars: different indent requirements
@@ -4725,8 +4728,8 @@ fn gfm_motivation_marker_width_determines_indent() {
     assert_eq!(html, "<ol start=\"10\">\n<li>foo\nbar</li>\n</ol>\n");
 }
 
-// gfm[verify container-blocks.list-items.motivation.fixed-indent-from-marker-is-an-alternative]
-// gfm[verify container-blocks.list-items.motivation.fixed-margin-indentation-is-unintuitive]
+// [spec:gfm:syn:container-blocks.list-items.motivation.fixed-indent-from-marker-is-an-alternative/test]
+// [spec:gfm:sem:container-blocks.list-items.motivation.fixed-margin-indentation-is-unintuitive/test]
 #[test]
 fn gfm_motivation_fixed_indent_alternative() {
     // CommonMark uses marker-width-based indentation rather than a fixed indent
@@ -4734,8 +4737,8 @@ fn gfm_motivation_fixed_indent_alternative() {
     assert_eq!(html, "<ul>\n<li>foo\nbar</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.motivation.fixed-marker-indent-breaks-code-patterns]
-// gfm[verify container-blocks.list-items.motivation.spec-preserves-eight-space-code-pattern]
+// [spec:gfm:syn:container-blocks.list-items.motivation.fixed-marker-indent-breaks-code-patterns/test]
+// [spec:gfm:syn:container-blocks.list-items.motivation.spec-preserves-eight-space-code-pattern/test]
 #[test]
 fn gfm_motivation_code_inside_list_item() {
     // Code inside a list item needs marker-width + 4 spaces
@@ -4747,7 +4750,8 @@ fn gfm_motivation_code_inside_list_item() {
     );
 }
 
-// gfm[verify container-blocks.list-items.motivation.indented-code-start-needs-special-treatment]
+// [spec:gfm:syn:container-blocks.list-items.motivation.indented-code-start-needs-special-treatment/test]
+// [spec:gfm:syn:container-blocks.list-items.item-starting-with-indented-code/test]
 #[test]
 fn gfm_motivation_indented_code_start() {
     // When the first line of a list item starts with enough spaces for a code block
@@ -4759,8 +4763,8 @@ fn gfm_motivation_indented_code_start() {
     );
 }
 
-// gfm[verify container-blocks.list-items.motivation.markdown-pl-diverged-from-four-space-rule]
-// gfm[verify container-blocks.list-items.motivation.no-rule-avoids-breaking-all-existing-documents]
+// [spec:gfm:sem:container-blocks.list-items.motivation.markdown-pl-diverged-from-four-space-rule/test]
+// [spec:gfm:sem:container-blocks.list-items.motivation.no-rule-avoids-breaking-all-existing-documents/test]
 #[test]
 fn gfm_motivation_divergence_from_four_space_rule() {
     // CommonMark's approach: marker width determines indentation
@@ -4768,8 +4772,8 @@ fn gfm_motivation_divergence_from_four_space_rule() {
     assert_eq!(html, "<ul>\n<li>a\nb</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.motivation.two-space-rule-is-extremely-unintuitive]
-// gfm[verify container-blocks.list-items.motivation.two-space-rule-allows-underindented-content]
+// [spec:gfm:sem:container-blocks.list-items.motivation.two-space-rule-is-extremely-unintuitive/test]
+// [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-allows-underindented-content/test]
 #[test]
 fn gfm_motivation_two_space_rule() {
     // Two spaces is the natural indent for "- " markers
@@ -4777,15 +4781,15 @@ fn gfm_motivation_two_space_rule() {
     assert_eq!(html, "<ul>\n<li>foo\nbar</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.motivation.two-space-rule-example-single-list-item]
+// [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-example-single-list-item/test]
 #[test]
 fn gfm_motivation_two_space_single_item() {
     let html = render_html(&parse_final_nodes("- foo\n\n  bar\n"));
     assert_eq!(html, "<ul>\n<li>\n<p>foo</p>\n<p>bar</p>\n</li>\n</ul>\n");
 }
 
-// gfm[verify container-blocks.list-items.motivation.two-space-rule-example-inside-block-quote]
-// gfm[verify container-blocks.list-items.motivation.two-space-rule-block-quote-html]
+// [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-example-inside-block-quote/test]
+// [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-block-quote-html/test]
 #[test]
 fn gfm_motivation_two_space_inside_block_quote() {
     let html = render_html(&parse_final_nodes("> - foo\n>   bar\n"));
@@ -4795,7 +4799,7 @@ fn gfm_motivation_two_space_inside_block_quote() {
     );
 }
 
-// gfm[verify container-blocks.list-items.motivation.extension-wrapper]
+// [spec:gfm:def:container-blocks.list-items.motivation.extension-wrapper/test]
 #[test]
 fn gfm_motivation_extension_wrapper() {
     // The motivation section explains the rationale for the list item rules
@@ -4809,9 +4813,9 @@ fn gfm_motivation_extension_wrapper() {
 // Preliminaries: Characters and lines
 // ---------------------------------------------------------------------------
 
-// gfm[verify preliminaries.characters-and-lines.line-ending-definition]
-// gfm[verify preliminaries.characters-and-lines.character-definition]
-// gfm[verify preliminaries.characters-and-lines.line-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.line-ending-definition/test]
+// [spec:gfm:def:preliminaries.characters-and-lines.character-definition/test]
+// [spec:gfm:def:preliminaries.characters-and-lines.line-definition/test]
 #[test]
 fn gfm_line_endings_cr_lf_crlf() {
     // LF line ending
@@ -4827,7 +4831,7 @@ fn gfm_line_endings_cr_lf_crlf() {
     assert_eq!(html_crlf, "<p>foo\nbar</p>\n");
 }
 
-// gfm[verify preliminaries.characters-and-lines.blank-line-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.blank-line-definition/test]
 #[test]
 fn gfm_blank_line_separates_paragraphs() {
     let html = render_html(&parse_final_nodes("aaa\n\nbbb\n"));
@@ -4838,8 +4842,8 @@ fn gfm_blank_line_separates_paragraphs() {
     assert_eq!(html, "<p>aaa</p>\n<p>bbb</p>\n");
 }
 
-// gfm[verify preliminaries.characters-and-lines.ascii-punctuation-character-definition]
-// gfm[verify preliminaries.characters-and-lines.punctuation-character-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.ascii-punctuation-character-definition/test]
+// [spec:gfm:def:preliminaries.characters-and-lines.punctuation-character-definition/test]
 #[test]
 fn gfm_ascii_punctuation_backslash_escaping() {
     // Backslash escaping works for ASCII punctuation characters
@@ -4850,10 +4854,10 @@ fn gfm_ascii_punctuation_backslash_escaping() {
     assert_eq!(html, "<p>*+,-./</p>\n");
 }
 
-// gfm[verify preliminaries.characters-and-lines.whitespace-character-definition]
-// gfm[verify preliminaries.characters-and-lines.whitespace-definition]
-// gfm[verify preliminaries.characters-and-lines.space-definition]
-// gfm[verify preliminaries.characters-and-lines.non-whitespace-character-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.whitespace-character-definition/test]
+// [spec:gfm:def:preliminaries.characters-and-lines.whitespace-definition/test]
+// [spec:gfm:def:preliminaries.characters-and-lines.space-definition/test]
+// [spec:gfm:def:preliminaries.characters-and-lines.non-whitespace-character-definition/test]
 #[test]
 fn gfm_whitespace_and_space_definitions() {
     // Spaces are structural whitespace (e.g., 4 spaces = indented code)
@@ -4877,8 +4881,8 @@ fn gfm_whitespace_and_space_definitions() {
     assert_eq!(html, "<p>abc</p>\n");
 }
 
-// gfm[verify preliminaries.characters-and-lines.unicode-whitespace-character-definition]
-// gfm[verify preliminaries.characters-and-lines.unicode-whitespace-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.unicode-whitespace-character-definition/test]
+// [spec:gfm:def:preliminaries.characters-and-lines.unicode-whitespace-definition/test]
 #[test]
 fn gfm_unicode_whitespace_not_structural() {
     // Non-breaking space (U+00A0) is unicode whitespace but does NOT act as
@@ -4887,7 +4891,7 @@ fn gfm_unicode_whitespace_not_structural() {
     assert_eq!(html, "<p>\u{00A0}\u{00A0}\u{00A0}\u{00A0}code</p>\n");
 }
 
-// gfm[verify preliminaries.characters-and-lines.character-class-definitions]
+// [spec:gfm:def:preliminaries.characters-and-lines.character-class-definitions/test]
 #[test]
 fn gfm_character_class_definitions() {
     // Unicode punctuation counts as punctuation for delimiter rules.
@@ -4897,8 +4901,8 @@ fn gfm_character_class_definitions() {
     assert_eq!(html, "<p>\u{00AB}<em>foo</em></p>\n");
 }
 
-// gfm[verify preliminaries.characters-and-lines.valid-commonmark-document]
-// gfm[verify preliminaries.characters-and-lines.encoding-is-unspecified]
+// [spec:gfm:syn:preliminaries.characters-and-lines.valid-commonmark-document/test]
+// [spec:gfm:req:preliminaries.characters-and-lines.encoding-is-unspecified/test]
 #[test]
 fn gfm_valid_document_and_encoding() {
     // Any sequence of characters is a valid CommonMark document
@@ -4918,7 +4922,7 @@ fn gfm_valid_document_and_encoding() {
 // Preliminaries: Insecure characters
 // ---------------------------------------------------------------------------
 
-// gfm[verify preliminaries.insecure-characters.null-character-is-replaced]
+// [spec:gfm:req:preliminaries.insecure-characters.null-character-is-replaced/test]
 #[test]
 fn gfm_null_character_replaced_with_replacement_char() {
     let html = render_html(&parse_final_nodes("foo\0bar\n"));
@@ -4929,7 +4933,7 @@ fn gfm_null_character_replaced_with_replacement_char() {
 // Blocks and Inlines
 // ---------------------------------------------------------------------------
 
-// gfm[verify blocks-and-inlines.document-is-sequence-of-blocks]
+// [spec:gfm:def:blocks-and-inlines.document-is-sequence-of-blocks/test]
 #[test]
 fn gfm_document_is_sequence_of_blocks() {
     // A document contains multiple block-level elements in sequence
@@ -4942,7 +4946,7 @@ fn gfm_document_is_sequence_of_blocks() {
     );
 }
 
-// gfm[verify blocks-and-inlines.container-and-leaf-blocks-definition]
+// [spec:gfm:def:blocks-and-inlines.container-and-leaf-blocks-definition/test]
 #[test]
 fn gfm_container_and_leaf_blocks_together() {
     // Container blocks (blockquote, list) hold other blocks;
@@ -4957,7 +4961,7 @@ fn gfm_container_and_leaf_blocks_together() {
     );
 }
 
-// gfm[verify blocks-and-inlines.precedence.block-indicators-take-precedence-over-inline-indicators]
+// [spec:gfm:syn:blocks-and-inlines.precedence.block-indicators-take-precedence-over-inline-indicators/test]
 #[test]
 fn gfm_block_takes_precedence_over_inline() {
     // `#` at the start of a line creates a heading, not a paragraph with a literal `#`
@@ -4969,7 +4973,7 @@ fn gfm_block_takes_precedence_over_inline() {
     assert_eq!(html, "<ul>\n<li>foo</li>\n</ul>\n");
 }
 
-// gfm[verify blocks-and-inlines.precedence.two-phase-parsing]
+// [spec:gfm:thm:blocks-and-inlines.precedence.two-phase-parsing/test]
 #[test]
 fn gfm_two_phase_parsing() {
     // Block structure is determined first; inline parsing happens second.
@@ -4984,8 +4988,8 @@ fn gfm_two_phase_parsing() {
 // Inlines: top-level rules
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.inline-parsing-is-sequential]
-// gfm[verify inlines.earlier-inline-match-takes-precedence-in-sequential-parse]
+// [spec:gfm:syn:inlines.inline-parsing-is-sequential/test]
+// [spec:gfm:syn:inlines.earlier-inline-match-takes-precedence-in-sequential-parse/test]
 #[test]
 fn gfm_inline_parsing_sequential_and_precedence() {
     // Inlines are parsed left-to-right; the earlier match wins.
@@ -4998,9 +5002,9 @@ fn gfm_inline_parsing_sequential_and_precedence() {
 // Inlines: Soft line breaks
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.soft-line-breaks.regular-line-break-produces-softbreak]
-// gfm[verify inlines.soft-line-breaks.softbreak-may-render-as-line-ending-or-space]
-// gfm[verify inlines.soft-line-breaks.renderers-may-optionally-promote-softbreaks]
+// [spec:gfm:def:inlines.soft-line-breaks.regular-line-break-produces-softbreak/test]
+// [spec:gfm:req:inlines.soft-line-breaks.softbreak-may-render-as-line-ending-or-space/test]
+// [spec:gfm:req:inlines.soft-line-breaks.renderers-may-optionally-promote-softbreaks/test]
 #[test]
 fn gfm_soft_line_break() {
     // A regular line break (without trailing spaces or backslash) produces a softbreak.
@@ -5009,7 +5013,7 @@ fn gfm_soft_line_break() {
     assert_eq!(html, "<p>foo\nbaz</p>\n");
 }
 
-// gfm[verify inlines.soft-line-breaks.edge-spaces-around-softbreak-are-removed]
+// [spec:gfm:sem:inlines.soft-line-breaks.edge-spaces-around-softbreak-are-removed/test]
 #[test]
 fn gfm_soft_line_break_edge_spaces_removed() {
     // A single trailing space (fewer than 2) does not create a hard break;
@@ -5029,7 +5033,7 @@ fn gfm_soft_line_break_edge_spaces_removed() {
 // Inlines: Textual content
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.textual-content.uninterpreted-characters-are-parsed-as-text]
+// [spec:gfm:syn:inlines.textual-content.uninterpreted-characters-are-parsed-as-text/test]
 #[test]
 fn gfm_textual_content_plain_text() {
     // Characters not given special interpretation are parsed as plain text.
@@ -5041,7 +5045,7 @@ fn gfm_textual_content_plain_text() {
     assert_eq!(html, "<p>Foo \u{03C7}\u{03C1}\u{1FC6}\u{03BD}</p>\n");
 }
 
-// gfm[verify inlines.textual-content.internal-spaces-are-preserved]
+// [spec:gfm:sem:inlines.textual-content.internal-spaces-are-preserved/test]
 #[test]
 fn gfm_textual_content_internal_spaces_preserved() {
     // Internal spaces are preserved verbatim.
@@ -5049,7 +5053,7 @@ fn gfm_textual_content_internal_spaces_preserved() {
     assert_eq!(html, "<p>Multiple     spaces</p>\n");
 }
 
-// gfm[verify inlines.textual-content.end-tests-marker]
+// [spec:gfm:def:inlines.textual-content.end-tests-marker/test]
 #[test]
 fn gfm_textual_content_end_tests_marker() {
     // The end-tests marker signals the end of the spec's example tests.
@@ -5062,7 +5066,7 @@ fn gfm_textual_content_end_tests_marker() {
 // Appendix A: Overview
 // ---------------------------------------------------------------------------
 
-// gfm[verify appendix-a-parsing-strategy.overview.document-is-represented-as-tree-of-blocks]
+// [spec:gfm:def:appendix-a-parsing-strategy.overview.document-is-represented-as-tree-of-blocks/test]
 #[test]
 fn gfm_appendix_document_tree_of_blocks() {
     // The document is represented as a tree: document -> blockquote -> paragraph
@@ -5077,8 +5081,8 @@ fn gfm_appendix_document_tree_of_blocks() {
     }
 }
 
-// gfm[verify appendix-a-parsing-strategy.overview.parsing-has-two-phases]
-// gfm[verify appendix-a-parsing-strategy.reference-implementations-use-this-parsing-strategy]
+// [spec:gfm:sem:appendix-a-parsing-strategy.overview.parsing-has-two-phases/test]
+// [spec:gfm:def:appendix-a-parsing-strategy.reference-implementations-use-this-parsing-strategy/test]
 #[test]
 fn gfm_appendix_parsing_two_phases() {
     // Phase 1 determines block structure; phase 2 parses inlines.
@@ -5092,19 +5096,19 @@ fn gfm_appendix_parsing_two_phases() {
 // Appendix A: Phase 1 - Block structure (4-line example)
 // ---------------------------------------------------------------------------
 
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.four-line-example-shows-tree-evolution]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.initial-tree-is-just-document]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.first-example-line]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.first-line-opens-block-quote-and-paragraph]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.second-example-line]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.second-line-is-lazy-continuation]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.third-example-line]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.third-line-closes-paragraph-and-opens-list]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.fourth-example-line]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.fourth-line-opens-second-list-item]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.each-line-may-close-open-or-append]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.phase-1-line-processing-procedure]
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.lines-can-be-discarded-after-incorporation]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.four-line-example-shows-tree-evolution/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.initial-tree-is-just-document/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-example-line/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-line-opens-block-quote-and-paragraph/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-example-line/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-line-is-lazy-continuation/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-example-line/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-line-closes-paragraph-and-opens-list/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-example-line/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-line-opens-second-list-item/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.each-line-may-close-open-or-append/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.phase-1-line-processing-procedure/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.lines-can-be-discarded-after-incorporation/test]
 #[test]
 fn gfm_appendix_phase1_four_line_example() {
     // The spec's 4-line example, but with the `>` prefix on every line so that
@@ -5118,7 +5122,7 @@ fn gfm_appendix_phase1_four_line_example() {
     );
 }
 
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.reference-definitions-are-detected-at-paragraph-close]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.reference-definitions-are-detected-at-paragraph-close/test]
 #[test]
 fn gfm_appendix_reference_definitions_detected_at_paragraph_close() {
     // Reference definitions are extracted from paragraphs when they close.
@@ -5126,7 +5130,7 @@ fn gfm_appendix_reference_definitions_detected_at_paragraph_close() {
     assert_eq!(html, "<p><a href=\"/url\">foo</a></p>\n");
 }
 
-// gfm[verify appendix-a-parsing-strategy.phase-1-block-structure.setext-underlines-convert-paragraphs]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.setext-underlines-convert-paragraphs/test]
 #[test]
 fn gfm_appendix_setext_underlines_convert_paragraphs() {
     // A setext underline converts a paragraph to a heading during phase 1.
@@ -5138,9 +5142,9 @@ fn gfm_appendix_setext_underlines_convert_paragraphs() {
 // Appendix A: Phase 2 - Inline structure
 // ---------------------------------------------------------------------------
 
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.phase-2-parses-inline-content]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.open-blocks-close-at-end-of-input]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.example-produces-softbreak-and-emphasis]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.phase-2-parses-inline-content/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.open-blocks-close-at-end-of-input/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.example-produces-softbreak-and-emphasis/test]
 #[test]
 fn gfm_appendix_phase2_inline_parsing() {
     // Phase 2 parses inline content after all blocks are finalized.
@@ -5193,14 +5197,14 @@ fn gfm_appendix_phase2_inline_parsing() {
 // Appendix A: Emphasis algorithm (process emphasis)
 // ---------------------------------------------------------------------------
 
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.delimiter-stack-definition]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.push-delimiters-to-stack]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.stack-entries-point-to-text-nodes]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-initial-current-position]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-loop]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-consumes-delimiters]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-inserts-node]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-chooses-node-kind]
+// [spec:gfm:def:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.delimiter-stack-definition/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.push-delimiters-to-stack/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.stack-entries-point-to-text-nodes/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-initial-current-position/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-loop/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-consumes-delimiters/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-inserts-node/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-chooses-node-kind/test]
 #[test]
 fn gfm_appendix_emphasis_algorithm_basic() {
     // Single delimiter: *em*
@@ -5216,11 +5220,11 @@ fn gfm_appendix_emphasis_algorithm_basic() {
     assert_eq!(html, "<p><em><strong>foo</strong></em></p>\n");
 }
 
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-interior-delimiters]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-advances]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-inactive-closer]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-cleans-up-stack]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.end-of-input-triggers-emphasis-processing]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-interior-delimiters/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-advances/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-inactive-closer/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-cleans-up-stack/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.end-of-input-triggers-emphasis-processing/test]
 #[test]
 fn gfm_appendix_emphasis_algorithm_nested_and_mismatched() {
     // Nested emphasis: *foo *bar* baz*
@@ -5236,10 +5240,10 @@ fn gfm_appendix_emphasis_algorithm_nested_and_mismatched() {
     assert_eq!(html, "<p><em>foo <strong>bar</strong> baz</em></p>\n");
 }
 
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-stack-bottom-limits-scan]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-tracks-openers-bottom]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-updates-openers-bottom]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.trickiest-inline-case]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-stack-bottom-limits-scan/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-tracks-openers-bottom/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-updates-openers-bottom/test]
+// [spec:gfm:def:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.trickiest-inline-case/test]
 #[test]
 fn gfm_appendix_emphasis_algorithm_openers_bottom_tracking() {
     // The "trickiest" case from the spec: interleaved * and _ delimiters
@@ -5255,11 +5259,11 @@ fn gfm_appendix_emphasis_algorithm_openers_bottom_tracking() {
 // Appendix A: Link/image algorithm
 // ---------------------------------------------------------------------------
 
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.closing-bracket-triggers-link-search]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-scan-backward]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-builds-node-children]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.closing-bracket-triggers-link-search/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-scan-backward/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-builds-node-children/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener/test]
 #[test]
 fn gfm_appendix_link_algorithm_success() {
     // `]` triggers a backward scan for `[`, then `(` triggers inline link parsing.
@@ -5274,9 +5278,9 @@ fn gfm_appendix_link_algorithm_success() {
     );
 }
 
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-failure-case]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-deactivates-earlier-openers]
-// gfm[verify appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-runs-emphasis-processing]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-failure-case/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-deactivates-earlier-openers/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-runs-emphasis-processing/test]
 #[test]
 fn gfm_appendix_link_algorithm_failure_and_deactivation() {
     // When `]` is not followed by `(` or `[`, the opener becomes literal text.
@@ -5299,11 +5303,11 @@ fn gfm_appendix_link_algorithm_failure_and_deactivation() {
 // Standard autolinks (angle-bracket delimited)
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.autolinks.extension-wrapper]
-// gfm[verify inlines.autolinks.uri-autolink-definition]
-// gfm[verify inlines.autolinks.absolute-uri-definition]
-// gfm[verify inlines.autolinks.scheme-definition]
-// gfm[verify inlines.autolinks.valid-uri-autolink-example]
+// [spec:gfm:syn:inlines.autolinks.extension-wrapper/test]
+// [spec:gfm:def:inlines.autolinks.uri-autolink-definition/test]
+// [spec:gfm:def:inlines.autolinks.absolute-uri-definition/test]
+// [spec:gfm:def:inlines.autolinks.scheme-definition/test]
+// [spec:gfm:def:inlines.autolinks.valid-uri-autolink-example/test]
 #[test]
 fn gfm_standard_uri_autolink() {
     let html = render_html(&parse_final_nodes("<http://foo.bar.baz>\n"));
@@ -5327,7 +5331,7 @@ fn gfm_standard_uri_autolink() {
     );
 }
 
-// gfm[verify inlines.autolinks.autolink-schemes-are-case-insensitive]
+// [spec:gfm:syn:inlines.autolinks.autolink-schemes-are-case-insensitive/test]
 #[test]
 fn gfm_autolink_case_insensitive_scheme() {
     let html = render_html(&parse_final_nodes("<MAILTO:FOO@BAR.BAZ>\n"));
@@ -5337,7 +5341,7 @@ fn gfm_autolink_case_insensitive_scheme() {
     );
 }
 
-// gfm[verify inlines.autolinks.spec-accepts-some-absolute-uris-that-are-not-valid-uris]
+// [spec:gfm:syn:inlines.autolinks.spec-accepts-some-absolute-uris-that-are-not-valid-uris/test]
 #[test]
 fn gfm_autolink_nonstandard_uris() {
     let html = render_html(&parse_final_nodes("<a+b+c:d>\n"));
@@ -5359,7 +5363,7 @@ fn gfm_autolink_nonstandard_uris() {
     );
 }
 
-// gfm[verify inlines.autolinks.autolinks-cannot-contain-spaces]
+// [spec:gfm:syn:inlines.autolinks.autolinks-cannot-contain-spaces/test]
 #[test]
 fn gfm_autolink_no_spaces() {
     // Spaces prevent autolink; entire <...> consumed as literal
@@ -5367,7 +5371,7 @@ fn gfm_autolink_no_spaces() {
     assert_eq!(html, "<p>&lt;http://foo.bar/baz bim&gt;</p>\n");
 }
 
-// gfm[verify inlines.autolinks.backslash-escapes-do-not-work-inside-autolinks]
+// [spec:gfm:syn:inlines.autolinks.backslash-escapes-do-not-work-inside-autolinks/test]
 #[test]
 fn gfm_autolink_no_backslash_escapes() {
     // Backslash escapes are not processed inside autolinks; the raw chars are kept
@@ -5378,10 +5382,10 @@ fn gfm_autolink_no_backslash_escapes() {
     );
 }
 
-// gfm[verify inlines.autolinks.email-autolink-definition]
-// gfm[verify inlines.autolinks.email-address-definition]
-// gfm[verify inlines.autolinks.email-address-regex]
-// gfm[verify inlines.autolinks.valid-email-autolink-example]
+// [spec:gfm:syn:inlines.autolinks.email-autolink-definition/test]
+// [spec:gfm:def:inlines.autolinks.email-address-definition/test]
+// [spec:gfm:def:inlines.autolinks.email-address-regex/test]
+// [spec:gfm:def:inlines.autolinks.valid-email-autolink-example/test]
 #[test]
 fn gfm_standard_email_autolink() {
     let html = render_html(&parse_final_nodes("<foo@bar.example.com>\n"));
@@ -5397,7 +5401,7 @@ fn gfm_standard_email_autolink() {
     );
 }
 
-// gfm[verify inlines.autolinks.backslash-escapes-do-not-work-inside-email-autolinks]
+// [spec:gfm:syn:inlines.autolinks.backslash-escapes-do-not-work-inside-email-autolinks/test]
 #[test]
 fn gfm_email_autolink_no_backslash_escapes() {
     // Backslash in email invalidates autolink; not valid HTML tag either
@@ -5405,7 +5409,7 @@ fn gfm_email_autolink_no_backslash_escapes() {
     assert_eq!(html, "<p>&lt;foo+@bar.example.com&gt;</p>\n");
 }
 
-// gfm[verify inlines.autolinks.invalid-autolink-example]
+// [spec:gfm:syn:inlines.autolinks.invalid-autolink-example/test]
 #[test]
 fn gfm_invalid_autolinks() {
     // Empty angle brackets: parsed as Text, escaped by renderer
@@ -5429,10 +5433,10 @@ fn gfm_invalid_autolinks() {
 // Extended autolinks (GFM extension) - additional rules
 // ---------------------------------------------------------------------------
 
-// gfm[verify inlines.autolinks-extension.extension-wrapper]
-// gfm[verify inlines.autolinks-extension.extended-email-autolink-definition]
-// gfm[verify inlines.autolinks-extension.extended-email-autolink-rules]
-// gfm[verify inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
+// [spec:gfm:syn:inlines.autolinks-extension.extension-wrapper/test]
+// [spec:gfm:def:inlines.autolinks-extension.extended-email-autolink-definition/test]
+// [spec:gfm:def:inlines.autolinks-extension.extended-email-autolink-rules/test]
+// [spec:gfm:syn:inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme/test]
 #[test]
 fn gfm_extended_email_autolink() {
     let html = render_html(&parse_final_nodes("foo@bar.baz\n"));
@@ -5442,7 +5446,7 @@ fn gfm_extended_email_autolink() {
     );
 }
 
-// gfm[verify inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign]
+// [spec:gfm:syn:inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign/test]
 #[test]
 fn gfm_extended_email_dot_dash_underscore() {
     // dot, dash, underscore allowed on both sides of @
@@ -5457,7 +5461,7 @@ fn gfm_extended_email_dot_dash_underscore() {
     assert_eq!(html, "<p>a.b-c_d@a.b_</p>\n");
 }
 
-// gfm[verify inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
+// [spec:gfm:sem:inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign/test]
 #[test]
 fn gfm_extended_email_plus_rules() {
     let html = render_html(&parse_final_nodes(
@@ -5469,7 +5473,7 @@ fn gfm_extended_email_plus_rules() {
     );
 }
 
-// gfm[verify inlines.autolinks-extension.left-angle-bracket-ends-autolink]
+// [spec:gfm:syn:inlines.autolinks-extension.left-angle-bracket-ends-autolink/test]
 #[test]
 fn gfm_extended_autolink_left_angle_ends() {
     let html = render_html(&parse_final_nodes("www.commonmark.org/he<lp\n"));
@@ -5479,7 +5483,7 @@ fn gfm_extended_autolink_left_angle_ends() {
     );
 }
 
-// gfm[verify inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
+// [spec:gfm:syn:inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity/test]
 #[test]
 fn gfm_extended_autolink_entity_like_semicolon() {
     // Normal query string with & is fine

@@ -1,0 +1,1353 @@
+name markdawn
+
+source {
+    url "git@github.com:necessary-nu/markdawn.git"
+    ref main
+}
+
+children (
+    {
+        id markdawn-highlighter-boundary
+        title "Establish the renderer-neutral syntax-highlighting boundary"
+        priority 0
+        implements {
+            main (
+                [spec:gfm:req:markdawn.highlighting.boundary.api]
+                [spec:gfm:req:markdawn.highlighting.boundary.span-semantics]
+                [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
+                [spec:gfm:req:markdawn.highlighting.boundary.arborium-transition]
+            )
+        }
+        log (
+            {
+                at 2026-07-29T12:50:59.623254Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+        )
+    }
+    {
+        id parsing
+        title "Markdown parsing"
+        priority 1
+        children (
+            {
+                id parsing.preliminaries
+                title "Characters, lines, tabs and whitespace"
+                priority 1
+                deps (core)
+                implements {
+                    main (
+                        [spec:gfm:def:preliminaries.characters-and-lines.ascii-punctuation-character-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.blank-line-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.character-class-definitions]
+                        [spec:gfm:def:preliminaries.characters-and-lines.character-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.line-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.line-ending-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.non-whitespace-character-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.punctuation-character-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.space-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.unicode-whitespace-character-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.unicode-whitespace-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.whitespace-character-definition]
+                        [spec:gfm:def:preliminaries.characters-and-lines.whitespace-definition]
+                        [spec:gfm:req:preliminaries.characters-and-lines.encoding-is-unspecified]
+                        [spec:gfm:req:preliminaries.insecure-characters.null-character-is-replaced]
+                        [spec:gfm:sem:preliminaries.tabs.tab-after-block-quote-marker-counts-toward-indent]
+                        [spec:gfm:sem:preliminaries.tabs.tab-indented-code-block-equivalence]
+                        [spec:gfm:sem:preliminaries.tabs.tab-indented-list-continuation-equivalence]
+                        [spec:gfm:sem:preliminaries.tabs.tabs-not-expanded-in-lines]
+                        [spec:gfm:syn:preliminaries.characters-and-lines.valid-commonmark-document]
+                    )
+                }
+            }
+            {
+                id parsing.document-model
+                title "Blocks, inlines and precedence"
+                priority 1
+                deps (core)
+                implements {
+                    main (
+                        [spec:gfm:def:blocks-and-inlines.container-and-leaf-blocks-definition]
+                        [spec:gfm:def:blocks-and-inlines.document-is-sequence-of-blocks]
+                        [spec:gfm:syn:blocks-and-inlines.precedence.block-indicators-take-precedence-over-inline-indicators]
+                        [spec:gfm:thm:blocks-and-inlines.precedence.two-phase-parsing]
+                    )
+                }
+            }
+            {
+                id parsing.leaf-blocks
+                title "Leaf block grammar"
+                priority 1
+                deps (parsing.preliminaries parsing.document-model)
+                implements {
+                    main (
+                        [spec:gfm:def:leaf-blocks.blank-lines.extension-wrapper]
+                        [spec:gfm:def:leaf-blocks.fenced-code-blocks.code-fence-uses-backticks-or-tildes]
+                        [spec:gfm:def:leaf-blocks.fenced-code-blocks.opening-fence-may-include-info-string]
+                        [spec:gfm:def:leaf-blocks.html-blocks.definition]
+                        [spec:gfm:def:leaf-blocks.html-blocks.has-seven-types]
+                        [spec:gfm:def:leaf-blocks.indented-code-blocks.definition]
+                        [spec:gfm:def:leaf-blocks.leaf-blocks-make-up-markdown-document]
+                        [spec:gfm:def:leaf-blocks.setext-headings.multiline-heading-has-four-interpretations]
+                        [spec:gfm:def:leaf-blocks.setext-headings.underline-uses-equals-or-dashes]
+                        [spec:gfm:def:leaf-blocks.tables-extension.delimiter-row-structure]
+                        [spec:gfm:def:leaf-blocks.tables-extension.extension-wrapper]
+                        [spec:gfm:def:leaf-blocks.tables-extension.gfm-enables-table-extension]
+                        [spec:gfm:def:leaf-blocks.tables-extension.table-definition]
+                        [spec:gfm:def:leaf-blocks.thematic-breaks.structure]
+                        [spec:gfm:req:leaf-blocks.fenced-code-blocks.info-string-treatment-is-not-mandated]
+                        [spec:gfm:req:leaf-blocks.tables-extension.leading-and-trailing-pipes-are-recommended-for-clarity]
+                        [spec:gfm:sem:leaf-blocks.atx-headings.contents-parse-as-inline-content]
+                        [spec:gfm:sem:leaf-blocks.atx-headings.trim-leading-and-trailing-whitespace-before-inline-parse]
+                        [spec:gfm:sem:leaf-blocks.blank-lines.blank-lines-at-beginning-end-document-are-also-ignored]
+                        [spec:gfm:sem:leaf-blocks.blank-lines.blank-lines-definition]
+                        [spec:gfm:sem:leaf-blocks.fenced-code-blocks.content-is-literal-text]
+                        [spec:gfm:sem:leaf-blocks.fenced-code-blocks.content-lines-without-indent-are-preserved]
+                        [spec:gfm:sem:leaf-blocks.fenced-code-blocks.content-removes-up-to-opening-indent]
+                        [spec:gfm:sem:leaf-blocks.fenced-code-blocks.fences-may-be-indented-and-content-deindents-to-match]
+                        [spec:gfm:sem:leaf-blocks.fenced-code-blocks.first-info-string-word-typically-identifies-language]
+                        [spec:gfm:sem:leaf-blocks.fenced-code-blocks.short-indented-content-lines-remove-all-indent]
+                        [spec:gfm:sem:leaf-blocks.html-blocks.blank-lines-can-usually-be-removed-except-in-pre-blocks]
+                        [spec:gfm:sem:leaf-blocks.html-blocks.differs-from-original-markdown-rule]
+                        [spec:gfm:sem:leaf-blocks.html-blocks.markdown-1-attribute-convention-is-more-complex]
+                        [spec:gfm:sem:leaf-blocks.html-blocks.most-implementations-do-not-follow-all-original-restrictions]
+                        [spec:gfm:sem:leaf-blocks.html-blocks.original-markdown-rule-is-more-liberal-about-blank-lines]
+                        [spec:gfm:sem:leaf-blocks.html-blocks.original-markdown-rule-is-more-restrictive-in-some-ways]
+                        [spec:gfm:sem:leaf-blocks.html-blocks.original-markdown-rule-quote]
+                        [spec:gfm:sem:leaf-blocks.html-blocks.pasting-html-with-blank-lines-usually-still-works]
+                        [spec:gfm:sem:leaf-blocks.html-blocks.trailing-text-after-end-marker-stays-inside-block]
+                        [spec:gfm:sem:leaf-blocks.indented-code-blocks.contents-are-literal-text]
+                        [spec:gfm:sem:leaf-blocks.indented-code-blocks.indent-beyond-four-is-preserved]
+                        [spec:gfm:sem:leaf-blocks.indented-code-blocks.surrounding-blank-lines-are-excluded]
+                        [spec:gfm:sem:leaf-blocks.indented-code-blocks.trailing-spaces-are-preserved]
+                        [spec:gfm:sem:leaf-blocks.link-reference-definitions.defines-label-for-reference-links-and-images]
+                        [spec:gfm:sem:leaf-blocks.link-reference-definitions.definition-status-is-independent-of-use]
+                        [spec:gfm:sem:leaf-blocks.link-reference-definitions.first-matching-definition-takes-precedence]
+                        [spec:gfm:sem:leaf-blocks.link-reference-definitions.label-matching-is-case-insensitive]
+                        [spec:gfm:sem:leaf-blocks.link-reference-definitions.may-appear-before-or-after-uses]
+                        [spec:gfm:sem:leaf-blocks.link-reference-definitions.may-occur-inside-block-containers]
+                        [spec:gfm:sem:leaf-blocks.link-reference-definitions.multiline-label-form-does-not-define-reference]
+                        [spec:gfm:sem:leaf-blocks.link-reference-definitions.scope-is-the-entire-document]
+                        [spec:gfm:sem:leaf-blocks.link-reference-definitions.unused-definitions-have-no-visible-output]
+                        [spec:gfm:sem:leaf-blocks.link-reference-definitions.use-may-precede-definition]
+                        [spec:gfm:sem:leaf-blocks.paragraphs.contents-parse-as-inlines]
+                        [spec:gfm:sem:leaf-blocks.paragraphs.leading-spaces-are-ignored]
+                        [spec:gfm:sem:leaf-blocks.paragraphs.multiple-blank-lines-between-paragraphs-have-no-effect]
+                        [spec:gfm:sem:leaf-blocks.paragraphs.raw-content-concatenates-lines-and-trims-edge-whitespace]
+                        [spec:gfm:sem:leaf-blocks.paragraphs.trailing-spaces-are-stripped-before-inline-parsing]
+                        [spec:gfm:sem:leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content]
+                        [spec:gfm:sem:leaf-blocks.setext-headings.level-determined-by-underline-marker]
+                        [spec:gfm:sem:leaf-blocks.setext-headings.multiline-heading-interprets-as-heading-then-paragraph]
+                        [spec:gfm:sem:leaf-blocks.setext-headings.raw-content-concatenates-lines-and-trims-edge-whitespace]
+                        [spec:gfm:sem:leaf-blocks.setext-headings.trailing-backslash-does-not-create-line-break]
+                        [spec:gfm:sem:leaf-blocks.setext-headings.trailing-spaces-in-content-do-not-create-line-break]
+                        [spec:gfm:sem:leaf-blocks.tables-extension.body-rows-may-have-fewer-or-more-cells-than-header]
+                        [spec:gfm:sem:leaf-blocks.tables-extension.no-tbody-generated-when-there-are-no-body-rows]
+                        [spec:gfm:sem:leaf-blocks.tables-extension.spaces-around-cell-content-are-trimmed]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.can-be-empty]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.can-interrupt-paragraphs-without-blank-lines]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-length-independent]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-may-be-followed-by-spaces-only]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-must-be-preceded-by-space]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-optional]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.escaped-hash-does-not-count-in-closing-sequence]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.escaped-opening-hash-does-not-open-heading]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.non-space-after-closing-hashes-makes-them-content]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.opening-indent-four-spaces-not-allowed]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.opening-indent-up-to-three-spaces]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.opening-sequence-followed-by-space-or-eol]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.opening-sequence-length-at-most-six]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.opening-sequence-length-one-to-six]
+                        [spec:gfm:syn:leaf-blocks.atx-headings.structure]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.backtick-info-string-cannot-contain-backticks]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.backtick-info-strings-cannot-contain-backticks]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.can-be-followed-directly-by-paragraphs]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.can-interrupt-paragraphs]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-indent-need-not-match-opening-indent]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-indent-up-to-three-spaces]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-indented-four-spaces-does-not-close]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-length-at-least-opening-length]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-must-use-same-marker-type]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fences-cannot-have-info-strings]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.content-continues-until-matching-closing-fence]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.content-may-be-empty]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.content-may-consist-only-of-empty-lines]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.fence-lines-cannot-contain-internal-spaces]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.fence-marker-cannot-mix-backticks-and-tildes]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.fewer-than-three-backticks-do-not-form-fence]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.four-space-indented-fence-starts-indented-code-block]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.info-string-may-be-provided-after-opening-fence]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.opening-fence-indent-up-to-three-spaces]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.other-blocks-can-appear-adjacent-without-blank-lines]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.simple-backtick-and-tilde-fences]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.tilde-info-strings-may-contain-backticks-and-tildes]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.unclosed-block-closes-at-end-of-containing-block]
+                        [spec:gfm:syn:leaf-blocks.fenced-code-blocks.unclosed-block-continues-to-end-of-containing-block]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.blank-line-after-opening-tag-allows-following-markdown]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.blank-line-ends-type-6-block-and-normal-parsing-resumes]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.blank-line-separates-two-html-blocks-with-markdown-between]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.block-vs-inline-tag-behavior]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.end-marker-may-occur-on-same-line-as-start]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.ends-at-matching-end-condition-or-container-end]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.indented-inner-tags-with-blank-lines-can-become-code-blocks]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.inline-html-when-tag-is-not-alone-on-line]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.inner-html-does-not-change-active-html-block-type]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.inner-start-conditions-do-not-affect-parser-state]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.non-type-6-tag-must-be-complete-and-alone-on-first-line]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.opening-tag-indent-up-to-three-spaces]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.single-line-block-when-start-and-end-both-match]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.starts-after-up-to-three-spaces-of-indentation]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-1-pre-example]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-1-script-example]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-1-script-pre-style-start-and-end-conditions]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-1-style-example]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-2-comment-example]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-2-comment-start-and-end-conditions]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-3-processing-instruction-example]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-3-processing-instruction-start-and-end-conditions]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-4-declaration-example]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-4-declaration-start-and-end-conditions]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-5-cdata-example]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-5-cdata-start-and-end-conditions]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-6-and-7-usually-require-following-blank-line]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-6-block-tag-start-and-blank-line-end]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-6-continues-through-apparent-markdown-until-blank-line]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-6-examples]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-alone-on-line]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-valid]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-6-may-start-with-closing-tag]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-6-open-tag-need-not-be-closed]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-6-opening-tag-may-be-partial-when-split-at-whitespace]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-6-partial-tag-need-not-be-completed]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-7-cannot-interrupt-paragraphs]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-7-complete-tag-start-and-blank-line-end]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-7-example-cannot-interrupt-paragraph]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.type-7-tag-name-may-be-anything]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-5-end-at-matching-end-marker]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-5-without-end-marker-close-at-container-end]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs]
+                        [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-6-need-not-be-preceded-by-blank-line]
+                        [spec:gfm:syn:leaf-blocks.indented-code-blocks.blank-lines-separate-chunks]
+                        [spec:gfm:syn:leaf-blocks.indented-code-blocks.cannot-interrupt-paragraphs]
+                        [spec:gfm:syn:leaf-blocks.indented-code-blocks.first-line-can-indented-more-than-four-spaces]
+                        [spec:gfm:syn:leaf-blocks.indented-code-blocks.indented-code-block-cannot-interrupt-paragraph]
+                        [spec:gfm:syn:leaf-blocks.indented-code-blocks.less-than-four-spaces-ends-block]
+                        [spec:gfm:syn:leaf-blocks.indented-code-blocks.list-item-interpretation-takes-precedence]
+                        [spec:gfm:syn:leaf-blocks.indented-code-blocks.may-occur-adjacent-to-other-blocks]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.cannot-interrupt-paragraphs]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.code-block-content-does-not-define-reference]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.destination-allows-leading-whitespace]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.destination-and-title-allow-escapes]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.empty-destination-may-use-angle-brackets]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.following-line-does-not-become-title]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.indent-four-spaces-prevents-definition]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.it-may-not-contain-blank-line]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.label-followed-by-colon]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.label-indent-up-to-three-spaces]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.link-destination-may-not-omitted]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.may-follow-other-blocks-without-blank-line]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.multiple-definitions-may-appear-consecutively]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.no-non-whitespace-after-definition]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.structure]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-allows-leading-whitespace]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-may-be-omitted]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-may-extend-over-multiple-lines]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-must-be-separated-by-whitespace]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-separated-from-destination-by-whitespace]
+                        [spec:gfm:syn:leaf-blocks.link-reference-definitions.trailing-non-whitespace-invalidates-definition]
+                        [spec:gfm:syn:leaf-blocks.paragraphs.blank-line-separates-paragraphs]
+                        [spec:gfm:syn:leaf-blocks.paragraphs.first-line-indent-up-to-three-spaces]
+                        [spec:gfm:syn:leaf-blocks.paragraphs.lines-after-first-may-be-indented-arbitrarily]
+                        [spec:gfm:syn:leaf-blocks.paragraphs.may-span-multiple-lines-without-blank-lines]
+                        [spec:gfm:syn:leaf-blocks.paragraphs.structure]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.backslash-escaped-underline-produces-literal-text]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.backslash-escapes-allow-literal-block-markers-in-content]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.blank-line-required-after-paragraph-before-heading]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.blank-lines-around-break-produce-hr]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.blank-lines-generally-not-required-around-heading]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.block-indicators-take-precedence-over-inline-indicators]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.cannot-be-empty]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.cannot-interrupt-paragraphs]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.content-indent-four-spaces-not-allowed]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.content-indent-up-to-three-spaces-and-need-not-align]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.content-may-span-multiple-lines]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.need-not-be-surrounded-by-blank-lines]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.non-setext-break-marker-produces-hr]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.setext-heading-underline-cannot-contain-internal-spaces]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.structure]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-indent-up-to-three-spaces]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-must-not-parse-as-other-block-constructs]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-must-otherwise-parse-as-paragraphs]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-require-non-whitespace-content]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.underline-cannot-be-lazy-continuation-line]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.underline-indent-four-spaces-not-allowed]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.underline-indent-up-to-three-spaces]
+                        [spec:gfm:syn:leaf-blocks.setext-headings.underline-may-be-any-length]
+                        [spec:gfm:syn:leaf-blocks.tables-extension.block-level-elements-cannot-appear-in-tables]
+                        [spec:gfm:syn:leaf-blocks.tables-extension.column-widths-and-edge-pipes-need-not-be-consistent]
+                        [spec:gfm:syn:leaf-blocks.tables-extension.escaped-pipes-are-literal-cell-content]
+                        [spec:gfm:syn:leaf-blocks.tables-extension.header-and-delimiter-row-must-have-matching-cell-count]
+                        [spec:gfm:syn:leaf-blocks.tables-extension.rows-consist-of-pipe-separated-cells]
+                        [spec:gfm:syn:leaf-blocks.tables-extension.table-ends-at-blank-line-or-other-block]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.all-marker-characters-must-match]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.can-interrupt-paragraphs]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.indent-four-spaces-not-allowed]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.indent-up-to-three-spaces]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.marker-sequence-may-be-longer-than-three]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.no-other-characters-allowed]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.requires-dash-underscore-or-asterisk-markers]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.requires-three-or-more-marker-characters]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.setext-heading-takes-precedence-over-dash-break]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.spaces-or-tabs-allowed-between-markers]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.trailing-spaces-allowed]
+                        [spec:gfm:syn:leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item]
+                        [spec:gfm:thm:leaf-blocks.html-blocks.types-1-through-5-may-contain-blank-lines]
+                    )
+                }
+            }
+            {
+                id parsing.container-blocks
+                title "Container block grammar"
+                priority 1
+                deps (parsing.preliminaries parsing.document-model)
+                implements {
+                    main (
+                        [spec:gfm:def:container-blocks.basic-kinds-are-block-quotes-and-list-items]
+                        [spec:gfm:def:container-blocks.block-quotes.marker-structure]
+                        [spec:gfm:def:container-blocks.block-quotes.paragraph-continuation-text-definition]
+                        [spec:gfm:def:container-blocks.definition]
+                        [spec:gfm:def:container-blocks.general-recursive-definition-form]
+                        [spec:gfm:def:container-blocks.generated-from-contents-rather-than-parse-recipe]
+                        [spec:gfm:def:container-blocks.list-items.bullet-marker-definition]
+                        [spec:gfm:def:container-blocks.list-items.marker-definition]
+                        [spec:gfm:def:container-blocks.list-items.motivation.extension-wrapper]
+                        [spec:gfm:def:container-blocks.list-items.ordered-marker-definition]
+                        [spec:gfm:def:container-blocks.lists-are-meta-containers-for-list-items]
+                        [spec:gfm:def:container-blocks.lists.definition]
+                        [spec:gfm:def:container-blocks.lists.loose-list-definition]
+                        [spec:gfm:def:container-blocks.lists.ordered-and-bullet-list-definition]
+                        [spec:gfm:def:container-blocks.lists.principle-of-uniformity-definition]
+                        [spec:gfm:def:container-blocks.lists.same-marker-type-definition]
+                        [spec:gfm:def:container-blocks.lists.same-type-definition]
+                        [spec:gfm:def:container-blocks.lists.start-number-definition]
+                        [spec:gfm:def:container-blocks.lists.tight-list-definition]
+                        [spec:gfm:def:container-blocks.syntax-is-defined-recursively]
+                        [spec:gfm:def:container-blocks.task-list-items-extension.definition]
+                        [spec:gfm:def:container-blocks.task-list-items-extension.extension-wrapper]
+                        [spec:gfm:def:container-blocks.task-list-items-extension.marker-structure]
+                        [spec:gfm:req:container-blocks.task-list-items-extension.checkbox-interaction-is-unspecified]
+                        [spec:gfm:sem:container-blocks.block-quotes.consecutiveness-rationale]
+                        [spec:gfm:sem:container-blocks.list-items.extra-indent-counts-as-code-content]
+                        [spec:gfm:sem:container-blocks.list-items.indented-code-inside-item-preserves-empty-lines]
+                        [spec:gfm:sem:container-blocks.list-items.motivation.fixed-margin-indentation-is-unintuitive]
+                        [spec:gfm:sem:container-blocks.list-items.motivation.four-space-rule-is-arbitrary]
+                        [spec:gfm:sem:container-blocks.list-items.motivation.markdown-pl-diverged-from-four-space-rule]
+                        [spec:gfm:sem:container-blocks.list-items.motivation.no-rule-avoids-breaking-all-existing-documents]
+                        [spec:gfm:sem:container-blocks.list-items.motivation.two-space-rule-is-extremely-unintuitive]
+                        [spec:gfm:sem:container-blocks.list-items.ordered-item-start-number-comes-from-marker]
+                        [spec:gfm:sem:container-blocks.list-items.type-is-determined-by-marker]
+                        [spec:gfm:sem:container-blocks.lists.blank-line-before-empty-item-still-makes-list-loose]
+                        [spec:gfm:sem:container-blocks.lists.blank-line-between-block-elements-in-item-makes-list-loose]
+                        [spec:gfm:sem:container-blocks.lists.blank-line-between-item-blocks-makes-list-loose]
+                        [spec:gfm:sem:container-blocks.lists.blank-line-between-items-makes-list-loose]
+                        [spec:gfm:sem:container-blocks.lists.blank-line-inside-block-quote-does-not-make-list-loose]
+                        [spec:gfm:sem:container-blocks.lists.blank-lines-inside-code-block-do-not-make-list-loose]
+                        [spec:gfm:sem:container-blocks.lists.consecutive-block-elements-without-blank-line-keep-list-tight]
+                        [spec:gfm:sem:container-blocks.lists.loose-sublist-does-not-necessarily-make-outer-list-loose]
+                        [spec:gfm:sem:container-blocks.lists.loose-vs-tight-html-difference]
+                        [spec:gfm:sem:container-blocks.lists.markdown-pl-disallows-this-to-avoid-hard-wrapped-numeral-lists]
+                        [spec:gfm:sem:container-blocks.lists.markdown-pl-still-allows-block-quotes-to-interrupt-paragraphs]
+                        [spec:gfm:sem:container-blocks.lists.outer-list-may-be-loose-while-inner-list-is-tight]
+                        [spec:gfm:sem:container-blocks.lists.second-reason-is-principle-of-uniformity]
+                        [spec:gfm:sem:container-blocks.lists.single-paragraph-list-is-tight]
+                        [spec:gfm:sem:container-blocks.lists.starting-with-one-should-prevent-most-spurious-captures]
+                        [spec:gfm:sem:container-blocks.task-list-items-extension.gfm-enables-task-list-extension]
+                        [spec:gfm:sem:container-blocks.task-list-items-extension.rendered-marker-becomes-semantic-checkbox]
+                        [spec:gfm:sem:container-blocks.task-list-items-extension.whitespace-marker-is-unchecked]
+                        [spec:gfm:syn:container-blocks.block-quotes.adjacent-lines-form-single-block-quote]
+                        [spec:gfm:syn:container-blocks.block-quotes.basic-case]
+                        [spec:gfm:syn:container-blocks.block-quotes.blank-line-separates-adjacent-block-quotes]
+                        [spec:gfm:syn:container-blocks.block-quotes.blank-lines-generally-not-required-around-block-quotes]
+                        [spec:gfm:syn:container-blocks.block-quotes.blank-quoted-line-creates-two-paragraphs]
+                        [spec:gfm:syn:container-blocks.block-quotes.can-be-empty]
+                        [spec:gfm:syn:container-blocks.block-quotes.can-have-initial-or-final-blank-lines]
+                        [spec:gfm:syn:container-blocks.block-quotes.can-interrupt-paragraphs]
+                        [spec:gfm:syn:container-blocks.block-quotes.consecutiveness]
+                        [spec:gfm:syn:container-blocks.block-quotes.example]
+                        [spec:gfm:syn:container-blocks.block-quotes.indented-dash-remains-paragraph-continuation-text]
+                        [spec:gfm:syn:container-blocks.block-quotes.laziness-allows-omitted-continuation-markers]
+                        [spec:gfm:syn:container-blocks.block-quotes.laziness-applies-only-to-paragraph-continuation-lines]
+                        [spec:gfm:syn:container-blocks.block-quotes.laziness-does-not-apply-to-code-block-lines]
+                        [spec:gfm:syn:container-blocks.block-quotes.laziness]
+                        [spec:gfm:syn:container-blocks.block-quotes.lazy-continuation-example]
+                        [spec:gfm:syn:container-blocks.block-quotes.lazy-continuation-list-example-explanation]
+                        [spec:gfm:syn:container-blocks.block-quotes.list-example-block-quote-ends-after-first-line]
+                        [spec:gfm:syn:container-blocks.block-quotes.marker-indent-four-spaces-starts-code-block]
+                        [spec:gfm:syn:container-blocks.block-quotes.marker-indent-up-to-three-spaces]
+                        [spec:gfm:syn:container-blocks.block-quotes.may-mix-lazy-and-non-lazy-continuation-lines]
+                        [spec:gfm:syn:container-blocks.block-quotes.omitting-marker-before-list-item-ends-block-quote]
+                        [spec:gfm:syn:container-blocks.block-quotes.omitting-marker-before-setext-underline-changes-meaning]
+                        [spec:gfm:syn:container-blocks.block-quotes.only-defined-cases-count]
+                        [spec:gfm:syn:container-blocks.block-quotes.space-after-marker-is-optional]
+                        [spec:gfm:syn:container-blocks.list-items.at-least-one-space-required-after-marker]
+                        [spec:gfm:syn:container-blocks.list-items.basic-case-example-ordered-item]
+                        [spec:gfm:syn:container-blocks.list-items.basic-case-example-source-blocks]
+                        [spec:gfm:syn:container-blocks.list-items.basic-case]
+                        [spec:gfm:syn:container-blocks.list-items.basic-rules-apply-only-to-nonblank-or-code-start]
+                        [spec:gfm:syn:container-blocks.list-items.blank-line-start-makes-post-marker-spacing-irrelevant]
+                        [spec:gfm:syn:container-blocks.list-items.empty-bullet-item]
+                        [spec:gfm:syn:container-blocks.list-items.empty-item-cannot-interrupt-paragraph]
+                        [spec:gfm:syn:container-blocks.list-items.empty-item-does-not-require-post-marker-spaces]
+                        [spec:gfm:syn:container-blocks.list-items.empty-lines-inside-list-item-need-not-be-indented]
+                        [spec:gfm:syn:container-blocks.list-items.empty-ordered-item]
+                        [spec:gfm:syn:container-blocks.list-items.examples-of-required-indentation]
+                        [spec:gfm:syn:container-blocks.list-items.far-right-text-may-still-be-outside-item]
+                        [spec:gfm:syn:container-blocks.list-items.indented-code-example-with-wider-marker]
+                        [spec:gfm:syn:container-blocks.list-items.indented-code-must-be-four-spaces-beyond-content-indent]
+                        [spec:gfm:syn:container-blocks.list-items.indented-code-start-uses-one-space-after-marker]
+                        [spec:gfm:syn:container-blocks.list-items.indenting-whole-item-four-spaces-produces-code-block]
+                        [spec:gfm:syn:container-blocks.list-items.interrupting-first-item-cannot-begin-with-blank-line]
+                        [spec:gfm:syn:container-blocks.list-items.interrupting-ordered-list-must-start-at-one]
+                        [spec:gfm:syn:container-blocks.list-items.item-blocks-may-be-separated-by-multiple-blank-lines]
+                        [spec:gfm:syn:container-blocks.list-items.item-may-contain-heading]
+                        [spec:gfm:syn:container-blocks.list-items.item-starting-with-blank-line]
+                        [spec:gfm:syn:container-blocks.list-items.item-starting-with-indented-code]
+                        [spec:gfm:syn:container-blocks.list-items.items-may-start-with-one-blank-line-and-still-be-nonempty]
+                        [spec:gfm:syn:container-blocks.list-items.laziness-works-inside-nested-structures]
+                        [spec:gfm:syn:container-blocks.list-items.lazy-continuation-example]
+                        [spec:gfm:syn:container-blocks.list-items.lazy-continuation-may-delete-only-part-of-indent]
+                        [spec:gfm:syn:container-blocks.list-items.list-may-be-first-block-in-item]
+                        [spec:gfm:syn:container-blocks.list-items.list-may-start-or-end-with-empty-item]
+                        [spec:gfm:syn:container-blocks.list-items.may-begin-with-at-most-one-blank-line]
+                        [spec:gfm:syn:container-blocks.list-items.may-contain-any-kind-of-block]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.fixed-indent-from-marker-is-an-alternative]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.fixed-marker-indent-breaks-code-patterns]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.four-space-rule-splits-list]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.indented-code-start-needs-special-treatment]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.marker-width-determines-indentation]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.original-markdown-spec-quoted]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.preferred-parse-is-single-list]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.spec-preserves-eight-space-code-pattern]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-allows-underindented-content]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-block-quote-html]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-example-inside-block-quote]
+                        [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-example-single-list-item]
+                        [spec:gfm:syn:container-blocks.list-items.ordered-start-number-cannot-be-negative]
+                        [spec:gfm:syn:container-blocks.list-items.ordered-start-number-is-at-most-nine-digits]
+                        [spec:gfm:syn:container-blocks.list-items.ordered-start-number-may-have-leading-zeroes]
+                        [spec:gfm:syn:container-blocks.list-items.required-indentation-is-marker-width-plus-padding]
+                        [spec:gfm:syn:container-blocks.list-items.required-indentation-is-relative-not-column-based]
+                        [spec:gfm:syn:container-blocks.list-items.same-column-can-still-be-inside-item-in-nested-context]
+                        [spec:gfm:syn:container-blocks.list-items.sublist-example-indent-increases-with-wider-marker]
+                        [spec:gfm:syn:container-blocks.list-items.sublist-example-one-space-is-not-enough]
+                        [spec:gfm:syn:container-blocks.list-items.sublist-example-three-spaces-not-enough-for-wider-marker]
+                        [spec:gfm:syn:container-blocks.list-items.sublist-example-two-space-indent]
+                        [spec:gfm:syn:container-blocks.list-items.thematic-break-line-is-not-a-list-item]
+                        [spec:gfm:syn:container-blocks.lists.any-number-of-blank-lines-may-separate-items]
+                        [spec:gfm:syn:container-blocks.lists.blank-html-comment-separates-lists]
+                        [spec:gfm:syn:container-blocks.lists.changing-marker-type-or-delimiter-starts-new-list]
+                        [spec:gfm:syn:container-blocks.lists.commonmark-allows-list-interruption]
+                        [spec:gfm:syn:container-blocks.lists.four-space-indented-marker-is-code-block]
+                        [spec:gfm:syn:container-blocks.lists.items-may-be-separated-by-blank-lines]
+                        [spec:gfm:syn:container-blocks.lists.items-need-not-use-uniform-indentation]
+                        [spec:gfm:syn:container-blocks.lists.list-can-interrupt-paragraph-without-blank-line]
+                        [spec:gfm:syn:container-blocks.lists.more-than-three-spaces-do-not-start-item]
+                        [spec:gfm:syn:container-blocks.lists.nested-example-is-list-item-with-sublist]
+                        [spec:gfm:syn:container-blocks.lists.only-lists-starting-with-one-may-interrupt-paragraphs]
+                        [spec:gfm:syn:container-blocks.lists.starting-with-one-can-still-cause-unintended-list-capture]
+                        [spec:gfm:syn:container-blocks.task-list-items-extension.task-lists-may-be-arbitrarily-nested]
+                        [spec:gfm:thm:container-blocks.block-quotes.blank-line-required-before-following-paragraph]
+                        [spec:gfm:thm:container-blocks.block-quotes.indented-code-needs-five-spaces-after-marker]
+                        [spec:gfm:thm:container-blocks.block-quotes.nested-block-quotes-may-omit-continuation-markers]
+                        [spec:gfm:thm:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
+                        [spec:gfm:thm:container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
+                        [spec:gfm:thm:container-blocks.list-items.sublists-follow-general-indentation-rules]
+                        [spec:gfm:thm:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
+                        [spec:gfm:thm:container-blocks.lists.uniformity-preserves-nested-list-meaning]
+                        [spec:gfm:thm:container-blocks.lists.uniformity-supports-list-interruption]
+                    )
+                }
+            }
+            {
+                id parsing.inlines
+                title "Inline grammar and emphasis resolution"
+                priority 1
+                deps (parsing.preliminaries parsing.document-model)
+                implements {
+                    main (
+                        [spec:gfm:def:inlines.autolinks-extension.definition]
+                        [spec:gfm:def:inlines.autolinks-extension.extended-email-autolink-definition]
+                        [spec:gfm:def:inlines.autolinks-extension.extended-email-autolink-rules]
+                        [spec:gfm:def:inlines.autolinks-extension.extended-www-autolinks-insert-http-scheme]
+                        [spec:gfm:def:inlines.autolinks-extension.gfm-enables-extended-autolinks]
+                        [spec:gfm:def:inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
+                        [spec:gfm:def:inlines.autolinks.absolute-uri-definition]
+                        [spec:gfm:def:inlines.autolinks.email-address-definition]
+                        [spec:gfm:def:inlines.autolinks.email-address-regex]
+                        [spec:gfm:def:inlines.autolinks.scheme-definition]
+                        [spec:gfm:def:inlines.autolinks.uri-autolink-definition]
+                        [spec:gfm:def:inlines.autolinks.valid-email-autolink-example]
+                        [spec:gfm:def:inlines.autolinks.valid-uri-autolink-example]
+                        [spec:gfm:def:inlines.code-spans.backtick-string-definition]
+                        [spec:gfm:def:inlines.code-spans.definition]
+                        [spec:gfm:def:inlines.disallowed-raw-html-extension.disallowed-tags]
+                        [spec:gfm:def:inlines.disallowed-raw-html-extension.extension-wrapper]
+                        [spec:gfm:def:inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.delimiter-run-definition]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.delimiter-run-example]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.double-asterisk-can-close-strong-emphasis]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.double-asterisk-can-open-strong-emphasis]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.left-flanking-delimiter-run-definition]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.left-right-flanking-terminology-note]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-closing]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-double-underscore]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.right-flanking-delimiter-run-definition]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.single-asterisk-can-close-emphasis]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.single-asterisk-can-open-emphasis]
+                        [spec:gfm:def:inlines.emphasis-and-strong-emphasis.unicode-nonbreaking-space-counts-as-whitespace]
+                        [spec:gfm:def:inlines.entity-and-numeric-character-references.decimal-numeric-reference-definition]
+                        [spec:gfm:def:inlines.entity-and-numeric-character-references.entity-references-definition]
+                        [spec:gfm:def:inlines.entity-and-numeric-character-references.hex-reference-definition]
+                        [spec:gfm:def:inlines.hard-line-breaks.two-trailing-spaces-produce-hard-line-break]
+                        [spec:gfm:def:inlines.images.image-description-follows-link-text-rules-with-two-differences]
+                        [spec:gfm:def:inlines.links.collapsed-reference-link-text-comes-from-first-label-inlines]
+                        [spec:gfm:def:inlines.links.definition]
+                        [spec:gfm:def:inlines.links.first-matching-reference-definition-is-used]
+                        [spec:gfm:def:inlines.links.full-reference-link-definition]
+                        [spec:gfm:def:inlines.links.implementations-may-limit-parenthesis-nesting-in-destinations]
+                        [spec:gfm:def:inlines.links.inline-and-reference-links-are-the-two-basic-kinds]
+                        [spec:gfm:def:inlines.links.inline-link-text-comes-from-link-text-inlines]
+                        [spec:gfm:def:inlines.links.link-label-definition]
+                        [spec:gfm:def:inlines.links.link-label-must-contain-non-whitespace]
+                        [spec:gfm:def:inlines.links.link-text-cannot-contain-links]
+                        [spec:gfm:def:inlines.links.link-text-definition]
+                        [spec:gfm:def:inlines.links.link-titles-may-span-lines-but-not-blank-lines]
+                        [spec:gfm:def:inlines.links.shortcut-reference-link-text-comes-from-label-inlines]
+                        [spec:gfm:def:inlines.raw-html.attribute-definition]
+                        [spec:gfm:def:inlines.raw-html.attribute-name-definition]
+                        [spec:gfm:def:inlines.raw-html.attribute-value-definition]
+                        [spec:gfm:def:inlines.raw-html.attribute-value-specification-definition]
+                        [spec:gfm:def:inlines.raw-html.cdata-section-definition]
+                        [spec:gfm:def:inlines.raw-html.closing-tag-definition]
+                        [spec:gfm:def:inlines.raw-html.declaration-definition]
+                        [spec:gfm:def:inlines.raw-html.double-quoted-attribute-value-definition]
+                        [spec:gfm:def:inlines.raw-html.extension-wrapper]
+                        [spec:gfm:def:inlines.raw-html.html-comment-definition]
+                        [spec:gfm:def:inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html]
+                        [spec:gfm:def:inlines.raw-html.html-tag-definition]
+                        [spec:gfm:def:inlines.raw-html.open-tag-definition]
+                        [spec:gfm:def:inlines.raw-html.processing-instruction-definition]
+                        [spec:gfm:def:inlines.raw-html.single-quoted-attribute-value-definition]
+                        [spec:gfm:def:inlines.raw-html.unquoted-attribute-value-definition]
+                        [spec:gfm:def:inlines.soft-line-breaks.regular-line-break-produces-softbreak]
+                        [spec:gfm:def:inlines.strikethrough-extension.gfm-enables-strikethrough-extension]
+                        [spec:gfm:def:inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
+                        [spec:gfm:def:inlines.textual-content.end-tests-marker]
+                        [spec:gfm:req:inlines.code-spans.browser-rendering-may-collapse-spaces]
+                        [spec:gfm:req:inlines.entity-and-numeric-character-references.parsers-need-not-preserve-source-form]
+                        [spec:gfm:req:inlines.images.reference-image-labels-are-case-insensitive]
+                        [spec:gfm:req:inlines.links.label-match-definition]
+                        [spec:gfm:req:inlines.links.link-title-definition]
+                        [spec:gfm:req:inlines.links.title-cannot-appear-without-destination]
+                        [spec:gfm:req:inlines.soft-line-breaks.renderers-may-optionally-promote-softbreaks]
+                        [spec:gfm:req:inlines.soft-line-breaks.softbreak-may-render-as-line-ending-or-space]
+                        [spec:gfm:sem:inlines.autolinks-extension.extended-www-autolinks-may-have-path-after-domain]
+                        [spec:gfm:sem:inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
+                        [spec:gfm:sem:inlines.backslash-escapes.escaped-characters-lose-special-meaning]
+                        [spec:gfm:sem:inlines.code-spans.all-space-content-is-not-trimmed]
+                        [spec:gfm:sem:inlines.code-spans.code-white-space-pre-wrap]
+                        [spec:gfm:sem:inlines.code-spans.edge-space-trimming-allows-literal-backticks-at-edges]
+                        [spec:gfm:sem:inlines.code-spans.edge-space-trimming-requires-space-on-both-sides]
+                        [spec:gfm:sem:inlines.code-spans.interior-spaces-are-preserved]
+                        [spec:gfm:sem:inlines.code-spans.line-endings-become-spaces]
+                        [spec:gfm:sem:inlines.code-spans.line-endings-conversion-example]
+                        [spec:gfm:sem:inlines.code-spans.only-ascii-space-is-trimmed]
+                        [spec:gfm:sem:inlines.code-spans.only-one-space-is-trimmed]
+                        [spec:gfm:sem:inlines.code-spans.single-edge-space-is-trimmed]
+                        [spec:gfm:sem:inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
+                        [spec:gfm:sem:inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
+                        [spec:gfm:sem:inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
+                        [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.less-common-but-useful-emphasis-patterns]
+                        [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.many-implementations-restrict-intraword-underscore]
+                        [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-markdown-description-quoted]
+                        [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-markdown-description]
+                        [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-rules-leave-nesting-underdetermined]
+                        [spec:gfm:sem:inlines.entity-and-numeric-character-references.references-produce-unicode-characters]
+                        [spec:gfm:sem:inlines.hard-line-breaks.leading-spaces-on-next-line-are-ignored]
+                        [spec:gfm:sem:inlines.images.escaping-opening-bracket-after-bang-produces-literal-bracketed-text]
+                        [spec:gfm:sem:inlines.images.html-rendering-should-use-plain-string-content-for-alt]
+                        [spec:gfm:sem:inlines.images.no-whitespace-allowed-between-reference-image-brackets]
+                        [spec:gfm:sem:inlines.links.collapsed-reference-link-is-equivalent-to-full-link-with-same-label]
+                        [spec:gfm:sem:inlines.links.collapsed-reference-link-labels-are-case-insensitive]
+                        [spec:gfm:sem:inlines.links.escaping-opening-bracket-prevents-reference-link]
+                        [spec:gfm:sem:inlines.links.first-reference-definition-wins-example]
+                        [spec:gfm:sem:inlines.links.full-reference-link-example]
+                        [spec:gfm:sem:inlines.links.inline-link-example]
+                        [spec:gfm:sem:inlines.links.inline-link-title-comes-from-title-with-delimiters-removed]
+                        [spec:gfm:sem:inlines.links.inline-link-uri-comes-from-destination-with-delimiters-removed]
+                        [spec:gfm:sem:inlines.links.label-matching-collapses-consecutive-internal-whitespace]
+                        [spec:gfm:sem:inlines.links.link-labels-cannot-contain-unescaped-brackets]
+                        [spec:gfm:sem:inlines.links.matching-uses-normalized-strings-not-parsed-inline-content]
+                        [spec:gfm:sem:inlines.links.no-whitespace-allowed-between-collapsed-reference-brackets]
+                        [spec:gfm:sem:inlines.links.no-whitespace-allowed-between-link-text-and-link-label]
+                        [spec:gfm:sem:inlines.links.reference-link-text-comes-from-first-label-inlines]
+                        [spec:gfm:sem:inlines.links.shortcut-reference-link-is-equivalent-to-collapsed-reference-link]
+                        [spec:gfm:sem:inlines.links.shortcut-reference-link-labels-are-case-insensitive]
+                        [spec:gfm:sem:inlines.links.shortcut-reference-links-make-space-before-label-too-dangerous]
+                        [spec:gfm:sem:inlines.links.space-after-shortcut-reference-link-is-preserved]
+                        [spec:gfm:sem:inlines.links.whitespace-is-allowed-inside-inline-link-delimiters]
+                        [spec:gfm:sem:inlines.raw-html.entity-and-numeric-references-are-preserved-in-html-attributes]
+                        [spec:gfm:sem:inlines.soft-line-breaks.edge-spaces-around-softbreak-are-removed]
+                        [spec:gfm:sem:inlines.textual-content.internal-spaces-are-preserved]
+                        [spec:gfm:syn:inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign]
+                        [spec:gfm:syn:inlines.autolinks-extension.extended-autolink-path-validation]
+                        [spec:gfm:syn:inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
+                        [spec:gfm:syn:inlines.autolinks-extension.extended-url-autolink-definition]
+                        [spec:gfm:syn:inlines.autolinks-extension.extended-www-autolink-definition]
+                        [spec:gfm:syn:inlines.autolinks-extension.extension-wrapper]
+                        [spec:gfm:syn:inlines.autolinks-extension.left-angle-bracket-ends-autolink]
+                        [spec:gfm:syn:inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
+                        [spec:gfm:syn:inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
+                        [spec:gfm:syn:inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
+                        [spec:gfm:syn:inlines.autolinks.autolink-schemes-are-case-insensitive]
+                        [spec:gfm:syn:inlines.autolinks.autolinks-cannot-contain-spaces]
+                        [spec:gfm:syn:inlines.autolinks.backslash-escapes-do-not-work-inside-autolinks]
+                        [spec:gfm:syn:inlines.autolinks.backslash-escapes-do-not-work-inside-email-autolinks]
+                        [spec:gfm:syn:inlines.autolinks.definition]
+                        [spec:gfm:syn:inlines.autolinks.email-autolink-definition]
+                        [spec:gfm:syn:inlines.autolinks.extension-wrapper]
+                        [spec:gfm:syn:inlines.autolinks.invalid-autolink-example]
+                        [spec:gfm:syn:inlines.autolinks.spec-accepts-some-absolute-uris-that-are-not-valid-uris]
+                        [spec:gfm:syn:inlines.backslash-escapes.any-ascii-punctuation-may-be-escaped]
+                        [spec:gfm:syn:inlines.backslash-escapes.backslash-at-end-line-is-hard-line-break]
+                        [spec:gfm:syn:inlines.backslash-escapes.backslashes-before-other-characters-are-literal]
+                        [spec:gfm:syn:inlines.backslash-escapes.do-not-work-in-code-autolinks-or-raw-html]
+                        [spec:gfm:syn:inlines.backslash-escapes.escaped-backslash-does-not-escape-following-character]
+                        [spec:gfm:syn:inlines.backslash-escapes.work-in-urls-titles-references-and-info-strings]
+                        [spec:gfm:syn:inlines.code-spans.autolink-wins-when-autolink-parses-first]
+                        [spec:gfm:syn:inlines.code-spans.backslashes-are-literal]
+                        [spec:gfm:syn:inlines.code-spans.code-span-prevents-link-parse]
+                        [spec:gfm:syn:inlines.code-spans.code-span-wins-in-ambiguous-autolink-like-text]
+                        [spec:gfm:syn:inlines.code-spans.code-spans-html-tags-and-autolinks-share-precedence]
+                        [spec:gfm:syn:inlines.code-spans.code-spans-take-precedence-over-emphasis-and-links]
+                        [spec:gfm:syn:inlines.code-spans.example]
+                        [spec:gfm:syn:inlines.code-spans.html-tag-wins-when-tag-parses-first]
+                        [spec:gfm:syn:inlines.code-spans.longer-delimiters-allow-literal-backticks]
+                        [spec:gfm:syn:inlines.code-spans.opening-and-closing-backtick-strings-must-have-equal-length]
+                        [spec:gfm:syn:inlines.code-spans.unclosed-backtick-string-is-literal]
+                        [spec:gfm:syn:inlines.earlier-inline-match-takes-precedence-in-sequential-parse]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.ambiguity-resolution-principles]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-punctuation-before-alphanumeric]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-whitespace]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-after-alphanumeric-before-punctuation]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-when-followed-by-whitespace]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-closing-restriction-example]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.both-multiples-of-three-allow-emphasis-match]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-punctuation-before-alphanumeric]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-whitespace]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-alphanumeric-before-punctuation]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-whitespace]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-closing-restriction-examples]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-close-strong-emphasis]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-close-when-punctuation-follows]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-open-strong-emphasis]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-open-when-punctuation-precedes]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-punctuation-before-alphanumeric]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-whitespace]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-alphanumeric-before-punctuation]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-whitespace]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-closing-restriction-example]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-allows-indefinite-nesting]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-emphasis]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-strong]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-delimiters-must-match]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-is-not-allowed-inside-words]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-may-contain-any-nonempty-inlines]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-requires-matching-delimiters]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.empty-asterisk-emphasis-is-not-allowed]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.empty-underscore-emphasis-is-not-allowed]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.extension-wrapper]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-double-underscore-closing-is-forbidden]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-allowed]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-disallowed]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-permitted]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-strong-emphasis-is-forbidden]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-strong-emphasis-is-permitted]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.is-emphasis-within-emphasis]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.literal-asterisk-cannot-edge-asterisk-emphasis]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.literal-underscore-cannot-edge-underscore-delimiters]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-condition-explanation]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-alternative]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-consecutive-emphasis]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-produces-nested-strong]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.right-flanking-underscore-does-not-emphasize]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-11-puts-excess-asterisks-outside-emphasis]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-12-puts-excess-underscores-outside-emphasis]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-13-applies-to-long-delimiter-runs]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-13-requires-different-directly-nested-delimiters]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rules-illustrated-by-examples]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.single-underscore-can-close-emphasis]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.single-underscore-can-open-emphasis]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-can-nest-inside-strong-with-same-delimiter]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-allows-indefinite-nesting]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-may-contain-any-nonempty-inlines]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-requires-matching-delimiters]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-can-close-when-punctuation-follows]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-can-open-when-punctuation-precedes]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-punctuation-before-alphanumeric]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-whitespace]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-alphanumeric-before-punctuation]
+                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-whitespace]
+                        [spec:gfm:syn:inlines.entity-and-numeric-character-references.invalid-references-are-literal-text]
+                        [spec:gfm:syn:inlines.entity-and-numeric-character-references.named-entities-require-semicolon]
+                        [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-are-literal-text-in-code]
+                        [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-are-not-recognized-in-code]
+                        [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-are-recognized-outside-code]
+                        [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-cannot-replace-structural-markers]
+                        [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-cannot-replace-structure-symbols]
+                        [spec:gfm:syn:inlines.entity-and-numeric-character-references.unknown-named-entities-are-literal]
+                        [spec:gfm:syn:inlines.hard-line-breaks.backslash-before-line-ending-also-produces-hard-line-break]
+                        [spec:gfm:syn:inlines.hard-line-breaks.hard-line-break-syntax-does-not-work-at-end-of-block]
+                        [spec:gfm:syn:inlines.hard-line-breaks.hard-line-breaks-can-occur-inside-inline-constructs]
+                        [spec:gfm:syn:inlines.hard-line-breaks.hard-line-breaks-do-not-occur-inside-code-spans-or-html-tags]
+                        [spec:gfm:syn:inlines.hard-line-breaks.more-than-two-trailing-spaces-also-work]
+                        [spec:gfm:syn:inlines.images.definition]
+                        [spec:gfm:syn:inlines.images.escaping-bang-produces-literal-bang-followed-by-link]
+                        [spec:gfm:syn:inlines.images.html-rendering-typically-uses-plain-description-as-alt]
+                        [spec:gfm:syn:inlines.images.image-description-contains-inline-elements]
+                        [spec:gfm:syn:inlines.images.reference-image-labels-cannot-contain-unescaped-brackets]
+                        [spec:gfm:syn:inlines.images.shortcut-image-labels-are-case-insensitive]
+                        [spec:gfm:syn:inlines.inline-parsing-is-sequential]
+                        [spec:gfm:syn:inlines.links.angle-brackets-around-destination-must-be-unescaped]
+                        [spec:gfm:syn:inlines.links.backslash-before-non-escapable-character-is-literal-in-destination]
+                        [spec:gfm:syn:inlines.links.balanced-parentheses-are-allowed-in-destination]
+                        [spec:gfm:syn:inlines.links.brackets-aren-t-part-links-do-not-take-precedence]
+                        [spec:gfm:syn:inlines.links.cases-illustrate-precedence-html-tags-code-spans-autolinks-over-link]
+                        [spec:gfm:syn:inlines.links.cases-illustrate-precedence-link-text-grouping-over-emphasis-grouping]
+                        [spec:gfm:syn:inlines.links.code-autolink-and-html-bind-tighter-than-link-text]
+                        [spec:gfm:syn:inlines.links.collapsed-reference-link-definition]
+                        [spec:gfm:syn:inlines.links.defined-middle-label-makes-earlier-reference-parse]
+                        [spec:gfm:syn:inlines.links.destination-allows-normal-backslash-escaping]
+                        [spec:gfm:syn:inlines.links.destination-and-title-may-both-be-omitted]
+                        [spec:gfm:syn:inlines.links.destination-cannot-contain-line-breaks]
+                        [spec:gfm:syn:inlines.links.destination-may-contain-right-parenthesis-in-angle-brackets]
+                        [spec:gfm:syn:inlines.links.destination-may-contain-spaces-only-in-angle-brackets]
+                        [spec:gfm:syn:inlines.links.destination-may-include-fragments-and-queries]
+                        [spec:gfm:syn:inlines.links.destination-preserves-url-escaping-and-allows-entity-references]
+                        [spec:gfm:syn:inlines.links.different-title-delimiter-can-avoid-escaping]
+                        [spec:gfm:syn:inlines.links.full-and-collapsed-references-take-precedence-over-shortcuts]
+                        [spec:gfm:syn:inlines.links.inline-link-definition]
+                        [spec:gfm:syn:inlines.links.inline-links-take-precedence-over-reference-links]
+                        [spec:gfm:syn:inlines.links.label-matching-uses-unicode-case-fold]
+                        [spec:gfm:syn:inlines.links.link-destination-definition]
+                        [spec:gfm:syn:inlines.links.link-label-cannot-contain-unescaped-brackets]
+                        [spec:gfm:syn:inlines.links.link-label-ends-at-first-unescaped-closing-bracket]
+                        [spec:gfm:syn:inlines.links.link-label-length-is-at-most-999-characters]
+                        [spec:gfm:syn:inlines.links.link-label-must-contain-at-least-one-non-whitespace-character]
+                        [spec:gfm:syn:inlines.links.link-text-allows-only-escaped-or-balanced-brackets]
+                        [spec:gfm:syn:inlines.links.link-text-brackets-bind-more-tightly-than-emphasis]
+                        [spec:gfm:syn:inlines.links.link-text-may-contain-balanced-brackets-but-not-unbalanced-ones]
+                        [spec:gfm:syn:inlines.links.link-text-may-contain-inline-content]
+                        [spec:gfm:syn:inlines.links.links-may-not-contain-other-links-at-any-level-nesting]
+                        [spec:gfm:syn:inlines.links.markdown-pl-title-behavior]
+                        [spec:gfm:syn:inlines.links.nested-balanced-quotes-in-titles-require-escaping]
+                        [spec:gfm:syn:inlines.links.nested-reference-link-examples-produce-shortcuts]
+                        [spec:gfm:syn:inlines.links.no-space-before-link-label-departs-from-original-markdown]
+                        [spec:gfm:syn:inlines.links.no-whitespace-allowed-between-link-text-and-opening-parenthesis]
+                        [spec:gfm:syn:inlines.links.parentheses-in-destination-may-be-escaped]
+                        [spec:gfm:syn:inlines.links.reference-link-may-parse-later-brackets-as-separate-text]
+                        [spec:gfm:syn:inlines.links.reference-link-text-allows-balanced-or-escaped-brackets]
+                        [spec:gfm:syn:inlines.links.reference-link-text-cannot-contain-links]
+                        [spec:gfm:syn:inlines.links.reference-link-text-follows-inline-link-text-rules]
+                        [spec:gfm:syn:inlines.links.reference-link-text-grouping-takes-precedence-over-emphasis]
+                        [spec:gfm:syn:inlines.links.reference-link-text-may-contain-inline-content]
+                        [spec:gfm:syn:inlines.links.reference-links-have-three-kinds]
+                        [spec:gfm:syn:inlines.links.reference-links-lose-to-html-tags-code-spans-and-autolinks]
+                        [spec:gfm:syn:inlines.links.shortcut-reference-does-not-parse-when-followed-by-link-label]
+                        [spec:gfm:syn:inlines.links.shortcut-reference-link-definition]
+                        [spec:gfm:syn:inlines.links.title-may-be-omitted]
+                        [spec:gfm:syn:inlines.links.title-must-be-separated-from-destination-by-whitespace]
+                        [spec:gfm:syn:inlines.links.titles-allow-backslash-escapes-and-entity-references]
+                        [spec:gfm:syn:inlines.links.titles-may-use-single-quotes-double-quotes-or-parentheses]
+                        [spec:gfm:syn:inlines.links.trailing-bracket-is-not-escaped-by-backslash-before-backslash]
+                        [spec:gfm:syn:inlines.links.unbalanced-parentheses-require-escaping-or-angle-brackets]
+                        [spec:gfm:syn:inlines.links.unmatched-angle-brackets-do-not-form-destination]
+                        [spec:gfm:syn:inlines.raw-html.backslash-escapes-do-not-work-in-html-attributes]
+                        [spec:gfm:syn:inlines.raw-html.closing-tags-cannot-have-attributes]
+                        [spec:gfm:syn:inlines.raw-html.custom-tag-and-attribute-names-are-allowed]
+                        [spec:gfm:syn:inlines.raw-html.custom-tag-names-are-allowed]
+                        [spec:gfm:syn:inlines.raw-html.illegal-tag-and-attribute-syntax-is-not-parsed-as-html]
+                        [spec:gfm:syn:inlines.raw-html.simple-open-tag-examples]
+                        [spec:gfm:syn:inlines.raw-html.tag-grammar-follows]
+                        [spec:gfm:syn:inlines.raw-html.tag-name-definition]
+                        [spec:gfm:syn:inlines.strikethrough-extension.extension-wrapper]
+                        [spec:gfm:syn:inlines.strikethrough-extension.new-paragraph-ends-strikethrough-parse]
+                        [spec:gfm:syn:inlines.textual-content.uninterpreted-characters-are-parsed-as-text]
+                        [spec:gfm:thm:inlines.code-spans.backslash-escapes-are-never-needed]
+                        [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.double-asterisk-closing-cannot-fall-back-to-single-asterisk-rule]
+                        [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
+                    )
+                }
+            }
+            {
+                id parsing.strategy
+                title "Two-phase parsing algorithm"
+                priority 1
+                deps (parsing.leaf-blocks parsing.container-blocks parsing.inlines)
+                implements {
+                    main (
+                        [spec:gfm:def:appendix-a-parsing-strategy.overview.document-is-represented-as-tree-of-blocks]
+                        [spec:gfm:def:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.delimiter-stack-definition]
+                        [spec:gfm:def:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.trickiest-inline-case]
+                        [spec:gfm:def:appendix-a-parsing-strategy.reference-implementations-use-this-parsing-strategy]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.overview.parsing-has-two-phases]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.each-line-may-close-open-or-append]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-example-line]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-line-opens-block-quote-and-paragraph]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.four-line-example-shows-tree-evolution]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-example-line]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-line-opens-second-list-item]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.initial-tree-is-just-document]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.lines-can-be-discarded-after-incorporation]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.phase-1-line-processing-procedure]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.reference-definitions-are-detected-at-paragraph-close]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-example-line]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-line-is-lazy-continuation]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.setext-underlines-convert-paragraphs]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-example-line]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-line-closes-paragraph-and-opens-list]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.closing-bracket-triggers-link-search]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.end-of-input-triggers-emphasis-processing]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-builds-node-children]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-deactivates-earlier-openers]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-failure-case]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-runs-emphasis-processing]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-scan-backward]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-advances]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-chooses-node-kind]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-cleans-up-stack]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-consumes-delimiters]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-initial-current-position]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-inserts-node]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-loop]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-inactive-closer]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-interior-delimiters]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-stack-bottom-limits-scan]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-tracks-openers-bottom]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-updates-openers-bottom]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.push-delimiters-to-stack]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.stack-entries-point-to-text-nodes]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.example-produces-softbreak-and-emphasis]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.open-blocks-close-at-end-of-input]
+                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.phase-2-parses-inline-content]
+                    )
+                }
+            }
+        )
+    }
+    {
+        id rendering
+        title "Rendering adapters"
+        priority 2
+        children (
+            {
+                id rendering.html
+                title "HTML and virtual-DOM adapters"
+                priority 2
+                deps (core)
+                implements {
+                    main (
+                        [spec:mw:def:html.adapter.surface]
+                        [spec:mw:def:html.custom.hook]
+                        [spec:mw:def:html.vdom.model]
+                        [spec:mw:req:html.escape.attribute-contexts]
+                        [spec:mw:req:html.escape.text]
+                        [spec:mw:req:html.escape.url]
+                        [spec:mw:req:html.render.serializer-over-vdom]
+                        [spec:mw:sem:html.custom.bridge]
+                        [spec:mw:sem:html.serialize.emission]
+                    )
+                }
+            }
+            {
+                id rendering.dioxus
+                title "Dioxus SSR adapter"
+                priority 2
+                deps (rendering.html)
+                implements {
+                    main (
+                        [spec:mw:def:dioxus.surface.entry-points]
+                        [spec:mw:def:dioxus.surface.options]
+                        [spec:mw:req:dioxus.html.host-element]
+                        [spec:mw:req:dioxus.props.inert]
+                        [spec:mw:req:dioxus.structure.vdom-agreement]
+                        [spec:mw:sem:dioxus.render.totality]
+                    )
+                }
+            }
+            {
+                id rendering.iced
+                title "Iced GUI adapter and text selection"
+                priority 2
+                deps (core markdawn-highlighter-boundary)
+                implements {
+                    main (
+                        [spec:mw:def:iced.copy.fragment]
+                        [spec:mw:def:iced.copy.selected-text-task]
+                        [spec:mw:def:iced.renderer.code-style]
+                        [spec:mw:def:iced.renderer.custom-extension]
+                        [spec:mw:def:iced.renderer.options]
+                        [spec:mw:def:iced.renderer.url-events]
+                        [spec:mw:def:iced.selection.clip-classification]
+                        [spec:mw:def:iced.widget.inline-atom]
+                        [spec:mw:def:iced.widget.selectable-rich-text]
+                        [spec:mw:def:iced.widget.selection-group]
+                        [spec:mw:def:iced.widget.selection-handle]
+                        [spec:mw:def:iced.widget.text-tables]
+                        [spec:mw:req:iced.atom.baseline-paint]
+                        [spec:mw:req:iced.atom.line-box-growth]
+                        [spec:mw:req:iced.atom.placeholder-run]
+                        [spec:mw:req:iced.atom.reshape-on-bounds-change]
+                        [spec:mw:req:iced.copy.atom-substitution]
+                        [spec:mw:req:iced.copy.document-order-join]
+                        [spec:mw:req:iced.copy.offset-interpretation]
+                        [spec:mw:req:iced.hit-test.degenerate-range]
+                        [spec:mw:req:iced.hit-test.global-byte-offset]
+                        [spec:mw:req:iced.hit-test.paragraph-downcast-fallback]
+                        [spec:mw:req:iced.paint.bidi-runs]
+                        [spec:mw:req:iced.paint.layer-order]
+                        [spec:mw:req:iced.renderer.code-block-dispatch]
+                        [spec:mw:req:iced.renderer.image-policy]
+                        [spec:mw:req:iced.renderer.link-safety]
+                        [spec:mw:req:iced.renderer.parse-failure-empty]
+                        [spec:mw:req:iced.renderer.render-cache]
+                        [spec:mw:req:iced.renderer.selection-group-wrap]
+                        [spec:mw:req:iced.renderer.theme-independence]
+                        [spec:mw:req:iced.selection.click-yields-no-selection]
+                        [spec:mw:req:iced.selection.clip-partial-local]
+                        [spec:mw:req:iced.selection.clip-whole]
+                        [spec:mw:req:iced.selection.drag-threshold]
+                        [spec:mw:req:iced.selection.link-press-precedence]
+                        [spec:mw:req:iced.selection.press-arbitration]
+                        [spec:mw:req:iced.selection.range-ordering]
+                        [spec:mw:sem:iced.copy.non-selectable-content]
+                        [spec:mw:sem:iced.hit-test.half-advance]
+                        [spec:mw:sem:iced.hit-test.outside-glyphs]
+                        [spec:mw:sem:iced.paint.glyph-run-grouping]
+                        [spec:mw:sem:iced.renderer.block-widgets]
+                        [spec:mw:sem:iced.selection.drag-routing]
+                        [spec:mw:sem:iced.selection.press-resets]
+                        [spec:mw:sem:iced.selection.release-finalizes]
+                    )
+                }
+            }
+            {
+                id rendering.uikit
+                title "UIKit adapter"
+                priority 2
+                deps (core markdawn-highlighter-boundary)
+                implements {
+                    main (
+                        [spec:mw:def:uikit.layout.code-block-view]
+                        [spec:mw:def:uikit.surface.block-sink]
+                        [spec:mw:def:uikit.surface.render-ctx]
+                        [spec:mw:def:uikit.surface.text-renderer]
+                        [spec:mw:req:uikit.attributes.font-resolution]
+                        [spec:mw:req:uikit.compartments.range-bookkeeping]
+                        [spec:mw:req:uikit.compartments.text-run-coalescing]
+                        [spec:mw:req:uikit.layout.blockquote]
+                        [spec:mw:req:uikit.layout.list-item]
+                        [spec:mw:req:uikit.style.system-colors]
+                        [spec:mw:req:uikit.syntax.capture-fallback]
+                        [spec:mw:req:uikit.syntax.span-bounds]
+                        [spec:mw:sem:uikit.attributes.inherited-traits]
+                        [spec:mw:sem:uikit.syntax.span-priority]
+                    )
+                }
+            }
+            {
+                id rendering.ansi
+                title "ANSI emission and terminal emulation"
+                priority 2
+                deps (core)
+                implements {
+                    main (
+                        [spec:mw:def:ansi.adapter.surface]
+                        [spec:mw:def:ansi.style.cell-style]
+                        [spec:mw:def:ansi.style.color]
+                        [spec:mw:def:ansi.term.emulator]
+                        [spec:mw:def:ansi.term.grid]
+                        [spec:mw:def:ansi.to-html.entry]
+                        [spec:mw:req:ansi.adapter.code-block]
+                        [spec:mw:req:ansi.adapter.links]
+                        [spec:mw:req:ansi.adapter.reset-discipline]
+                        [spec:mw:req:ansi.adapter.wrapping]
+                        [spec:mw:req:ansi.style.css-emission]
+                        [spec:mw:req:ansi.term.auto-size]
+                        [spec:mw:req:ansi.term.html-runs]
+                        [spec:mw:req:ansi.term.style-mapping]
+                        [spec:mw:req:ansi.to-html.extended-color]
+                        [spec:mw:req:ansi.to-html.non-sgr-dropped]
+                        [spec:mw:req:ansi.to-html.osc8]
+                        [spec:mw:req:ansi.to-html.sgr-params]
+                        [spec:mw:req:ansi.to-html.span-discipline]
+                        [spec:mw:req:ansi.to-html.text-and-controls]
+                        [spec:mw:sem:ansi.adapter.color-depth-inert]
+                        [spec:mw:sem:ansi.style.palette-resolution]
+                        [spec:mw:sem:ansi.to-html.sgr-accumulation]
+                        [spec:mw:syn:ansi.annotated.labels]
+                        [spec:mw:syn:ansi.term.ansi-encoding]
+                    )
+                }
+            }
+            {
+                id rendering.typst
+                title "Typst output adapter and compilation environment"
+                priority 2
+                deps (core)
+                implements {
+                    main (
+                        [spec:mw:def:typst.adapter.surface]
+                        [spec:mw:def:typst.world.hermetic]
+                        [spec:mw:req:typst.adapter.escaping]
+                        [spec:mw:req:typst.packages.offline-resolution]
+                        [spec:mw:req:typst.preamble.svg-auto-page]
+                        [spec:mw:req:typst.svg.inline-uses]
+                        [spec:mw:sem:typst.adapter.block-mapping]
+                        [spec:mw:sem:typst.adapter.inline-mapping]
+                    )
+                }
+            }
+        )
+    }
+    {
+        id diagrams
+        title "Diagram engines"
+        priority 1
+        children (
+            {
+                id diagrams.svg-safety
+                title "Emitted-SVG sanitisation and text outlining"
+                priority 1
+                implements {
+                    main (
+                        [spec:adv:req:output.animate-href-safe]
+                        [spec:adv:req:output.foreign-object-safe]
+                        [spec:adv:req:output.no-event-handlers]
+                        [spec:adv:req:output.no-external-entities]
+                        [spec:adv:req:output.no-script]
+                        [spec:adv:req:output.no-stylesheet-pi]
+                        [spec:adv:req:output.size-cap]
+                        [spec:adv:req:output.text-as-paths]
+                        [spec:adv:req:output.url-allowlist]
+                        [spec:adv:sem:output.inline-trim]
+                    )
+                }
+            }
+            {
+                id diagrams.graphviz
+                title "Graphviz DOT rendering and hardening"
+                priority 1
+                deps (diagrams.svg-safety)
+                implements {
+                    main (
+                        [spec:adv:req:input.attribute-cap]
+                        [spec:adv:req:input.brace-depth-cap]
+                        [spec:adv:req:input.byte-cap]
+                        [spec:adv:req:input.edge-cap]
+                        [spec:adv:req:input.html-depth-cap]
+                        [spec:adv:req:input.node-cap]
+                        [spec:adv:req:input.record-depth-cap]
+                        [spec:adv:req:input.subgraph-cap]
+                        [spec:adv:req:neutralise.escape-expansion]
+                        [spec:adv:req:neutralise.external-file-attrs]
+                        [spec:adv:req:neutralise.html-img-tag]
+                        [spec:adv:req:neutralise.layout-override]
+                        [spec:adv:req:neutralise.minlen-clamp]
+                        [spec:adv:req:neutralise.numeric-clamps]
+                        [spec:adv:req:neutralise.numeric-overflow]
+                        [spec:adv:req:render.error-callback-capture]
+                        [spec:adv:req:render.panic-capture]
+                        [spec:adv:req:render.serialise]
+                        [spec:adv:req:render.staged-timeout]
+                        [spec:adv:req:render.timeout]
+                        [spec:adv:sem:render.process-isolation]
+                    )
+                }
+            }
+            {
+                id diagrams.pikchr
+                title "Pikchr rendering and hardening"
+                priority 1
+                deps (diagrams.svg-safety)
+                implements {
+                    main (
+                        [spec:adv:req:pikchr.input.byte-cap]
+                        [spec:adv:req:pikchr.render.panic-capture]
+                        [spec:adv:req:pikchr.render.serialise]
+                        [spec:adv:req:pikchr.render.timeout]
+                    )
+                }
+            }
+            {
+                id diagrams.typst
+                title "Typst diagram rendering and hardening"
+                priority 1
+                deps (diagrams.svg-safety)
+                implements {
+                    main (
+                        [spec:adv:req:typst.input.byte-cap]
+                        [spec:adv:req:typst.render.panic-capture]
+                        [spec:adv:req:typst.render.serialise]
+                        [spec:adv:req:typst.render.timeout]
+                    )
+                }
+            }
+        )
+    }
+    {
+        id safety
+        title "Input and output safety"
+        priority 1
+        children (
+            {
+                id safety.markdown
+                title "Markdown-level input caps and URL allow-listing"
+                priority 1
+                deps (parsing.inlines)
+                implements {
+                    main (
+                        [spec:adv:req:markdown.input.byte-cap]
+                        [spec:adv:req:markdown.url-allowlist]
+                    )
+                }
+            }
+        )
+    }
+    {
+        id defects
+        title "Defects found during spec adoption"
+        priority 1
+        children (
+            {
+                id defects.ansi-osc8-url-filtering
+                title "OSC 8 hyperlink URLs reach output HTML unfiltered"
+                priority 1
+            }
+            {
+                id defects.ffi-handle-null-guard
+                title "JNI entry points dereference unvalidated handles"
+                priority 1
+            }
+            {
+                id defects.ffi-string-free-cross-heap
+                title "Per-module mw_string_free routing is unenforced across wasm heaps"
+                priority 1
+            }
+            {
+                id defects.ffi-utf8-stall
+                title "Invalid UTF-8 lead byte stalls push_bytes and is silently dropped"
+                priority 1
+            }
+            {
+                id defects.serializer-escaping
+                title "Serializer performs no escaping and never widens delimiters"
+                priority 1
+            }
+            {
+                id defects.serializer-nontermination
+                title "TableRow/TableCell/Custom serialise arms mutually delegate"
+                priority 1
+            }
+            {
+                id defects.dioxus-vdom-drift
+                title "Dioxus adapter has drifted from the vdom adapter"
+                priority 1
+            }
+            {
+                id defects.image-url-policy
+                title "is_safe_url vs is_safe_image_url divergence strands data-URI images"
+                priority 1
+            }
+            {
+                id defects.editor-span-drift
+                title "Editor spans drift against the un-normalised buffer; cursor never remapped"
+                priority 2
+            }
+            {
+                id defects.ansi-feature-gaps
+                title "ColorDepth inert, colon colour forms unsupported, dim/strike dropped"
+                priority 2
+            }
+            {
+                id defects.core-span-population
+                title "Unpopulated spans read as a real zero-width position"
+                priority 2
+            }
+            {
+                id defects.test-coverage-gaps
+                title "Rules with implementation but no honest verify site"
+                priority 2
+            }
+            {
+                id defects.spec-junk-rules
+                title "12 gfm rules have content-free bodies from the spec.txt conversion"
+                priority 2
+            }
+            {
+                id defects.highlighting-rules-misfiled
+                title "markdawn.highlighting.* sits in the gfm grammar spec, not mw"
+                priority 2
+            }
+            {
+                id defects.core-spec-padding
+                title "core def-layer rules restate declarations without adding constraint"
+                priority 2
+            }
+            {
+                id defects.uikit-media-unspecd
+                title "uikit image, math and diagram path carries no rules"
+                priority 2
+            }
+            {
+                id defects.verb-misassignment
+                title "Several gfm thm rules derive nothing; assorted mw verb mismatches"
+                priority 2
+            }
+            {
+                id defects.example-required-features
+                title "Repo lint and test checks were red: ansi_demo lacked required-features"
+                priority 2
+            }
+        )
+    }
+    {
+        id core
+        title "Document model, stream protocol and extension contract"
+        priority 0
+        implements {
+            main (
+                [spec:mw:def:core.error.stream-error]
+                [spec:mw:def:core.error.taxonomy]
+                [spec:mw:def:core.ext.inline-context]
+                [spec:mw:def:core.ext.match-types]
+                [spec:mw:def:core.ext.trait]
+                [spec:mw:def:core.html-filter.modes]
+                [spec:mw:def:core.node.alert-kinds]
+                [spec:mw:def:core.node.custom-payload]
+                [spec:mw:def:core.node.footnote-triple]
+                [spec:mw:def:core.node.generic-tree]
+                [spec:mw:def:core.node.table-shape]
+                [spec:mw:def:core.rewriter.types]
+                [spec:mw:def:core.sink.trait]
+                [spec:mw:def:core.sink.vec-sink]
+                [spec:mw:def:core.span.half-open-bytes]
+                [spec:mw:def:core.stream.protocol]
+                [spec:mw:def:core.url.scheme]
+                [spec:mw:req:core.ext.block-zero-consumed]
+                [spec:mw:req:core.ext.ctx-delegation]
+                [spec:mw:req:core.ext.dispatch-order]
+                [spec:mw:req:core.ext.inline-match-validity]
+                [spec:mw:req:core.html-filter.default-safe]
+                [spec:mw:req:core.html-filter.fail-closed]
+                [spec:mw:req:core.node.alert-title-fallback]
+                [spec:mw:req:core.node.footnote-numbering]
+                [spec:mw:req:core.node.source-accessors]
+                [spec:mw:req:core.node.table-cell-alignment]
+                [spec:mw:req:core.rewriter.dispatch-order]
+                [spec:mw:req:core.rewriter.render-time-only]
+                [spec:mw:req:core.sink.error-aborts]
+                [spec:mw:req:core.span.exact-extent]
+                [spec:mw:req:core.span.non-inverted]
+                [spec:mw:req:core.span.sliceable]
+                [spec:mw:req:core.stream.batch-ordering]
+                [spec:mw:req:core.stream.change-only-upsert]
+                [spec:mw:req:core.stream.slot-identity]
+                [spec:mw:req:core.stream.upsert-replaces]
+                [spec:mw:req:core.traversal.direct-children]
+                [spec:mw:req:core.traversal.mutable-mirror]
+                [spec:mw:req:core.traversal.walk-preorder]
+                [spec:mw:req:core.url.parse-strictness]
+                [spec:mw:sem:core.error.location]
+                [spec:mw:sem:core.ext.inline-context-isolation]
+                [spec:mw:sem:core.span.contains]
+                [spec:mw:sem:core.span.unpopulated-is-empty]
+                [spec:mw:sem:core.stream.provisional]
+                [spec:mw:sem:core.traversal.table-child-order]
+            )
+        }
+    }
+    {
+        id editing
+        title "Incremental editing and round-trip serialisation"
+        priority 2
+        deps (core parsing.strategy)
+        implements {
+            main (
+                [spec:mw:def:editing.document.editable-document]
+                [spec:mw:def:editing.serialize.entry-points]
+                [spec:mw:req:editing.cursor.reveal-source]
+                [spec:mw:req:editing.document.byte-offsets]
+                [spec:mw:req:editing.reparse.correlation-stability]
+                [spec:mw:req:editing.reparse.window]
+                [spec:mw:req:editing.serialize.escaping]
+                [spec:mw:req:editing.serialize.round-trip]
+                [spec:mw:sem:editing.block-at.containment]
+                [spec:mw:sem:editing.cursor.reparse-edit-interaction]
+                [spec:mw:sem:editing.serialize.block-forms]
+                [spec:mw:sem:editing.serialize.inline-forms]
+            )
+        }
+    }
+    {
+        id tracey-ext
+        title "Tracey-flavoured markdown extension"
+        priority 2
+        deps (core)
+        implements {
+            main (
+                [spec:mw:def:traceyext.extension.req-node]
+                [spec:mw:def:traceyext.handler.traits]
+                [spec:mw:def:traceyext.marker.kind]
+                [spec:mw:def:traceyext.render.document]
+                [spec:mw:def:traceyext.rule-id.model]
+                [spec:mw:req:traceyext.heading.slug]
+                [spec:mw:req:traceyext.marker.non-markers]
+                [spec:mw:req:traceyext.rule-id.version-suffix]
+                [spec:mw:req:traceyext.span.absolute-offsets]
+                [spec:mw:sem:traceyext.diff.markdown]
+                [spec:mw:sem:traceyext.render.pipeline]
+                [spec:mw:syn:traceyext.frontmatter.delimiters]
+                [spec:mw:syn:traceyext.marker.grammar]
+            )
+        }
+    }
+    {
+        id bindings
+        title "Swift, Android and WebAssembly bindings"
+        priority 3
+        deps (core rendering.html)
+        implements {
+            main (
+                [spec:mw:def:ffi.host.jni]
+                [spec:mw:def:ffi.host.wasm-bindgen]
+                [spec:mw:def:ffi.ownership.handle]
+                [spec:mw:def:ffi.plugin.grammar-registration]
+                [spec:mw:req:ffi.ownership.borrowed-input]
+                [spec:mw:req:ffi.ownership.handle-release]
+                [spec:mw:req:ffi.ownership.retained-objc]
+                [spec:mw:req:ffi.ownership.string-free]
+                [spec:mw:req:ffi.safety.no-unwind]
+                [spec:mw:req:ffi.safety.null-guard]
+                [spec:mw:sem:ffi.encoding.utf8]
+                [spec:mw:sem:ffi.render-shim.lazy-module]
+            )
+        }
+    }
+)

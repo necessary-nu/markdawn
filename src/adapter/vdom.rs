@@ -58,6 +58,7 @@ impl Props {
 }
 
 /// A node in the framework-neutral render tree.
+// [spec:mw:def:html.vdom.model]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VNode {
     /// A text node.
@@ -195,7 +196,7 @@ pub struct VdomAdapter<R = ()> {
     html_filter: crate::HtmlFilter,
     allow_data_image_urls: bool,
     #[cfg(feature = "highlight")]
-    highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SpanHighlighter>>>,
+    highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SyntaxHighlighter>>>,
     #[cfg(feature = "pikchr")]
     pikchr: bool,
     #[cfg(feature = "graphviz")]
@@ -260,7 +261,7 @@ impl<R> VdomAdapter<R> {
 impl<R> VdomAdapter<R> {
     pub fn with_highlighter<H>(mut self, highlighter: H) -> Self
     where
-        H: arborium::advanced::HighlightSpans + 'static,
+        H: crate::highlight::SyntaxHighlighter + 'static,
     {
         self.highlighter = core::cell::RefCell::new(Some(Box::new(highlighter)));
         self
@@ -327,12 +328,9 @@ impl<R> VdomAdapter<R> {
             .filter(|s| !s.is_empty())?;
         let mut borrow = self.highlighter.borrow_mut();
         let hl = borrow.as_mut()?;
-        let spans = hl.spans(lang, literal)?;
-        let html = arborium::advanced::spans_to_html(
-            literal,
-            spans,
-            &arborium::advanced::HtmlFormat::default(),
-        );
+        // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
+        let spans = hl.highlight(lang, literal).ok()?;
+        let html = crate::highlight::spans_to_html(literal, spans);
         let code = El::new("code")
             .attr("class", AttrVal::Esc(format!("language-{lang}")))
             .child(VNode::Raw {
@@ -1301,6 +1299,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:def:html.vdom.model/test]
     #[test]
     fn task_item_uses_boolean_props_and_void_input() {
         let n = Node::List {

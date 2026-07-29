@@ -15,6 +15,7 @@ use super::heading::{Heading, slugify};
 use super::req::{InlineCodeSpan, ReqDefinition, SourceSpan};
 
 /// A rendered markdown document.
+// [spec:mw:def:traceyext.render.document]
 #[derive(Debug, Clone)]
 pub struct Document {
     pub html: String,
@@ -41,6 +42,7 @@ pub struct Paragraph {
 }
 
 /// Options for rendering.
+// [spec:mw:def:traceyext.render.document]
 #[derive(Default, Clone)]
 pub struct RenderOptions {
     pub source_path: Option<String>,
@@ -109,6 +111,7 @@ impl From<HandlerError> for RenderError {
 }
 
 /// Render markdown to HTML and extract structured tracey data.
+// [spec:mw:sem:traceyext.render.pipeline]
 pub fn render(markdown: &str, opts: &RenderOptions) -> Result<Document, RenderError> {
     let (frontmatter, body) = parse_frontmatter(markdown)?;
     let frontmatter = if !frontmatter_is_default(&frontmatter) {
@@ -224,6 +227,8 @@ fn build_html_adapter() -> HtmlAdapter<()> {
     adapter
 }
 
+// [spec:mw:req:traceyext.span.absolute-offsets]
+// [spec:mw:req:traceyext.heading.slug]
 fn collect_metadata(
     node: &Node<TraceyExt>,
     source: &str,

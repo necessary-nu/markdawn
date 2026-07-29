@@ -1,4 +1,4 @@
-//! Convert arborium spans into a coloured `NSAttributedString` for code blocks.
+//! Convert neutral syntax spans into a coloured `NSAttributedString`.
 //!
 //! The mapping from tree-sitter capture names to UIColors uses iOS system
 //! colours so the result adapts to light/dark mode automatically. Unknown
@@ -11,15 +11,16 @@ use objc2_foundation::{
 };
 use objc2_ui_kit::{UIColor, UIFont};
 
-use arborium::advanced::Span;
-
+use crate::SyntaxSpan;
 use crate::adapter::uikit::style::UIKitStyle;
 
 /// Build an attributed string for the given `source`, applying foreground
-/// colors per `Span`. Returns `None` if the source has no characters.
+/// colors per `SyntaxSpan`. Returns `None` if the source has no characters.
+// [spec:mw:sem:uikit.syntax.span-priority]
+// [spec:mw:req:uikit.syntax.span-bounds]
 pub(crate) fn build_highlighted(
     source: &str,
-    spans: &[Span],
+    spans: &[SyntaxSpan],
     style: &UIKitStyle,
     base_font: &UIFont,
     base_color: &UIColor,
@@ -48,6 +49,18 @@ pub(crate) fn build_highlighted(
         }
     }
 
+    // Apply outer and lower-priority spans first so nested and higher-priority
+    // captures win when attributed ranges overlap.
+    let mut spans: Vec<_> = spans.iter().collect();
+    spans.sort_by(|a, b| {
+        let a_width = a.end.saturating_sub(a.start);
+        let b_width = b.end.saturating_sub(b.start);
+        b_width
+            .cmp(&a_width)
+            .then_with(|| a.start.cmp(&b.start))
+            .then_with(|| a.pattern_index.cmp(&b.pattern_index))
+    });
+
     // Apply per-span colors. Convert byte offsets to UTF-16 indices.
     let trimmed_bytes = trimmed.len();
     for span in spans {
@@ -73,9 +86,10 @@ pub(crate) fn build_highlighted(
     result
 }
 
-/// Map an arborium tree-sitter capture name (e.g. `"keyword.function"`,
+/// Map a raw syntax capture name (e.g. `"keyword.function"`,
 /// `"string"`, `"comment"`) to a UIColor. Falls back through dotted prefixes:
 /// `"keyword.function"` → tries `"keyword.function"`, then `"keyword"`.
+// [spec:mw:req:uikit.syntax.capture-fallback]
 fn syntax_color(style: &UIKitStyle, capture: &str) -> Option<Retained<UIColor>> {
     let mut name = capture;
     loop {
@@ -91,6 +105,7 @@ fn syntax_color(style: &UIKitStyle, capture: &str) -> Option<Retained<UIColor>> 
     None
 }
 
+// [spec:mw:req:uikit.syntax.capture-fallback]
 fn capture_default_color(capture: &str) -> Option<Retained<UIColor>> {
     let color = match capture {
         "keyword" | "include" | "storageclass" | "conditional" | "repeat" => {
@@ -115,6 +130,7 @@ fn capture_default_color(capture: &str) -> Option<Retained<UIColor>> {
     Some(color)
 }
 
+// [spec:mw:req:uikit.syntax.span-bounds]
 fn utf16_offset(source: &str, byte_offset: usize) -> usize {
     let upper = byte_offset.min(source.len());
     source[..upper].chars().map(char::len_utf16).sum()

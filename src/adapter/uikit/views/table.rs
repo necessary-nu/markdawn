@@ -71,6 +71,7 @@ impl TableHandles {
     }
 }
 
+// [spec:mw:req:uikit.style.system-colors]
 pub fn build_table_view(
     header_cells: &[Retained<NSMutableAttributedString>],
     data_rows: &[Vec<Retained<NSMutableAttributedString>>],

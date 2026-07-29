@@ -2,6 +2,8 @@
 
 use markdawn::tracey::{RenderOptions, ReqKind, parse_rule_id, render};
 
+// [spec:mw:def:traceyext.extension.req-node/test]
+// [spec:mw:req:traceyext.span.absolute-offsets/test]
 #[test]
 fn extracts_definition_blockquote() {
     let md = "> :[r:my.req]\n> This MUST be foo.\n";
@@ -14,6 +16,7 @@ fn extracts_definition_blockquote() {
     assert_eq!(&md[s.offset..s.offset + s.length], ":[r:my.req]");
 }
 
+// [spec:mw:def:traceyext.marker.kind/test]
 #[test]
 fn extracts_constraint_blockquote() {
     let md = "> :[!r:determinism]\n> The system MUST be deterministic.\n";
@@ -25,6 +28,7 @@ fn extracts_constraint_blockquote() {
     assert_eq!(&md[s.offset..s.offset + s.length], ":[!r:determinism]");
 }
 
+// [spec:mw:def:traceyext.rule-id.model/test]
 #[test]
 fn extracts_versioned_definition() {
     let md = "> :[r:my.req+2]\n> bumped body.\n";
@@ -34,11 +38,13 @@ fn extracts_versioned_definition() {
     assert_eq!(doc.reqs[0].id.version, 2);
 }
 
+// [spec:mw:req:traceyext.rule-id.version-suffix/test]
 #[test]
 fn rejects_plus_zero_via_parse() {
     assert!(parse_rule_id("my.req+0").is_none());
 }
 
+// [spec:mw:req:traceyext.marker.non-markers/test]
 #[test]
 fn rejects_paragraph_form_definition() {
     // Paragraph-form (`r[foo]\nbody.`) is no longer a marker.
@@ -47,6 +53,7 @@ fn rejects_paragraph_form_definition() {
     assert!(doc.reqs.is_empty(), "paragraph form should NOT extract");
 }
 
+// [spec:mw:req:traceyext.marker.non-markers/test]
 #[test]
 fn rejects_blockquote_without_leading_colon() {
     // Bare `[r:id]` without the leading `:` is NOT a marker. The leading
@@ -60,6 +67,7 @@ fn rejects_blockquote_without_leading_colon() {
     );
 }
 
+// [spec:mw:req:traceyext.marker.non-markers/test]
 #[test]
 fn rejects_legacy_in_bracket_sigils() {
     // Legacy `[>r:id]`/`[?r:id]` shapes belong to the source-side grammar,
@@ -80,6 +88,7 @@ fn rejects_legacy_in_bracket_sigils() {
     );
 }
 
+// [spec:mw:req:traceyext.marker.non-markers/test]
 #[test]
 fn rejects_gfm_alert_blocks() {
     // Standard GFM alerts (`[!NOTE]`, etc.) must not be picked up.
@@ -88,6 +97,7 @@ fn rejects_gfm_alert_blocks() {
     assert!(doc.reqs.is_empty(), "GFM alert should NOT extract as a req");
 }
 
+// [spec:mw:def:traceyext.render.document/test]
 #[test]
 fn extracts_three_definitions_in_order() {
     let md = concat!(
@@ -103,6 +113,7 @@ fn extracts_three_definitions_in_order() {
     assert_eq!(ids, vec!["req.one", "req.two", "req.three"]);
 }
 
+// [spec:mw:req:traceyext.heading.slug/test]
 #[test]
 fn extracts_headings() {
     let md = "# Top\n\n## Subsection\n\nBody text.\n";
@@ -115,6 +126,7 @@ fn extracts_headings() {
     assert_eq!(doc.headings[1].level, 2);
 }
 
+// [spec:mw:def:traceyext.extension.req-node/test]
 #[test]
 fn unmarked_blockquote_not_a_req() {
     let md = "> Just a quoted paragraph.\n";
@@ -122,6 +134,8 @@ fn unmarked_blockquote_not_a_req() {
     assert!(doc.reqs.is_empty());
 }
 
+// [spec:mw:req:traceyext.span.absolute-offsets/test]
+// [spec:mw:sem:traceyext.render.pipeline/test]
 #[test]
 fn frontmatter_yaml_excluded_from_offsets() {
     let md = "---\ntitle: spec\nweight: 5\n---\n> :[r:my.req]\n> body.\n";
@@ -135,6 +149,8 @@ fn frontmatter_yaml_excluded_from_offsets() {
     assert_eq!(&md[s.offset..s.offset + s.length], ":[r:my.req]");
 }
 
+// [spec:mw:sem:traceyext.render.pipeline/test]
+// [spec:mw:def:traceyext.handler.traits/test]
 #[test]
 fn req_html_contains_default_handler_anchor() {
     let md = "> :[r:my.req]\n> Body.\n";
@@ -144,6 +160,7 @@ fn req_html_contains_default_handler_anchor() {
     assert!(doc.html.contains("id=\"r--my.req\""));
 }
 
+// [spec:mw:def:traceyext.marker.kind/test]
 #[test]
 fn ordinary_and_constraint_distinguished() {
     let md = concat!(
@@ -166,6 +183,7 @@ fn constraint_accepts_single_segment_id() {
     assert_eq!(doc.reqs[0].kind, ReqKind::Constraint);
 }
 
+// [spec:mw:syn:traceyext.marker.grammar/test]
 #[test]
 fn multi_char_prefix() {
     let md = "> :[h2:rfc.7540.streams]\n> body.\n";
@@ -174,6 +192,8 @@ fn multi_char_prefix() {
     assert_eq!(doc.reqs[0].id.base, "rfc.7540.streams");
 }
 
+// [spec:mw:def:traceyext.handler.traits/test]
+// [spec:mw:sem:traceyext.render.pipeline/test]
 #[test]
 fn inline_code_handler_can_replace_code_spans() {
     use markdawn::tracey::InlineCodeHandler;
@@ -196,6 +216,7 @@ fn inline_code_handler_can_replace_code_spans() {
     assert!(doc.html.contains("<code>other</code>"));
 }
 
+// [spec:mw:def:traceyext.render.document/test]
 #[test]
 fn inline_code_spans_collected() {
     let md = "Use `foo` and `bar` here.\n";

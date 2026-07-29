@@ -1,0 +1,26 @@
+platforms (
+    {
+        platform "rust"
+        files (src/**/*.rs crates/**/*.rs tests/**/*.rs examples/**/*.rs)
+        checks {
+            format {
+                cmd "cargo fmt --all -- --check"
+                fix "cargo fmt --all"
+            }
+            lint {
+                cmd "cargo clippy --no-deps -p markdawn -p markdawn-graphviz --all-targets -- -D warnings"
+            }
+            test {
+                cmd "cargo nextest run --workspace"
+            }
+        }
+    }
+)
+
+commit {
+    type-prefix "required"
+}
+
+adoption {
+    scope "maintenance"
+}

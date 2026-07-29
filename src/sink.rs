@@ -1,5 +1,6 @@
 use crate::node::StreamItem;
 
+// [spec:mw:def:core.sink.trait]
 pub trait Sink<N> {
     type Error;
 
@@ -25,6 +26,7 @@ impl<N> VecSink<N> {
     }
 }
 
+// [spec:mw:def:core.sink.vec-sink]
 impl<N> Sink<N> for VecSink<N> {
     type Error = core::convert::Infallible;
 

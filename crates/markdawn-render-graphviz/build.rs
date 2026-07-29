@@ -1,3 +1,6 @@
+// The export set and the distinct `EXPORT_NAME` are what let this module be
+// instantiated alongside the core module without their heaps colliding.
+// [spec:mw:sem:ffi.render-shim.lazy-module]
 fn main() {
     let target = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     if target != "emscripten" {

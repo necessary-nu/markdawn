@@ -7,6 +7,9 @@
 
 /// 4-bit / 8-bit / 24-bit color, matching xterm's SGR 30-37, 90-97,
 /// 38;5, 38;2 conventions.
+// `Named` stays distinct from `Palette(0..=15)` so the SGR re-encoding
+// direction can recover the short 30-37 / 90-97 forms.
+// [spec:mw:def:ansi.style.color]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Color {
     /// 0–7 (normal) and 8–15 (bright); palette resolved at render time.
@@ -28,6 +31,9 @@ impl Color {
 }
 
 /// xterm default palette (brights on 8–15).
+// Out-of-range indices fall back to `inherit` — the ambient colour is a
+// safer wrong answer than an arbitrary swatch.
+// [spec:mw:sem:ansi.style.palette-resolution]
 pub fn named_palette(n: u8) -> &'static str {
     match n {
         0 => "#000000",
@@ -53,6 +59,7 @@ pub fn named_palette(n: u8) -> &'static str {
 /// Translate an xterm 256-color index to a CSS colour. Indices 0–15 are
 /// the named palette; 16–231 are a 6x6x6 colour cube; 232–255 are a
 /// 24-step greyscale ramp.
+// [spec:mw:sem:ansi.style.palette-resolution]
 pub fn ansi256_css(n: u8) -> String {
     match n {
         0..=15 => named_palette(n).into(),
@@ -73,6 +80,10 @@ pub fn ansi256_css(n: u8) -> String {
 
 /// Terminal cell style — full SGR attribute set plus fg/bg colors. Both
 /// the byte-stream and grid-snapshot pipelines work with this shape.
+// `Default` is the plain style; `is_plain` is equality with it, and is
+// the single predicate both renderers use to decide whether any
+// styling wrapper is needed at all.
+// [spec:mw:def:ansi.style.cell-style]
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct CellStyle {
     pub fg: Option<Color>,
@@ -89,6 +100,11 @@ impl CellStyle {
     /// CSS declaration string for this style (no trailing semicolon).
     /// `inverse` swaps fg/bg so the HTML mirrors what a terminal would
     /// actually show.
+    // Declaration order is fixed so equal styles stringify identically
+    // and run-coalescing can compare on the style, not the text.
+    // underline+strike must collapse into one `text-decoration`: two
+    // declarations would leave only the last one live.
+    // [spec:mw:req:ansi.style.css-emission]
     pub fn css(&self) -> String {
         let mut out = String::new();
         let mut push = |prop: &str, value: &str| {

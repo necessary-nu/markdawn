@@ -1,0 +1,35 @@
+specs (
+    {
+        name gfm,
+        include (docs/spec/spec.md),
+        impls ({
+            name main,
+            languages (@rust),
+            include (src/**/*.rs crates/**/*.rs tests/**/*.rs),
+            exclude (target/** crates/markdawn-graphviz/vendor/**),
+            test_include (tests/**/*.rs crates/*/tests/**/*.rs)
+        })
+    }
+    {
+        name mw,
+        include (docs/spec/markdawn/**/*.md),
+        impls ({
+            name main,
+            languages (@rust),
+            include (src/**/*.rs crates/**/*.rs tests/**/*.rs),
+            exclude (target/** crates/markdawn-graphviz/vendor/**),
+            test_include (tests/**/*.rs crates/*/tests/**/*.rs)
+        })
+    }
+    {
+        name adv,
+        include (docs/spec/adversarial.md),
+        impls ({
+            name main,
+            languages (@rust),
+            include (src/**/*.rs crates/**/*.rs tests/**/*.rs),
+            exclude (target/** crates/markdawn-graphviz/vendor/**),
+            test_include (tests/**/*.rs crates/*/tests/**/*.rs)
+        })
+    }
+)

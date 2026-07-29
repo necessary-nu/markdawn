@@ -34,7 +34,7 @@ use sanitizer::{SanitizerAttribute, SanitizerConfig};
 /// Maximum byte length of a rendered SVG we'll pass back to the
 /// caller. Graphviz can turn a small DOT input into a massive SVG
 /// (long labels on many edges, etc.); cap the amplification.
-// adv[impl output.size-cap]
+// [spec:adv:req:output.size-cap]
 pub const MAX_SVG_BYTES: usize = 5 * 1024 * 1024;
 
 /// A cloned W3C safe-default config with `xlink:href` additionally
@@ -59,14 +59,14 @@ static CONFIG: LazyLock<SanitizerConfig> = LazyLock::new(|| {
 /// underlying sanitiser rejects the input, we return an empty string
 /// (callers treat empty output as "rendering failed, fall back to
 /// plain code block").
-// adv[impl output.url-allowlist]
-// adv[impl output.no-script]
-// adv[impl output.no-event-handlers]
-// adv[impl output.no-external-entities]
-// adv[impl output.no-stylesheet-pi]
-// adv[impl output.inline-trim]
-// adv[impl output.foreign-object-safe]
-// adv[impl output.animate-href-safe]
+// [spec:adv:req:output.url-allowlist]
+// [spec:adv:req:output.no-script]
+// [spec:adv:req:output.no-event-handlers]
+// [spec:adv:req:output.no-external-entities]
+// [spec:adv:req:output.no-stylesheet-pi]
+// [spec:adv:sem:output.inline-trim]
+// [spec:adv:req:output.foreign-object-safe]
+// [spec:adv:req:output.animate-href-safe]
 pub fn sanitize_svg(svg: &str) -> String {
     match CONFIG.sanitize(svg) {
         Ok(out) => out.into_inner(),
@@ -78,13 +78,13 @@ pub fn sanitize_svg(svg: &str) -> String {
 mod tests {
     use super::*;
 
-    // adv[verify output.size-cap]
+    // [spec:adv:req:output.size-cap/test]
     #[test]
     fn size_cap_constant_bounds_expected() {
         assert!(MAX_SVG_BYTES >= 1024 * 1024);
     }
 
-    // adv[verify output.no-stylesheet-pi]
+    // [spec:adv:req:output.no-stylesheet-pi/test]
     #[test]
     fn xml_stylesheet_pi_dropped() {
         let svg = r#"<?xml-stylesheet href="javascript:alert(1)"?><svg><rect/></svg>"#;
@@ -93,7 +93,7 @@ mod tests {
         assert!(!out.contains("javascript:"), "got: {out}");
     }
 
-    // adv[verify output.no-script]
+    // [spec:adv:req:output.no-script/test]
     #[test]
     fn script_block_dropped() {
         let svg =
@@ -103,7 +103,7 @@ mod tests {
         assert!(!out.contains("alert"), "got: {out}");
     }
 
-    // adv[verify output.no-script]
+    // [spec:adv:req:output.no-script/test]
     #[test]
     fn script_block_case_insensitive() {
         let svg = r#"<svg><ScRiPt>alert(1)</ScRiPt></svg>"#;
@@ -111,7 +111,7 @@ mod tests {
         assert!(!out.to_ascii_lowercase().contains("<script"), "got: {out}");
     }
 
-    // adv[verify output.no-event-handlers]
+    // [spec:adv:req:output.no-event-handlers/test]
     #[test]
     fn event_handler_attribute_dropped() {
         let svg = r#"<svg><circle onclick="alert(1)" cx="5" cy="5" r="3"/></svg>"#;
@@ -120,7 +120,7 @@ mod tests {
         assert!(out.contains("<circle"), "circle structure preserved: {out}");
     }
 
-    // adv[verify output.no-event-handlers]
+    // [spec:adv:req:output.no-event-handlers/test]
     #[test]
     fn onload_handler_dropped_from_svg_root() {
         let svg = r#"<svg onload="alert(1)"><circle/></svg>"#;
@@ -128,7 +128,7 @@ mod tests {
         assert!(!out.contains("onload"), "got: {out}");
     }
 
-    // adv[verify output.url-allowlist]
+    // [spec:adv:req:output.url-allowlist/test]
     #[test]
     fn javascript_xlink_href_is_neutered() {
         let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -139,7 +139,7 @@ mod tests {
         assert!(!out.contains("alert"), "got: {out}");
     }
 
-    // adv[verify output.url-allowlist]
+    // [spec:adv:req:output.url-allowlist/test]
     #[test]
     fn javascript_href_plain_is_neutered() {
         let svg = r#"<svg><a href="javascript:alert(1)"><rect/></a></svg>"#;
@@ -147,7 +147,7 @@ mod tests {
         assert!(!out.contains("javascript:"), "got: {out}");
     }
 
-    // adv[verify output.url-allowlist]
+    // [spec:adv:req:output.url-allowlist/test]
     #[test]
     fn href_with_fragment_survives() {
         let svg = r##"<svg><a href="#section"><rect/></a></svg>"##;
@@ -155,7 +155,7 @@ mod tests {
         assert!(out.contains("#section"), "benign fragment survived: {out}");
     }
 
-    // adv[verify output.url-allowlist]
+    // [spec:adv:req:output.url-allowlist/test]
     #[test]
     fn href_with_relative_url_survives() {
         let svg = r#"<svg><a href="page.html"><rect/></a></svg>"#;
@@ -163,7 +163,7 @@ mod tests {
         assert!(out.contains("page.html"), "relative URL survived: {out}");
     }
 
-    // adv[verify output.url-allowlist] — graphviz-shaped xlink:href.
+    // [spec:adv:req:output.url-allowlist/test] — graphviz-shaped xlink:href.
     #[test]
     fn graphviz_shaped_safe_xlink_href_survives() {
         let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -173,7 +173,7 @@ mod tests {
         assert!(out.contains("https://example.com/page"), "got: {out}");
     }
 
-    // adv[verify output.animate-href-safe]
+    // [spec:adv:req:output.animate-href-safe/test]
     // <animate attributeName="href" values="javascript:..."> is a known SVG XSS
     // class. The W3C safe-default drops <animate> because it's not on the
     // allow-list. Neither of the attacker payloads survives.
@@ -185,7 +185,7 @@ mod tests {
         assert!(!out.contains("javascript:"), "got: {out}");
     }
 
-    // adv[verify output.animate-href-safe]
+    // [spec:adv:req:output.animate-href-safe/test]
     #[test]
     fn set_element_dropped_entirely() {
         let svg =
@@ -195,7 +195,7 @@ mod tests {
         assert!(!out.contains("javascript:"), "got: {out}");
     }
 
-    // adv[verify output.foreign-object-safe]
+    // [spec:adv:req:output.foreign-object-safe/test]
     // foreignObject is on the SVG allow-list (useful for MathML / HTML-in-SVG)
     // but its contents go through the HTML sanitiser, so a <script> hosted
     // inside foreignObject's <body> is still dropped.
@@ -210,7 +210,7 @@ mod tests {
         assert!(!out.contains("alert"), "got: {out}");
     }
 
-    // adv[verify output.no-external-entities]
+    // [spec:adv:req:output.no-external-entities/test]
     #[test]
     fn entity_declarations_dropped() {
         // DOCTYPE with internal subset. html5ever drops entity declarations
@@ -222,7 +222,7 @@ mod tests {
         assert!(!out.contains("/etc/passwd"), "got: {out}");
     }
 
-    // adv[verify output.inline-trim]
+    // [spec:adv:sem:output.inline-trim/test]
     // html5ever's parse loses the XML prologue automatically because it's a
     // bogus comment in HTML parse context.
     #[test]

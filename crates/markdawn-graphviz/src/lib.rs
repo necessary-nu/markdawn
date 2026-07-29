@@ -32,13 +32,13 @@ pub use scrubber::{
 /// Reject DOT source larger than this many bytes before any libgraphviz
 /// call. Large enough for realistic diagrams; small enough that the
 /// worst adversarial inputs never reach the layout engine.
-// adv[impl input.byte-cap]
+// [spec:adv:req:input.byte-cap]
 pub const MAX_DOT_BYTES: usize = 256 * 1024;
 
 /// Reject DOT source whose `{`/`}` nesting depth exceeds this. Deeply
 /// nested subgraphs are the main way to trigger stack overflow inside
 /// libgraphviz's recursive layout.
-// adv[impl input.brace-depth-cap]
+// [spec:adv:req:input.brace-depth-cap]
 pub const MAX_BRACE_DEPTH: usize = 64;
 
 /// Thread stack size for the dedicated render thread. Larger than the
@@ -58,11 +58,11 @@ pub const RENDER_TIMEOUT_SECS: u64 = 10;
 /// `agmemread` / `gvLayout` / `gvRenderData`. We can't interrupt
 /// libgraphviz mid-call, but we *can* bail between stages so a
 /// pathological parse doesn't consume the layout + render budget too.
-// adv[impl render.staged-timeout]
+// [spec:adv:req:render.staged-timeout]
 pub const PARSE_BUDGET_MS: u64 = 2_000;
-// adv[impl render.staged-timeout]
+// [spec:adv:req:render.staged-timeout]
 pub const LAYOUT_BUDGET_MS: u64 = 7_000;
-// adv[impl render.staged-timeout]
+// [spec:adv:req:render.staged-timeout]
 pub const RENDER_BUDGET_MS: u64 = 1_000;
 
 #[derive(Debug, Clone)]
@@ -277,7 +277,7 @@ unsafe extern "C" {
     fn markdawn_gv_free_error(ptr: *mut c_char);
 }
 
-// adv[impl render.process-isolation]
+// [spec:adv:sem:render.process-isolation]
 // Before the first fork()-isolated render, the parent must complete
 // libgraphviz's plugin load (which on macOS transitively dlopen()s
 // Cocoa via the quartz plugin and triggers Objective-C `+initialize`).
@@ -346,11 +346,11 @@ fn render_inner_pipeline(source: &str, timeout: Duration) -> Result<String, Grap
         return render_inner(&scrubbed);
     }
 
-    // adv[impl render.timeout] — spawn the worker, wait on a channel
+    // [spec:adv:req:render.timeout] — spawn the worker, wait on a channel
     // with a wall-clock timeout. On timeout the worker is orphaned; it
     // keeps running until libgraphviz returns. Next caller's worker
     // will block on RENDER_LOCK and will itself time out here.
-    // adv[impl render.panic-capture] — std::panic::catch_unwind inside
+    // [spec:adv:req:render.panic-capture] — std::panic::catch_unwind inside
     // the worker captures Rust panics; they arrive on the channel as
     // Err(panic_payload).
     #[cfg(not(target_family = "wasm"))]
@@ -382,14 +382,14 @@ fn render_inner_pipeline(source: &str, timeout: Duration) -> Result<String, Grap
     }
 }
 
-// adv[impl render.error-callback-capture]
+// [spec:adv:req:render.error-callback-capture]
 // The C shim (`wrapper.c`) installs `agseterrf` on entry and restores the
 // previous callback on exit; diagnostics flow back to us via out_err and
 // get wrapped into `GraphvizError::RenderFailed`. Rust-side this is just
 // the bridge call.
-// adv[impl render.staged-timeout]
-// adv[impl render.serialise]
-// adv[impl render.error-callback-capture]
+// [spec:adv:req:render.staged-timeout]
+// [spec:adv:req:render.serialise]
+// [spec:adv:req:render.error-callback-capture]
 //
 // Dispatch table. Forked path is used wherever fork() is viable —
 // Linux directly, and macOS *after* a parent-side pre-warm that
@@ -408,7 +408,7 @@ fn render_inner(source: &str) -> Result<String, GraphvizError> {
     render_inner_in_process(source)
 }
 
-// adv[impl render.process-isolation]
+// [spec:adv:sem:render.process-isolation]
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn render_inner_forked(source: &str) -> Result<String, GraphvizError> {
     let dot = CString::new(source).map_err(|_| GraphvizError::InvalidInput)?;
@@ -567,7 +567,7 @@ mod tests {
         assert!(svg.contains("</svg>"));
     }
 
-    // adv[verify render.error-callback-capture]
+    // [spec:adv:req:render.error-callback-capture/test]
     // If err_sink wasn't installed, this test would have nothing to
     // assert non-empty on (libgraphviz would have written straight to
     // stderr).

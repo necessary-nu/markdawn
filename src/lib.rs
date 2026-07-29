@@ -34,7 +34,6 @@ mod ansi_to_html;
 mod editor;
 mod error;
 mod ext;
-#[cfg(feature = "highlight")]
 mod highlight;
 mod html_filter;
 mod node;
@@ -63,8 +62,7 @@ pub use crate::terminal::{
     Cell, TermEmulator, TermGrid, ansi_snapshot_to_ansi, ansi_snapshot_to_html,
 };
 
-#[cfg(feature = "highlight")]
-pub use crate::highlight::SpanHighlighter;
+pub use crate::highlight::{HighlightError, SyntaxHighlighter, SyntaxSpan};
 #[cfg(feature = "highlight")]
 pub use arborium;
 
@@ -117,10 +115,10 @@ pub use crate::url::{MarkdawnUrl, parse_markdawn_url};
 #[allow(dead_code)]
 pub(crate) fn clear_provisional_diagram_info<Ext>(node: &mut crate::node::Node<Ext>) {
     node.walk_mut(&mut |n| {
-        if is_diagram_code_block(n) {
-            if let crate::node::Node::CodeBlock { info, .. } = n {
-                *info = None;
-            }
+        if is_diagram_code_block(n)
+            && let crate::node::Node::CodeBlock { info, .. } = n
+        {
+            *info = None;
         }
     });
 }

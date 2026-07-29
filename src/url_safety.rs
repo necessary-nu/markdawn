@@ -27,7 +27,7 @@ const ALLOWED_SCHEMES: &[&str] = &[
 ///   reject the whole input rather than try to second-guess normalisation.
 /// - URLs with a scheme not in the allow-list: `javascript:`, `data:`,
 ///   `vbscript:`, `file:`, `blob:`, etc.
-// adv[impl markdown.url-allowlist]
+// [spec:adv:req:markdown.url-allowlist]
 pub fn is_safe_url(url: &str) -> bool {
     // Reject any control chars (including TAB and NL). Browsers strip
     // these during scheme parsing, so allowing them would let an
@@ -76,7 +76,7 @@ pub fn is_safe_url(url: &str) -> bool {
 /// src>` cannot run JS the way `data:text/html` could. Restricting
 /// the relaxation to image MIME types keeps that property: a
 /// `data:text/html;…` URI still gets dropped.
-// adv[impl markdown.url-allowlist]
+// [spec:adv:req:markdown.url-allowlist]
 pub fn is_safe_image_url(url: &str) -> bool {
     if is_safe_url(url) {
         return true;
@@ -94,12 +94,14 @@ pub fn is_safe_image_url(url: &str) -> bool {
 mod tests {
     use super::*;
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn http_and_https_accepted() {
         assert!(is_safe_url("http://example.com"));
         assert!(is_safe_url("https://example.com/a/b?c=d#e"));
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn mailto_tel_sms_ftp_accepted() {
         assert!(is_safe_url("mailto:foo@example.com"));
@@ -108,16 +110,19 @@ mod tests {
         assert!(is_safe_url("ftp://example.com/file"));
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn markdawn_internal_scheme_accepted() {
         assert!(is_safe_url("markdawn://footnote/1"));
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn fragment_accepted() {
         assert!(is_safe_url("#section"));
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn relative_and_absolute_paths_accepted() {
         assert!(is_safe_url("/abs/path"));
@@ -126,6 +131,7 @@ mod tests {
         assert!(is_safe_url(""));
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn javascript_scheme_rejected() {
         assert!(!is_safe_url("javascript:alert(1)"));
@@ -133,6 +139,7 @@ mod tests {
         assert!(!is_safe_url("JAVASCRIPT:alert(1)"));
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn data_vbscript_file_blob_rejected() {
         assert!(!is_safe_url("data:text/html,<script>alert(1)</script>"));
@@ -141,6 +148,7 @@ mod tests {
         assert!(!is_safe_url("blob:http://example.com/xyz"));
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn control_chars_smuggling_rejected() {
         assert!(!is_safe_url("java\tscript:alert(1)"));
@@ -150,6 +158,7 @@ mod tests {
         assert!(!is_safe_url("http://example\r\n.com"));
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn leading_whitespace_does_not_promote_javascript() {
         // The leading space is trimmed for the scheme lookup, but even
@@ -158,6 +167,7 @@ mod tests {
         assert!(!is_safe_url("   javascript:alert(1)"));
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn colon_in_relative_path_is_not_a_scheme() {
         // "C:foo" has a single-char "scheme" that IS valid per RFC 3986,

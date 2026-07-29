@@ -56,6 +56,7 @@ impl Sink<Node<()>> for HtmlPipeline {
     }
 }
 
+// [spec:mw:def:ffi.ownership.handle]
 pub struct State {
     parser: Parser<()>,
     pipeline: HtmlPipeline,
@@ -71,6 +72,9 @@ impl State {
         }
     }
 
+    // Bytes that don't yet form a complete code point stay buffered; a byte
+    // that can never start one keeps the valid prefix at zero until `finish`.
+    // [spec:mw:sem:ffi.encoding.utf8]
     fn push_bytes(&mut self, bytes: &[u8]) -> Result<(), ()> {
         self.pending.extend_from_slice(bytes);
         let valid_len = match std::str::from_utf8(&self.pending) {
@@ -118,6 +122,7 @@ pub extern "C" fn mw_state_new() -> *mut State {
 
 /// # Safety
 /// `state` must be a pointer returned by `mw_state_new` and not yet freed.
+// [spec:mw:req:ffi.safety.null-guard]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_push_byte(state: *mut State, byte: u8) -> u32 {
     if state.is_null() {
@@ -130,6 +135,9 @@ pub unsafe extern "C" fn mw_state_push_byte(state: *mut State, byte: u8) -> u32 
 /// # Safety
 /// `state` must be a pointer returned by `mw_state_new`. `ptr` must
 /// point to `len` readable bytes.
+// The chunk is copied into the pending buffer before returning; the caller
+// may free or reuse it immediately.
+// [spec:mw:req:ffi.ownership.borrowed-input]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_push_chunk(state: *mut State, ptr: *const u8, len: usize) -> u32 {
     if state.is_null() || (ptr.is_null() && len > 0) {
@@ -146,6 +154,9 @@ pub unsafe extern "C" fn mw_state_push_chunk(state: *mut State, ptr: *const u8, 
 
 /// # Safety
 /// `state` must be a pointer returned by `mw_state_new` and not yet freed.
+// Parser errors collapse to a status code rather than propagating out of the
+// extern "C" frame.
+// [spec:mw:req:ffi.safety.no-unwind]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_finish(state: *mut State) -> u32 {
     if state.is_null() {
@@ -159,6 +170,7 @@ pub unsafe extern "C" fn mw_state_finish(state: *mut State) -> u32 {
 ///
 /// # Safety
 /// `state` must be a pointer returned by `mw_state_new` and not yet freed.
+// [spec:mw:req:ffi.ownership.string-free]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_render(state: *const State) -> *mut c_char {
     if state.is_null() {
@@ -173,6 +185,7 @@ pub unsafe extern "C" fn mw_state_render(state: *const State) -> *mut c_char {
 
 /// # Safety
 /// `ptr` must be a pointer returned by `mw_state_render` and not yet freed.
+// [spec:mw:req:ffi.ownership.string-free]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_string_free(ptr: *mut c_char) {
     if ptr.is_null() {
@@ -183,6 +196,7 @@ pub unsafe extern "C" fn mw_string_free(ptr: *mut c_char) {
 
 /// # Safety
 /// `state` must be a pointer returned by `mw_state_new` and not yet freed.
+// [spec:mw:req:ffi.ownership.handle-release]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_free(state: *mut State) {
     if state.is_null() {

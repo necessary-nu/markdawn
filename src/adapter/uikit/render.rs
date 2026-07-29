@@ -33,6 +33,7 @@ pub(crate) struct PendingImage {
     pub attachment: Retained<NSTextAttachment>,
 }
 
+// [spec:mw:def:uikit.surface.render-ctx]
 pub struct RenderCtx {
     pub blockquote_depth: u32,
     pub list_stack: Vec<ListFrame>,
@@ -106,6 +107,7 @@ impl std::error::Error for UIKitError {}
 /// container) to an attributed string. Non-text blocks (Table, CodeBlock, BlockQuote,
 /// ThematicBreak) return `Err(UnsupportedBlockNode)` — `BlockSink` dispatches them
 /// to view factories instead.
+// [spec:mw:def:uikit.surface.text-renderer]
 pub struct TextRenderer<R = ()> {
     pub(crate) style: Arc<UIKitStyle>,
     pub(crate) custom: R,
@@ -717,6 +719,7 @@ impl<R> TextRenderer<R> {
 
     /// Render the inner content of a blockquote as an attributed string suitable
     /// for embedding in a UITextView inside the blockquote view.
+    // [spec:mw:req:uikit.layout.blockquote]
     pub(crate) fn render_blockquote_content<Ext>(
         &self,
         children: &[Node<Ext>],
@@ -751,6 +754,7 @@ impl<R> TextRenderer<R> {
         Ok(result)
     }
 
+    // [spec:mw:req:uikit.layout.list-item]
     fn list_item_prefix(&self, ctx: &RenderCtx) -> String {
         if let Some(frame) = ctx.list_stack.last() {
             if frame.ordered {

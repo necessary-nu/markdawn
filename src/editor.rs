@@ -34,6 +34,7 @@ use crate::parser::{LiveBlock, Parser, reconcile_blocks};
 
 /// Live document backed by a markdown source buffer. Edits produce
 /// `StreamItem` events suitable for the same sinks the streaming parser uses.
+// [spec:mw:def:editing.document.editable-document]
 pub struct EditableDocument<Ext = ()> {
     source: String,
     blocks: Vec<LiveBlock<Ext>>,
@@ -74,6 +75,7 @@ where
     ///
     /// Returns `None` if the offset falls in inter-block whitespace or past
     /// the end of the source.
+    // [spec:mw:sem:editing.block-at.containment]
     pub fn block_at(&self, byte_offset: usize) -> Option<&LiveBlock<Ext>> {
         self.blocks
             .iter()
@@ -82,6 +84,7 @@ where
 
     /// Replace the entire source buffer and reparse. Returns the events the
     /// renderer should consume to reach the new state.
+    // [spec:mw:req:editing.reparse.window]
     pub fn set_source(&mut self, source: &str) -> Result<Vec<StreamItem<Node<Ext>>>, Error> {
         self.source.clear();
         self.source.push_str(source);
@@ -97,6 +100,7 @@ where
     /// Internally uses block-window reparse: only blocks at or after the
     /// edit position are reparsed; unchanged prefix blocks keep their IDs
     /// and are not re-emitted.
+    // [spec:mw:req:editing.document.byte-offsets]
     pub fn edit(
         &mut self,
         range: Range<usize>,
@@ -115,6 +119,8 @@ where
     ///
     /// This is the Bear-style "reveal source under cursor" pattern.
     /// Adapters that don't want this behaviour can ignore the cursor.
+    // [spec:mw:req:editing.cursor.reveal-source]
+    // [spec:mw:sem:editing.cursor.reparse-edit-interaction]
     pub fn set_cursor(&mut self, byte_offset: Option<usize>) -> Vec<StreamItem<Node<Ext>>> {
         use crate::node::{Emission, SourceSpan};
 
@@ -125,36 +131,36 @@ where
         let mut events = Vec::new();
 
         // Re-emit the previous cursor block as formatted.
-        if let Some(prev_id) = self.cursor_block_id {
-            if let Some(block) = self.blocks.iter().find(|b| b.id == prev_id) {
-                events.push(StreamItem::Upsert(Emission {
-                    id: prev_id,
-                    provisional: block.provisional,
-                    node: block.node.clone(),
-                }));
-            }
+        if let Some(prev_id) = self.cursor_block_id
+            && let Some(block) = self.blocks.iter().find(|b| b.id == prev_id)
+        {
+            events.push(StreamItem::Upsert(Emission {
+                id: prev_id,
+                provisional: block.provisional,
+                node: block.node.clone(),
+            }));
         }
 
         // Emit the new cursor block as raw markdown source.
-        if let Some(id) = new_id {
-            if let Some(block) = self.blocks.iter().find(|b| b.id == id) {
-                let span = block.node.source();
-                let raw = self
-                    .source
-                    .get(span.start..span.end)
-                    .unwrap_or("")
-                    .trim_end_matches('\n')
-                    .to_string();
-                events.push(StreamItem::Upsert(Emission {
-                    id,
-                    provisional: block.provisional,
-                    node: Node::CodeBlock {
-                        info: Some("markdown".to_string()),
-                        literal: raw,
-                        source: SourceSpan::new(span.start, span.end),
-                    },
-                }));
-            }
+        if let Some(id) = new_id
+            && let Some(block) = self.blocks.iter().find(|b| b.id == id)
+        {
+            let span = block.node.source();
+            let raw = self
+                .source
+                .get(span.start..span.end)
+                .unwrap_or("")
+                .trim_end_matches('\n')
+                .to_string();
+            events.push(StreamItem::Upsert(Emission {
+                id,
+                provisional: block.provisional,
+                node: Node::CodeBlock {
+                    info: Some("markdown".to_string()),
+                    literal: raw,
+                    source: SourceSpan::new(span.start, span.end),
+                },
+            }));
         }
 
         self.cursor_block_id = new_id;
@@ -167,6 +173,8 @@ where
 
     /// Reparse from the first block whose source span overlaps `edit_start`
     /// onward. Blocks before that point are left untouched.
+    // [spec:mw:req:editing.reparse.window]
+    // [spec:mw:req:editing.reparse.correlation-stability]
     fn reparse_from(&mut self, edit_start: usize) -> Result<Vec<StreamItem<Node<Ext>>>, Error> {
         let split_idx = self
             .blocks
@@ -219,6 +227,8 @@ mod tests {
         assert!(events.is_empty());
     }
 
+    // [spec:mw:def:editing.document.editable-document/test]
+    // [spec:mw:def:core.stream.protocol/test]
     #[test]
     fn initial_source_emits_one_upsert_per_block() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
@@ -228,6 +238,8 @@ mod tests {
         assert!(matches!(events[1], StreamItem::Upsert(_)));
     }
 
+    // [spec:mw:req:editing.document.byte-offsets/test]
+    // [spec:mw:req:core.stream.change-only-upsert/test]
     #[test]
     fn editing_a_paragraph_emits_only_an_update_for_that_paragraph() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
@@ -253,6 +265,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:req:editing.reparse.window/test]
     #[test]
     fn appending_text_emits_only_one_upsert_for_the_last_block() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
@@ -265,6 +278,7 @@ mod tests {
         assert_eq!(upserts.len(), 1);
     }
 
+    // [spec:mw:req:editing.reparse.correlation-stability/test]
     #[test]
     fn deleting_a_block_emits_a_delete_event() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
@@ -278,6 +292,8 @@ mod tests {
         assert_eq!(deletes.len(), 1);
     }
 
+    // [spec:mw:req:editing.reparse.correlation-stability/test]
+    // [spec:mw:req:core.stream.slot-identity/test]
     #[test]
     fn block_id_is_stable_across_unrelated_edits() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
@@ -292,6 +308,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:sem:editing.block-at.containment/test]
     #[test]
     fn block_at_finds_block_under_cursor() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
@@ -304,6 +321,7 @@ mod tests {
         assert_eq!(text, "second");
     }
 
+    // [spec:mw:def:core.span.half-open-bytes/test]
     #[test]
     fn inline_emphasis_span_maps_back_to_source() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
@@ -320,6 +338,7 @@ mod tests {
         assert_eq!(&doc.source()[span.start..span.end], "*world*");
     }
 
+    // [spec:mw:req:core.span.exact-extent/test]
     #[test]
     fn inline_strong_span_maps_back_to_source() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
@@ -335,6 +354,7 @@ mod tests {
         assert_eq!(&doc.source()[span.start..span.end], "**bold**");
     }
 
+    // [spec:mw:req:core.span.sliceable/test]
     #[test]
     fn inline_code_span_maps_back_to_source() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
@@ -352,6 +372,8 @@ mod tests {
         assert_eq!(slice, "`code`");
     }
 
+    // [spec:mw:sem:editing.block-at.containment/test]
+    // [spec:mw:sem:core.span.contains/test]
     #[test]
     fn block_at_returns_none_for_blank_line_between_blocks() {
         let mut doc = EditableDocument::new(Parser::<()>::new());
@@ -360,6 +382,7 @@ mod tests {
         assert!(doc.block_at(6).is_none());
     }
 
+    // [spec:mw:req:editing.cursor.reveal-source/test]
     #[test]
     fn cursor_swaps_block_to_raw_source_and_back() {
         let mut doc = EditableDocument::new(Parser::<()>::new());

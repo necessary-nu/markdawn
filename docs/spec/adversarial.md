@@ -31,52 +31,52 @@ therefore sit in the residual-risk bucket.
 
 ## Input caps (pre-render)
 
-> adv[input.byte-cap]
+> [spec:adv:req:input.byte-cap]
 > DOT source exceeding `markdawn_graphviz::MAX_DOT_BYTES` (256 KB)
 > must be rejected before any libgraphviz call. Catches enormous
 > labels, oceans of identifiers, unterminated strings/comments.
 
-> adv[input.brace-depth-cap]
+> [spec:adv:req:input.brace-depth-cap]
 > Outer `{`/`}` nesting exceeding `MAX_BRACE_DEPTH` (64) must be
 > rejected. Catches `subgraph{subgraph{…}}` stack attacks.
 
-> adv[input.record-depth-cap]
+> [spec:adv:req:input.record-depth-cap]
 > `{`/`}` nesting inside a quoted string (record-label syntax)
 > exceeding `MAX_RECORD_DEPTH` (16) must be rejected. The outer-
 > brace scanner skips contents of `"…"`, so attackers smuggle
 > record recursion this way; the scrubber's string-state counter
 > catches it.
 
-> adv[input.html-depth-cap]
+> [spec:adv:req:input.html-depth-cap]
 > `<tag>` / `</tag>` nesting inside an HTML label exceeding
 > `MAX_HTML_DEPTH` (16) must be rejected. HTML labels have their
 > own recursive parser inside libgraphviz.
 
-> adv[input.node-cap]
+> [spec:adv:req:input.node-cap]
 > Heuristic identifier count (upper bound on node count) above
 > `MAX_NODES` (1 000) must be rejected. The counter overcounts by
 > design — every identifier occurrence increments — so it rejects
 > borderline adversarial inputs conservatively.
 
-> adv[input.edge-cap]
+> [spec:adv:req:input.edge-cap]
 > Heuristic edge count above `MAX_EDGES` (2 000) must be rejected.
 > The counter expands shorthand: `A -> {b c d}` counts as 3 edges;
 > `{A B C} -> {X Y}` counts as 6; chained `A -> B -> C` counts as
 > 2.
 
-> adv[input.attribute-cap]
+> [spec:adv:req:input.attribute-cap]
 > Total `name=value` attribute declarations above `MAX_ATTRIBUTES`
 > (2 000) must be rejected. This is a count of declarations, not
 > of `[…]` lists — a single list with thousands of attributes must
 > also be rejected.
 
-> adv[input.subgraph-cap]
+> [spec:adv:req:input.subgraph-cap]
 > Occurrences of the `subgraph` keyword above `MAX_SUBGRAPHS`
 > (100) must be rejected.
 
 ## Attribute neutralisation (pre-render scrubber)
 
-> adv[neutralise.external-file-attrs]
+> [spec:adv:req:neutralise.external-file-attrs]
 > The attributes `image`, `shapefile`, `fontpath`, `imagepath`,
 > `stylesheet`, and absolute-path `fontname` must be renamed
 > (libgraphviz drops unknown attrs silently) so libgraphviz does
@@ -84,25 +84,25 @@ therefore sit in the residual-risk bucket.
 > Whitespace around `=` tolerated. Applies inside attribute lists
 > and at `graph [...]` / `node [...]` / `edge [...]` defaults.
 
-> adv[neutralise.layout-override]
+> [spec:adv:req:neutralise.layout-override]
 > The `layout=` graph attribute must be renamed. Our
 > `gvLayout(gvc, g, "dot")` call picks the layout engine; allowing
 > the attribute to override it exposes us to per-engine DoS
 > characteristics (neato, fdp, sfdp, twopi all have different
 > pathological inputs).
 
-> adv[neutralise.minlen-clamp]
+> [spec:adv:req:neutralise.minlen-clamp]
 > The `minlen=N` edge attribute must be clamped to at most
 > `MAX_MINLEN` (20). Large values cause libgraphviz to insert
 > virtual nodes between ranks; `minlen=1000` on a cross-rank edge
 > creates 1 000 virtual nodes from small input.
 
-> adv[neutralise.html-img-tag]
+> [spec:adv:req:neutralise.html-img-tag]
 > `<IMG …>` tags inside HTML labels must be renamed so
 > libgraphviz's HTML-label parser does not open the `SRC` file for
 > image sizing.
 
-> adv[neutralise.numeric-clamps]
+> [spec:adv:req:neutralise.numeric-clamps]
 > Render-cost-multiplying numeric attributes must be clamped to
 > sane maxima: `peripheries` to `MAX_PERIPHERIES` (5),
 > `samplepoints` to `MAX_SAMPLEPOINTS` (200), `dpi` to `MAX_DPI`
@@ -110,7 +110,7 @@ therefore sit in the residual-risk bucket.
 > in untrusted markdown rendering and are renamed entirely.
 > `minlen` is clamped separately by `neutralise.minlen-clamp`.
 
-> adv[neutralise.numeric-overflow]
+> [spec:adv:req:neutralise.numeric-overflow]
 > Attribute values that look like pathological numeric literals
 > (exponent magnitude > `MAX_NUMERIC_EXPONENT_DIGITS` digits, or
 > `nan` / `inf` / `infinity` literals) must be replaced with `"0"`.
@@ -118,7 +118,7 @@ therefore sit in the residual-risk bucket.
 > `strtod`, which has had historical O(n²) parsing issues on
 > pathologically long scientific notation.
 
-> adv[neutralise.escape-expansion]
+> [spec:adv:req:neutralise.escape-expansion]
 > Each quoted string containing more than
 > `MAX_ESCAPE_EXPANSIONS_PER_STRING` (20) render-time escape
 > sequences (`\N`, `\G`, `\L`, `\E`, `\T`, `\H`) must be rejected
@@ -129,26 +129,26 @@ therefore sit in the residual-risk bucket.
 
 ## Output hardening (post-render SVG sanitiser)
 
-> adv[output.size-cap]
+> [spec:adv:req:output.size-cap]
 > Rendered SVG byte length exceeding
 > `markdawn::svg_sanitize::MAX_SVG_BYTES` (5 MB) must not be
 > passed to the host document. Catches the input-to-output
 > amplification class (small DOT → huge SVG).
 
-> adv[output.url-allowlist]
+> [spec:adv:req:output.url-allowlist]
 > Every `href` / `xlink:href` attribute value in emitted SVG must
 > pass `markdawn::url_safety::is_safe_url`. Values failing the
 > check must be replaced with `"#"`. Applies whether the URL came
 > from graphviz, pikchr, or any other SVG source.
 
-> adv[output.no-script]
+> [spec:adv:req:output.no-script]
 > `<script>…</script>` blocks must be removed from emitted SVG.
 
-> adv[output.no-event-handlers]
+> [spec:adv:req:output.no-event-handlers]
 > `on*="…"` event-handler attributes (e.g. `onclick`, `onload`,
 > `onmouseover`) must be removed from emitted SVG.
 
-> adv[output.text-as-paths]
+> [spec:adv:req:output.text-as-paths]
 > Every `<text>` element in emitted SVG must be converted to
 > outlined glyph `<path>` elements (using the bundled Liberation
 > family — Serif / Sans / Mono, Regular weight, SIL OFL 1.1) with
@@ -172,7 +172,7 @@ therefore sit in the residual-risk bucket.
 > browser's fallback font can render it (CJK, Deseret, emoji,
 > etc.).
 
-> adv[output.inline-trim]
+> [spec:adv:sem:output.inline-trim]
 > Since every SVG we emit is embedded inline in HTML, the XML
 > prologue (`<?xml version=…?>`), DOCTYPE (`<!DOCTYPE svg …>`),
 > and all `<!-- … -->` comments are dead weight — browsers treat
@@ -182,14 +182,14 @@ therefore sit in the residual-risk bucket.
 > comment-injection tricks (attacker-controlled labels that
 > manage to contain `-->` sequences).
 
-> adv[output.no-external-entities]
+> [spec:adv:req:output.no-external-entities]
 > `<!ENTITY …>` declarations must be removed from emitted SVG.
 > Graphviz doesn't emit these itself, but belt-and-suspenders: any
 > entity declaration that reaches our output enables XML-bomb
 > expansion or external-entity exfiltration in downstream consumers
 > that honour them.
 
-> adv[output.no-stylesheet-pi]
+> [spec:adv:req:output.no-stylesheet-pi]
 > `<?xml-stylesheet …?>` processing instructions must be removed
 > from emitted SVG. Attacker-controlled `href` inside the PI would
 > reference an external stylesheet; even with our URL allow-list on
@@ -197,7 +197,7 @@ therefore sit in the residual-risk bucket.
 > html5ever's HTML parse context in the sanitiser (PIs other than
 > `<?xml version=?>` are parsed as bogus comments and dropped).
 
-> adv[output.animate-href-safe]
+> [spec:adv:req:output.animate-href-safe]
 > SVG `<animate attributeName="href" values="javascript:…"/>` is a
 > known XSS amplifier: the element itself looks benign, and the
 > payload sits inside an `attributeName` string that a naive
@@ -205,7 +205,7 @@ therefore sit in the residual-risk bucket.
 > emitted SVG (they're not on the W3C safe-default allow-list and
 > are dropped on sanitise).
 
-> adv[output.foreign-object-safe]
+> [spec:adv:req:output.foreign-object-safe]
 > SVG `<foreignObject>` embeds arbitrary HTML inside SVG. It stays
 > on the allow-list because MathML / tooltip content legitimately
 > uses it, but its contents must be sanitised as HTML — any
@@ -214,7 +214,7 @@ therefore sit in the residual-risk bucket.
 
 ## Markdown input cap
 
-> adv[markdown.input.byte-cap]
+> [spec:adv:req:markdown.input.byte-cap]
 > The markdown parser must support a caller-supplied input-size cap
 > via `ParserBuilder::with_max_input_bytes(n)`. When set, cumulative
 > bytes across `push_str`, `finish`, and `parse_full_at` exceeding
@@ -225,7 +225,7 @@ therefore sit in the residual-risk bucket.
 
 ## Markdown URL hardening
 
-> adv[markdown.url-allowlist]
+> [spec:adv:req:markdown.url-allowlist]
 > Markdown link and image destinations (`[text](URL)`,
 > `![alt](URL)`, autolinks) must pass `url_safety::is_safe_url`.
 > Failing URLs result in empty `href=""` / `src=""` (matches
@@ -233,7 +233,7 @@ therefore sit in the residual-risk bucket.
 
 ## Runtime isolation (render stage)
 
-> adv[render.timeout]
+> [spec:adv:req:render.timeout]
 > Each render call must enforce a wall-clock timeout
 > (`RENDER_TIMEOUT_SECS`, 10 s). On timeout, return
 > `GraphvizError::TimedOut`. Because libgraphviz is C and cannot
@@ -242,19 +242,19 @@ therefore sit in the residual-risk bucket.
 > time out on acquiring the global `RENDER_LOCK` rather than
 > waiting indefinitely.
 
-> adv[render.panic-capture]
+> [spec:adv:req:render.panic-capture]
 > The render thread must catch Rust panics and return
 > `GraphvizError::Panicked(message)` rather than propagating to
 > the caller. This catches Rust-level panics only — C-level
 > `abort()` / `SIGSEGV` still terminate the host process and are
 > residual risk.
 
-> adv[render.serialise]
+> [spec:adv:req:render.serialise]
 > Concurrent render calls must serialise via a process-global
 > `Mutex`. libgraphviz keeps per-context state that is not thread-
 > safe; overlapping calls would race even with our wrapper.
 
-> adv[render.process-isolation]
+> [spec:adv:sem:render.process-isolation]
 > Each render runs in a fork()ed child process. Parent reads the
 > SVG via a pipe with a `poll()`-based timeout; on timeout or
 > oversized response the child is SIGKILLed and the kernel
@@ -281,7 +281,7 @@ therefore sit in the residual-risk bucket.
 > will fail there. The `markdawn_gv_prewarm` callback stays
 > installed as a best-effort mitigation for that case.
 
-> adv[render.staged-timeout]
+> [spec:adv:req:render.staged-timeout]
 > libgraphviz's pipeline is `agmemread` (parse) → `gvLayout` (layout)
 > → `gvRenderData` (render). Each stage must have its own wall-clock
 > budget (`PARSE_BUDGET_MS`, `LAYOUT_BUDGET_MS`, `RENDER_BUDGET_MS`)
@@ -294,7 +294,7 @@ therefore sit in the residual-risk bucket.
 > `GraphvizError::TimedOutAtParse` / `AtLayout` / `AtRender` with
 > the observed elapsed time as payload.
 
-> adv[render.error-callback-capture]
+> [spec:adv:req:render.error-callback-capture]
 > `agseterrf` must be installed around each render call so
 > libgraphviz diagnostics land in `GraphvizError::RenderFailed`
 > instead of leaking to the host process's stderr. The previous
@@ -309,26 +309,67 @@ libpikchr is reportedly reentrant, but we apply the same input cap /
 timeout / panic capture / serialisation as the graphviz path for
 uniform posture and defence in depth.
 
-> adv[pikchr.input.byte-cap]
+> [spec:adv:req:pikchr.input.byte-cap]
 > Pikchr source exceeding `markdawn::pikchr_render::MAX_PIKCHR_BYTES`
 > (256 KB) must be rejected before calling libpikchr.
 
-> adv[pikchr.render.timeout]
+> [spec:adv:req:pikchr.render.timeout]
 > Each pikchr render call must enforce a wall-clock timeout
 > (`PIKCHR_RENDER_TIMEOUT_SECS`, 10 s). On timeout, return
 > `PikchrError::TimedOut`. The worker thread cannot be killed from
 > outside; it continues running until libpikchr returns.
 
-> adv[pikchr.render.panic-capture]
+> [spec:adv:req:pikchr.render.panic-capture]
 > The pikchr render thread must catch Rust panics via
 > `std::panic::catch_unwind` and return
 > `PikchrError::Panicked(message)` rather than propagating to the
 > caller.
 
-> adv[pikchr.render.serialise]
+> [spec:adv:req:pikchr.render.serialise]
 > Concurrent pikchr render calls must serialise via a process-global
 > `Mutex`. Defensive — libpikchr is reentrant, but the Mutex cost is
 > negligible and matches the graphviz wrapper's shape.
+
+## Typst runtime isolation
+
+The typst integration mirrors the same defensive layer. typst is
+pure Rust and each compile builds its own `RenderWorld`, but the
+`comemo` memoisation cache is process-wide, so the input cap /
+timeout / panic capture / serialisation posture is applied
+uniformly. Two entry points exist — SVG (diagram fences) and PDF
+(whole documents) — with separate caps and budgets.
+
+> [spec:adv:req:typst.input.byte-cap]
+> Typst source exceeding `markdawn::typst::MAX_TYPST_BYTES` (256 KB)
+> must be rejected before compiling, and PDF source exceeding
+> `MAX_TYPST_PDF_BYTES` (8 MB) before compiling a document. Both
+> return `TypstRenderError::InputTooLarge`, checked before the
+> timeout budget starts.
+
+> [spec:adv:req:typst.render.timeout]
+> Each typst render call must enforce a wall-clock timeout —
+> `TYPST_RENDER_TIMEOUT_SECS` (10 s) for SVG,
+> `TYPST_PDF_RENDER_TIMEOUT_SECS` (60 s) for PDF, which compiles a
+> whole document rather than one fence. On expiry, return
+> `TypstRenderError::TimedOut`. The worker thread cannot be killed
+> from outside; it continues running until typst returns. On wasm
+> there is no usable thread, so the compile runs inline and the
+> timeout is not enforced — the byte cap remains the defence.
+
+> [spec:adv:req:typst.render.panic-capture]
+> The typst render thread must catch Rust panics via
+> `std::panic::catch_unwind` and return
+> `TypstRenderError::Panicked(message)` rather than propagating to
+> the caller. A worker that dies without sending — a disconnected
+> result channel — must also report `Panicked`, so a lost thread
+> never surfaces as a hang or a silent success.
+
+> [spec:adv:req:typst.render.serialise]
+> Concurrent typst render calls must serialise via a process-global
+> `Mutex` (`RENDER_LOCK`), held across compile and export on both
+> the SVG and PDF paths. Lock poisoning must not be fatal: the
+> guard is recovered with `into_inner()` so one panicking render
+> does not permanently disable the renderer.
 
 ## Residual risk
 

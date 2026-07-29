@@ -107,6 +107,10 @@ dioxus-ssr = "0.7"
 serde_json = "1"
 
 [[example]]
+name = "ansi_demo"
+required-features = ["ansi"]
+
+[[example]]
 name = "ssg_blog"
 required-features = ["dioxus"]
 

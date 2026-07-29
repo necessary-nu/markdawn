@@ -20,6 +20,7 @@ use markdawn::{BlockSink, Parser, UIKitError};
 
 use crate::grammar_store::global_store;
 
+// [spec:mw:def:ffi.ownership.handle]
 pub struct UIKitState {
     parser: Parser<()>,
     sink: BlockSink<()>,
@@ -77,6 +78,7 @@ impl UIKitState {
 /// Allocate a new UIKit-renderer state on the main thread.
 ///
 /// Returns NULL if called off the main thread.
+// [spec:mw:req:ffi.safety.null-guard]
 #[unsafe(no_mangle)]
 pub extern "C" fn mw_uikit_state_new() -> *mut UIKitState {
     let Some(mtm) = MainThreadMarker::new() else {
@@ -88,6 +90,9 @@ pub extern "C" fn mw_uikit_state_new() -> *mut UIKitState {
 /// # Safety
 /// `state` must be a pointer returned by `mw_uikit_state_new`. `ptr` must
 /// point to `len` readable bytes.
+// The chunk is copied into the pending buffer before returning; the caller
+// may free or reuse it immediately.
+// [spec:mw:req:ffi.ownership.borrowed-input]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_uikit_state_push_chunk(
     state: *mut UIKitState,
@@ -124,6 +129,7 @@ pub unsafe extern "C" fn mw_uikit_state_finish(state: *mut UIKitState) -> u32 {
 ///
 /// # Safety
 /// `state` must be a pointer returned by `mw_uikit_state_new`.
+// [spec:mw:req:ffi.ownership.retained-objc]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_uikit_state_stack_view(state: *const UIKitState) -> *mut c_void {
     if state.is_null() {
@@ -139,6 +145,7 @@ pub unsafe extern "C" fn mw_uikit_state_stack_view(state: *const UIKitState) -> 
 ///
 /// # Safety
 /// `state` must be a pointer returned by `mw_uikit_state_new`.
+// [spec:mw:req:ffi.ownership.retained-objc]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_uikit_state_attributed_text(state: *const UIKitState) -> *mut c_void {
     if state.is_null() {
@@ -150,6 +157,7 @@ pub unsafe extern "C" fn mw_uikit_state_attributed_text(state: *const UIKitState
 
 /// # Safety
 /// `state` must be a pointer returned by `mw_uikit_state_new` and not yet freed.
+// [spec:mw:req:ffi.ownership.handle-release]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_uikit_state_free(state: *mut UIKitState) {
     if state.is_null() {

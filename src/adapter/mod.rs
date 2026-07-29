@@ -16,6 +16,7 @@ pub mod vdom;
 pub use self::ansi::{
     AnsiAdapter, AnsiError, AnsiOptions, AnsiSink, AnsiWalker, ColorDepth, RenderAnsiCustom,
 };
+// [spec:mw:def:html.adapter.surface]
 pub use self::html::{HtmlAdapter, HtmlError, HtmlSink, RenderHtmlCustom};
 #[cfg(feature = "iced")]
 pub use self::iced::{

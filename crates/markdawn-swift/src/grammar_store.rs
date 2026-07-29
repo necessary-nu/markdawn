@@ -38,6 +38,7 @@ pub fn global_store() -> &'static Arc<GrammarStore> {
 /// lengths. `lang_fn` must be the raw function pointer obtained from
 /// `LanguageFn::into_raw` (i.e. `unsafe extern "C" fn() -> *const ()`),
 /// erased to `*const c_void`.
+// [spec:mw:def:ffi.plugin.grammar-registration]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_register_grammar(
     name: *const c_char,
@@ -87,6 +88,9 @@ pub unsafe extern "C" fn mw_register_grammar(
     0
 }
 
+// A zero length is the empty string whatever the pointer holds; anything else
+// must be valid UTF-8 or the caller maps `None` onto its own return code.
+// [spec:mw:sem:ffi.encoding.utf8]
 unsafe fn slice_to_str<'a>(ptr: *const c_char, len: usize) -> Option<&'a str> {
     if len == 0 {
         return Some("");

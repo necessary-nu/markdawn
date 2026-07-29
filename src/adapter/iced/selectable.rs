@@ -54,6 +54,7 @@ struct SelectionState {
 /// Handle to cross-block selection state shared by every
 /// [`SelectableRichText`] produced by the same [`super::Renderer`].
 /// Cheap to clone (just an `Rc`).
+// [spec:mw:def:iced.widget.selection-handle]
 #[derive(Debug, Default, Clone)]
 pub struct Selection {
     inner: Rc<RefCell<SelectionState>>,
@@ -66,6 +67,7 @@ impl Selection {
 
     /// Mouse went down. Stash as a pending anchor — we won't promote it
     /// to a real drag until the cursor travels far enough.
+    // [spec:mw:sem:iced.selection.press-resets]
     fn press(&self, point: Point) {
         let mut s = self.inner.borrow_mut();
         s.pending_anchor = Some(point);
@@ -77,6 +79,7 @@ impl Selection {
     /// Cursor moved. If pending and we've crossed the threshold,
     /// promote the pending anchor into a real drag. Otherwise just
     /// update the cursor position (for already-active drags).
+    // [spec:mw:req:iced.selection.drag-threshold]
     fn drag_to(&self, point: Point) {
         let mut s = self.inner.borrow_mut();
         if s.finalized {
@@ -99,6 +102,8 @@ impl Selection {
     /// Mouse released. If a real drag is active, finalize it. Either
     /// way, clear the pending anchor (a click that didn't reach the
     /// threshold leaves no trace).
+    // [spec:mw:sem:iced.selection.release-finalizes]
+    // [spec:mw:req:iced.selection.click-yields-no-selection]
     fn release(&self) {
         let mut s = self.inner.borrow_mut();
         s.pending_anchor = None;
@@ -117,6 +122,7 @@ impl Selection {
         s.anchor.is_some() && s.cursor.is_some()
     }
 
+    // [spec:mw:sem:iced.selection.drag-routing]
     fn is_dragging(&self) -> bool {
         let s = self.inner.borrow();
         // Either we already promoted to a real drag, OR we have a
@@ -127,6 +133,7 @@ impl Selection {
 
     /// The selection range as `(top-left, bottom-right)` in window coords,
     /// or None if no selection is active.
+    // [spec:mw:req:iced.selection.range-ordering]
     fn range(&self) -> Option<(Point, Point)> {
         let s = self.inner.borrow();
         let a = s.anchor?;
@@ -145,6 +152,7 @@ impl Selection {
 /// or a "replaced" atom — an inline image / SVG that occupies a fixed
 /// width in the text flow but renders as an arbitrary widget. Modeled
 /// after browsers' inline-block / Flutter's `WidgetSpan`.
+// [spec:mw:def:iced.widget.inline-atom]
 pub enum InlineAtom<'a, F = crate::iced_shim::Font> {
     /// A regular text span — same as `text::Span` to `iced::widget::rich_text`.
     Span(text::Span<'a, String, F>),
@@ -232,6 +240,7 @@ const COSMIC_LINE_DESCENT_FRACTION: f32 = 0.22;
 /// A rich-text block that supports drag-to-select, `selected_text()`
 /// copy-collection, AND inline replaced atoms (SVGs/images embedded
 /// in the text flow with proper line wrapping).
+// [spec:mw:def:iced.widget.selectable-rich-text]
 pub struct SelectableRichText<
     'a,
     Message,
@@ -295,6 +304,7 @@ where
 /// `iced::advanced::svg::Renderer::draw_svg` at positions allocated
 /// by transparent placeholder glyphs — they participate in line
 /// wrapping like browsers' inline-block elements.
+// [spec:mw:req:iced.atom.placeholder-run]
 pub fn selectable_rich_content<'a, Message, Theme, Renderer>(
     atoms: Vec<InlineAtom<'a, Renderer::Font>>,
     selection: Selection,
@@ -392,6 +402,7 @@ where
     }
 }
 
+// [spec:mw:def:iced.widget.text-tables]
 struct State<P: text::Paragraph> {
     spans: Vec<text::Span<'static, String, P::Font>>,
     /// Mirrors widget.atom_meta. Cached in state so paint and copy
@@ -432,6 +443,7 @@ impl<P: text::Paragraph> Default for State<P> {
 /// Non-generic state fragment exposed to operations. `Operation::custom`
 /// receives `&mut dyn Any`; the concrete type must not be generic, so
 /// we project into this owned snapshot before publishing.
+// [spec:mw:def:iced.copy.fragment]
 #[derive(Debug, Clone)]
 struct SelectionFragment {
     /// Top y-coordinate of the widget in window-local coords. Used to
@@ -461,6 +473,8 @@ where
         }
     }
 
+    // [spec:mw:req:iced.atom.line-box-growth]
+    // [spec:mw:req:iced.atom.reshape-on-bounds-change]
     fn layout(
         &mut self,
         tree: &mut tree::Tree,
@@ -577,6 +591,7 @@ where
         })
     }
 
+    // [spec:mw:req:iced.paint.layer-order]
     fn draw(
         &self,
         tree: &tree::Tree,
@@ -728,6 +743,7 @@ where
         }
     }
 
+    // [spec:mw:req:iced.selection.link-press-precedence]
     fn update(
         &mut self,
         tree: &mut tree::Tree,
@@ -864,6 +880,7 @@ where
 /// (cosmic-text's hit() under iced's Hit::CharOffset doesn't reliably
 /// give the trailing offset for points beyond the last glyph). For
 /// fully-enclosed widgets we sidestep hit_test entirely.
+// [spec:mw:def:iced.selection.clip-classification]
 enum Clipped {
     Outside,
     Whole,
@@ -879,6 +896,7 @@ enum Clipped {
 ///
 /// This is the algorithmic core of `paint_bidi_selection`, extracted
 /// so it can be unit-tested without an iced runtime.
+// [spec:mw:sem:iced.paint.glyph-run-grouping]
 fn group_in_selection_glyphs(
     glyphs: &[(usize, usize, f32, f32)],
     lo: usize,
@@ -913,6 +931,8 @@ fn group_in_selection_glyphs(
     out
 }
 
+// [spec:mw:req:iced.selection.clip-whole]
+// [spec:mw:req:iced.selection.clip-partial-local]
 fn local_selection_range(selection: &Selection, bounds: Rectangle) -> Clipped {
     let Some((start, end)) = selection.range() else {
         return Clipped::Outside;
@@ -943,6 +963,8 @@ fn local_selection_range(selection: &Selection, bounds: Rectangle) -> Clipped {
     Clipped::Partial(local_start, local_end)
 }
 
+// [spec:mw:req:iced.hit-test.degenerate-range]
+// [spec:mw:req:iced.copy.offset-interpretation]
 fn compute_selected_text<P: text::Paragraph + 'static>(
     state: &State<P>,
     anchor: Point,
@@ -992,6 +1014,7 @@ fn compute_selected_text<P: text::Paragraph + 'static>(
 /// part of "Inline: $a^2+b^2=c^2$." copies the surrounding text
 /// concatenated with the original LaTeX source — never the U+2007
 /// placeholder runs.
+// [spec:mw:req:iced.copy.atom-substitution]
 fn substitute_atoms_in_range<P: text::Paragraph>(state: &State<P>, lo: usize, hi: usize) -> String {
     let mut out = String::new();
     let mut cursor = lo;
@@ -1045,6 +1068,7 @@ fn substitute_atoms_in_range<P: text::Paragraph>(state: &State<P>, lo: usize, hi
 /// emit a `draw_svg` call for each completed run. This produces ONE
 /// SVG draw per atom per visual line — matches inline-block
 /// rendering in browsers.
+// [spec:mw:req:iced.atom.baseline-paint]
 fn paint_atoms<R: text::Renderer + svg::Renderer>(
     renderer: &mut R,
     paragraph: &R::Paragraph,
@@ -1188,6 +1212,10 @@ fn emit_atom_svg<R: svg::Renderer>(
 /// (code blocks) this gives the wrong byte. Reach into cosmic-text
 /// via the `iced_graphics::text::Paragraph` downcast so we can use
 /// the full Cursor (line + index) and add the line offset.
+// [spec:mw:req:iced.hit-test.global-byte-offset]
+// [spec:mw:sem:iced.hit-test.half-advance]
+// [spec:mw:sem:iced.hit-test.outside-glyphs]
+// [spec:mw:req:iced.hit-test.paragraph-downcast-fallback]
 fn hit_test_global_byte<P: text::Paragraph + 'static>(
     paragraph: &P,
     line_offsets: &[usize],
@@ -1203,6 +1231,7 @@ fn hit_test_global_byte<P: text::Paragraph + 'static>(
     paragraph.hit_test(point).map(|h| h.cursor())
 }
 
+// [spec:mw:req:iced.paint.bidi-runs]
 fn paint_bidi_selection<R: text::Renderer>(
     renderer: &mut R,
     paragraph: &R::Paragraph,
@@ -1267,6 +1296,7 @@ where
 // Lets dead-space clicks (between blocks, around list bullets, etc.)
 // initiate drags instead of falling through.
 
+// [spec:mw:def:iced.widget.selection-group]
 pub struct SelectionGroup<'a, Message, Theme, Renderer>
 where
     Renderer: crate::iced_shim::advanced::Renderer,
@@ -1333,6 +1363,7 @@ where
             .draw(tree, renderer, theme, defaults, layout, cursor, viewport);
     }
 
+    // [spec:mw:req:iced.selection.press-arbitration]
     fn update(
         &mut self,
         tree: &mut tree::Tree,
@@ -1444,6 +1475,7 @@ where
 
 // ─── selected_text Task ─────────────────────────────────────────────
 
+// [spec:mw:req:iced.copy.document-order-join]
 fn collect_selected() -> impl Operation<Option<String>> {
     struct CollectSelected {
         fragments: Vec<(f32, String)>,
@@ -1505,6 +1537,7 @@ fn collect_selected() -> impl Operation<Option<String>> {
 ///     _ => Task::none(),
 /// }
 /// ```
+// [spec:mw:def:iced.copy.selected-text-task]
 pub fn selected_text() -> Task<Option<String>> {
     ::iced_runtime::task::widget(collect_selected())
 }
@@ -1528,6 +1561,8 @@ mod tests {
         assert!(s.range().is_none());
     }
 
+    // [spec:mw:sem:iced.selection.release-finalizes/test]
+    // [spec:mw:sem:iced.selection.drag-routing/test]
     #[test]
     fn selection_drag_lifecycle() {
         let s = Selection::new();
@@ -1555,6 +1590,7 @@ mod tests {
         assert!(!s.active());
     }
 
+    // [spec:mw:req:iced.selection.range-ordering/test]
     #[test]
     fn selection_normalizes_reverse_drag() {
         let s = Selection::new();
@@ -1564,6 +1600,7 @@ mod tests {
         assert_eq!(end, Point::new(50.0, 25.0));
     }
 
+    // [spec:mw:def:iced.selection.clip-classification/test]
     #[test]
     fn local_range_clips_widget_above() {
         let s = Selection::new();
@@ -1575,6 +1612,7 @@ mod tests {
         ));
     }
 
+    // [spec:mw:def:iced.selection.clip-classification/test]
     #[test]
     fn local_range_clips_widget_below() {
         let s = Selection::new();
@@ -1586,6 +1624,7 @@ mod tests {
         ));
     }
 
+    // [spec:mw:req:iced.selection.clip-whole/test]
     #[test]
     fn local_range_full_widget_inside_selection() {
         let s = Selection::new();
@@ -1596,6 +1635,7 @@ mod tests {
 
     // ─── Drag-distance threshold ─────────────────────────────────
 
+    // [spec:mw:sem:iced.selection.press-resets/test]
     #[test]
     fn press_alone_does_not_activate() {
         let s = Selection::new();
@@ -1604,6 +1644,7 @@ mod tests {
         assert!(s.range().is_none());
     }
 
+    // [spec:mw:req:iced.selection.drag-threshold/test]
     #[test]
     fn small_drift_does_not_activate() {
         let s = Selection::new();
@@ -1614,6 +1655,7 @@ mod tests {
         assert!(s.range().is_none());
     }
 
+    // [spec:mw:req:iced.selection.drag-threshold/test]
     #[test]
     fn drag_past_threshold_activates() {
         let s = Selection::new();
@@ -1625,6 +1667,7 @@ mod tests {
         assert_eq!(end, Point::new(20.0, 5.0));
     }
 
+    // [spec:mw:req:iced.selection.click-yields-no-selection/test]
     #[test]
     fn release_before_threshold_clears_pending() {
         let s = Selection::new();
@@ -1636,6 +1679,7 @@ mod tests {
 
     // ─── group_in_selection_glyphs (UAX #9 painting core) ───────
 
+    // [spec:mw:sem:iced.paint.glyph-run-grouping/test]
     #[test]
     fn grouping_pure_ltr_contiguous() {
         // Bytes monotonic with visual idx; a single contiguous run.
@@ -1649,6 +1693,7 @@ mod tests {
         assert_eq!(group_in_selection_glyphs(&glyphs, 1, 3), vec![(10.0, 30.0)],);
     }
 
+    // [spec:mw:req:iced.paint.bidi-runs/test]
     #[test]
     fn grouping_pure_rtl_contiguous() {
         // RTL: visual order left-to-right but bytes descending.
@@ -1662,6 +1707,7 @@ mod tests {
         assert_eq!(group_in_selection_glyphs(&glyphs, 1, 3), vec![(10.0, 30.0)],);
     }
 
+    // [spec:mw:req:iced.paint.bidi-runs/test]
     #[test]
     fn grouping_mixed_bidi_two_rects_with_gap() {
         // "Hello عربي world" simplified — visual order left to right.
@@ -1696,6 +1742,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:sem:iced.paint.glyph-run-grouping/test]
     #[test]
     fn grouping_empty_selection_yields_no_rects() {
         let glyphs = [(0, 1, 0.0, 10.0), (1, 2, 10.0, 20.0)];
@@ -1706,6 +1753,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:sem:iced.paint.glyph-run-grouping/test]
     #[test]
     fn grouping_subpixel_gap_coalesces() {
         // Two glyphs whose x extents are 0.3 px apart should merge.
@@ -1729,6 +1777,7 @@ mod tests {
         assert_eq!(group_in_selection_glyphs(&glyphs, 1, 4), vec![(10.0, 40.0)],);
     }
 
+    // [spec:mw:req:iced.selection.drag-threshold/test]
     #[test]
     fn drag_to_after_promotion_keeps_updating_cursor() {
         let s = Selection::new();

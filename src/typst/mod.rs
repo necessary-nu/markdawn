@@ -79,7 +79,7 @@ impl fmt::Display for TypstRenderError {
 
 impl std::error::Error for TypstRenderError {}
 
-// adv[impl typst.render.serialise]
+// [spec:adv:req:typst.render.serialise]
 static RENDER_LOCK: Mutex<()> = Mutex::new(());
 
 /// Render a typst source as SVG with the default timeout.
@@ -89,6 +89,7 @@ pub fn render(source: &str) -> Result<String, TypstRenderError> {
 
 /// Render a typst source as SVG with a caller-supplied wall-clock
 /// budget. Pre-flight input cap is applied before the timer starts.
+// [spec:adv:req:typst.input.byte-cap]
 pub fn render_with_timeout(source: &str, timeout: Duration) -> Result<String, TypstRenderError> {
     if source.len() > MAX_TYPST_BYTES {
         return Err(TypstRenderError::InputTooLarge(source.len()));
@@ -113,8 +114,8 @@ pub fn render_with_timeout(source: &str, timeout: Duration) -> Result<String, Ty
             Result<Result<String, TypstRenderError>, Box<dyn std::any::Any + Send>>,
         >();
 
-        // adv[impl typst.render.timeout]
-        // adv[impl typst.render.panic-capture]
+        // [spec:adv:req:typst.render.timeout]
+        // [spec:adv:req:typst.render.panic-capture]
         std::thread::Builder::new()
             .stack_size(RENDER_STACK_BYTES)
             .name("markdawn-typst".to_owned())
@@ -153,6 +154,7 @@ pub fn render_pdf(source: &str) -> Result<Vec<u8>, TypstRenderError> {
 /// Render a typst source as PDF with a caller-supplied wall-clock
 /// budget. Pre-flight input cap ([`MAX_TYPST_PDF_BYTES`]) is applied
 /// before the timer starts.
+// [spec:adv:req:typst.input.byte-cap]
 pub fn render_pdf_with_timeout(
     source: &str,
     timeout: Duration,
@@ -165,8 +167,8 @@ pub fn render_pdf_with_timeout(
     let (tx, rx) =
         mpsc::channel::<Result<Result<Vec<u8>, TypstRenderError>, Box<dyn std::any::Any + Send>>>();
 
-    // adv[impl typst.render.timeout]
-    // adv[impl typst.render.panic-capture]
+    // [spec:adv:req:typst.render.timeout]
+    // [spec:adv:req:typst.render.panic-capture]
     std::thread::Builder::new()
         .stack_size(RENDER_STACK_BYTES)
         .name("markdawn-typst-pdf".to_owned())
@@ -201,6 +203,8 @@ fn compile_to_paged(source: String) -> Result<(RenderWorld, PagedDocument), Typs
     Ok((world, document))
 }
 
+// [spec:mw:req:typst.preamble.svg-auto-page]
+// [spec:mw:req:typst.svg.inline-uses]
 fn render_inner(source: String) -> Result<String, TypstRenderError> {
     let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_world, document) = compile_to_paged(source)?;
@@ -225,6 +229,7 @@ fn render_pdf_inner(source: String) -> Result<Vec<u8>, TypstRenderError> {
 /// Wrap user source in a tiny preamble so the page sizes to its content
 /// instead of printing on a blank A4. Hard-coded because there is no
 /// per-block configuration surface yet.
+// [spec:mw:req:typst.preamble.svg-auto-page]
 fn wrap_with_preamble(source: &str) -> String {
     let mut out = String::with_capacity(source.len() + 96);
     out.push_str(
@@ -276,6 +281,7 @@ fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> String {
 mod tests {
     use super::*;
 
+    // [spec:adv:req:typst.input.byte-cap/test]
     #[test]
     fn oversize_input_rejected() {
         let huge = "a".repeat(MAX_TYPST_BYTES + 1);
@@ -286,12 +292,14 @@ mod tests {
         }
     }
 
+    // [spec:mw:def:typst.world.hermetic/test]
     #[test]
     fn benign_source_renders() {
         let svg = render("= Hello\n\nworld").expect("render ok");
         assert!(svg.contains("<svg"), "got: {svg}");
     }
 
+    // [spec:mw:req:typst.packages.offline-resolution/test]
     #[test]
     fn syntree_renders() {
         let src = r#"
@@ -306,6 +314,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:req:typst.packages.offline-resolution/test]
     #[test]
     fn cetz_renders() {
         let src = r#"
@@ -324,12 +333,14 @@ mod tests {
         );
     }
 
+    // [spec:adv:req:typst.render.timeout/test]
     #[test]
     fn timeout_fires_with_zero_budget() {
         let err = render_with_timeout("= Hi", Duration::from_millis(0)).unwrap_err();
         assert!(matches!(err, TypstRenderError::TimedOut), "got: {err:?}");
     }
 
+    // [spec:adv:req:typst.render.panic-capture/test]
     #[test]
     fn panic_variant_round_trips_through_display() {
         let err = TypstRenderError::Panicked("boom".to_owned());
@@ -345,6 +356,7 @@ mod tests {
         assert!(matches!(err, TypstRenderError::Failed(_)), "got: {err:?}");
     }
 
+    // [spec:mw:req:typst.svg.inline-uses/test]
     #[test]
     fn rendered_svg_has_no_use_or_symbol() {
         // After inline_uses runs, the output must be entirely
@@ -374,6 +386,7 @@ mod tests {
         );
     }
 
+    // [spec:adv:req:typst.input.byte-cap/test]
     #[test]
     fn render_pdf_oversize_input_rejected() {
         let huge = "a".repeat(MAX_TYPST_PDF_BYTES + 1);
@@ -384,6 +397,7 @@ mod tests {
         }
     }
 
+    // [spec:adv:req:typst.render.timeout/test]
     #[test]
     fn render_pdf_timeout_fires_with_zero_budget() {
         let err = render_pdf_with_timeout("= Hi", Duration::from_millis(0)).unwrap_err();
@@ -396,6 +410,7 @@ mod tests {
         assert!(matches!(err, TypstRenderError::Failed(_)), "got: {err:?}");
     }
 
+    // [spec:mw:req:typst.packages.offline-resolution/test]
     #[test]
     fn render_pdf_uses_bundled_packages() {
         // Proof point for ebook authoring: bundled `@preview/syntree`
@@ -411,7 +426,7 @@ mod tests {
         );
     }
 
-    // adv[verify typst.render.serialise]
+    // [spec:adv:req:typst.render.serialise/test]
     #[test]
     fn concurrent_renders_serialize() {
         let handles: Vec<_> = (0..4)

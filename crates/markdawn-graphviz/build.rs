@@ -430,12 +430,9 @@ fn build_vendored_graphviz(
 }
 
 fn find_archive(build_dir: &Path, name: &str) -> Option<PathBuf> {
-    for entry in walk_archives(build_dir) {
-        if entry.file_name().and_then(|s| s.to_str()) == Some(name) {
-            return Some(entry);
-        }
-    }
-    None
+    walk_archives(build_dir)
+        .into_iter()
+        .find(|entry| entry.file_name().and_then(|s| s.to_str()) == Some(name))
 }
 
 fn walk_archives(root: &Path) -> Vec<PathBuf> {

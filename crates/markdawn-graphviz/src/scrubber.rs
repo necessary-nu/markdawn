@@ -8,46 +8,46 @@
 
 use crate::{GraphvizError, MAX_BRACE_DEPTH};
 
-// adv[impl input.node-cap]
+// [spec:adv:req:input.node-cap]
 pub const MAX_NODES: usize = 1_000;
-// adv[impl input.edge-cap]
+// [spec:adv:req:input.edge-cap]
 pub const MAX_EDGES: usize = 2_000;
-// adv[impl input.attribute-cap]
+// [spec:adv:req:input.attribute-cap]
 pub const MAX_ATTRIBUTES: usize = 2_000;
-// adv[impl input.subgraph-cap]
+// [spec:adv:req:input.subgraph-cap]
 pub const MAX_SUBGRAPHS: usize = 100;
-// adv[impl input.record-depth-cap]
+// [spec:adv:req:input.record-depth-cap]
 pub const MAX_RECORD_DEPTH: usize = 16;
-// adv[impl input.html-depth-cap]
+// [spec:adv:req:input.html-depth-cap]
 pub const MAX_HTML_DEPTH: usize = 16;
-// adv[impl neutralise.minlen-clamp]
+// [spec:adv:req:neutralise.minlen-clamp]
 pub const MAX_MINLEN: u32 = 20;
-/// adv[impl neutralise.numeric-clamps]
 /// `peripheries=100000` draws 100k concentric shapes on a single
 /// node; libgraphviz happily obliges. Clamp to a sane small number.
+// [spec:adv:req:neutralise.numeric-clamps]
 pub const MAX_PERIPHERIES: u32 = 5;
-/// adv[impl neutralise.numeric-clamps]
 /// `samplepoints` controls polygon approximation of circles. High
 /// values multiply render cost per rounded shape.
+// [spec:adv:req:neutralise.numeric-clamps]
 pub const MAX_SAMPLEPOINTS: u32 = 200;
-/// adv[impl neutralise.numeric-clamps]
 /// `dpi` affects SVG viewBox and downstream browser cost. SVG is
 /// nominally resolution-independent but graphviz scales coordinates
 /// by DPI, so huge values produce huge coordinate space.
+// [spec:adv:req:neutralise.numeric-clamps]
 pub const MAX_DPI: u32 = 300;
-/// adv[impl neutralise.escape-expansion]
 /// Maximum number of `\N` / `\G` / `\L` / `\E` / `\T` / `\H`
 /// render-time escape expansions permitted in a single quoted
 /// string. Each gets substituted at render time with the node /
 /// graph / label / edge / tail / head name, so a default attribute
 /// with many escapes applied to many nodes is a billion-laughs
 /// amplifier.
+// [spec:adv:req:neutralise.escape-expansion]
 pub const MAX_ESCAPE_EXPANSIONS_PER_STRING: usize = 20;
-/// adv[impl neutralise.numeric-overflow]
 /// Maximum exponent magnitude in a numeric attribute value before we
 /// neutralise the attribute. `width=1e9999` fed to libc's strtod can
 /// trigger O(n²) parsing behaviour ("strtod billion laughs"); any
 /// exponent > 3 digits is beyond the useful range for rendering.
+// [spec:adv:req:neutralise.numeric-overflow]
 pub const MAX_NUMERIC_EXPONENT_DIGITS: usize = 3;
 
 #[derive(Debug, Default)]
@@ -247,7 +247,7 @@ impl<'a> Scanner<'a> {
         self.out.push('"');
         self.i += 1;
         self.record_depth = 0;
-        // adv[impl neutralise.escape-expansion] — count backslash-letter
+        // [spec:adv:req:neutralise.escape-expansion] — count backslash-letter
         // render-time expansions per string and reject excess. `\N`,
         // `\G`, `\L`, `\E`, `\T`, `\H` get substituted at render time.
         let mut escape_expansions: usize = 0;
@@ -346,7 +346,7 @@ impl<'a> Scanner<'a> {
                     }
                 }
                 if is_img {
-                    // adv[impl neutralise.html-img-tag]
+                    // [spec:adv:req:neutralise.html-img-tag]
                     // Rename <IMG…> → <_img…> so graphviz's HTML-label
                     // parser doesn't recognise it as IMG and so doesn't
                     // try to open the SRC file.
@@ -398,15 +398,15 @@ impl<'a> Scanner<'a> {
         let is_attr = la < self.bytes.len() && self.bytes[la] == b'=';
 
         if is_attr {
-            // adv[impl input.attribute-cap] — count each name=value
+            // [spec:adv:req:input.attribute-cap] — count each name=value
             // declaration, not `[…]` lists, so a single mega-list can't
             // smuggle 100k attrs past the cap.
             self.report.attributes = self.report.attributes.saturating_add(1);
             // Don't count attr names as nodes; don't fire edges.
             let lower = name.to_ascii_lowercase();
-            // adv[impl neutralise.external-file-attrs]
-            // adv[impl neutralise.layout-override]
-            // adv[impl neutralise.numeric-clamps] `layers` / `size` have
+            // [spec:adv:req:neutralise.external-file-attrs]
+            // [spec:adv:req:neutralise.layout-override]
+            // [spec:adv:req:neutralise.numeric-clamps] `layers` / `size` have
             // no legitimate use for untrusted markdown rendering; just
             // drop them.
             let rename = matches!(
@@ -421,7 +421,7 @@ impl<'a> Scanner<'a> {
                     | "size"
             );
             let is_fontname = lower == "fontname";
-            // adv[impl neutralise.numeric-clamps]
+            // [spec:adv:req:neutralise.numeric-clamps]
             let clamp_max: Option<u32> = match lower.as_str() {
                 "minlen" => Some(MAX_MINLEN),
                 "peripheries" => Some(MAX_PERIPHERIES),
@@ -466,7 +466,7 @@ impl<'a> Scanner<'a> {
                 }
                 let trimmed_value: String =
                     self.out[before_len..].trim_matches('"').trim().to_owned();
-                // adv[impl neutralise.numeric-overflow]
+                // [spec:adv:req:neutralise.numeric-overflow]
                 // Reject pathological numeric literals before libgraphviz's
                 // strtod touches them. Applies to any attribute that looks
                 // numeric, not just the clamp-list ones.
@@ -475,15 +475,14 @@ impl<'a> Scanner<'a> {
                     self.out.push('"');
                     self.out.push('0');
                     self.out.push('"');
-                } else if let Some(max) = clamp_max {
-                    if let Ok(n) = trimmed_value.parse::<u32>() {
-                        if n > max {
-                            self.out.truncate(before_len);
-                            self.out.push('"');
-                            self.out.push_str(&max.to_string());
-                            self.out.push('"');
-                        }
-                    }
+                } else if let Some(max) = clamp_max
+                    && let Ok(n) = trimmed_value.parse::<u32>()
+                    && n > max
+                {
+                    self.out.truncate(before_len);
+                    self.out.push('"');
+                    self.out.push_str(&max.to_string());
+                    self.out.push('"');
                 }
                 return Ok(());
             } else if self.i < self.bytes.len() && self.bytes[self.i] == b'<' {
@@ -503,17 +502,16 @@ impl<'a> Scanner<'a> {
                     self.i += 1;
                 }
                 let bare_value = self.out[out_value_start..].trim().to_owned();
-                // adv[impl neutralise.numeric-overflow]
+                // [spec:adv:req:neutralise.numeric-overflow]
                 if looks_pathological_numeric(&bare_value) {
                     self.out.truncate(out_value_start);
                     self.out.push('0');
-                } else if let Some(max) = clamp_max {
-                    if let Ok(n) = bare_value.parse::<u32>() {
-                        if n > max {
-                            self.out.truncate(out_value_start);
-                            self.out.push_str(&max.to_string());
-                        }
-                    }
+                } else if let Some(max) = clamp_max
+                    && let Ok(n) = bare_value.parse::<u32>()
+                    && n > max
+                {
+                    self.out.truncate(out_value_start);
+                    self.out.push_str(&max.to_string());
                 }
                 let _ = value_start;
                 return Ok(());
@@ -585,7 +583,7 @@ fn looks_pathological_numeric(value: &str) -> bool {
     if let Some(e_pos) = trimmed.bytes().position(|b| b == b'e' || b == b'E') {
         let exp_part = &trimmed[e_pos + 1..];
         let exp_digits = exp_part
-            .trim_start_matches(|c: char| c == '+' || c == '-')
+            .trim_start_matches(['+', '-'])
             .bytes()
             .take_while(|b| b.is_ascii_digit())
             .count();
@@ -677,7 +675,7 @@ mod tests {
         for _ in 0..20 {
             src.push_str("<B>");
         }
-        src.push_str("x");
+        src.push('x');
         for _ in 0..20 {
             src.push_str("</B>");
         }
@@ -722,7 +720,7 @@ mod tests {
         assert!(r.attributes >= 100, "got attributes={}", r.attributes);
     }
 
-    // adv[verify neutralise.minlen-clamp]
+    // [spec:adv:req:neutralise.minlen-clamp/test]
     #[test]
     fn minlen_clamped() {
         let (out, _) = scan_and_scrub("digraph { A -> B [minlen=9999] }").unwrap();
@@ -730,7 +728,7 @@ mod tests {
         assert!(out.contains("minlen=20"), "got: {out}");
     }
 
-    // adv[verify neutralise.numeric-clamps]
+    // [spec:adv:req:neutralise.numeric-clamps/test]
     #[test]
     fn peripheries_clamped() {
         let (out, _) = scan_and_scrub(r#"digraph { A [peripheries=100000] }"#).unwrap();
@@ -738,14 +736,14 @@ mod tests {
         assert!(out.contains("peripheries="), "got: {out}");
     }
 
-    // adv[verify neutralise.numeric-clamps]
+    // [spec:adv:req:neutralise.numeric-clamps/test]
     #[test]
     fn samplepoints_clamped() {
         let (out, _) = scan_and_scrub(r#"digraph { A [samplepoints=50000] }"#).unwrap();
         assert!(!out.contains("50000"), "got: {out}");
     }
 
-    // adv[verify neutralise.numeric-clamps]
+    // [spec:adv:req:neutralise.numeric-clamps/test]
     #[test]
     fn dpi_clamped() {
         let (out, _) = scan_and_scrub(r#"digraph { graph [dpi=10000]; A -> B }"#).unwrap();
@@ -753,7 +751,7 @@ mod tests {
         assert!(out.contains("dpi="), "got: {out}");
     }
 
-    // adv[verify neutralise.numeric-clamps]
+    // [spec:adv:req:neutralise.numeric-clamps/test]
     #[test]
     fn layers_attribute_neutralised() {
         let (out, _) = scan_and_scrub(r#"digraph { graph [layers="a:b:c"]; A -> B }"#).unwrap();
@@ -761,7 +759,7 @@ mod tests {
         assert!(out.contains("_layers="), "got: {out}");
     }
 
-    // adv[verify neutralise.numeric-clamps]
+    // [spec:adv:req:neutralise.numeric-clamps/test]
     #[test]
     fn size_attribute_neutralised() {
         let (out, _) = scan_and_scrub(r#"digraph { graph [size="1000,1000!"]; A -> B }"#).unwrap();
@@ -769,7 +767,7 @@ mod tests {
         assert!(out.contains("_size="), "got: {out}");
     }
 
-    // adv[verify neutralise.numeric-clamps]
+    // [spec:adv:req:neutralise.numeric-clamps/test]
     #[test]
     fn legitimate_numeric_values_preserved() {
         let (out, _) = scan_and_scrub(r#"digraph { A [peripheries=2, samplepoints=20] }"#).unwrap();
@@ -777,7 +775,7 @@ mod tests {
         assert!(out.contains("samplepoints=20"), "got: {out}");
     }
 
-    // adv[verify neutralise.escape-expansion]
+    // [spec:adv:req:neutralise.escape-expansion/test]
     #[test]
     fn escape_expansion_flood_rejected() {
         let src = format!(
@@ -791,28 +789,28 @@ mod tests {
         );
     }
 
-    // adv[verify neutralise.numeric-overflow]
+    // [spec:adv:req:neutralise.numeric-overflow/test]
     #[test]
     fn huge_exponent_neutralised() {
         let (out, _) = scan_and_scrub(r#"digraph { A [width="1e9999"] }"#).unwrap();
         assert!(!out.contains("1e9999"), "got: {out}");
     }
 
-    // adv[verify neutralise.numeric-overflow]
+    // [spec:adv:req:neutralise.numeric-overflow/test]
     #[test]
     fn infinity_literal_neutralised() {
         let (out, _) = scan_and_scrub(r#"digraph { A [width="Infinity"] }"#).unwrap();
         assert!(!out.to_lowercase().contains("infinity"), "got: {out}");
     }
 
-    // adv[verify neutralise.numeric-overflow]
+    // [spec:adv:req:neutralise.numeric-overflow/test]
     #[test]
     fn nan_literal_neutralised() {
         let (out, _) = scan_and_scrub(r#"digraph { A [width="NaN"] }"#).unwrap();
         assert!(!out.to_lowercase().contains("nan"), "got: {out}");
     }
 
-    // adv[verify neutralise.numeric-overflow]
+    // [spec:adv:req:neutralise.numeric-overflow/test]
     #[test]
     fn legitimate_float_values_preserved() {
         let (out, _) = scan_and_scrub(r#"digraph { A [width="2.5", height="1.0"] }"#).unwrap();
@@ -820,14 +818,14 @@ mod tests {
         assert!(out.contains("1.0"), "got: {out}");
     }
 
-    // adv[verify neutralise.numeric-overflow]
+    // [spec:adv:req:neutralise.numeric-overflow/test]
     #[test]
     fn small_exponent_preserved() {
         let (out, _) = scan_and_scrub(r#"digraph { A [width="1e2"] }"#).unwrap();
         assert!(out.contains("1e2"), "got: {out}");
     }
 
-    // adv[verify neutralise.escape-expansion]
+    // [spec:adv:req:neutralise.escape-expansion/test]
     #[test]
     fn normal_escape_use_preserved() {
         // A couple of \N in a label — common legitimate use ("\N" = node name).

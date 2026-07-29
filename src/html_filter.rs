@@ -16,6 +16,7 @@ use sanitizer::SanitizerConfig;
 /// HTML pass-through policy. Cheap to clone (the inner config is `Clone`).
 //
 // [>r:markdown.html.sanitizer]
+// [spec:mw:def:core.html-filter.modes]
 #[derive(Debug, Clone)]
 pub struct HtmlFilter(Mode);
 
@@ -27,6 +28,7 @@ enum Mode {
     Unrestricted,
 }
 
+// [spec:mw:req:core.html-filter.default-safe]
 impl Default for HtmlFilter {
     fn default() -> Self {
         Self::safe()
@@ -59,6 +61,7 @@ impl HtmlFilter {
     /// On sanitizer failure (e.g. invalid config — shouldn't happen for the
     /// builtin profiles) the input is dropped and an empty string is
     /// returned, mirroring the safer fallback.
+    // [spec:mw:req:core.html-filter.fail-closed]
     pub fn filter(&self, html: &str) -> String {
         match &self.0 {
             Mode::Unrestricted => html.to_string(),
@@ -81,6 +84,7 @@ mod tests {
         assert!(out.contains("<p>ok</p>"));
     }
 
+    // [spec:mw:def:core.html-filter.modes/test]
     #[test]
     fn unrestricted_passes_em_dash_unchanged() {
         // Regression: the previous byte-level filter panicked when its

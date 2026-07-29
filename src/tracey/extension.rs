@@ -7,6 +7,7 @@ use super::heading::slugify;
 use super::req::{ReqKind, RuleId, parse_req_leading_marker, parse_rule_id};
 
 /// Custom-node payload used inside `Node::Custom { payload: TraceyExt::Req(_), .. }`.
+// [spec:mw:def:traceyext.extension.req-node]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TraceyExt {
     Req(ReqPayload),
@@ -93,6 +94,9 @@ fn recurse_children<Ext: From<TraceyExt> + Clone>(
 }
 
 // [>r:markdown.syntax.inline-ignored+2]
+//
+// [spec:mw:def:traceyext.extension.req-node]
+// [spec:mw:req:traceyext.marker.non-markers]
 fn try_convert_to_req<Ext: From<TraceyExt> + Clone>(
     node: &mut Node<Ext>,
     source: &str,
@@ -145,6 +149,8 @@ fn try_convert_to_req<Ext: From<TraceyExt> + Clone>(
 //
 // [>r:dashboard.editing.byte-range.req-span]
 // [>r:dashboard.editing.byte-range.marker-and-content]
+//
+// [spec:mw:req:traceyext.span.absolute-offsets]
 fn detect_marker_in_blockquote_block(
     block_text: &str,
     abs_start: usize,

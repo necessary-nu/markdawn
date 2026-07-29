@@ -29,6 +29,7 @@ pub struct UIKitStyle {
     pub math_block_scale: f64,
 }
 
+// [spec:mw:req:uikit.style.system-colors]
 impl Default for UIKitStyle {
     fn default() -> Self {
         Self {

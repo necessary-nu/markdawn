@@ -21,6 +21,7 @@ use std::fmt;
 ///
 /// Distinct from [`crate::SourceSpan`] (which uses `start..end`); this matches
 /// the offset/length form expected by tracey for rewriting markers in place.
+// [spec:mw:req:traceyext.span.absolute-offsets]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 pub struct SourceSpan {
     /// Byte offset from start of content.
@@ -43,6 +44,7 @@ impl SourceSpan {
 ///
 /// An unversioned id like `r[my.req]` parses to `RuleId { base, version: 0 }`.
 /// `r[my.req+1]` is version 1, `r[my.req+2]` is version 2, etc. `+0` is rejected.
+// [spec:mw:def:traceyext.rule-id.model]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RuleId {
     /// Base identifier without version suffix.
@@ -81,6 +83,8 @@ impl PartialEq<RuleId> for &str {
 // [>r:ref.syntax.version+2]
 // [>r:ref.syntax.version.implicit+2]
 // [>r:markdown.constraint.id-grammar+2]
+//
+// [spec:mw:req:traceyext.rule-id.version-suffix]
 pub fn parse_rule_id(id: &str) -> Option<RuleId> {
     if id.is_empty() {
         return None;
@@ -112,6 +116,7 @@ pub fn parse_rule_id(id: &str) -> Option<RuleId> {
 ///
 /// - `> :[r:id]` → `Definition` (ordinary requirement)
 /// - `> :[!r:id]` → `Constraint` (cross-cutting; applies to heading subtree)
+// [spec:mw:def:traceyext.marker.kind]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ReqKind {
     /// Ordinary requirement definition: `> :[r:ID]`. Tracked for impl/verify
@@ -124,6 +129,7 @@ pub enum ReqKind {
 }
 
 /// A requirement definition extracted from markdown.
+// [spec:mw:def:traceyext.render.document]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReqDefinition {
     /// The requirement identifier (e.g. `channel.id.allocation`).
@@ -176,6 +182,9 @@ pub struct InlineCodeSpan {
 // [>r:markdown.syntax.marker+3]
 // [>r:markdown.syntax.paragraph-form-rejected]
 // [>r:markdown.constraint.marker+2]
+//
+// [spec:mw:syn:traceyext.marker.grammar]
+// [spec:mw:req:traceyext.marker.non-markers]
 pub(crate) fn parse_req_leading_marker(text: &str) -> Option<(&str, ReqKind, &str, usize)> {
     let bytes = text.as_bytes();
     // Leading `:` outside the brackets is mandatory.
@@ -218,6 +227,7 @@ pub(crate) fn parse_req_leading_marker(text: &str) -> Option<(&str, ReqKind, &st
 mod tests {
     use super::*;
 
+    // [spec:mw:def:traceyext.rule-id.model/test]
     #[test]
     fn parse_unversioned_rule_id() {
         let r = parse_rule_id("my.req").unwrap();
@@ -225,6 +235,7 @@ mod tests {
         assert_eq!(r.version, 0);
     }
 
+    // [spec:mw:req:traceyext.rule-id.version-suffix/test]
     #[test]
     fn parse_versioned_rule_id() {
         let r = parse_rule_id("my.req+2").unwrap();
@@ -232,11 +243,13 @@ mod tests {
         assert_eq!(r.version, 2);
     }
 
+    // [spec:mw:req:traceyext.rule-id.version-suffix/test]
     #[test]
     fn reject_plus_zero() {
         assert!(parse_rule_id("my.req+0").is_none());
     }
 
+    // [spec:mw:req:traceyext.rule-id.version-suffix/test]
     #[test]
     fn reject_empty() {
         assert!(parse_rule_id("").is_none());
@@ -244,6 +257,7 @@ mod tests {
         assert!(parse_rule_id("foo+").is_none());
     }
 
+    // [spec:mw:def:traceyext.rule-id.model/test]
     #[test]
     fn display_format() {
         assert_eq!(
@@ -268,6 +282,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:syn:traceyext.marker.grammar/test]
     #[test]
     fn marker_extraction_definition() {
         let (prefix, kind, content, end) = parse_req_leading_marker(":[r:my.req] body").unwrap();
@@ -277,6 +292,7 @@ mod tests {
         assert_eq!(end, 10); // index of ']'
     }
 
+    // [spec:mw:def:traceyext.marker.kind/test]
     #[test]
     fn marker_extraction_constraint() {
         let (prefix, kind, content, end) =
@@ -287,6 +303,7 @@ mod tests {
         assert_eq!(end, 16); // index of ']'
     }
 
+    // [spec:mw:syn:traceyext.marker.grammar/test]
     #[test]
     fn marker_extraction_multi_char_prefix() {
         let (prefix, kind, content, _) =
@@ -296,6 +313,7 @@ mod tests {
         assert_eq!(content, "rfc.7540.streams");
     }
 
+    // [spec:mw:req:traceyext.marker.non-markers/test]
     #[test]
     fn marker_extraction_rejects_paragraph_form() {
         // Paragraph-form `r[id]` is no longer recognised.
@@ -303,6 +321,7 @@ mod tests {
         assert!(parse_req_leading_marker("r![determinism] body").is_none());
     }
 
+    // [spec:mw:req:traceyext.marker.non-markers/test]
     #[test]
     fn marker_extraction_rejects_missing_leading_colon() {
         // The leading `:` outside the brackets is mandatory.
@@ -310,6 +329,7 @@ mod tests {
         assert!(parse_req_leading_marker("[!r:foo] body").is_none());
     }
 
+    // [spec:mw:req:traceyext.marker.non-markers/test]
     #[test]
     fn marker_extraction_rejects_gfm_alerts() {
         // GFM alert-block tokens shouldn't trigger tracey extraction.
@@ -317,6 +337,7 @@ mod tests {
         assert!(parse_req_leading_marker("[!WARNING] something").is_none());
     }
 
+    // [spec:mw:req:traceyext.marker.non-markers/test]
     #[test]
     fn marker_extraction_rejects_unknown_sigil() {
         // Only `!` is a valid in-bracket sigil; `>`/`?` are source-only.

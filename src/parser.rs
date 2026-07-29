@@ -25,6 +25,9 @@ pub struct LiveBlock<Ext> {
 ///
 /// Used by both `Parser::push_str` (streaming append) and `EditableDocument`
 /// (editor edits) — same protocol, two producers.
+// [spec:mw:req:core.stream.slot-identity]
+// [spec:mw:req:core.stream.change-only-upsert]
+// [spec:mw:req:core.stream.batch-ordering]
 pub(crate) fn reconcile_blocks<Ext>(
     previous: Vec<LiveBlock<Ext>>,
     blocks: Vec<ParsedBlock<Ext>>,
@@ -171,7 +174,7 @@ impl<Ext> ParserBuilder<Ext> {
     /// and `parse_full_at` exceed `max`. Default is unlimited (no cap).
     /// Useful when rendering untrusted markdown where you want a hard
     /// upper bound before the parser starts allocating.
-    // adv[impl markdown.input.byte-cap]
+    // [spec:adv:req:markdown.input.byte-cap]
     pub fn with_max_input_bytes(mut self, max: usize) -> Self {
         self.max_input_bytes = Some(max);
         self
@@ -225,7 +228,7 @@ impl<Ext> Parser<Ext> {
         ParserBuilder::new()
     }
 
-    // adv[impl markdown.input.byte-cap]
+    // [spec:adv:req:markdown.input.byte-cap]
     pub fn push_str<S>(&mut self, chunk: &str, sink: &mut S) -> Result<(), StreamError<S::Error>>
     where
         S: Sink<Node<Ext>>,
@@ -275,7 +278,8 @@ impl<Ext> Parser<Ext> {
     /// `source` spans populated to byte ranges relative to `base_offset`
     /// (the byte offset of `source` within an outer document). Used by
     /// `EditableDocument` for both full and block-window reparse.
-    // adv[impl markdown.input.byte-cap]
+    // [spec:adv:req:markdown.input.byte-cap]
+    // [spec:mw:req:core.span.exact-extent]
     pub(crate) fn parse_full_at(
         &mut self,
         source: &str,
@@ -284,13 +288,13 @@ impl<Ext> Parser<Ext> {
     where
         Ext: Clone + PartialEq,
     {
-        if let Some(cap) = self.max_input_bytes {
-            if source.len() > cap {
-                return Err(Error::InputTooLarge {
-                    seen: source.len(),
-                    cap,
-                });
-            }
+        if let Some(cap) = self.max_input_bytes
+            && source.len() > cap
+        {
+            return Err(Error::InputTooLarge {
+                seen: source.len(),
+                cap,
+            });
         }
 
         self.buffer.clear();
@@ -347,6 +351,7 @@ impl<Ext> Parser<Ext> {
         Ok(blocks)
     }
 
+    // [spec:mw:req:core.sink.error-aborts]
     fn emit_blocks<S>(
         &mut self,
         blocks: Vec<ParsedBlock<Ext>>,
@@ -365,11 +370,11 @@ impl<Ext> Parser<Ext> {
         Ok(())
     }
 
-    // gfm[impl blocks-and-inlines.precedence.two-phase-parsing]
-    // gfm[impl blocks-and-inlines.document-is-sequence-of-blocks]
-    // gfm[impl appendix-a-parsing-strategy.overview.document-is-represented-as-tree-of-blocks]
-    // gfm[impl appendix-a-parsing-strategy.overview.parsing-has-two-phases]
-    // gfm[impl appendix-a-parsing-strategy.reference-implementations-use-this-parsing-strategy]
+    // [spec:gfm:thm:blocks-and-inlines.precedence.two-phase-parsing]
+    // [spec:gfm:def:blocks-and-inlines.document-is-sequence-of-blocks]
+    // [spec:gfm:def:appendix-a-parsing-strategy.overview.document-is-represented-as-tree-of-blocks]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.overview.parsing-has-two-phases]
+    // [spec:gfm:def:appendix-a-parsing-strategy.reference-implementations-use-this-parsing-strategy]
     fn parse_blocks(&self, finalizing: bool) -> Result<Vec<ParsedBlock<Ext>>, Error>
     where
         Ext: Clone + PartialEq,
@@ -401,6 +406,7 @@ impl<Ext> Parser<Ext> {
         Ok(blocks)
     }
 
+    // [spec:mw:req:core.ext.block-zero-consumed]
     fn try_block_extension(&self, lines: &[String], start: usize) -> Option<(usize, Node<Ext>)> {
         for extension in &self.extensions {
             if let Some(BlockMatch {
@@ -417,6 +423,7 @@ impl<Ext> Parser<Ext> {
         None
     }
 
+    // [spec:mw:req:core.node.footnote-numbering]
     fn finalize_footnotes(
         &self,
         blocks: &mut Vec<ParsedBlock<Ext>>,
@@ -483,12 +490,12 @@ impl<Ext> Parser<Ext> {
         Ok(())
     }
 
-    // gfm[impl leaf-blocks.link-reference-definitions.may-appear-before-or-after-uses]
-    // gfm[impl leaf-blocks.link-reference-definitions.scope-is-the-entire-document]
-    // gfm[impl leaf-blocks.link-reference-definitions.first-matching-definition-takes-precedence]
-    // gfm[impl leaf-blocks.link-reference-definitions.multiple-definitions-may-appear-consecutively]
-    // gfm[impl leaf-blocks.link-reference-definitions.unused-definitions-have-no-visible-output]
-    // gfm[impl leaf-blocks.link-reference-definitions.use-may-precede-definition]
+    // [spec:gfm:sem:leaf-blocks.link-reference-definitions.may-appear-before-or-after-uses]
+    // [spec:gfm:sem:leaf-blocks.link-reference-definitions.scope-is-the-entire-document]
+    // [spec:gfm:sem:leaf-blocks.link-reference-definitions.first-matching-definition-takes-precedence]
+    // [spec:gfm:syn:leaf-blocks.link-reference-definitions.multiple-definitions-may-appear-consecutively]
+    // [spec:gfm:sem:leaf-blocks.link-reference-definitions.unused-definitions-have-no-visible-output]
+    // [spec:gfm:sem:leaf-blocks.link-reference-definitions.use-may-precede-definition]
     fn collect_reference_definitions(&self, lines: &[String]) -> Result<ReferenceDefinitions, Error>
     where
         Ext: Clone + PartialEq,
@@ -519,12 +526,12 @@ impl<Ext> Parser<Ext> {
 
             if !in_paragraph {
                 // Skip footnote definitions — handled by collect_footnote_definitions.
-                if self.gfm {
-                    if let Some((next, _, _)) = collect_footnote_def_lines(lines, index) {
-                        index = next;
-                        in_paragraph = false;
-                        continue;
-                    }
+                if self.gfm
+                    && let Some((next, _, _)) = collect_footnote_def_lines(lines, index)
+                {
+                    index = next;
+                    in_paragraph = false;
+                    continue;
                 }
                 if let Some((next, (label, def))) = parse_reference_definition(lines, index) {
                     refs.entry(label).or_insert(def);
@@ -565,12 +572,12 @@ impl<Ext> Parser<Ext> {
                 continue;
             }
 
-            if self.math {
-                if let Some((next, _)) = parse_math_block::<Ext>(lines, index, true) {
-                    index = next;
-                    in_paragraph = false;
-                    continue;
-                }
+            if self.math
+                && let Some((next, _)) = parse_math_block::<Ext>(lines, index, true)
+            {
+                index = next;
+                in_paragraph = false;
+                continue;
             }
 
             if let Some((next, _)) = self.parse_fenced_code(lines, index, true) {
@@ -606,22 +613,22 @@ impl<Ext> Parser<Ext> {
         Ok(())
     }
 
-    // gfm[impl leaf-blocks.leaf-blocks-make-up-markdown-document]
-    // gfm[impl blocks-and-inlines.precedence.block-indicators-take-precedence-over-inline-indicators]
-    // gfm[impl blocks-and-inlines.container-and-leaf-blocks-definition]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.phase-1-line-processing-procedure]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.each-line-may-close-open-or-append]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.initial-tree-is-just-document]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.lines-can-be-discarded-after-incorporation]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.four-line-example-shows-tree-evolution]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.first-example-line]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.first-line-opens-block-quote-and-paragraph]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.second-example-line]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.second-line-is-lazy-continuation]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.third-example-line]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.third-line-closes-paragraph-and-opens-list]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.fourth-example-line]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.fourth-line-opens-second-list-item]
+    // [spec:gfm:def:leaf-blocks.leaf-blocks-make-up-markdown-document]
+    // [spec:gfm:syn:blocks-and-inlines.precedence.block-indicators-take-precedence-over-inline-indicators]
+    // [spec:gfm:def:blocks-and-inlines.container-and-leaf-blocks-definition]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.phase-1-line-processing-procedure]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.each-line-may-close-open-or-append]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.initial-tree-is-just-document]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.lines-can-be-discarded-after-incorporation]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.four-line-example-shows-tree-evolution]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-example-line]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-line-opens-block-quote-and-paragraph]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-example-line]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-line-is-lazy-continuation]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-example-line]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-line-closes-paragraph-and-opens-list]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-example-line]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-line-opens-second-list-item]
     fn parse_block_lines(
         &self,
         lines: &[String],
@@ -644,6 +651,7 @@ impl<Ext> Parser<Ext> {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn parse_block_lines_with_lazy(
         &self,
         lines: &[String],
@@ -665,9 +673,9 @@ impl<Ext> Parser<Ext> {
             let blocks_len_before = blocks.len();
 
             'block: {
-                // gfm[impl leaf-blocks.blank-lines.blank-lines-definition]
-                // gfm[impl leaf-blocks.blank-lines.blank-lines-at-beginning-end-document-are-also-ignored]
-                // gfm[impl leaf-blocks.blank-lines.extension-wrapper]
+                // [spec:gfm:sem:leaf-blocks.blank-lines.blank-lines-definition]
+                // [spec:gfm:sem:leaf-blocks.blank-lines.blank-lines-at-beginning-end-document-are-also-ignored]
+                // [spec:gfm:def:leaf-blocks.blank-lines.extension-wrapper]
                 if lines[index].trim().is_empty() {
                     index += 1;
                     break 'block;
@@ -675,11 +683,11 @@ impl<Ext> Parser<Ext> {
 
                 // Skip footnote definitions — they are collected separately and rendered
                 // in a synthetic footnote section at the end of the document.
-                if self.gfm {
-                    if let Some((next, _, _)) = collect_footnote_def_lines(lines, index) {
-                        index = next;
-                        break 'block;
-                    }
+                if self.gfm
+                    && let Some((next, _, _)) = collect_footnote_def_lines(lines, index)
+                {
+                    index = next;
+                    break 'block;
                 }
 
                 if let Some((next, _)) = parse_reference_definition(lines, index) {
@@ -706,19 +714,19 @@ impl<Ext> Parser<Ext> {
                     break 'block;
                 }
 
-                if self.gfm {
-                    if let Some((next, block)) = self.parse_table(
+                if self.gfm
+                    && let Some((next, block)) = self.parse_table(
                         lines,
                         index,
                         finalizing,
                         terminated,
                         refs,
                         footnote_labels,
-                    )? {
-                        blocks.push(block);
-                        index = next;
-                        break 'block;
-                    }
+                    )?
+                {
+                    blocks.push(block);
+                    index = next;
+                    break 'block;
                 }
 
                 if let Some((next, block)) = self.parse_block_quote(
@@ -734,10 +742,10 @@ impl<Ext> Parser<Ext> {
                     break 'block;
                 }
 
-                // gfm[impl leaf-blocks.thematic-breaks.can-interrupt-paragraphs]
-                // gfm[impl leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines]
-                // gfm[impl leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item]
-                // gfm[impl leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item]
+                // [spec:gfm:syn:leaf-blocks.thematic-breaks.can-interrupt-paragraphs]
+                // [spec:gfm:syn:leaf-blocks.thematic-breaks.need-not-be-surrounded-by-blank-lines]
+                // [spec:gfm:syn:leaf-blocks.thematic-breaks.thematic-break-takes-precedence-over-list-item]
+                // [spec:gfm:syn:leaf-blocks.thematic-breaks.use-different-bullet-for-break-inside-list-item]
                 if is_thematic_break(&lines[index]) {
                     blocks.push(ParsedBlock {
                         node: Node::ThematicBreak {
@@ -757,15 +765,15 @@ impl<Ext> Parser<Ext> {
                     break 'block;
                 }
 
-                if self.math {
-                    if let Some((next, block)) = parse_math_block(lines, index, finalizing) {
-                        blocks.push(block);
-                        index = next;
-                        break 'block;
-                    }
+                if self.math
+                    && let Some((next, block)) = parse_math_block(lines, index, finalizing)
+                {
+                    blocks.push(block);
+                    index = next;
+                    break 'block;
                 }
 
-                if let Some((next, block)) = self.parse_fenced_code(&lines, index, finalizing) {
+                if let Some((next, block)) = self.parse_fenced_code(lines, index, finalizing) {
                     blocks.push(block?);
                     index = next;
                     break 'block;
@@ -788,18 +796,17 @@ impl<Ext> Parser<Ext> {
                     break 'block;
                 }
 
-                if self.definition_lists {
-                    if let Some((next, block)) =
+                if self.definition_lists
+                    && let Some((next, block)) =
                         self.parse_definition_list(lines, index, refs, footnote_labels)?
-                    {
-                        blocks.push(block);
-                        index = next;
-                        break 'block;
-                    }
+                {
+                    blocks.push(block);
+                    index = next;
+                    break 'block;
                 }
 
                 let (next, block) = self.parse_paragraphish(
-                    &lines,
+                    lines,
                     index,
                     finalizing,
                     terminated,
@@ -811,47 +818,47 @@ impl<Ext> Parser<Ext> {
                 index = next;
             }
 
-            if blocks.len() > blocks_len_before {
-                if let Some(out) = ranges_out.as_deref_mut() {
-                    out.push(block_start..index);
-                }
+            if blocks.len() > blocks_len_before
+                && let Some(out) = ranges_out.as_deref_mut()
+            {
+                out.push(block_start..index);
             }
         }
 
         Ok(blocks)
     }
 
-    // gfm[impl container-blocks.block-quotes.marker-structure]
-    // gfm[impl container-blocks.block-quotes.space-after-marker-is-optional]
-    // gfm[impl container-blocks.block-quotes.can-have-initial-or-final-blank-lines]
-    // gfm[impl container-blocks.block-quotes.basic-case]
-    // gfm[impl container-blocks.block-quotes.adjacent-lines-form-single-block-quote]
-    // gfm[impl container-blocks.block-quotes.blank-line-required-before-following-paragraph]
-    // gfm[impl container-blocks.block-quotes.blank-line-separates-adjacent-block-quotes]
-    // gfm[impl container-blocks.block-quotes.blank-lines-generally-not-required-around-block-quotes]
-    // gfm[impl container-blocks.block-quotes.blank-quoted-line-creates-two-paragraphs]
-    // gfm[impl container-blocks.block-quotes.can-be-empty]
-    // gfm[impl container-blocks.block-quotes.can-interrupt-paragraphs]
-    // gfm[impl container-blocks.block-quotes.consecutiveness]
-    // gfm[impl container-blocks.block-quotes.consecutiveness-rationale]
-    // gfm[impl container-blocks.block-quotes.example]
-    // gfm[impl container-blocks.block-quotes.indented-code-needs-five-spaces-after-marker]
-    // gfm[impl container-blocks.block-quotes.indented-dash-remains-paragraph-continuation-text]
-    // gfm[impl container-blocks.block-quotes.laziness]
-    // gfm[impl container-blocks.block-quotes.laziness-allows-omitted-continuation-markers]
-    // gfm[impl container-blocks.block-quotes.laziness-applies-only-to-paragraph-continuation-lines]
-    // gfm[impl container-blocks.block-quotes.laziness-does-not-apply-to-code-block-lines]
-    // gfm[impl container-blocks.block-quotes.lazy-continuation-example]
-    // gfm[impl container-blocks.block-quotes.lazy-continuation-list-example-explanation]
-    // gfm[impl container-blocks.block-quotes.list-example-block-quote-ends-after-first-line]
-    // gfm[impl container-blocks.block-quotes.marker-indent-four-spaces-starts-code-block]
-    // gfm[impl container-blocks.block-quotes.marker-indent-up-to-three-spaces]
-    // gfm[impl container-blocks.block-quotes.may-mix-lazy-and-non-lazy-continuation-lines]
-    // gfm[impl container-blocks.block-quotes.nested-block-quotes-may-omit-continuation-markers]
-    // gfm[impl container-blocks.block-quotes.omitting-marker-before-list-item-ends-block-quote]
-    // gfm[impl container-blocks.block-quotes.omitting-marker-before-setext-underline-changes-meaning]
-    // gfm[impl container-blocks.block-quotes.only-defined-cases-count]
-    // gfm[impl container-blocks.block-quotes.paragraph-continuation-text-definition]
+    // [spec:gfm:def:container-blocks.block-quotes.marker-structure]
+    // [spec:gfm:syn:container-blocks.block-quotes.space-after-marker-is-optional]
+    // [spec:gfm:syn:container-blocks.block-quotes.can-have-initial-or-final-blank-lines]
+    // [spec:gfm:syn:container-blocks.block-quotes.basic-case]
+    // [spec:gfm:syn:container-blocks.block-quotes.adjacent-lines-form-single-block-quote]
+    // [spec:gfm:thm:container-blocks.block-quotes.blank-line-required-before-following-paragraph]
+    // [spec:gfm:syn:container-blocks.block-quotes.blank-line-separates-adjacent-block-quotes]
+    // [spec:gfm:syn:container-blocks.block-quotes.blank-lines-generally-not-required-around-block-quotes]
+    // [spec:gfm:syn:container-blocks.block-quotes.blank-quoted-line-creates-two-paragraphs]
+    // [spec:gfm:syn:container-blocks.block-quotes.can-be-empty]
+    // [spec:gfm:syn:container-blocks.block-quotes.can-interrupt-paragraphs]
+    // [spec:gfm:syn:container-blocks.block-quotes.consecutiveness]
+    // [spec:gfm:sem:container-blocks.block-quotes.consecutiveness-rationale]
+    // [spec:gfm:syn:container-blocks.block-quotes.example]
+    // [spec:gfm:thm:container-blocks.block-quotes.indented-code-needs-five-spaces-after-marker]
+    // [spec:gfm:syn:container-blocks.block-quotes.indented-dash-remains-paragraph-continuation-text]
+    // [spec:gfm:syn:container-blocks.block-quotes.laziness]
+    // [spec:gfm:syn:container-blocks.block-quotes.laziness-allows-omitted-continuation-markers]
+    // [spec:gfm:syn:container-blocks.block-quotes.laziness-applies-only-to-paragraph-continuation-lines]
+    // [spec:gfm:syn:container-blocks.block-quotes.laziness-does-not-apply-to-code-block-lines]
+    // [spec:gfm:syn:container-blocks.block-quotes.lazy-continuation-example]
+    // [spec:gfm:syn:container-blocks.block-quotes.lazy-continuation-list-example-explanation]
+    // [spec:gfm:syn:container-blocks.block-quotes.list-example-block-quote-ends-after-first-line]
+    // [spec:gfm:syn:container-blocks.block-quotes.marker-indent-four-spaces-starts-code-block]
+    // [spec:gfm:syn:container-blocks.block-quotes.marker-indent-up-to-three-spaces]
+    // [spec:gfm:syn:container-blocks.block-quotes.may-mix-lazy-and-non-lazy-continuation-lines]
+    // [spec:gfm:thm:container-blocks.block-quotes.nested-block-quotes-may-omit-continuation-markers]
+    // [spec:gfm:syn:container-blocks.block-quotes.omitting-marker-before-list-item-ends-block-quote]
+    // [spec:gfm:syn:container-blocks.block-quotes.omitting-marker-before-setext-underline-changes-meaning]
+    // [spec:gfm:syn:container-blocks.block-quotes.only-defined-cases-count]
+    // [spec:gfm:def:container-blocks.block-quotes.paragraph-continuation-text-definition]
     fn parse_block_quote(
         &self,
         lines: &[String],
@@ -1022,46 +1029,46 @@ impl<Ext> Parser<Ext> {
         )))
     }
 
-    // gfm[impl container-blocks.list-items.marker-definition]
-    // gfm[impl container-blocks.list-items.type-is-determined-by-marker]
-    // gfm[impl container-blocks.lists.loose-list-definition]
-    // gfm[impl container-blocks.lists.tight-list-definition]
-    // gfm[impl container-blocks.lists.definition]
-    // gfm[impl container-blocks.lists.ordered-and-bullet-list-definition]
-    // gfm[impl container-blocks.lists.same-marker-type-definition]
-    // gfm[impl container-blocks.lists.same-type-definition]
-    // gfm[impl container-blocks.lists.start-number-definition]
-    // gfm[impl container-blocks.lists.loose-vs-tight-html-difference]
-    // gfm[impl container-blocks.lists.changing-marker-type-or-delimiter-starts-new-list]
-    // gfm[impl container-blocks.lists.any-number-of-blank-lines-may-separate-items]
-    // gfm[impl container-blocks.lists.blank-html-comment-separates-lists]
-    // gfm[impl container-blocks.lists.blank-line-before-empty-item-still-makes-list-loose]
-    // gfm[impl container-blocks.lists.blank-line-between-block-elements-in-item-makes-list-loose]
-    // gfm[impl container-blocks.lists.blank-line-between-item-blocks-makes-list-loose]
-    // gfm[impl container-blocks.lists.blank-line-between-items-makes-list-loose]
-    // gfm[impl container-blocks.lists.blank-line-inside-block-quote-does-not-make-list-loose]
-    // gfm[impl container-blocks.lists.blank-lines-inside-code-block-do-not-make-list-loose]
-    // gfm[impl container-blocks.lists.commonmark-allows-list-interruption]
-    // gfm[impl container-blocks.lists.consecutive-block-elements-without-blank-line-keep-list-tight]
-    // gfm[impl container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
-    // gfm[impl container-blocks.lists.four-space-indented-marker-is-code-block]
-    // gfm[impl container-blocks.lists.items-may-be-separated-by-blank-lines]
-    // gfm[impl container-blocks.lists.items-need-not-use-uniform-indentation]
-    // gfm[impl container-blocks.lists.list-can-interrupt-paragraph-without-blank-line]
-    // gfm[impl container-blocks.lists.loose-sublist-does-not-necessarily-make-outer-list-loose]
-    // gfm[impl container-blocks.lists.markdown-pl-disallows-this-to-avoid-hard-wrapped-numeral-lists]
-    // gfm[impl container-blocks.lists.markdown-pl-still-allows-block-quotes-to-interrupt-paragraphs]
-    // gfm[impl container-blocks.lists.more-than-three-spaces-do-not-start-item]
-    // gfm[impl container-blocks.lists.nested-example-is-list-item-with-sublist]
-    // gfm[impl container-blocks.lists.only-lists-starting-with-one-may-interrupt-paragraphs]
-    // gfm[impl container-blocks.lists.outer-list-may-be-loose-while-inner-list-is-tight]
-    // gfm[impl container-blocks.lists.principle-of-uniformity-definition]
-    // gfm[impl container-blocks.lists.second-reason-is-principle-of-uniformity]
-    // gfm[impl container-blocks.lists.single-paragraph-list-is-tight]
-    // gfm[impl container-blocks.lists.starting-with-one-can-still-cause-unintended-list-capture]
-    // gfm[impl container-blocks.lists.starting-with-one-should-prevent-most-spurious-captures]
-    // gfm[impl container-blocks.lists.uniformity-preserves-nested-list-meaning]
-    // gfm[impl container-blocks.lists.uniformity-supports-list-interruption]
+    // [spec:gfm:def:container-blocks.list-items.marker-definition]
+    // [spec:gfm:sem:container-blocks.list-items.type-is-determined-by-marker]
+    // [spec:gfm:def:container-blocks.lists.loose-list-definition]
+    // [spec:gfm:def:container-blocks.lists.tight-list-definition]
+    // [spec:gfm:def:container-blocks.lists.definition]
+    // [spec:gfm:def:container-blocks.lists.ordered-and-bullet-list-definition]
+    // [spec:gfm:def:container-blocks.lists.same-marker-type-definition]
+    // [spec:gfm:def:container-blocks.lists.same-type-definition]
+    // [spec:gfm:def:container-blocks.lists.start-number-definition]
+    // [spec:gfm:sem:container-blocks.lists.loose-vs-tight-html-difference]
+    // [spec:gfm:syn:container-blocks.lists.changing-marker-type-or-delimiter-starts-new-list]
+    // [spec:gfm:syn:container-blocks.lists.any-number-of-blank-lines-may-separate-items]
+    // [spec:gfm:syn:container-blocks.lists.blank-html-comment-separates-lists]
+    // [spec:gfm:sem:container-blocks.lists.blank-line-before-empty-item-still-makes-list-loose]
+    // [spec:gfm:sem:container-blocks.lists.blank-line-between-block-elements-in-item-makes-list-loose]
+    // [spec:gfm:sem:container-blocks.lists.blank-line-between-item-blocks-makes-list-loose]
+    // [spec:gfm:sem:container-blocks.lists.blank-line-between-items-makes-list-loose]
+    // [spec:gfm:sem:container-blocks.lists.blank-line-inside-block-quote-does-not-make-list-loose]
+    // [spec:gfm:sem:container-blocks.lists.blank-lines-inside-code-block-do-not-make-list-loose]
+    // [spec:gfm:syn:container-blocks.lists.commonmark-allows-list-interruption]
+    // [spec:gfm:sem:container-blocks.lists.consecutive-block-elements-without-blank-line-keep-list-tight]
+    // [spec:gfm:thm:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
+    // [spec:gfm:syn:container-blocks.lists.four-space-indented-marker-is-code-block]
+    // [spec:gfm:syn:container-blocks.lists.items-may-be-separated-by-blank-lines]
+    // [spec:gfm:syn:container-blocks.lists.items-need-not-use-uniform-indentation]
+    // [spec:gfm:syn:container-blocks.lists.list-can-interrupt-paragraph-without-blank-line]
+    // [spec:gfm:sem:container-blocks.lists.loose-sublist-does-not-necessarily-make-outer-list-loose]
+    // [spec:gfm:sem:container-blocks.lists.markdown-pl-disallows-this-to-avoid-hard-wrapped-numeral-lists]
+    // [spec:gfm:sem:container-blocks.lists.markdown-pl-still-allows-block-quotes-to-interrupt-paragraphs]
+    // [spec:gfm:syn:container-blocks.lists.more-than-three-spaces-do-not-start-item]
+    // [spec:gfm:syn:container-blocks.lists.nested-example-is-list-item-with-sublist]
+    // [spec:gfm:syn:container-blocks.lists.only-lists-starting-with-one-may-interrupt-paragraphs]
+    // [spec:gfm:sem:container-blocks.lists.outer-list-may-be-loose-while-inner-list-is-tight]
+    // [spec:gfm:def:container-blocks.lists.principle-of-uniformity-definition]
+    // [spec:gfm:sem:container-blocks.lists.second-reason-is-principle-of-uniformity]
+    // [spec:gfm:sem:container-blocks.lists.single-paragraph-list-is-tight]
+    // [spec:gfm:syn:container-blocks.lists.starting-with-one-can-still-cause-unintended-list-capture]
+    // [spec:gfm:sem:container-blocks.lists.starting-with-one-should-prevent-most-spurious-captures]
+    // [spec:gfm:thm:container-blocks.lists.uniformity-preserves-nested-list-meaning]
+    // [spec:gfm:thm:container-blocks.lists.uniformity-supports-list-interruption]
     fn parse_list(
         &self,
         lines: &[String],
@@ -1128,66 +1135,69 @@ impl<Ext> Parser<Ext> {
         )))
     }
 
-    // gfm[impl container-blocks.list-items.required-indentation-is-marker-width-plus-padding]
-    // gfm[impl container-blocks.list-items.sublists-follow-general-indentation-rules]
-    // gfm[impl container-blocks.list-items.lazy-continuation-example]
-    // gfm[impl container-blocks.list-items.item-blocks-may-be-separated-by-multiple-blank-lines]
-    // gfm[impl container-blocks.list-items.basic-case]
-    // gfm[impl container-blocks.list-items.basic-case-example-ordered-item]
-    // gfm[impl container-blocks.list-items.basic-case-example-source-blocks]
-    // gfm[impl container-blocks.list-items.basic-rules-apply-only-to-nonblank-or-code-start]
-    // gfm[impl container-blocks.list-items.blank-line-start-makes-post-marker-spacing-irrelevant]
-    // gfm[impl container-blocks.list-items.empty-bullet-item]
-    // gfm[impl container-blocks.list-items.empty-item-cannot-interrupt-paragraph]
-    // gfm[impl container-blocks.list-items.empty-lines-inside-list-item-need-not-be-indented]
-    // gfm[impl container-blocks.list-items.empty-ordered-item]
-    // gfm[impl container-blocks.list-items.examples-of-required-indentation]
-    // gfm[impl container-blocks.list-items.extra-indent-counts-as-code-content]
-    // gfm[impl container-blocks.list-items.far-right-text-may-still-be-outside-item]
-    // gfm[impl container-blocks.list-items.indented-code-example-with-wider-marker]
-    // gfm[impl container-blocks.list-items.indented-code-inside-item-preserves-empty-lines]
-    // gfm[impl container-blocks.list-items.indented-code-must-be-four-spaces-beyond-content-indent]
-    // gfm[impl container-blocks.list-items.indented-code-start-uses-one-space-after-marker]
-    // gfm[impl container-blocks.list-items.indenting-whole-item-four-spaces-produces-code-block]
-    // gfm[impl container-blocks.list-items.interrupting-first-item-cannot-begin-with-blank-line]
-    // gfm[impl container-blocks.list-items.interrupting-ordered-list-must-start-at-one]
-    // gfm[impl container-blocks.list-items.item-may-contain-heading]
-    // gfm[impl container-blocks.list-items.items-may-start-with-one-blank-line-and-still-be-nonempty]
-    // gfm[impl container-blocks.list-items.laziness-works-inside-nested-structures]
-    // gfm[impl container-blocks.list-items.lazy-continuation-may-delete-only-part-of-indent]
-    // gfm[impl container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
-    // gfm[impl container-blocks.list-items.list-may-be-first-block-in-item]
-    // gfm[impl container-blocks.list-items.list-may-start-or-end-with-empty-item]
-    // gfm[impl container-blocks.list-items.may-begin-with-at-most-one-blank-line]
-    // gfm[impl container-blocks.list-items.may-contain-any-kind-of-block]
-    // gfm[impl container-blocks.list-items.ordered-item-start-number-comes-from-marker]
-    // gfm[impl container-blocks.list-items.ordered-start-number-cannot-be-negative]
-    // gfm[impl container-blocks.list-items.required-indentation-is-relative-not-column-based]
-    // gfm[impl container-blocks.list-items.same-column-can-still-be-inside-item-in-nested-context]
-    // gfm[impl container-blocks.list-items.sublist-example-indent-increases-with-wider-marker]
-    // gfm[impl container-blocks.list-items.sublist-example-one-space-is-not-enough]
-    // gfm[impl container-blocks.list-items.sublist-example-three-spaces-not-enough-for-wider-marker]
-    // gfm[impl container-blocks.list-items.sublist-example-two-space-indent]
-    // gfm[impl container-blocks.list-items.thematic-break-line-is-not-a-list-item]
-    // gfm[impl container-blocks.list-items.motivation.extension-wrapper]
-    // gfm[impl container-blocks.list-items.motivation.fixed-indent-from-marker-is-an-alternative]
-    // gfm[impl container-blocks.list-items.motivation.fixed-margin-indentation-is-unintuitive]
-    // gfm[impl container-blocks.list-items.motivation.fixed-marker-indent-breaks-code-patterns]
-    // gfm[impl container-blocks.list-items.motivation.four-space-rule-is-arbitrary]
-    // gfm[impl container-blocks.list-items.motivation.four-space-rule-splits-list]
-    // gfm[impl container-blocks.list-items.motivation.indented-code-start-needs-special-treatment]
-    // gfm[impl container-blocks.list-items.motivation.markdown-pl-diverged-from-four-space-rule]
-    // gfm[impl container-blocks.list-items.motivation.marker-width-determines-indentation]
-    // gfm[impl container-blocks.list-items.motivation.no-rule-avoids-breaking-all-existing-documents]
-    // gfm[impl container-blocks.list-items.motivation.original-markdown-spec-quoted]
-    // gfm[impl container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
-    // gfm[impl container-blocks.list-items.motivation.preferred-parse-is-single-list]
-    // gfm[impl container-blocks.list-items.motivation.spec-preserves-eight-space-code-pattern]
-    // gfm[impl container-blocks.list-items.motivation.two-space-rule-allows-underindented-content]
-    // gfm[impl container-blocks.list-items.motivation.two-space-rule-block-quote-html]
-    // gfm[impl container-blocks.list-items.motivation.two-space-rule-example-inside-block-quote]
-    // gfm[impl container-blocks.list-items.motivation.two-space-rule-example-single-list-item]
-    // gfm[impl container-blocks.list-items.motivation.two-space-rule-is-extremely-unintuitive]
+    // [spec:gfm:syn:container-blocks.list-items.required-indentation-is-marker-width-plus-padding]
+    // [spec:gfm:thm:container-blocks.list-items.sublists-follow-general-indentation-rules]
+    // [spec:gfm:syn:container-blocks.list-items.lazy-continuation-example]
+    // [spec:gfm:syn:container-blocks.list-items.item-blocks-may-be-separated-by-multiple-blank-lines]
+    // [spec:gfm:syn:container-blocks.list-items.basic-case]
+    // [spec:gfm:syn:container-blocks.list-items.basic-case-example-ordered-item]
+    // [spec:gfm:syn:container-blocks.list-items.basic-case-example-source-blocks]
+    // [spec:gfm:syn:container-blocks.list-items.basic-rules-apply-only-to-nonblank-or-code-start]
+    // [spec:gfm:syn:container-blocks.list-items.blank-line-start-makes-post-marker-spacing-irrelevant]
+    // [spec:gfm:syn:container-blocks.list-items.empty-bullet-item]
+    // [spec:gfm:syn:container-blocks.list-items.empty-item-cannot-interrupt-paragraph]
+    // [spec:gfm:syn:container-blocks.list-items.empty-lines-inside-list-item-need-not-be-indented]
+    // [spec:gfm:syn:container-blocks.list-items.empty-ordered-item]
+    // [spec:gfm:syn:container-blocks.list-items.examples-of-required-indentation]
+    // [spec:gfm:sem:container-blocks.list-items.extra-indent-counts-as-code-content]
+    // [spec:gfm:syn:container-blocks.list-items.far-right-text-may-still-be-outside-item]
+    // [spec:gfm:syn:container-blocks.list-items.indented-code-example-with-wider-marker]
+    // [spec:gfm:sem:container-blocks.list-items.indented-code-inside-item-preserves-empty-lines]
+    // [spec:gfm:syn:container-blocks.list-items.indented-code-must-be-four-spaces-beyond-content-indent]
+    // [spec:gfm:syn:container-blocks.list-items.indented-code-start-uses-one-space-after-marker]
+    // [spec:gfm:syn:container-blocks.list-items.indenting-whole-item-four-spaces-produces-code-block]
+    // [spec:gfm:syn:container-blocks.list-items.interrupting-first-item-cannot-begin-with-blank-line]
+    // [spec:gfm:syn:container-blocks.list-items.interrupting-ordered-list-must-start-at-one]
+    // [spec:gfm:syn:container-blocks.list-items.item-may-contain-heading]
+    // [spec:gfm:syn:container-blocks.list-items.item-starting-with-blank-line]
+    // [spec:gfm:syn:container-blocks.list-items.item-starting-with-indented-code]
+    // [spec:gfm:syn:container-blocks.list-items.items-may-start-with-one-blank-line-and-still-be-nonempty]
+    // [spec:gfm:syn:container-blocks.list-items.laziness-works-inside-nested-structures]
+    // [spec:gfm:syn:container-blocks.list-items.lazy-continuation-may-delete-only-part-of-indent]
+    // [spec:gfm:thm:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
+    // [spec:gfm:syn:container-blocks.list-items.list-may-be-first-block-in-item]
+    // [spec:gfm:syn:container-blocks.list-items.list-may-start-or-end-with-empty-item]
+    // [spec:gfm:syn:container-blocks.list-items.may-begin-with-at-most-one-blank-line]
+    // [spec:gfm:syn:container-blocks.list-items.may-contain-any-kind-of-block]
+    // [spec:gfm:sem:container-blocks.list-items.ordered-item-start-number-comes-from-marker]
+    // [spec:gfm:syn:container-blocks.list-items.ordered-start-number-cannot-be-negative]
+    // [spec:gfm:syn:container-blocks.list-items.required-indentation-is-relative-not-column-based]
+    // [spec:gfm:syn:container-blocks.list-items.same-column-can-still-be-inside-item-in-nested-context]
+    // [spec:gfm:syn:container-blocks.list-items.sublist-example-indent-increases-with-wider-marker]
+    // [spec:gfm:syn:container-blocks.list-items.sublist-example-one-space-is-not-enough]
+    // [spec:gfm:syn:container-blocks.list-items.sublist-example-three-spaces-not-enough-for-wider-marker]
+    // [spec:gfm:syn:container-blocks.list-items.sublist-example-two-space-indent]
+    // [spec:gfm:syn:container-blocks.list-items.thematic-break-line-is-not-a-list-item]
+    // [spec:gfm:def:container-blocks.list-items.motivation.extension-wrapper]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.fixed-indent-from-marker-is-an-alternative]
+    // [spec:gfm:sem:container-blocks.list-items.motivation.fixed-margin-indentation-is-unintuitive]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.fixed-marker-indent-breaks-code-patterns]
+    // [spec:gfm:sem:container-blocks.list-items.motivation.four-space-rule-is-arbitrary]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.four-space-rule-splits-list]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.indented-code-start-needs-special-treatment]
+    // [spec:gfm:sem:container-blocks.list-items.motivation.markdown-pl-diverged-from-four-space-rule]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.marker-width-determines-indentation]
+    // [spec:gfm:sem:container-blocks.list-items.motivation.no-rule-avoids-breaking-all-existing-documents]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.original-markdown-spec-quoted]
+    // [spec:gfm:thm:container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.preferred-parse-is-single-list]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.spec-preserves-eight-space-code-pattern]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-allows-underindented-content]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-block-quote-html]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-example-inside-block-quote]
+    // [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-example-single-list-item]
+    // [spec:gfm:sem:container-blocks.list-items.motivation.two-space-rule-is-extremely-unintuitive]
+    #[allow(clippy::too_many_arguments)]
     fn parse_list_item(
         &self,
         lines: &[String],
@@ -1351,18 +1361,18 @@ impl<Ext> Parser<Ext> {
         ))
     }
 
-    // gfm[impl leaf-blocks.indented-code-blocks.definition]
-    // gfm[impl leaf-blocks.indented-code-blocks.less-than-four-spaces-ends-block]
-    // gfm[impl leaf-blocks.indented-code-blocks.contents-are-literal-text]
-    // gfm[impl leaf-blocks.indented-code-blocks.blank-lines-separate-chunks]
-    // gfm[impl leaf-blocks.indented-code-blocks.surrounding-blank-lines-are-excluded]
-    // gfm[impl leaf-blocks.indented-code-blocks.trailing-spaces-are-preserved]
-    // gfm[impl leaf-blocks.indented-code-blocks.first-line-can-indented-more-than-four-spaces]
-    // gfm[impl leaf-blocks.indented-code-blocks.indent-beyond-four-is-preserved]
-    // gfm[impl leaf-blocks.indented-code-blocks.cannot-interrupt-paragraphs]
-    // gfm[impl leaf-blocks.indented-code-blocks.indented-code-block-cannot-interrupt-paragraph]
-    // gfm[impl leaf-blocks.indented-code-blocks.may-occur-adjacent-to-other-blocks]
-    // gfm[impl leaf-blocks.indented-code-blocks.list-item-interpretation-takes-precedence]
+    // [spec:gfm:def:leaf-blocks.indented-code-blocks.definition]
+    // [spec:gfm:syn:leaf-blocks.indented-code-blocks.less-than-four-spaces-ends-block]
+    // [spec:gfm:sem:leaf-blocks.indented-code-blocks.contents-are-literal-text]
+    // [spec:gfm:syn:leaf-blocks.indented-code-blocks.blank-lines-separate-chunks]
+    // [spec:gfm:sem:leaf-blocks.indented-code-blocks.surrounding-blank-lines-are-excluded]
+    // [spec:gfm:sem:leaf-blocks.indented-code-blocks.trailing-spaces-are-preserved]
+    // [spec:gfm:syn:leaf-blocks.indented-code-blocks.first-line-can-indented-more-than-four-spaces]
+    // [spec:gfm:sem:leaf-blocks.indented-code-blocks.indent-beyond-four-is-preserved]
+    // [spec:gfm:syn:leaf-blocks.indented-code-blocks.cannot-interrupt-paragraphs]
+    // [spec:gfm:syn:leaf-blocks.indented-code-blocks.indented-code-block-cannot-interrupt-paragraph]
+    // [spec:gfm:syn:leaf-blocks.indented-code-blocks.may-occur-adjacent-to-other-blocks]
+    // [spec:gfm:syn:leaf-blocks.indented-code-blocks.list-item-interpretation-takes-precedence]
     fn parse_indented_code(
         &self,
         lines: &[String],
@@ -1416,41 +1426,42 @@ impl<Ext> Parser<Ext> {
         ))
     }
 
-    // gfm[impl leaf-blocks.html-blocks.definition]
-    // gfm[impl leaf-blocks.html-blocks.ends-at-matching-end-condition-or-container-end]
-    // gfm[impl leaf-blocks.html-blocks.type-1-script-pre-style-start-and-end-conditions]
-    // gfm[impl leaf-blocks.html-blocks.type-2-comment-start-and-end-conditions]
-    // gfm[impl leaf-blocks.html-blocks.type-3-processing-instruction-start-and-end-conditions]
-    // gfm[impl leaf-blocks.html-blocks.type-4-declaration-start-and-end-conditions]
-    // gfm[impl leaf-blocks.html-blocks.type-5-cdata-start-and-end-conditions]
-    // gfm[impl leaf-blocks.html-blocks.type-6-block-tag-start-and-blank-line-end]
-    // gfm[impl leaf-blocks.html-blocks.type-7-complete-tag-start-and-blank-line-end]
-    // gfm[impl leaf-blocks.html-blocks.types-1-through-5-end-at-matching-end-marker]
-    // gfm[impl leaf-blocks.html-blocks.starts-after-up-to-three-spaces-of-indentation]
-    // gfm[impl leaf-blocks.html-blocks.has-seven-types]
-    // gfm[impl leaf-blocks.html-blocks.end-marker-may-occur-on-same-line-as-start]
-    // gfm[impl leaf-blocks.html-blocks.single-line-block-when-start-and-end-both-match]
-    // gfm[impl leaf-blocks.html-blocks.trailing-text-after-end-marker-stays-inside-block]
-    // gfm[impl leaf-blocks.html-blocks.inner-html-does-not-change-active-html-block-type]
-    // gfm[impl leaf-blocks.html-blocks.inner-start-conditions-do-not-affect-parser-state]
-    // gfm[impl leaf-blocks.html-blocks.types-1-through-5-without-end-marker-close-at-container-end]
-    // gfm[impl leaf-blocks.html-blocks.types-1-through-6-need-not-be-preceded-by-blank-line]
-    // gfm[impl leaf-blocks.html-blocks.blank-line-ends-type-6-block-and-normal-parsing-resumes]
-    // gfm[impl leaf-blocks.html-blocks.blank-line-after-opening-tag-allows-following-markdown]
-    // gfm[impl leaf-blocks.html-blocks.blank-line-separates-two-html-blocks-with-markdown-between]
-    // gfm[impl leaf-blocks.html-blocks.blank-lines-can-usually-be-removed-except-in-pre-blocks]
-    // gfm[impl leaf-blocks.html-blocks.type-6-and-7-usually-require-following-blank-line]
-    // gfm[impl leaf-blocks.html-blocks.type-6-continues-through-apparent-markdown-until-blank-line]
-    // gfm[impl leaf-blocks.html-blocks.pasting-html-with-blank-lines-usually-still-works]
-    // gfm[impl leaf-blocks.html-blocks.differs-from-original-markdown-rule]
-    // gfm[impl leaf-blocks.html-blocks.original-markdown-rule-quote]
-    // gfm[impl leaf-blocks.html-blocks.original-markdown-rule-is-more-liberal-about-blank-lines]
-    // gfm[impl leaf-blocks.html-blocks.original-markdown-rule-is-more-restrictive-in-some-ways]
-    // gfm[impl leaf-blocks.html-blocks.most-implementations-do-not-follow-all-original-restrictions]
-    // gfm[impl leaf-blocks.html-blocks.markdown-1-attribute-convention-is-more-complex]
-    // gfm[impl leaf-blocks.html-blocks.block-vs-inline-tag-behavior]
-    // gfm[impl leaf-blocks.html-blocks.inline-html-when-tag-is-not-alone-on-line]
-    // gfm[impl leaf-blocks.html-blocks.indented-inner-tags-with-blank-lines-can-become-code-blocks]
+    // [spec:gfm:def:leaf-blocks.html-blocks.definition]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.ends-at-matching-end-condition-or-container-end]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-1-script-pre-style-start-and-end-conditions]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-2-comment-start-and-end-conditions]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-3-processing-instruction-start-and-end-conditions]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-4-declaration-start-and-end-conditions]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-5-cdata-start-and-end-conditions]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-6-block-tag-start-and-blank-line-end]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-7-complete-tag-start-and-blank-line-end]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-5-end-at-matching-end-marker]
+    // [spec:gfm:thm:leaf-blocks.html-blocks.types-1-through-5-may-contain-blank-lines]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.starts-after-up-to-three-spaces-of-indentation]
+    // [spec:gfm:def:leaf-blocks.html-blocks.has-seven-types]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.end-marker-may-occur-on-same-line-as-start]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.single-line-block-when-start-and-end-both-match]
+    // [spec:gfm:sem:leaf-blocks.html-blocks.trailing-text-after-end-marker-stays-inside-block]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.inner-html-does-not-change-active-html-block-type]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.inner-start-conditions-do-not-affect-parser-state]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-5-without-end-marker-close-at-container-end]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-6-need-not-be-preceded-by-blank-line]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.blank-line-ends-type-6-block-and-normal-parsing-resumes]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.blank-line-after-opening-tag-allows-following-markdown]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.blank-line-separates-two-html-blocks-with-markdown-between]
+    // [spec:gfm:sem:leaf-blocks.html-blocks.blank-lines-can-usually-be-removed-except-in-pre-blocks]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-6-and-7-usually-require-following-blank-line]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-6-continues-through-apparent-markdown-until-blank-line]
+    // [spec:gfm:sem:leaf-blocks.html-blocks.pasting-html-with-blank-lines-usually-still-works]
+    // [spec:gfm:sem:leaf-blocks.html-blocks.differs-from-original-markdown-rule]
+    // [spec:gfm:sem:leaf-blocks.html-blocks.original-markdown-rule-quote]
+    // [spec:gfm:sem:leaf-blocks.html-blocks.original-markdown-rule-is-more-liberal-about-blank-lines]
+    // [spec:gfm:sem:leaf-blocks.html-blocks.original-markdown-rule-is-more-restrictive-in-some-ways]
+    // [spec:gfm:sem:leaf-blocks.html-blocks.most-implementations-do-not-follow-all-original-restrictions]
+    // [spec:gfm:sem:leaf-blocks.html-blocks.markdown-1-attribute-convention-is-more-complex]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.block-vs-inline-tag-behavior]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.inline-html-when-tag-is-not-alone-on-line]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.indented-inner-tags-with-blank-lines-can-become-code-blocks]
     fn parse_html_block(
         &self,
         lines: &[String],
@@ -1524,18 +1535,18 @@ impl<Ext> Parser<Ext> {
         ))
     }
 
-    // gfm[impl leaf-blocks.tables-extension.table-definition]
-    // gfm[impl leaf-blocks.tables-extension.delimiter-row-structure]
-    // gfm[impl leaf-blocks.tables-extension.header-and-delimiter-row-must-have-matching-cell-count]
-    // gfm[impl leaf-blocks.tables-extension.table-ends-at-blank-line-or-other-block]
-    // gfm[impl leaf-blocks.tables-extension.extension-wrapper]
-    // gfm[impl leaf-blocks.tables-extension.gfm-enables-table-extension]
-    // gfm[impl leaf-blocks.tables-extension.rows-consist-of-pipe-separated-cells]
-    // gfm[impl leaf-blocks.tables-extension.body-rows-may-have-fewer-or-more-cells-than-header]
-    // gfm[impl leaf-blocks.tables-extension.column-widths-and-edge-pipes-need-not-be-consistent]
-    // gfm[impl leaf-blocks.tables-extension.no-tbody-generated-when-there-are-no-body-rows]
-    // gfm[impl leaf-blocks.tables-extension.block-level-elements-cannot-appear-in-tables]
-    // gfm[impl leaf-blocks.tables-extension.leading-and-trailing-pipes-are-recommended-for-clarity]
+    // [spec:gfm:def:leaf-blocks.tables-extension.table-definition]
+    // [spec:gfm:def:leaf-blocks.tables-extension.delimiter-row-structure]
+    // [spec:gfm:syn:leaf-blocks.tables-extension.header-and-delimiter-row-must-have-matching-cell-count]
+    // [spec:gfm:syn:leaf-blocks.tables-extension.table-ends-at-blank-line-or-other-block]
+    // [spec:gfm:def:leaf-blocks.tables-extension.extension-wrapper]
+    // [spec:gfm:def:leaf-blocks.tables-extension.gfm-enables-table-extension]
+    // [spec:gfm:syn:leaf-blocks.tables-extension.rows-consist-of-pipe-separated-cells]
+    // [spec:gfm:sem:leaf-blocks.tables-extension.body-rows-may-have-fewer-or-more-cells-than-header]
+    // [spec:gfm:syn:leaf-blocks.tables-extension.column-widths-and-edge-pipes-need-not-be-consistent]
+    // [spec:gfm:sem:leaf-blocks.tables-extension.no-tbody-generated-when-there-are-no-body-rows]
+    // [spec:gfm:syn:leaf-blocks.tables-extension.block-level-elements-cannot-appear-in-tables]
+    // [spec:gfm:req:leaf-blocks.tables-extension.leading-and-trailing-pipes-are-recommended-for-clarity]
     fn parse_table(
         &self,
         lines: &[String],
@@ -1559,6 +1570,10 @@ impl<Ext> Parser<Ext> {
             return Ok(None);
         };
         let header_cells = split_table_row(&lines[start]);
+        // A header row that disagrees with the delimiter row's column
+        // count is not a table: reject the whole construct rather than
+        // reshape the header.
+        // [spec:mw:req:core.node.table-cell-alignment]
         if header_cells.is_empty() || header_cells.len() != alignments.len() {
             return Ok(None);
         }
@@ -1579,7 +1594,9 @@ impl<Ext> Parser<Ext> {
                 break;
             }
             let mut cells = split_table_row(&lines[index]);
-            // Pad or truncate to match header column count
+            // Body rows are normalised, not rejected: pad short rows with
+            // empty cells and truncate long ones to the column count.
+            // [spec:mw:req:core.node.table-cell-alignment]
             cells.resize(alignments.len(), String::new());
             rows.push(Node::TableRow {
                 cells: self.parse_table_cells(&cells, false, &alignments, refs, footnote_labels)?,
@@ -1611,7 +1628,8 @@ impl<Ext> Parser<Ext> {
         )))
     }
 
-    // gfm[impl leaf-blocks.tables-extension.spaces-around-cell-content-are-trimmed]
+    // [spec:gfm:sem:leaf-blocks.tables-extension.spaces-around-cell-content-are-trimmed]
+    // [spec:mw:req:core.node.table-cell-alignment]
     fn parse_table_cells(
         &self,
         cells: &[String],
@@ -1635,25 +1653,25 @@ impl<Ext> Parser<Ext> {
         Ok(out)
     }
 
-    // gfm[impl leaf-blocks.fenced-code-blocks.code-fence-uses-backticks-or-tildes]
-    // gfm[impl leaf-blocks.fenced-code-blocks.opening-fence-may-include-info-string]
-    // gfm[impl leaf-blocks.fenced-code-blocks.content-continues-until-matching-closing-fence]
-    // gfm[impl leaf-blocks.fenced-code-blocks.unclosed-block-continues-to-end-of-containing-block]
-    // gfm[impl leaf-blocks.fenced-code-blocks.simple-backtick-and-tilde-fences]
-    // gfm[impl leaf-blocks.fenced-code-blocks.content-is-literal-text]
-    // gfm[impl leaf-blocks.fenced-code-blocks.content-may-be-empty]
-    // gfm[impl leaf-blocks.fenced-code-blocks.content-may-consist-only-of-empty-lines]
-    // gfm[impl leaf-blocks.fenced-code-blocks.content-lines-without-indent-are-preserved]
-    // gfm[impl leaf-blocks.fenced-code-blocks.content-removes-up-to-opening-indent]
-    // gfm[impl leaf-blocks.fenced-code-blocks.short-indented-content-lines-remove-all-indent]
-    // gfm[impl leaf-blocks.fenced-code-blocks.fences-may-be-indented-and-content-deindents-to-match]
-    // gfm[impl leaf-blocks.fenced-code-blocks.unclosed-block-closes-at-end-of-containing-block]
-    // gfm[impl leaf-blocks.fenced-code-blocks.can-interrupt-paragraphs]
-    // gfm[impl leaf-blocks.fenced-code-blocks.can-be-followed-directly-by-paragraphs]
-    // gfm[impl leaf-blocks.fenced-code-blocks.other-blocks-can-appear-adjacent-without-blank-lines]
-    // gfm[impl leaf-blocks.fenced-code-blocks.info-string-may-be-provided-after-opening-fence]
-    // gfm[impl leaf-blocks.fenced-code-blocks.first-info-string-word-typically-identifies-language]
-    // gfm[impl leaf-blocks.fenced-code-blocks.info-string-treatment-is-not-mandated]
+    // [spec:gfm:def:leaf-blocks.fenced-code-blocks.code-fence-uses-backticks-or-tildes]
+    // [spec:gfm:def:leaf-blocks.fenced-code-blocks.opening-fence-may-include-info-string]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.content-continues-until-matching-closing-fence]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.unclosed-block-continues-to-end-of-containing-block]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.simple-backtick-and-tilde-fences]
+    // [spec:gfm:sem:leaf-blocks.fenced-code-blocks.content-is-literal-text]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.content-may-be-empty]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.content-may-consist-only-of-empty-lines]
+    // [spec:gfm:sem:leaf-blocks.fenced-code-blocks.content-lines-without-indent-are-preserved]
+    // [spec:gfm:sem:leaf-blocks.fenced-code-blocks.content-removes-up-to-opening-indent]
+    // [spec:gfm:sem:leaf-blocks.fenced-code-blocks.short-indented-content-lines-remove-all-indent]
+    // [spec:gfm:sem:leaf-blocks.fenced-code-blocks.fences-may-be-indented-and-content-deindents-to-match]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.unclosed-block-closes-at-end-of-containing-block]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.can-interrupt-paragraphs]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.can-be-followed-directly-by-paragraphs]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.other-blocks-can-appear-adjacent-without-blank-lines]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.info-string-may-be-provided-after-opening-fence]
+    // [spec:gfm:sem:leaf-blocks.fenced-code-blocks.first-info-string-word-typically-identifies-language]
+    // [spec:gfm:req:leaf-blocks.fenced-code-blocks.info-string-treatment-is-not-mandated]
     fn parse_fenced_code(
         &self,
         lines: &[String],
@@ -1690,7 +1708,7 @@ impl<Ext> Parser<Ext> {
                 literal.push('\n');
             }
             first_content = false;
-            literal.push_str(&strip_up_to_n_leading_spaces(&lines[index], opener.indent));
+            literal.push_str(strip_up_to_n_leading_spaces(&lines[index], opener.indent));
             index += 1;
         }
 
@@ -1710,17 +1728,17 @@ impl<Ext> Parser<Ext> {
         ))
     }
 
-    // gfm[impl leaf-blocks.atx-headings.structure]
-    // gfm[impl leaf-blocks.atx-headings.opening-sequence-length-one-to-six]
-    // gfm[impl leaf-blocks.atx-headings.opening-sequence-length-at-most-six]
-    // gfm[impl leaf-blocks.atx-headings.opening-sequence-followed-by-space-or-eol]
-    // gfm[impl leaf-blocks.atx-headings.contents-parse-as-inline-content]
-    // gfm[impl leaf-blocks.atx-headings.opening-indent-up-to-three-spaces]
-    // gfm[impl leaf-blocks.atx-headings.opening-indent-four-spaces-not-allowed]
-    // gfm[impl leaf-blocks.atx-headings.can-be-empty]
-    // gfm[impl leaf-blocks.atx-headings.trim-leading-and-trailing-whitespace-before-inline-parse]
-    // gfm[impl leaf-blocks.atx-headings.can-interrupt-paragraphs-without-blank-lines]
-    // gfm[impl leaf-blocks.atx-headings.escaped-opening-hash-does-not-open-heading]
+    // [spec:gfm:syn:leaf-blocks.atx-headings.structure]
+    // [spec:gfm:syn:leaf-blocks.atx-headings.opening-sequence-length-one-to-six]
+    // [spec:gfm:syn:leaf-blocks.atx-headings.opening-sequence-length-at-most-six]
+    // [spec:gfm:syn:leaf-blocks.atx-headings.opening-sequence-followed-by-space-or-eol]
+    // [spec:gfm:sem:leaf-blocks.atx-headings.contents-parse-as-inline-content]
+    // [spec:gfm:syn:leaf-blocks.atx-headings.opening-indent-up-to-three-spaces]
+    // [spec:gfm:syn:leaf-blocks.atx-headings.opening-indent-four-spaces-not-allowed]
+    // [spec:gfm:syn:leaf-blocks.atx-headings.can-be-empty]
+    // [spec:gfm:sem:leaf-blocks.atx-headings.trim-leading-and-trailing-whitespace-before-inline-parse]
+    // [spec:gfm:syn:leaf-blocks.atx-headings.can-interrupt-paragraphs-without-blank-lines]
+    // [spec:gfm:syn:leaf-blocks.atx-headings.escaped-opening-hash-does-not-open-heading]
     fn parse_atx_heading(
         &self,
         line: &str,
@@ -1758,42 +1776,43 @@ impl<Ext> Parser<Ext> {
         }))
     }
 
-    // gfm[impl leaf-blocks.paragraphs.structure]
-    // gfm[impl leaf-blocks.paragraphs.contents-parse-as-inlines]
-    // gfm[impl leaf-blocks.paragraphs.may-span-multiple-lines-without-blank-lines]
-    // gfm[impl leaf-blocks.paragraphs.blank-line-separates-paragraphs]
-    // gfm[impl leaf-blocks.paragraphs.first-line-indent-up-to-three-spaces]
-    // gfm[impl leaf-blocks.paragraphs.leading-spaces-are-ignored]
-    // gfm[impl leaf-blocks.paragraphs.lines-after-first-may-be-indented-arbitrarily]
-    // gfm[impl leaf-blocks.paragraphs.multiple-blank-lines-between-paragraphs-have-no-effect]
-    // gfm[impl leaf-blocks.paragraphs.raw-content-concatenates-lines-and-trims-edge-whitespace]
-    // gfm[impl leaf-blocks.paragraphs.trailing-spaces-are-stripped-before-inline-parsing]
-    // gfm[impl leaf-blocks.setext-headings.structure]
-    // gfm[impl leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content]
-    // gfm[impl leaf-blocks.setext-headings.cannot-be-empty]
-    // gfm[impl leaf-blocks.setext-headings.cannot-interrupt-paragraphs]
-    // gfm[impl leaf-blocks.setext-headings.need-not-be-surrounded-by-blank-lines]
-    // gfm[impl leaf-blocks.setext-headings.blank-lines-generally-not-required-around-heading]
-    // gfm[impl leaf-blocks.setext-headings.blank-line-required-after-paragraph-before-heading]
-    // gfm[impl leaf-blocks.setext-headings.blank-lines-around-break-produce-hr]
-    // gfm[impl leaf-blocks.setext-headings.non-setext-break-marker-produces-hr]
-    // gfm[impl leaf-blocks.setext-headings.text-lines-must-not-parse-as-other-block-constructs]
-    // gfm[impl leaf-blocks.setext-headings.text-lines-must-otherwise-parse-as-paragraphs]
-    // gfm[impl leaf-blocks.setext-headings.text-lines-require-non-whitespace-content]
-    // gfm[impl leaf-blocks.setext-headings.text-lines-indent-up-to-three-spaces]
-    // gfm[impl leaf-blocks.setext-headings.content-indent-up-to-three-spaces-and-need-not-align]
-    // gfm[impl leaf-blocks.setext-headings.content-indent-four-spaces-not-allowed]
-    // gfm[impl leaf-blocks.setext-headings.trailing-spaces-in-content-do-not-create-line-break]
-    // gfm[impl leaf-blocks.setext-headings.trailing-backslash-does-not-create-line-break]
-    // gfm[impl leaf-blocks.setext-headings.backslash-escaped-underline-produces-literal-text]
-    // gfm[impl leaf-blocks.setext-headings.backslash-escapes-allow-literal-block-markers-in-content]
-    // gfm[impl leaf-blocks.setext-headings.block-indicators-take-precedence-over-inline-indicators]
-    // gfm[impl leaf-blocks.setext-headings.multiline-heading-has-four-interpretations]
-    // gfm[impl leaf-blocks.setext-headings.multiline-heading-interprets-as-heading-then-paragraph]
-    // gfm[impl leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs]
-    // gfm[impl leaf-blocks.html-blocks.type-7-cannot-interrupt-paragraphs]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.setext-underlines-convert-paragraphs]
-    // gfm[impl appendix-a-parsing-strategy.phase-1-block-structure.reference-definitions-are-detected-at-paragraph-close]
+    // [spec:gfm:syn:leaf-blocks.paragraphs.structure]
+    // [spec:gfm:sem:leaf-blocks.paragraphs.contents-parse-as-inlines]
+    // [spec:gfm:syn:leaf-blocks.paragraphs.may-span-multiple-lines-without-blank-lines]
+    // [spec:gfm:syn:leaf-blocks.paragraphs.blank-line-separates-paragraphs]
+    // [spec:gfm:syn:leaf-blocks.paragraphs.first-line-indent-up-to-three-spaces]
+    // [spec:gfm:sem:leaf-blocks.paragraphs.leading-spaces-are-ignored]
+    // [spec:gfm:syn:leaf-blocks.paragraphs.lines-after-first-may-be-indented-arbitrarily]
+    // [spec:gfm:sem:leaf-blocks.paragraphs.multiple-blank-lines-between-paragraphs-have-no-effect]
+    // [spec:gfm:sem:leaf-blocks.paragraphs.raw-content-concatenates-lines-and-trims-edge-whitespace]
+    // [spec:gfm:sem:leaf-blocks.paragraphs.trailing-spaces-are-stripped-before-inline-parsing]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.structure]
+    // [spec:gfm:sem:leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.cannot-be-empty]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.cannot-interrupt-paragraphs]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.need-not-be-surrounded-by-blank-lines]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.blank-lines-generally-not-required-around-heading]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.blank-line-required-after-paragraph-before-heading]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.blank-lines-around-break-produce-hr]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.non-setext-break-marker-produces-hr]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-must-not-parse-as-other-block-constructs]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-must-otherwise-parse-as-paragraphs]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-require-non-whitespace-content]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.text-lines-indent-up-to-three-spaces]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.content-indent-up-to-three-spaces-and-need-not-align]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.content-indent-four-spaces-not-allowed]
+    // [spec:gfm:sem:leaf-blocks.setext-headings.trailing-spaces-in-content-do-not-create-line-break]
+    // [spec:gfm:sem:leaf-blocks.setext-headings.trailing-backslash-does-not-create-line-break]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.backslash-escaped-underline-produces-literal-text]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.backslash-escapes-allow-literal-block-markers-in-content]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.block-indicators-take-precedence-over-inline-indicators]
+    // [spec:gfm:def:leaf-blocks.setext-headings.multiline-heading-has-four-interpretations]
+    // [spec:gfm:sem:leaf-blocks.setext-headings.multiline-heading-interprets-as-heading-then-paragraph]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.types-1-through-6-can-interrupt-paragraphs]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-7-cannot-interrupt-paragraphs]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.setext-underlines-convert-paragraphs]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.reference-definitions-are-detected-at-paragraph-close]
+    #[allow(clippy::too_many_arguments)]
     fn parse_paragraphish(
         &self,
         lines: &[String],
@@ -1817,12 +1836,12 @@ impl<Ext> Parser<Ext> {
 
             let is_lazy = lazy.get(index).copied().unwrap_or(false);
 
-            // gfm[impl leaf-blocks.thematic-breaks.setext-heading-takes-precedence-over-dash-break]
-            // gfm[impl leaf-blocks.setext-headings.level-determined-by-underline-marker]
-            // gfm[impl leaf-blocks.setext-headings.underline-uses-equals-or-dashes]
-            // gfm[impl leaf-blocks.setext-headings.content-may-span-multiple-lines]
-            // gfm[impl leaf-blocks.setext-headings.raw-content-concatenates-lines-and-trims-edge-whitespace]
-            // gfm[impl leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content]
+            // [spec:gfm:syn:leaf-blocks.thematic-breaks.setext-heading-takes-precedence-over-dash-break]
+            // [spec:gfm:sem:leaf-blocks.setext-headings.level-determined-by-underline-marker]
+            // [spec:gfm:def:leaf-blocks.setext-headings.underline-uses-equals-or-dashes]
+            // [spec:gfm:syn:leaf-blocks.setext-headings.content-may-span-multiple-lines]
+            // [spec:gfm:sem:leaf-blocks.setext-headings.raw-content-concatenates-lines-and-trims-edge-whitespace]
+            // [spec:gfm:sem:leaf-blocks.setext-headings.contents-parse-preceding-lines-as-inline-content]
             // Setext underline cannot be a lazy continuation line
             if !is_lazy && is_setext_underline(&lines[index]) {
                 let text = join_lines(&collected);
@@ -1891,10 +1910,10 @@ impl<Ext> Parser<Ext> {
         ))
     }
 
-    // gfm[impl blocks-and-inlines.precedence.two-phase-parsing]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.phase-2-parses-inline-content]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.open-blocks-close-at-end-of-input]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.example-produces-softbreak-and-emphasis]
+    // [spec:gfm:thm:blocks-and-inlines.precedence.two-phase-parsing]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.phase-2-parses-inline-content]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.open-blocks-close-at-end-of-input]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.example-produces-softbreak-and-emphasis]
     fn parse_inline_nodes(
         &self,
         text: &str,
@@ -1932,7 +1951,7 @@ fn promote_semantic_html<Ext>(nodes: Vec<Node<Ext>>) -> Vec<Node<Ext>> {
             let mut children = Vec::new();
             let mut found_close = false;
 
-            while let Some(next) = iter.next() {
+            for next in iter.by_ref() {
                 if matches_html_close(&next, &close) {
                     found_close = true;
                     break;
@@ -2176,12 +2195,12 @@ const HTML_BLOCK_TYPE_6_TAGS: &[&str] = &[
     "ul",
 ];
 
-// gfm[impl preliminaries.characters-and-lines.line-ending-definition]
-// gfm[impl preliminaries.insecure-characters.null-character-is-replaced]
-// gfm[impl preliminaries.tabs.tabs-not-expanded-in-lines]
-// gfm[impl preliminaries.characters-and-lines.character-definition]
-// gfm[impl preliminaries.characters-and-lines.encoding-is-unspecified]
-// gfm[impl preliminaries.characters-and-lines.valid-commonmark-document]
+// [spec:gfm:def:preliminaries.characters-and-lines.line-ending-definition]
+// [spec:gfm:req:preliminaries.insecure-characters.null-character-is-replaced]
+// [spec:gfm:sem:preliminaries.tabs.tabs-not-expanded-in-lines]
+// [spec:gfm:def:preliminaries.characters-and-lines.character-definition]
+// [spec:gfm:req:preliminaries.characters-and-lines.encoding-is-unspecified]
+// [spec:gfm:syn:preliminaries.characters-and-lines.valid-commonmark-document]
 fn normalize_chunk(chunk: &str) -> String {
     let mut out = String::with_capacity(chunk.len());
     let mut chars = chunk.chars().peekable();
@@ -2207,12 +2226,13 @@ struct SplitLines {
     terminated: bool,
 }
 
-// gfm[impl preliminaries.characters-and-lines.line-definition]
-// gfm[impl preliminaries.characters-and-lines.blank-line-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.line-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.blank-line-definition]
 /// Add `offset` to the `source` span of every descendant of `node` (NOT the
 /// node itself — its span is already absolute). Used to translate
 /// inline-relative spans produced by `InlineParser` into source-absolute
 /// coordinates.
+// [spec:mw:sem:core.span.unpopulated-is-empty]
 fn offset_descendant_spans<Ext>(node: &mut Node<Ext>, offset: usize) {
     node.for_each_child_mut(|child| {
         let span = child.source();
@@ -2257,30 +2277,30 @@ fn join_lines(lines: &[String]) -> String {
     lines.join("\n")
 }
 
-// gfm[impl leaf-blocks.link-reference-definitions.structure]
-// gfm[impl leaf-blocks.link-reference-definitions.label-followed-by-colon]
-// gfm[impl leaf-blocks.link-reference-definitions.label-indent-up-to-three-spaces]
-// gfm[impl leaf-blocks.link-reference-definitions.indent-four-spaces-prevents-definition]
-// gfm[impl leaf-blocks.link-reference-definitions.defines-label-for-reference-links-and-images]
-// gfm[impl leaf-blocks.link-reference-definitions.title-may-be-omitted]
-// gfm[impl leaf-blocks.link-reference-definitions.title-separated-from-destination-by-whitespace]
-// gfm[impl leaf-blocks.link-reference-definitions.title-must-be-separated-by-whitespace]
-// gfm[impl leaf-blocks.link-reference-definitions.title-allows-leading-whitespace]
-// gfm[impl leaf-blocks.link-reference-definitions.title-may-extend-over-multiple-lines]
-// gfm[impl leaf-blocks.link-reference-definitions.destination-allows-leading-whitespace]
-// gfm[impl leaf-blocks.link-reference-definitions.destination-and-title-allow-escapes]
-// gfm[impl leaf-blocks.link-reference-definitions.empty-destination-may-use-angle-brackets]
-// gfm[impl leaf-blocks.link-reference-definitions.link-destination-may-not-omitted]
-// gfm[impl leaf-blocks.link-reference-definitions.it-may-not-contain-blank-line]
-// gfm[impl leaf-blocks.link-reference-definitions.following-line-does-not-become-title]
-// gfm[impl leaf-blocks.link-reference-definitions.trailing-non-whitespace-invalidates-definition]
-// gfm[impl leaf-blocks.link-reference-definitions.no-non-whitespace-after-definition]
-// gfm[impl leaf-blocks.link-reference-definitions.multiline-label-form-does-not-define-reference]
-// gfm[impl leaf-blocks.link-reference-definitions.definition-status-is-independent-of-use]
-// gfm[impl leaf-blocks.link-reference-definitions.cannot-interrupt-paragraphs]
-// gfm[impl leaf-blocks.link-reference-definitions.may-follow-other-blocks-without-blank-line]
-// gfm[impl leaf-blocks.link-reference-definitions.may-occur-inside-block-containers]
-// gfm[impl leaf-blocks.link-reference-definitions.code-block-content-does-not-define-reference]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.structure]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.label-followed-by-colon]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.label-indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.indent-four-spaces-prevents-definition]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.defines-label-for-reference-links-and-images]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-may-be-omitted]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-separated-from-destination-by-whitespace]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-must-be-separated-by-whitespace]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-allows-leading-whitespace]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.title-may-extend-over-multiple-lines]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.destination-allows-leading-whitespace]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.destination-and-title-allow-escapes]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.empty-destination-may-use-angle-brackets]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.link-destination-may-not-omitted]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.it-may-not-contain-blank-line]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.following-line-does-not-become-title]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.trailing-non-whitespace-invalidates-definition]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.no-non-whitespace-after-definition]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.multiline-label-form-does-not-define-reference]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.definition-status-is-independent-of-use]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.cannot-interrupt-paragraphs]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.may-follow-other-blocks-without-blank-line]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.may-occur-inside-block-containers]
+// [spec:gfm:syn:leaf-blocks.link-reference-definitions.code-block-content-does-not-define-reference]
 fn parse_reference_definition(
     lines: &[String],
     start: usize,
@@ -2306,9 +2326,9 @@ fn parse_reference_definition(
     let first_stripped_bytes = lines[start].len() - first_line.len();
     let mut text = String::from(first_line);
     let mut line_ends = vec![text.len()]; // byte position after each line (just before its \n)
-    for i in (start + 1)..end_line {
+    for line in &lines[(start + 1)..end_line] {
         text.push('\n');
-        text.push_str(&lines[i]);
+        text.push_str(line);
         line_ends.push(text.len());
     }
 
@@ -2338,8 +2358,7 @@ fn parse_reference_definition(
     }
 
     // Parse destination
-    let (destination, dest_consumed) = if dest_text.starts_with('<') {
-        let body = &dest_text[1..];
+    let (destination, dest_consumed) = if let Some(body) = dest_text.strip_prefix('<') {
         let close = find_angle_close(body)?;
         let dest = process_escapes_and_entities(&body[..close]);
         (dest, 2 + close)
@@ -2816,12 +2835,11 @@ fn collect_raw_footnote_definitions(lines: &[String]) -> RawFootnoteDefs {
             index += 1;
             continue;
         }
-        if !in_paragraph {
-            if let Some((next, label, body)) = collect_footnote_def_lines(lines, index) {
-                defs.entry(label).or_insert(RawFootnoteDef { lines: body });
-                index = next;
-                continue;
-            }
+        if !in_paragraph && let Some((next, label, body)) = collect_footnote_def_lines(lines, index)
+        {
+            defs.entry(label).or_insert(RawFootnoteDef { lines: body });
+            index = next;
+            continue;
         }
         // Conservatively treat other lines as potentially paragraph text so that
         // a `[^label]:` appearing mid-paragraph doesn't steal content.
@@ -2837,25 +2855,22 @@ fn collect_raw_footnote_definitions(lines: &[String]) -> RawFootnoteDefs {
 }
 
 fn trim_up_to_three_spaces(line: &str) -> &str {
-    let mut removed = 0;
     let mut start = 0;
-    for (index, ch) in line.char_indices() {
+    for (removed, (index, ch)) in line.char_indices().enumerate() {
         if removed == 3 || ch != ' ' {
-            start = index;
-            return &line[start..];
+            return &line[index..];
         }
-        removed += 1;
         start = index + ch.len_utf8();
     }
     &line[start..]
 }
 
-// gfm[impl leaf-blocks.atx-headings.closing-sequence-optional]
-// gfm[impl leaf-blocks.atx-headings.closing-sequence-length-independent]
-// gfm[impl leaf-blocks.atx-headings.closing-sequence-may-be-followed-by-spaces-only]
-// gfm[impl leaf-blocks.atx-headings.closing-sequence-must-be-preceded-by-space]
-// gfm[impl leaf-blocks.atx-headings.escaped-hash-does-not-count-in-closing-sequence]
-// gfm[impl leaf-blocks.atx-headings.non-space-after-closing-hashes-makes-them-content]
+// [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-optional]
+// [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-length-independent]
+// [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-may-be-followed-by-spaces-only]
+// [spec:gfm:syn:leaf-blocks.atx-headings.closing-sequence-must-be-preceded-by-space]
+// [spec:gfm:syn:leaf-blocks.atx-headings.escaped-hash-does-not-count-in-closing-sequence]
+// [spec:gfm:syn:leaf-blocks.atx-headings.non-space-after-closing-hashes-makes-them-content]
 fn strip_atx_content(rest: &str) -> &str {
     let trimmed = rest.trim();
     let mut end = trimmed.len();
@@ -2875,7 +2890,7 @@ fn strip_atx_content(rest: &str) -> &str {
     }
 }
 
-// gfm[impl preliminaries.tabs.tab-after-block-quote-marker-counts-toward-indent]
+// [spec:gfm:sem:preliminaries.tabs.tab-after-block-quote-marker-counts-toward-indent]
 fn strip_block_quote_marker(line: &str) -> Option<String> {
     let line = trim_up_to_three_spaces(line);
     let rest = line.strip_prefix('>')?;
@@ -2910,13 +2925,13 @@ fn strip_block_quote_marker(line: &str) -> Option<String> {
     Some(out)
 }
 
-// gfm[impl container-blocks.list-items.bullet-marker-definition]
-// gfm[impl container-blocks.list-items.ordered-marker-definition]
-// gfm[impl container-blocks.list-items.at-least-one-space-required-after-marker]
-// gfm[impl container-blocks.list-items.ordered-start-number-is-at-most-nine-digits]
-// gfm[impl container-blocks.list-items.ordered-start-number-may-have-leading-zeroes]
-// gfm[impl container-blocks.list-items.empty-item-does-not-require-post-marker-spaces]
-// gfm[impl preliminaries.tabs.tab-indented-list-continuation-equivalence]
+// [spec:gfm:def:container-blocks.list-items.bullet-marker-definition]
+// [spec:gfm:def:container-blocks.list-items.ordered-marker-definition]
+// [spec:gfm:syn:container-blocks.list-items.at-least-one-space-required-after-marker]
+// [spec:gfm:syn:container-blocks.list-items.ordered-start-number-is-at-most-nine-digits]
+// [spec:gfm:syn:container-blocks.list-items.ordered-start-number-may-have-leading-zeroes]
+// [spec:gfm:syn:container-blocks.list-items.empty-item-does-not-require-post-marker-spaces]
+// [spec:gfm:sem:preliminaries.tabs.tab-indented-list-continuation-equivalence]
 fn parse_list_marker(line: &str) -> Option<ListMarker> {
     let indent = leading_indent(line);
     if indent.columns > 3 {
@@ -3052,7 +3067,7 @@ fn strip_list_continuation(line: &str, required_indent: usize) -> Option<String>
     strip_indent_columns(line, required_indent)
 }
 
-// gfm[impl preliminaries.tabs.tab-indented-code-block-equivalence]
+// [spec:gfm:sem:preliminaries.tabs.tab-indented-code-block-equivalence]
 fn strip_indented_code_line(line: &str) -> Option<String> {
     strip_indent_columns(line, 4)
 }
@@ -3109,12 +3124,10 @@ fn strip_indent_columns(line: &str, columns: usize) -> Option<String> {
 }
 
 fn strip_up_to_n_leading_spaces(line: &str, n: usize) -> &str {
-    let mut removed = 0;
-    for (i, ch) in line.char_indices() {
+    for (removed, (i, ch)) in line.char_indices().enumerate() {
         if removed >= n || ch != ' ' {
             return &line[i..];
         }
-        removed += 1;
     }
     &line[line.len()..]
 }
@@ -3127,14 +3140,14 @@ fn indent_width(current_columns: usize, ch: char) -> usize {
     }
 }
 
-// gfm[impl leaf-blocks.fenced-code-blocks.opening-fence-indent-up-to-three-spaces]
-// gfm[impl leaf-blocks.fenced-code-blocks.four-space-indented-fence-starts-indented-code-block]
-// gfm[impl leaf-blocks.fenced-code-blocks.fewer-than-three-backticks-do-not-form-fence]
-// gfm[impl leaf-blocks.fenced-code-blocks.fence-marker-cannot-mix-backticks-and-tildes]
-// gfm[impl leaf-blocks.fenced-code-blocks.backtick-info-string-cannot-contain-backticks]
-// gfm[impl leaf-blocks.fenced-code-blocks.backtick-info-strings-cannot-contain-backticks]
-// gfm[impl leaf-blocks.fenced-code-blocks.tilde-info-strings-may-contain-backticks-and-tildes]
-// gfm[impl leaf-blocks.fenced-code-blocks.fence-lines-cannot-contain-internal-spaces]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.opening-fence-indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.four-space-indented-fence-starts-indented-code-block]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.fewer-than-three-backticks-do-not-form-fence]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.fence-marker-cannot-mix-backticks-and-tildes]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.backtick-info-string-cannot-contain-backticks]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.backtick-info-strings-cannot-contain-backticks]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.tilde-info-strings-may-contain-backticks-and-tildes]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.fence-lines-cannot-contain-internal-spaces]
 fn parse_fence_opener(line: &str) -> Option<FenceOpener> {
     let trimmed = trim_up_to_three_spaces(line);
     let indent = line.len() - trimmed.len();
@@ -3168,12 +3181,12 @@ fn parse_fence_opener(line: &str) -> Option<FenceOpener> {
     })
 }
 
-// gfm[impl leaf-blocks.fenced-code-blocks.closing-fence-length-at-least-opening-length]
-// gfm[impl leaf-blocks.fenced-code-blocks.closing-fence-must-use-same-marker-type]
-// gfm[impl leaf-blocks.fenced-code-blocks.closing-fences-cannot-have-info-strings]
-// gfm[impl leaf-blocks.fenced-code-blocks.closing-fence-indent-up-to-three-spaces]
-// gfm[impl leaf-blocks.fenced-code-blocks.closing-fence-indented-four-spaces-does-not-close]
-// gfm[impl leaf-blocks.fenced-code-blocks.closing-fence-indent-need-not-match-opening-indent]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-length-at-least-opening-length]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-must-use-same-marker-type]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fences-cannot-have-info-strings]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-indented-four-spaces-does-not-close]
+// [spec:gfm:syn:leaf-blocks.fenced-code-blocks.closing-fence-indent-need-not-match-opening-indent]
 fn is_fence_closer(line: &str, marker: char, count: usize) -> bool {
     let line = trim_up_to_three_spaces(line);
     let chars = line.chars();
@@ -3181,16 +3194,16 @@ fn is_fence_closer(line: &str, marker: char, count: usize) -> bool {
     run >= count && line[run..].trim().is_empty()
 }
 
-// gfm[impl leaf-blocks.thematic-breaks.structure]
-// gfm[impl leaf-blocks.thematic-breaks.requires-dash-underscore-or-asterisk-markers]
-// gfm[impl leaf-blocks.thematic-breaks.requires-three-or-more-marker-characters]
-// gfm[impl leaf-blocks.thematic-breaks.all-marker-characters-must-match]
-// gfm[impl leaf-blocks.thematic-breaks.spaces-or-tabs-allowed-between-markers]
-// gfm[impl leaf-blocks.thematic-breaks.no-other-characters-allowed]
-// gfm[impl leaf-blocks.thematic-breaks.marker-sequence-may-be-longer-than-three]
-// gfm[impl leaf-blocks.thematic-breaks.trailing-spaces-allowed]
-// gfm[impl leaf-blocks.thematic-breaks.indent-up-to-three-spaces]
-// gfm[impl leaf-blocks.thematic-breaks.indent-four-spaces-not-allowed]
+// [spec:gfm:def:leaf-blocks.thematic-breaks.structure]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.requires-dash-underscore-or-asterisk-markers]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.requires-three-or-more-marker-characters]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.all-marker-characters-must-match]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.spaces-or-tabs-allowed-between-markers]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.no-other-characters-allowed]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.marker-sequence-may-be-longer-than-three]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.trailing-spaces-allowed]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.thematic-breaks.indent-four-spaces-not-allowed]
 fn is_thematic_break(line: &str) -> bool {
     let indent = leading_indent(line);
     if indent.columns > 3 {
@@ -3218,11 +3231,11 @@ fn is_thematic_break(line: &str) -> bool {
     count >= 3
 }
 
-// gfm[impl leaf-blocks.setext-headings.underline-may-be-any-length]
-// gfm[impl leaf-blocks.setext-headings.underline-indent-up-to-three-spaces]
-// gfm[impl leaf-blocks.setext-headings.underline-indent-four-spaces-not-allowed]
-// gfm[impl leaf-blocks.setext-headings.setext-heading-underline-cannot-contain-internal-spaces]
-// gfm[impl leaf-blocks.setext-headings.underline-cannot-be-lazy-continuation-line]
+// [spec:gfm:syn:leaf-blocks.setext-headings.underline-may-be-any-length]
+// [spec:gfm:syn:leaf-blocks.setext-headings.underline-indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.setext-headings.underline-indent-four-spaces-not-allowed]
+// [spec:gfm:syn:leaf-blocks.setext-headings.setext-heading-underline-cannot-contain-internal-spaces]
+// [spec:gfm:syn:leaf-blocks.setext-headings.underline-cannot-be-lazy-continuation-line]
 fn is_setext_underline(line: &str) -> bool {
     let indent = leading_indent(line);
     if indent.columns > 3 {
@@ -3261,11 +3274,13 @@ struct InlineParser<'a, Ext> {
 impl<'a, Ext> InlineParser<'a, Ext> {
     /// Build a `SourceSpan` from the byte range `[start, self.index)` in
     /// `input`, translated to source coordinates via `base_offset`.
+    // [spec:mw:req:core.span.sliceable]
     fn span_from(&self, start: usize) -> SourceSpan {
         SourceSpan::new(self.base_offset + start, self.base_offset + self.index)
     }
 }
 
+// [spec:mw:sem:core.ext.inline-context-isolation]
 impl<'a, Ext> crate::ext::InlineContext<Ext> for InlineParser<'a, Ext>
 where
     Ext: Clone + PartialEq,
@@ -3298,8 +3313,8 @@ enum EmphasisMarker {
     Underscore,
 }
 
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.delimiter-stack-definition]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.stack-entries-point-to-text-nodes]
+// [spec:gfm:def:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.delimiter-stack-definition]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.stack-entries-point-to-text-nodes]
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum InlinePiece<Ext> {
     Text(String),
@@ -3329,44 +3344,45 @@ impl<'a, Ext> InlineParser<'a, Ext>
 where
     Ext: Clone + PartialEq,
 {
-    // gfm[impl inlines.inline-parsing-is-sequential]
-    // gfm[impl inlines.earlier-inline-match-takes-precedence-in-sequential-parse]
-    // gfm[impl inlines.backslash-escapes.any-ascii-punctuation-may-be-escaped]
-    // gfm[impl inlines.backslash-escapes.backslash-at-end-line-is-hard-line-break]
-    // gfm[impl inlines.backslash-escapes.backslashes-before-other-characters-are-literal]
-    // gfm[impl inlines.backslash-escapes.do-not-work-in-code-autolinks-or-raw-html]
-    // gfm[impl inlines.backslash-escapes.escaped-backslash-does-not-escape-following-character]
-    // gfm[impl inlines.backslash-escapes.escaped-characters-lose-special-meaning]
-    // gfm[impl inlines.backslash-escapes.work-in-urls-titles-references-and-info-strings]
-    // gfm[impl inlines.code-spans.definition]
-    // gfm[impl inlines.code-spans.code-spans-take-precedence-over-emphasis-and-links]
-    // gfm[impl inlines.code-spans.code-spans-html-tags-and-autolinks-share-precedence]
-    // gfm[impl inlines.hard-line-breaks.two-trailing-spaces-produce-hard-line-break]
-    // gfm[impl inlines.hard-line-breaks.backslash-before-line-ending-also-produces-hard-line-break]
-    // gfm[impl inlines.hard-line-breaks.hard-line-break-syntax-does-not-work-at-end-of-block]
-    // gfm[impl inlines.hard-line-breaks.hard-line-breaks-can-occur-inside-inline-constructs]
-    // gfm[impl inlines.hard-line-breaks.hard-line-breaks-do-not-occur-inside-code-spans-or-html-tags]
-    // gfm[impl inlines.hard-line-breaks.leading-spaces-on-next-line-are-ignored]
-    // gfm[impl inlines.hard-line-breaks.more-than-two-trailing-spaces-also-work]
-    // gfm[impl inlines.soft-line-breaks.regular-line-break-produces-softbreak]
-    // gfm[impl inlines.soft-line-breaks.edge-spaces-around-softbreak-are-removed]
-    // gfm[impl inlines.soft-line-breaks.renderers-may-optionally-promote-softbreaks]
-    // gfm[impl inlines.soft-line-breaks.softbreak-may-render-as-line-ending-or-space]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-requires-matching-delimiters]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.strong-emphasis-requires-matching-delimiters]
-    // gfm[impl inlines.textual-content.uninterpreted-characters-are-parsed-as-text]
-    // gfm[impl inlines.textual-content.internal-spaces-are-preserved]
-    // gfm[impl inlines.textual-content.end-tests-marker]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.end-of-input-triggers-emphasis-processing]
+    // [spec:gfm:syn:inlines.inline-parsing-is-sequential]
+    // [spec:gfm:syn:inlines.earlier-inline-match-takes-precedence-in-sequential-parse]
+    // [spec:gfm:syn:inlines.backslash-escapes.any-ascii-punctuation-may-be-escaped]
+    // [spec:gfm:syn:inlines.backslash-escapes.backslash-at-end-line-is-hard-line-break]
+    // [spec:gfm:syn:inlines.backslash-escapes.backslashes-before-other-characters-are-literal]
+    // [spec:gfm:syn:inlines.backslash-escapes.do-not-work-in-code-autolinks-or-raw-html]
+    // [spec:gfm:syn:inlines.backslash-escapes.escaped-backslash-does-not-escape-following-character]
+    // [spec:gfm:sem:inlines.backslash-escapes.escaped-characters-lose-special-meaning]
+    // [spec:gfm:syn:inlines.backslash-escapes.work-in-urls-titles-references-and-info-strings]
+    // [spec:gfm:def:inlines.code-spans.definition]
+    // [spec:gfm:syn:inlines.code-spans.code-spans-take-precedence-over-emphasis-and-links]
+    // [spec:gfm:syn:inlines.code-spans.code-spans-html-tags-and-autolinks-share-precedence]
+    // [spec:gfm:def:inlines.hard-line-breaks.two-trailing-spaces-produce-hard-line-break]
+    // [spec:gfm:syn:inlines.hard-line-breaks.backslash-before-line-ending-also-produces-hard-line-break]
+    // [spec:gfm:syn:inlines.hard-line-breaks.hard-line-break-syntax-does-not-work-at-end-of-block]
+    // [spec:gfm:syn:inlines.hard-line-breaks.hard-line-breaks-can-occur-inside-inline-constructs]
+    // [spec:gfm:syn:inlines.hard-line-breaks.hard-line-breaks-do-not-occur-inside-code-spans-or-html-tags]
+    // [spec:gfm:sem:inlines.hard-line-breaks.leading-spaces-on-next-line-are-ignored]
+    // [spec:gfm:syn:inlines.hard-line-breaks.more-than-two-trailing-spaces-also-work]
+    // [spec:gfm:def:inlines.soft-line-breaks.regular-line-break-produces-softbreak]
+    // [spec:gfm:sem:inlines.soft-line-breaks.edge-spaces-around-softbreak-are-removed]
+    // [spec:gfm:req:inlines.soft-line-breaks.renderers-may-optionally-promote-softbreaks]
+    // [spec:gfm:req:inlines.soft-line-breaks.softbreak-may-render-as-line-ending-or-space]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-requires-matching-delimiters]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-requires-matching-delimiters]
+    // [spec:gfm:syn:inlines.textual-content.uninterpreted-characters-are-parsed-as-text]
+    // [spec:gfm:sem:inlines.textual-content.internal-spaces-are-preserved]
+    // [spec:gfm:def:inlines.textual-content.end-tests-marker]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.end-of-input-triggers-emphasis-processing]
+    // [spec:mw:req:core.ext.inline-match-validity]
     fn parse_until(&mut self, stop: Option<&str>) -> Result<Vec<Node<Ext>>, Error> {
         let mut pieces = Vec::new();
         let mut text = String::new();
 
         while self.index < self.input.len() {
-            if let Some(stop_delim) = stop {
-                if self.remaining().starts_with(stop_delim) {
-                    break;
-                }
+            if let Some(stop_delim) = stop
+                && self.remaining().starts_with(stop_delim)
+            {
+                break;
             }
 
             let iter_start = self.index;
@@ -3396,22 +3412,21 @@ where
                 // precede the backslash-escape handler.
                 if self.math
                     && (self.remaining().starts_with("\\(") || self.remaining().starts_with("\\["))
+                    && let Some((math, display)) = self.try_math_backslash_span()
                 {
-                    if let Some((math, display)) = self.try_math_backslash_span() {
-                        flush_text_piece(&mut pieces, &mut text);
-                        pieces.push(InlinePiece::Node(if display {
-                            Node::MathBlock {
-                                math,
-                                source: SourceSpan::default(),
-                            }
-                        } else {
-                            Node::MathInline {
-                                math,
-                                source: SourceSpan::default(),
-                            }
-                        }));
-                        break 'iter;
-                    }
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(if display {
+                        Node::MathBlock {
+                            math,
+                            source: SourceSpan::default(),
+                        }
+                    } else {
+                        Node::MathInline {
+                            math,
+                            source: SourceSpan::default(),
+                        }
+                    }));
+                    break 'iter;
                 }
 
                 if self.remaining().starts_with("\\\n") {
@@ -3474,22 +3489,23 @@ where
                     break 'iter;
                 }
 
-                if self.math && self.remaining().starts_with('$') {
-                    if let Some((math, display)) = self.try_math_span() {
-                        flush_text_piece(&mut pieces, &mut text);
-                        pieces.push(InlinePiece::Node(if display {
-                            Node::MathBlock {
-                                math,
-                                source: SourceSpan::default(),
-                            }
-                        } else {
-                            Node::MathInline {
-                                math,
-                                source: SourceSpan::default(),
-                            }
-                        }));
-                        break 'iter;
-                    }
+                if self.math
+                    && self.remaining().starts_with('$')
+                    && let Some((math, display)) = self.try_math_span()
+                {
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(if display {
+                        Node::MathBlock {
+                            math,
+                            source: SourceSpan::default(),
+                        }
+                    } else {
+                        Node::MathInline {
+                            math,
+                            source: SourceSpan::default(),
+                        }
+                    }));
+                    break 'iter;
                 }
 
                 if let Some(node) = self.try_autolink() {
@@ -3498,12 +3514,12 @@ where
                     break 'iter;
                 }
 
-                if self.gfm {
-                    if let Some(node) = self.try_autolink_literal() {
-                        flush_text_piece(&mut pieces, &mut text);
-                        pieces.push(InlinePiece::Node(node));
-                        break 'iter;
-                    }
+                if self.gfm
+                    && let Some(node) = self.try_autolink_literal()
+                {
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(node));
+                    break 'iter;
                 }
 
                 if let Some(html) = self.try_html_inline() {
@@ -3532,12 +3548,12 @@ where
                     }
                 }
 
-                if self.gfm {
-                    if let Some(node) = self.try_footnote_ref() {
-                        flush_text_piece(&mut pieces, &mut text);
-                        pieces.push(InlinePiece::Node(node));
-                        break 'iter;
-                    }
+                if self.gfm
+                    && let Some(node) = self.try_footnote_ref()
+                {
+                    flush_text_piece(&mut pieces, &mut text);
+                    pieces.push(InlinePiece::Node(node));
+                    break 'iter;
                 }
 
                 if let Some(node) = self.try_link_or_image()? {
@@ -3565,18 +3581,19 @@ where
                     }
                 }
 
-                if self.highlights && self.remaining().starts_with("==") {
-                    if let Some(node) = self.try_delimited("==", false)? {
-                        flush_text_piece(&mut pieces, &mut text);
-                        let Node::Emphasis { children, .. } = node else {
-                            unreachable!()
-                        };
-                        pieces.push(InlinePiece::Node(Node::Highlight {
-                            children,
-                            source: SourceSpan::default(),
-                        }));
-                        break 'iter;
-                    }
+                if self.highlights
+                    && self.remaining().starts_with("==")
+                    && let Some(node) = self.try_delimited("==", false)?
+                {
+                    flush_text_piece(&mut pieces, &mut text);
+                    let Node::Emphasis { children, .. } = node else {
+                        unreachable!()
+                    };
+                    pieces.push(InlinePiece::Node(Node::Highlight {
+                        children,
+                        source: SourceSpan::default(),
+                    }));
+                    break 'iter;
                 }
 
                 if let Some(run) = self.parse_delimiter_run() {
@@ -3625,10 +3642,10 @@ where
 
             // If a Node piece was just pushed, set its source span based on
             // the byte range we consumed during this iteration.
-            if pieces.len() > pieces_len_before {
-                if let Some(InlinePiece::Node(node)) = pieces.last_mut() {
-                    *node.source_mut() = self.span_from(iter_start);
-                }
+            if pieces.len() > pieces_len_before
+                && let Some(InlinePiece::Node(node)) = pieces.last_mut()
+            {
+                *node.source_mut() = self.span_from(iter_start);
             }
         }
 
@@ -3636,6 +3653,7 @@ where
         Ok(resolve_emphasis(pieces))
     }
 
+    // [spec:mw:req:core.ext.dispatch-order]
     fn try_extension(&self) -> Option<InlineMatch<Ext>> {
         for extension in self.extensions {
             if let Some(candidate) = extension.try_inline_ctx(self.remaining(), self) {
@@ -3645,28 +3663,28 @@ where
         None
     }
 
-    // gfm[impl inlines.code-spans.backtick-string-definition]
-    // gfm[impl inlines.code-spans.opening-and-closing-backtick-strings-must-have-equal-length]
-    // gfm[impl inlines.code-spans.unclosed-backtick-string-is-literal]
-    // gfm[impl inlines.code-spans.longer-delimiters-allow-literal-backticks]
-    // gfm[impl inlines.code-spans.example]
-    // gfm[impl inlines.code-spans.line-endings-become-spaces]
-    // gfm[impl inlines.code-spans.line-endings-conversion-example]
-    // gfm[impl inlines.code-spans.interior-spaces-are-preserved]
-    // gfm[impl inlines.code-spans.single-edge-space-is-trimmed]
-    // gfm[impl inlines.code-spans.edge-space-trimming-requires-space-on-both-sides]
-    // gfm[impl inlines.code-spans.edge-space-trimming-allows-literal-backticks-at-edges]
-    // gfm[impl inlines.code-spans.only-one-space-is-trimmed]
-    // gfm[impl inlines.code-spans.only-ascii-space-is-trimmed]
-    // gfm[impl inlines.code-spans.all-space-content-is-not-trimmed]
-    // gfm[impl inlines.code-spans.backslash-escapes-are-never-needed]
-    // gfm[impl inlines.code-spans.backslashes-are-literal]
-    // gfm[impl inlines.code-spans.browser-rendering-may-collapse-spaces]
-    // gfm[impl inlines.code-spans.code-white-space-pre-wrap]
-    // gfm[impl inlines.code-spans.autolink-wins-when-autolink-parses-first]
-    // gfm[impl inlines.code-spans.html-tag-wins-when-tag-parses-first]
-    // gfm[impl inlines.code-spans.code-span-prevents-link-parse]
-    // gfm[impl inlines.code-spans.code-span-wins-in-ambiguous-autolink-like-text]
+    // [spec:gfm:def:inlines.code-spans.backtick-string-definition]
+    // [spec:gfm:syn:inlines.code-spans.opening-and-closing-backtick-strings-must-have-equal-length]
+    // [spec:gfm:syn:inlines.code-spans.unclosed-backtick-string-is-literal]
+    // [spec:gfm:syn:inlines.code-spans.longer-delimiters-allow-literal-backticks]
+    // [spec:gfm:syn:inlines.code-spans.example]
+    // [spec:gfm:sem:inlines.code-spans.line-endings-become-spaces]
+    // [spec:gfm:sem:inlines.code-spans.line-endings-conversion-example]
+    // [spec:gfm:sem:inlines.code-spans.interior-spaces-are-preserved]
+    // [spec:gfm:sem:inlines.code-spans.single-edge-space-is-trimmed]
+    // [spec:gfm:sem:inlines.code-spans.edge-space-trimming-requires-space-on-both-sides]
+    // [spec:gfm:sem:inlines.code-spans.edge-space-trimming-allows-literal-backticks-at-edges]
+    // [spec:gfm:sem:inlines.code-spans.only-one-space-is-trimmed]
+    // [spec:gfm:sem:inlines.code-spans.only-ascii-space-is-trimmed]
+    // [spec:gfm:sem:inlines.code-spans.all-space-content-is-not-trimmed]
+    // [spec:gfm:thm:inlines.code-spans.backslash-escapes-are-never-needed]
+    // [spec:gfm:syn:inlines.code-spans.backslashes-are-literal]
+    // [spec:gfm:req:inlines.code-spans.browser-rendering-may-collapse-spaces]
+    // [spec:gfm:sem:inlines.code-spans.code-white-space-pre-wrap]
+    // [spec:gfm:syn:inlines.code-spans.autolink-wins-when-autolink-parses-first]
+    // [spec:gfm:syn:inlines.code-spans.html-tag-wins-when-tag-parses-first]
+    // [spec:gfm:syn:inlines.code-spans.code-span-prevents-link-parse]
+    // [spec:gfm:syn:inlines.code-spans.code-span-wins-in-ambiguous-autolink-like-text]
     fn try_code_span(&mut self) -> Option<String> {
         let remaining = self.remaining();
         if !remaining.starts_with('`') {
@@ -3737,7 +3755,7 @@ where
                 if content.len() > 1
                     && content.starts_with(' ')
                     && content.ends_with(' ')
-                    && content.trim().is_empty() == false
+                    && !content.trim().is_empty()
                 {
                     i += 1;
                     continue;
@@ -3781,52 +3799,52 @@ where
         }
     }
 
-    // gfm[impl inlines.emphasis-and-strong-emphasis.delimiter-run-definition]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.delimiter-run-example]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.left-flanking-delimiter-run-definition]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.right-flanking-delimiter-run-definition]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.left-right-flanking-terminology-note]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.single-asterisk-can-open-emphasis]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.single-asterisk-can-close-emphasis]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.single-underscore-can-open-emphasis]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.single-underscore-can-close-emphasis]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-can-open-strong-emphasis]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-can-close-strong-emphasis]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-can-open-strong-emphasis]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-can-close-strong-emphasis]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-can-open-when-punctuation-precedes]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-can-close-when-punctuation-follows]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-can-open-when-punctuation-precedes]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-can-close-when-punctuation-follows]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-when-followed-by-whitespace]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-whitespace]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-after-alphanumeric-before-punctuation]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-punctuation-before-alphanumeric]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.asterisk-closing-restriction-example]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-whitespace]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-whitespace]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-alphanumeric-before-punctuation]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-punctuation-before-alphanumeric]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-whitespace]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-whitespace]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-alphanumeric-before-punctuation]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-punctuation-before-alphanumeric]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-closing-restriction-examples]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-asterisk-closing-cannot-fall-back-to-single-asterisk-rule]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-whitespace]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-whitespace]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-alphanumeric-before-punctuation]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-punctuation-before-alphanumeric]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.double-underscore-closing-restriction-example]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-closing]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-double-underscore]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.right-flanking-underscore-does-not-emphasize]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-allowed]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-disallowed]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.intraword-double-underscore-closing-is-forbidden]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.many-implementations-restrict-intraword-underscore]
-    // gfm[impl inlines.emphasis-and-strong-emphasis.unicode-nonbreaking-space-counts-as-whitespace]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.push-delimiters-to-stack]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.delimiter-run-definition]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.delimiter-run-example]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.left-flanking-delimiter-run-definition]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.right-flanking-delimiter-run-definition]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.left-right-flanking-terminology-note]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.single-asterisk-can-open-emphasis]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.single-asterisk-can-close-emphasis]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.single-underscore-can-open-emphasis]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.single-underscore-can-close-emphasis]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.double-asterisk-can-open-strong-emphasis]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.double-asterisk-can-close-strong-emphasis]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-open-strong-emphasis]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-close-strong-emphasis]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-can-open-when-punctuation-precedes]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-can-close-when-punctuation-follows]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-open-when-punctuation-precedes]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-can-close-when-punctuation-follows]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-when-followed-by-whitespace]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-whitespace]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-open-after-alphanumeric-before-punctuation]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-cannot-close-after-punctuation-before-alphanumeric]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.asterisk-closing-restriction-example]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-whitespace]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-whitespace]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-open-after-alphanumeric-before-punctuation]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.underscore-cannot-close-after-punctuation-before-alphanumeric]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-whitespace]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-whitespace]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-open-after-alphanumeric-before-punctuation]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-cannot-close-after-punctuation-before-alphanumeric]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-asterisk-closing-restriction-examples]
+    // [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.double-asterisk-closing-cannot-fall-back-to-single-asterisk-rule]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-whitespace]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-whitespace]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-open-after-alphanumeric-before-punctuation]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-cannot-close-after-punctuation-before-alphanumeric]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.double-underscore-closing-restriction-example]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-closing]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.newline-counts-as-whitespace-for-double-underscore]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.right-flanking-underscore-does-not-emphasize]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-allowed]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-disallowed]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-double-underscore-closing-is-forbidden]
+    // [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.many-implementations-restrict-intraword-underscore]
+    // [spec:gfm:def:inlines.emphasis-and-strong-emphasis.unicode-nonbreaking-space-counts-as-whitespace]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.push-delimiters-to-stack]
     fn parse_delimiter_run(&self) -> Option<DelimiterRun> {
         let remaining = self.remaining();
         let marker = match remaining.chars().next()? {
@@ -3862,10 +3880,10 @@ where
         })
     }
 
-    // gfm[impl inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
-    // gfm[impl inlines.strikethrough-extension.new-paragraph-ends-strikethrough-parse]
-    // gfm[impl inlines.strikethrough-extension.extension-wrapper]
-    // gfm[impl inlines.strikethrough-extension.gfm-enables-strikethrough-extension]
+    // [spec:gfm:def:inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
+    // [spec:gfm:syn:inlines.strikethrough-extension.new-paragraph-ends-strikethrough-parse]
+    // [spec:gfm:syn:inlines.strikethrough-extension.extension-wrapper]
+    // [spec:gfm:def:inlines.strikethrough-extension.gfm-enables-strikethrough-extension]
     fn try_delimited(&mut self, delim: &str, strong: bool) -> Result<Option<Node<Ext>>, Error> {
         let remaining = self.remaining();
         if !remaining.starts_with(delim) {
@@ -3918,71 +3936,71 @@ where
         &self.input[self.index..]
     }
 
-    // gfm[impl inlines.links.definition]
-    // gfm[impl inlines.links.inline-link-definition]
-    // gfm[impl inlines.links.inline-link-example]
-    // gfm[impl inlines.links.inline-link-text-comes-from-link-text-inlines]
-    // gfm[impl inlines.links.inline-link-uri-comes-from-destination-with-delimiters-removed]
-    // gfm[impl inlines.links.inline-link-title-comes-from-title-with-delimiters-removed]
-    // gfm[impl inlines.links.inline-and-reference-links-are-the-two-basic-kinds]
-    // gfm[impl inlines.links.inline-links-take-precedence-over-reference-links]
-    // gfm[impl inlines.links.full-reference-link-definition]
-    // gfm[impl inlines.links.full-reference-link-example]
-    // gfm[impl inlines.links.full-and-collapsed-references-take-precedence-over-shortcuts]
-    // gfm[impl inlines.links.collapsed-reference-link-definition]
-    // gfm[impl inlines.links.collapsed-reference-link-is-equivalent-to-full-link-with-same-label]
-    // gfm[impl inlines.links.collapsed-reference-link-labels-are-case-insensitive]
-    // gfm[impl inlines.links.collapsed-reference-link-text-comes-from-first-label-inlines]
-    // gfm[impl inlines.links.no-whitespace-allowed-between-collapsed-reference-brackets]
-    // gfm[impl inlines.links.shortcut-reference-link-definition]
-    // gfm[impl inlines.links.shortcut-reference-link-is-equivalent-to-collapsed-reference-link]
-    // gfm[impl inlines.links.shortcut-reference-link-labels-are-case-insensitive]
-    // gfm[impl inlines.links.shortcut-reference-link-text-comes-from-label-inlines]
-    // gfm[impl inlines.links.shortcut-reference-does-not-parse-when-followed-by-link-label]
-    // gfm[impl inlines.links.shortcut-reference-links-make-space-before-label-too-dangerous]
-    // gfm[impl inlines.links.space-after-shortcut-reference-link-is-preserved]
-    // gfm[impl inlines.links.reference-links-have-three-kinds]
-    // gfm[impl inlines.links.reference-link-text-allows-balanced-or-escaped-brackets]
-    // gfm[impl inlines.links.reference-link-text-cannot-contain-links]
-    // gfm[impl inlines.links.reference-link-text-comes-from-first-label-inlines]
-    // gfm[impl inlines.links.reference-link-text-follows-inline-link-text-rules]
-    // gfm[impl inlines.links.reference-link-text-may-contain-inline-content]
-    // gfm[impl inlines.links.reference-link-text-grouping-takes-precedence-over-emphasis]
-    // gfm[impl inlines.links.reference-link-may-parse-later-brackets-as-separate-text]
-    // gfm[impl inlines.links.reference-links-lose-to-html-tags-code-spans-and-autolinks]
-    // gfm[impl inlines.links.first-matching-reference-definition-is-used]
-    // gfm[impl inlines.links.first-reference-definition-wins-example]
-    // gfm[impl inlines.links.defined-middle-label-makes-earlier-reference-parse]
-    // gfm[impl inlines.links.nested-reference-link-examples-produce-shortcuts]
-    // gfm[impl inlines.links.escaping-opening-bracket-prevents-reference-link]
-    // gfm[impl inlines.links.link-text-definition]
-    // gfm[impl inlines.links.link-text-may-contain-inline-content]
-    // gfm[impl inlines.links.link-text-may-contain-balanced-brackets-but-not-unbalanced-ones]
-    // gfm[impl inlines.links.link-text-allows-only-escaped-or-balanced-brackets]
-    // gfm[impl inlines.links.link-text-cannot-contain-links]
-    // gfm[impl inlines.links.link-text-brackets-bind-more-tightly-than-emphasis]
-    // gfm[impl inlines.links.links-may-not-contain-other-links-at-any-level-nesting]
-    // gfm[impl inlines.links.brackets-aren-t-part-links-do-not-take-precedence]
-    // gfm[impl inlines.links.code-autolink-and-html-bind-tighter-than-link-text]
-    // gfm[impl inlines.links.cases-illustrate-precedence-html-tags-code-spans-autolinks-over-link]
-    // gfm[impl inlines.links.cases-illustrate-precedence-link-text-grouping-over-emphasis-grouping]
-    // gfm[impl inlines.links.destination-and-title-may-both-be-omitted]
-    // gfm[impl inlines.links.no-whitespace-allowed-between-link-text-and-opening-parenthesis]
-    // gfm[impl inlines.links.no-whitespace-allowed-between-link-text-and-link-label]
-    // gfm[impl inlines.links.no-space-before-link-label-departs-from-original-markdown]
-    // gfm[impl inlines.links.whitespace-is-allowed-inside-inline-link-delimiters]
-    // gfm[impl inlines.links.matching-uses-normalized-strings-not-parsed-inline-content]
-    // gfm[impl inlines.links.markdown-pl-title-behavior]
-    // gfm[impl inlines.images.definition]
-    // gfm[impl inlines.images.html-rendering-should-use-plain-string-content-for-alt]
-    // gfm[impl inlines.images.image-description-follows-link-text-rules-with-two-differences]
-    // gfm[impl inlines.images.image-description-contains-inline-elements]
-    // gfm[impl inlines.images.escaping-bang-produces-literal-bang-followed-by-link]
-    // gfm[impl inlines.images.escaping-opening-bracket-after-bang-produces-literal-bracketed-text]
-    // gfm[impl inlines.images.no-whitespace-allowed-between-reference-image-brackets]
-    // gfm[impl inlines.images.reference-image-labels-are-case-insensitive]
-    // gfm[impl inlines.images.reference-image-labels-cannot-contain-unescaped-brackets]
-    // gfm[impl inlines.images.shortcut-image-labels-are-case-insensitive]
+    // [spec:gfm:def:inlines.links.definition]
+    // [spec:gfm:syn:inlines.links.inline-link-definition]
+    // [spec:gfm:sem:inlines.links.inline-link-example]
+    // [spec:gfm:def:inlines.links.inline-link-text-comes-from-link-text-inlines]
+    // [spec:gfm:sem:inlines.links.inline-link-uri-comes-from-destination-with-delimiters-removed]
+    // [spec:gfm:sem:inlines.links.inline-link-title-comes-from-title-with-delimiters-removed]
+    // [spec:gfm:def:inlines.links.inline-and-reference-links-are-the-two-basic-kinds]
+    // [spec:gfm:syn:inlines.links.inline-links-take-precedence-over-reference-links]
+    // [spec:gfm:def:inlines.links.full-reference-link-definition]
+    // [spec:gfm:sem:inlines.links.full-reference-link-example]
+    // [spec:gfm:syn:inlines.links.full-and-collapsed-references-take-precedence-over-shortcuts]
+    // [spec:gfm:syn:inlines.links.collapsed-reference-link-definition]
+    // [spec:gfm:sem:inlines.links.collapsed-reference-link-is-equivalent-to-full-link-with-same-label]
+    // [spec:gfm:sem:inlines.links.collapsed-reference-link-labels-are-case-insensitive]
+    // [spec:gfm:def:inlines.links.collapsed-reference-link-text-comes-from-first-label-inlines]
+    // [spec:gfm:sem:inlines.links.no-whitespace-allowed-between-collapsed-reference-brackets]
+    // [spec:gfm:syn:inlines.links.shortcut-reference-link-definition]
+    // [spec:gfm:sem:inlines.links.shortcut-reference-link-is-equivalent-to-collapsed-reference-link]
+    // [spec:gfm:sem:inlines.links.shortcut-reference-link-labels-are-case-insensitive]
+    // [spec:gfm:def:inlines.links.shortcut-reference-link-text-comes-from-label-inlines]
+    // [spec:gfm:syn:inlines.links.shortcut-reference-does-not-parse-when-followed-by-link-label]
+    // [spec:gfm:sem:inlines.links.shortcut-reference-links-make-space-before-label-too-dangerous]
+    // [spec:gfm:sem:inlines.links.space-after-shortcut-reference-link-is-preserved]
+    // [spec:gfm:syn:inlines.links.reference-links-have-three-kinds]
+    // [spec:gfm:syn:inlines.links.reference-link-text-allows-balanced-or-escaped-brackets]
+    // [spec:gfm:syn:inlines.links.reference-link-text-cannot-contain-links]
+    // [spec:gfm:sem:inlines.links.reference-link-text-comes-from-first-label-inlines]
+    // [spec:gfm:syn:inlines.links.reference-link-text-follows-inline-link-text-rules]
+    // [spec:gfm:syn:inlines.links.reference-link-text-may-contain-inline-content]
+    // [spec:gfm:syn:inlines.links.reference-link-text-grouping-takes-precedence-over-emphasis]
+    // [spec:gfm:syn:inlines.links.reference-link-may-parse-later-brackets-as-separate-text]
+    // [spec:gfm:syn:inlines.links.reference-links-lose-to-html-tags-code-spans-and-autolinks]
+    // [spec:gfm:def:inlines.links.first-matching-reference-definition-is-used]
+    // [spec:gfm:sem:inlines.links.first-reference-definition-wins-example]
+    // [spec:gfm:syn:inlines.links.defined-middle-label-makes-earlier-reference-parse]
+    // [spec:gfm:syn:inlines.links.nested-reference-link-examples-produce-shortcuts]
+    // [spec:gfm:sem:inlines.links.escaping-opening-bracket-prevents-reference-link]
+    // [spec:gfm:def:inlines.links.link-text-definition]
+    // [spec:gfm:syn:inlines.links.link-text-may-contain-inline-content]
+    // [spec:gfm:syn:inlines.links.link-text-may-contain-balanced-brackets-but-not-unbalanced-ones]
+    // [spec:gfm:syn:inlines.links.link-text-allows-only-escaped-or-balanced-brackets]
+    // [spec:gfm:def:inlines.links.link-text-cannot-contain-links]
+    // [spec:gfm:syn:inlines.links.link-text-brackets-bind-more-tightly-than-emphasis]
+    // [spec:gfm:syn:inlines.links.links-may-not-contain-other-links-at-any-level-nesting]
+    // [spec:gfm:syn:inlines.links.brackets-aren-t-part-links-do-not-take-precedence]
+    // [spec:gfm:syn:inlines.links.code-autolink-and-html-bind-tighter-than-link-text]
+    // [spec:gfm:syn:inlines.links.cases-illustrate-precedence-html-tags-code-spans-autolinks-over-link]
+    // [spec:gfm:syn:inlines.links.cases-illustrate-precedence-link-text-grouping-over-emphasis-grouping]
+    // [spec:gfm:syn:inlines.links.destination-and-title-may-both-be-omitted]
+    // [spec:gfm:syn:inlines.links.no-whitespace-allowed-between-link-text-and-opening-parenthesis]
+    // [spec:gfm:sem:inlines.links.no-whitespace-allowed-between-link-text-and-link-label]
+    // [spec:gfm:syn:inlines.links.no-space-before-link-label-departs-from-original-markdown]
+    // [spec:gfm:sem:inlines.links.whitespace-is-allowed-inside-inline-link-delimiters]
+    // [spec:gfm:sem:inlines.links.matching-uses-normalized-strings-not-parsed-inline-content]
+    // [spec:gfm:syn:inlines.links.markdown-pl-title-behavior]
+    // [spec:gfm:syn:inlines.images.definition]
+    // [spec:gfm:sem:inlines.images.html-rendering-should-use-plain-string-content-for-alt]
+    // [spec:gfm:def:inlines.images.image-description-follows-link-text-rules-with-two-differences]
+    // [spec:gfm:syn:inlines.images.image-description-contains-inline-elements]
+    // [spec:gfm:syn:inlines.images.escaping-bang-produces-literal-bang-followed-by-link]
+    // [spec:gfm:sem:inlines.images.escaping-opening-bracket-after-bang-produces-literal-bracketed-text]
+    // [spec:gfm:sem:inlines.images.no-whitespace-allowed-between-reference-image-brackets]
+    // [spec:gfm:req:inlines.images.reference-image-labels-are-case-insensitive]
+    // [spec:gfm:syn:inlines.images.reference-image-labels-cannot-contain-unescaped-brackets]
+    // [spec:gfm:syn:inlines.images.shortcut-image-labels-are-case-insensitive]
     // GFM footnotes: [^label] references a footnote definition collected earlier.
     // Only emit a FootnoteRef if a matching definition exists; otherwise fall
     // through so the text becomes literal (matching cmark-gfm behaviour).
@@ -4009,14 +4027,14 @@ where
         })
     }
 
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.closing-bracket-triggers-link-search]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-scan-backward]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-failure-case]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-builds-node-children]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-deactivates-earlier-openers]
-    // gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-runs-emphasis-processing]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.closing-bracket-triggers-link-search]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-scan-backward]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-failure-case]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-builds-node-children]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-deactivates-earlier-openers]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-runs-emphasis-processing]
     fn try_link_or_image(&mut self) -> Result<Option<Node<Ext>>, Error> {
         let remaining = self.remaining();
         let image = remaining.starts_with("![");
@@ -4035,33 +4053,33 @@ where
         let label = &self.input[label_start..label_end];
         let after = &self.input[label_end + 1..];
 
-        if let Some(after_open) = after.strip_prefix('(') {
-            if let Some((consumed, destination, title)) = parse_inline_link_target(after_open) {
-                let children = parse_inline_children(
-                    label,
-                    self.extensions,
-                    self.refs,
-                    self.footnote_labels,
-                    self.provisional,
-                    self.gfm,
-                    self.math,
-                    self.highlights,
-                )?;
-                // Links cannot contain other links
-                if !image && contains_link(&children) {
-                    return Ok(None);
-                }
-                self.index = label_end + 2 + consumed;
-                return Ok(Some(build_link_or_image(
-                    image,
-                    destination,
-                    title,
-                    children,
-                    SourceSpan::default(),
-                )));
+        if let Some(after_open) = after.strip_prefix('(')
+            && let Some((consumed, destination, title)) = parse_inline_link_target(after_open)
+        {
+            let children = parse_inline_children(
+                label,
+                self.extensions,
+                self.refs,
+                self.footnote_labels,
+                self.provisional,
+                self.gfm,
+                self.math,
+                self.highlights,
+            )?;
+            // Links cannot contain other links
+            if !image && contains_link(&children) {
+                return Ok(None);
             }
-            // Inline link failed; fall through to try reference link matching.
+            self.index = label_end + 2 + consumed;
+            return Ok(Some(build_link_or_image(
+                image,
+                destination,
+                title,
+                children,
+                SourceSpan::default(),
+            )));
         }
+        // Inline link failed; fall through to try reference link matching.
 
         let mut consumed_after = 0;
         let target_label = if let Some(rest) = after.strip_prefix("[]") {
@@ -4106,29 +4124,29 @@ where
         )))
     }
 
-    // gfm[impl inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html]
-    // gfm[impl inlines.raw-html.html-tag-definition]
-    // gfm[impl inlines.raw-html.tag-grammar-follows]
-    // gfm[impl inlines.raw-html.extension-wrapper]
-    // gfm[impl inlines.raw-html.simple-open-tag-examples]
-    // gfm[impl inlines.raw-html.custom-tag-names-are-allowed]
-    // gfm[impl inlines.raw-html.custom-tag-and-attribute-names-are-allowed]
-    // gfm[impl inlines.raw-html.closing-tags-cannot-have-attributes]
-    // gfm[impl inlines.raw-html.illegal-tag-and-attribute-syntax-is-not-parsed-as-html]
-    // gfm[impl inlines.raw-html.html-comment-definition]
-    // gfm[impl inlines.raw-html.processing-instruction-definition]
-    // gfm[impl inlines.raw-html.declaration-definition]
-    // gfm[impl inlines.raw-html.cdata-section-definition]
-    // gfm[impl inlines.raw-html.backslash-escapes-do-not-work-in-html-attributes]
-    // gfm[impl inlines.raw-html.entity-and-numeric-references-are-preserved-in-html-attributes]
-    // gfm[impl inlines.raw-html.attribute-value-definition]
+    // [spec:gfm:def:inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html]
+    // [spec:gfm:def:inlines.raw-html.html-tag-definition]
+    // [spec:gfm:syn:inlines.raw-html.tag-grammar-follows]
+    // [spec:gfm:def:inlines.raw-html.extension-wrapper]
+    // [spec:gfm:syn:inlines.raw-html.simple-open-tag-examples]
+    // [spec:gfm:syn:inlines.raw-html.custom-tag-names-are-allowed]
+    // [spec:gfm:syn:inlines.raw-html.custom-tag-and-attribute-names-are-allowed]
+    // [spec:gfm:syn:inlines.raw-html.closing-tags-cannot-have-attributes]
+    // [spec:gfm:syn:inlines.raw-html.illegal-tag-and-attribute-syntax-is-not-parsed-as-html]
+    // [spec:gfm:def:inlines.raw-html.html-comment-definition]
+    // [spec:gfm:def:inlines.raw-html.processing-instruction-definition]
+    // [spec:gfm:def:inlines.raw-html.declaration-definition]
+    // [spec:gfm:def:inlines.raw-html.cdata-section-definition]
+    // [spec:gfm:syn:inlines.raw-html.backslash-escapes-do-not-work-in-html-attributes]
+    // [spec:gfm:sem:inlines.raw-html.entity-and-numeric-references-are-preserved-in-html-attributes]
+    // [spec:gfm:def:inlines.raw-html.attribute-value-definition]
     // TODO: disallowed raw HTML extension is not yet implemented
-    // gfm[impl inlines.disallowed-raw-html-extension.disallowed-tags]
-    // gfm[impl inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
-    // gfm[impl inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
-    // gfm[impl inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
-    // gfm[impl inlines.disallowed-raw-html-extension.extension-wrapper]
-    // gfm[impl inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
+    // [spec:gfm:def:inlines.disallowed-raw-html-extension.disallowed-tags]
+    // [spec:gfm:sem:inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
+    // [spec:gfm:sem:inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
+    // [spec:gfm:sem:inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
+    // [spec:gfm:def:inlines.disallowed-raw-html-extension.extension-wrapper]
+    // [spec:gfm:def:inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
     fn try_html_inline(&mut self) -> Option<String> {
         let remaining = self.remaining();
         if !remaining.starts_with('<') {
@@ -4165,22 +4183,22 @@ where
         Some(html)
     }
 
-    // gfm[impl inlines.autolinks.definition]
-    // gfm[impl inlines.autolinks.uri-autolink-definition]
-    // gfm[impl inlines.autolinks.email-autolink-definition]
-    // gfm[impl inlines.autolinks.absolute-uri-definition]
-    // gfm[impl inlines.autolinks.scheme-definition]
-    // gfm[impl inlines.autolinks.autolink-schemes-are-case-insensitive]
-    // gfm[impl inlines.autolinks.autolinks-cannot-contain-spaces]
-    // gfm[impl inlines.autolinks.backslash-escapes-do-not-work-inside-autolinks]
-    // gfm[impl inlines.autolinks.backslash-escapes-do-not-work-inside-email-autolinks]
-    // gfm[impl inlines.autolinks.email-address-definition]
-    // gfm[impl inlines.autolinks.email-address-regex]
-    // gfm[impl inlines.autolinks.extension-wrapper]
-    // gfm[impl inlines.autolinks.invalid-autolink-example]
-    // gfm[impl inlines.autolinks.spec-accepts-some-absolute-uris-that-are-not-valid-uris]
-    // gfm[impl inlines.autolinks.valid-email-autolink-example]
-    // gfm[impl inlines.autolinks.valid-uri-autolink-example]
+    // [spec:gfm:syn:inlines.autolinks.definition]
+    // [spec:gfm:def:inlines.autolinks.uri-autolink-definition]
+    // [spec:gfm:syn:inlines.autolinks.email-autolink-definition]
+    // [spec:gfm:def:inlines.autolinks.absolute-uri-definition]
+    // [spec:gfm:def:inlines.autolinks.scheme-definition]
+    // [spec:gfm:syn:inlines.autolinks.autolink-schemes-are-case-insensitive]
+    // [spec:gfm:syn:inlines.autolinks.autolinks-cannot-contain-spaces]
+    // [spec:gfm:syn:inlines.autolinks.backslash-escapes-do-not-work-inside-autolinks]
+    // [spec:gfm:syn:inlines.autolinks.backslash-escapes-do-not-work-inside-email-autolinks]
+    // [spec:gfm:def:inlines.autolinks.email-address-definition]
+    // [spec:gfm:def:inlines.autolinks.email-address-regex]
+    // [spec:gfm:syn:inlines.autolinks.extension-wrapper]
+    // [spec:gfm:syn:inlines.autolinks.invalid-autolink-example]
+    // [spec:gfm:syn:inlines.autolinks.spec-accepts-some-absolute-uris-that-are-not-valid-uris]
+    // [spec:gfm:def:inlines.autolinks.valid-email-autolink-example]
+    // [spec:gfm:def:inlines.autolinks.valid-uri-autolink-example]
     fn try_autolink(&mut self) -> Option<Node<Ext>> {
         let remaining = self.remaining();
         if !remaining.starts_with('<') {
@@ -4219,24 +4237,24 @@ where
         None
     }
 
-    // gfm[impl inlines.autolinks-extension.definition]
-    // gfm[impl inlines.autolinks-extension.extended-url-autolink-definition]
-    // gfm[impl inlines.autolinks-extension.extended-email-autolink-definition]
-    // gfm[impl inlines.autolinks-extension.extended-www-autolink-definition]
-    // gfm[impl inlines.autolinks-extension.extended-www-autolinks-insert-http-scheme]
-    // gfm[impl inlines.autolinks-extension.extended-www-autolinks-may-have-path-after-domain]
-    // gfm[impl inlines.autolinks-extension.extended-email-autolink-rules]
-    // gfm[impl inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
-    // gfm[impl inlines.autolinks-extension.extended-autolink-path-validation]
-    // gfm[impl inlines.autolinks-extension.gfm-enables-extended-autolinks]
-    // gfm[impl inlines.autolinks-extension.extension-wrapper]
-    // gfm[impl inlines.autolinks-extension.left-angle-bracket-ends-autolink]
-    // gfm[impl inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
-    // gfm[impl inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
-    // gfm[impl inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
-    // gfm[impl inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
-    // gfm[impl inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign]
-    // gfm[impl inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
+    // [spec:gfm:def:inlines.autolinks-extension.definition]
+    // [spec:gfm:syn:inlines.autolinks-extension.extended-url-autolink-definition]
+    // [spec:gfm:def:inlines.autolinks-extension.extended-email-autolink-definition]
+    // [spec:gfm:syn:inlines.autolinks-extension.extended-www-autolink-definition]
+    // [spec:gfm:def:inlines.autolinks-extension.extended-www-autolinks-insert-http-scheme]
+    // [spec:gfm:sem:inlines.autolinks-extension.extended-www-autolinks-may-have-path-after-domain]
+    // [spec:gfm:def:inlines.autolinks-extension.extended-email-autolink-rules]
+    // [spec:gfm:syn:inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
+    // [spec:gfm:syn:inlines.autolinks-extension.extended-autolink-path-validation]
+    // [spec:gfm:def:inlines.autolinks-extension.gfm-enables-extended-autolinks]
+    // [spec:gfm:syn:inlines.autolinks-extension.extension-wrapper]
+    // [spec:gfm:syn:inlines.autolinks-extension.left-angle-bracket-ends-autolink]
+    // [spec:gfm:def:inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
+    // [spec:gfm:syn:inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
+    // [spec:gfm:syn:inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
+    // [spec:gfm:syn:inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
+    // [spec:gfm:syn:inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign]
+    // [spec:gfm:sem:inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
     fn try_autolink_literal(&mut self) -> Option<Node<Ext>> {
         let remaining = self.remaining();
 
@@ -4363,53 +4381,53 @@ fn flush_text_piece<Ext>(pieces: &mut Vec<InlinePiece<Ext>>, text: &mut String) 
     pieces.push(InlinePiece::Text(core::mem::take(text)));
 }
 
-// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-requires-matching-delimiters]
-// gfm[impl inlines.emphasis-and-strong-emphasis.strong-emphasis-requires-matching-delimiters]
-// gfm[impl inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-permitted]
-// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-is-not-allowed-inside-words]
-// gfm[impl inlines.emphasis-and-strong-emphasis.intraword-strong-emphasis-is-permitted]
-// gfm[impl inlines.emphasis-and-strong-emphasis.intraword-strong-emphasis-is-forbidden]
-// gfm[impl inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-consecutive-emphasis]
-// gfm[impl inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-produces-nested-strong]
-// gfm[impl inlines.emphasis-and-strong-emphasis.both-multiples-of-three-allow-emphasis-match]
-// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-allows-indefinite-nesting]
-// gfm[impl inlines.emphasis-and-strong-emphasis.strong-emphasis-allows-indefinite-nesting]
-// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-emphasis]
-// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-strong]
-// gfm[impl inlines.emphasis-and-strong-emphasis.strong-can-nest-inside-strong-with-same-delimiter]
-// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-delimiters-must-match]
-// gfm[impl inlines.emphasis-and-strong-emphasis.emphasis-may-contain-any-nonempty-inlines]
-// gfm[impl inlines.emphasis-and-strong-emphasis.strong-emphasis-may-contain-any-nonempty-inlines]
-// gfm[impl inlines.emphasis-and-strong-emphasis.empty-asterisk-emphasis-is-not-allowed]
-// gfm[impl inlines.emphasis-and-strong-emphasis.empty-underscore-emphasis-is-not-allowed]
-// gfm[impl inlines.emphasis-and-strong-emphasis.is-emphasis-within-emphasis]
-// gfm[impl inlines.emphasis-and-strong-emphasis.rule-11-puts-excess-asterisks-outside-emphasis]
-// gfm[impl inlines.emphasis-and-strong-emphasis.rule-12-puts-excess-underscores-outside-emphasis]
-// gfm[impl inlines.emphasis-and-strong-emphasis.rule-13-applies-to-long-delimiter-runs]
-// gfm[impl inlines.emphasis-and-strong-emphasis.rule-13-requires-different-directly-nested-delimiters]
-// gfm[impl inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
-// gfm[impl inlines.emphasis-and-strong-emphasis.rules-illustrated-by-examples]
-// gfm[impl inlines.emphasis-and-strong-emphasis.less-common-but-useful-emphasis-patterns]
-// gfm[impl inlines.emphasis-and-strong-emphasis.ambiguity-resolution-principles]
-// gfm[impl inlines.emphasis-and-strong-emphasis.original-markdown-description]
-// gfm[impl inlines.emphasis-and-strong-emphasis.original-markdown-description-quoted]
-// gfm[impl inlines.emphasis-and-strong-emphasis.original-rules-leave-nesting-underdetermined]
-// gfm[impl inlines.emphasis-and-strong-emphasis.extension-wrapper]
-// gfm[impl inlines.emphasis-and-strong-emphasis.literal-asterisk-cannot-edge-asterisk-emphasis]
-// gfm[impl inlines.emphasis-and-strong-emphasis.literal-underscore-cannot-edge-underscore-delimiters]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.trickiest-inline-case]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-initial-current-position]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-loop]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-stack-bottom-limits-scan]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-tracks-openers-bottom]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-updates-openers-bottom]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-consumes-delimiters]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-chooses-node-kind]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-inserts-node]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-interior-delimiters]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-advances]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-inactive-closer]
-// gfm[impl appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-cleans-up-stack]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-requires-matching-delimiters]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-requires-matching-delimiters]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-permitted]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-is-not-allowed-inside-words]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-strong-emphasis-is-permitted]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-strong-emphasis-is-forbidden]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-consecutive-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-produces-nested-strong]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.both-multiples-of-three-allow-emphasis-match]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-allows-indefinite-nesting]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-allows-indefinite-nesting]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-and-strong-may-nest-inside-strong]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-can-nest-inside-strong-with-same-delimiter]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-delimiters-must-match]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-may-contain-any-nonempty-inlines]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-may-contain-any-nonempty-inlines]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.empty-asterisk-emphasis-is-not-allowed]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.empty-underscore-emphasis-is-not-allowed]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.is-emphasis-within-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-11-puts-excess-asterisks-outside-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-12-puts-excess-underscores-outside-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-13-applies-to-long-delimiter-runs]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-13-requires-different-directly-nested-delimiters]
+// [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rules-illustrated-by-examples]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.less-common-but-useful-emphasis-patterns]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.ambiguity-resolution-principles]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-markdown-description]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-markdown-description-quoted]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-rules-leave-nesting-underdetermined]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.extension-wrapper]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.literal-asterisk-cannot-edge-asterisk-emphasis]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.literal-underscore-cannot-edge-underscore-delimiters]
+// [spec:gfm:def:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.trickiest-inline-case]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-initial-current-position]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-loop]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-stack-bottom-limits-scan]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-tracks-openers-bottom]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-updates-openers-bottom]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-consumes-delimiters]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-chooses-node-kind]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-inserts-node]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-interior-delimiters]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-advances]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-removes-inactive-closer]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-cleans-up-stack]
 fn resolve_emphasis<Ext>(mut pieces: Vec<InlinePiece<Ext>>) -> Vec<Node<Ext>>
 where
     Ext: Clone + PartialEq,
@@ -4606,12 +4624,12 @@ fn char_after(input: &str, index: usize) -> Option<char> {
     input.get(index..)?.chars().next()
 }
 
-// gfm[impl preliminaries.characters-and-lines.unicode-whitespace-character-definition]
-// gfm[impl preliminaries.characters-and-lines.unicode-whitespace-definition]
-// gfm[impl preliminaries.characters-and-lines.whitespace-character-definition]
-// gfm[impl preliminaries.characters-and-lines.whitespace-definition]
-// gfm[impl preliminaries.characters-and-lines.non-whitespace-character-definition]
-// gfm[impl preliminaries.characters-and-lines.space-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.unicode-whitespace-character-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.unicode-whitespace-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.whitespace-character-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.whitespace-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.non-whitespace-character-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.space-definition]
 fn is_left_flanking(prev: Option<char>, next: Option<char>) -> bool {
     let next_whitespace = next.is_none_or(char::is_whitespace);
     let next_punct = is_unicode_punctuation(next);
@@ -4630,14 +4648,14 @@ fn is_right_flanking(prev: Option<char>, next: Option<char>) -> bool {
     !prev_whitespace && (!prev_punct || next_whitespace || next_punct)
 }
 
-// gfm[impl preliminaries.characters-and-lines.punctuation-character-definition]
-// gfm[impl preliminaries.characters-and-lines.ascii-punctuation-character-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.punctuation-character-definition]
+// [spec:gfm:def:preliminaries.characters-and-lines.ascii-punctuation-character-definition]
 fn is_unicode_punctuation(ch: Option<char>) -> bool {
     ch.is_some_and(|ch| ch.is_ascii_punctuation() || ch.is_ascii_graphic() && !ch.is_alphanumeric())
 }
 
-// gfm[impl inlines.emphasis-and-strong-emphasis.multiple-of-three-condition-explanation]
-// gfm[impl inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-alternative]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-condition-explanation]
+// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.multiple-of-three-rule-prevents-alternative]
 fn multiple_of_three_blocked(
     opener_count: usize,
     closer_count: usize,
@@ -4646,12 +4664,12 @@ fn multiple_of_three_blocked(
 ) -> bool {
     let one_can_both = opener_can_close || closer_can_open;
     one_can_both
-        && (opener_count + closer_count) % 3 == 0
-        && !(opener_count % 3 == 0 && closer_count % 3 == 0)
+        && (opener_count + closer_count).is_multiple_of(3)
+        && !(opener_count.is_multiple_of(3) && closer_count.is_multiple_of(3))
 }
 
-// gfm[impl inlines.code-spans.all-space-content-is-not-trimmed]
-// gfm[impl inlines.code-spans.only-ascii-space-is-trimmed]
+// [spec:gfm:sem:inlines.code-spans.all-space-content-is-not-trimmed]
+// [spec:gfm:sem:inlines.code-spans.only-ascii-space-is-trimmed]
 fn normalize_code_span(code: &str) -> String {
     if code.starts_with(' ')
         && code.ends_with(' ')
@@ -4734,13 +4752,13 @@ fn find_delimited_closer(input: &str, mut index: usize, delim: &str) -> Option<u
     None
 }
 
-// gfm[impl inlines.links.link-label-definition]
-// gfm[impl inlines.links.link-label-ends-at-first-unescaped-closing-bracket]
-// gfm[impl inlines.links.link-label-cannot-contain-unescaped-brackets]
-// gfm[impl inlines.links.link-label-length-is-at-most-999-characters]
-// gfm[impl inlines.links.link-label-must-contain-at-least-one-non-whitespace-character]
-// gfm[impl inlines.links.link-label-must-contain-non-whitespace]
-// gfm[impl inlines.links.link-labels-cannot-contain-unescaped-brackets]
+// [spec:gfm:def:inlines.links.link-label-definition]
+// [spec:gfm:syn:inlines.links.link-label-ends-at-first-unescaped-closing-bracket]
+// [spec:gfm:syn:inlines.links.link-label-cannot-contain-unescaped-brackets]
+// [spec:gfm:syn:inlines.links.link-label-length-is-at-most-999-characters]
+// [spec:gfm:syn:inlines.links.link-label-must-contain-at-least-one-non-whitespace-character]
+// [spec:gfm:def:inlines.links.link-label-must-contain-non-whitespace]
+// [spec:gfm:sem:inlines.links.link-labels-cannot-contain-unescaped-brackets]
 fn find_closing_bracket(input: &str, start: usize) -> Option<usize> {
     let mut depth = 0usize;
     let mut escaped = false;
@@ -4789,27 +4807,26 @@ fn find_closing_bracket(input: &str, start: usize) -> Option<usize> {
     None
 }
 
-// gfm[impl inlines.links.link-destination-definition]
-// gfm[impl inlines.links.destination-allows-normal-backslash-escaping]
-// gfm[impl inlines.links.destination-cannot-contain-line-breaks]
-// gfm[impl inlines.links.destination-may-contain-right-parenthesis-in-angle-brackets]
-// gfm[impl inlines.links.destination-may-contain-spaces-only-in-angle-brackets]
-// gfm[impl inlines.links.destination-may-include-fragments-and-queries]
-// gfm[impl inlines.links.destination-preserves-url-escaping-and-allows-entity-references]
-// gfm[impl inlines.links.balanced-parentheses-are-allowed-in-destination]
-// gfm[impl inlines.links.implementations-may-limit-parenthesis-nesting-in-destinations]
-// gfm[impl inlines.links.parentheses-in-destination-may-be-escaped]
-// gfm[impl inlines.links.unbalanced-parentheses-require-escaping-or-angle-brackets]
-// gfm[impl inlines.links.unmatched-angle-brackets-do-not-form-destination]
-// gfm[impl inlines.links.angle-brackets-around-destination-must-be-unescaped]
-// gfm[impl inlines.links.backslash-before-non-escapable-character-is-literal-in-destination]
-// gfm[impl inlines.links.trailing-bracket-is-not-escaped-by-backslash-before-backslash]
-// gfm[impl inlines.links.destination-and-title-may-both-be-omitted]
+// [spec:gfm:syn:inlines.links.link-destination-definition]
+// [spec:gfm:syn:inlines.links.destination-allows-normal-backslash-escaping]
+// [spec:gfm:syn:inlines.links.destination-cannot-contain-line-breaks]
+// [spec:gfm:syn:inlines.links.destination-may-contain-right-parenthesis-in-angle-brackets]
+// [spec:gfm:syn:inlines.links.destination-may-contain-spaces-only-in-angle-brackets]
+// [spec:gfm:syn:inlines.links.destination-may-include-fragments-and-queries]
+// [spec:gfm:syn:inlines.links.destination-preserves-url-escaping-and-allows-entity-references]
+// [spec:gfm:syn:inlines.links.balanced-parentheses-are-allowed-in-destination]
+// [spec:gfm:def:inlines.links.implementations-may-limit-parenthesis-nesting-in-destinations]
+// [spec:gfm:syn:inlines.links.parentheses-in-destination-may-be-escaped]
+// [spec:gfm:syn:inlines.links.unbalanced-parentheses-require-escaping-or-angle-brackets]
+// [spec:gfm:syn:inlines.links.unmatched-angle-brackets-do-not-form-destination]
+// [spec:gfm:syn:inlines.links.angle-brackets-around-destination-must-be-unescaped]
+// [spec:gfm:syn:inlines.links.backslash-before-non-escapable-character-is-literal-in-destination]
+// [spec:gfm:syn:inlines.links.trailing-bracket-is-not-escaped-by-backslash-before-backslash]
+// [spec:gfm:syn:inlines.links.destination-and-title-may-both-be-omitted]
 fn parse_inline_link_target(rest: &str) -> Option<(usize, String, Option<String>)> {
     let trimmed = rest.trim_start();
 
-    if trimmed.starts_with('<') {
-        let after_angle = &trimmed[1..];
+    if let Some(after_angle) = trimmed.strip_prefix('<') {
         let angle_close = find_angle_close(after_angle)?;
         let destination = process_escapes_and_entities(&after_angle[..angle_close]);
         let after_gt = &after_angle[angle_close + 1..];
@@ -4903,12 +4920,12 @@ fn process_escapes_and_entities(input: &str) -> String {
                 continue;
             }
         }
-        if bytes[i] == b'&' {
-            if let Some((consumed, decoded)) = parse_entity_reference(&input[i..]) {
-                out.push_str(&decoded);
-                i += consumed;
-                continue;
-            }
+        if bytes[i] == b'&'
+            && let Some((consumed, decoded)) = parse_entity_reference(&input[i..])
+        {
+            out.push_str(&decoded);
+            i += consumed;
+            continue;
         }
         let ch = input[i..].chars().next().unwrap();
         out.push(ch);
@@ -4956,15 +4973,15 @@ fn parse_title(s: &str) -> Option<String> {
     None
 }
 
-// gfm[impl inlines.links.link-title-definition]
-// gfm[impl inlines.links.titles-may-use-single-quotes-double-quotes-or-parentheses]
-// gfm[impl inlines.links.titles-allow-backslash-escapes-and-entity-references]
-// gfm[impl inlines.links.link-titles-may-span-lines-but-not-blank-lines]
-// gfm[impl inlines.links.nested-balanced-quotes-in-titles-require-escaping]
-// gfm[impl inlines.links.different-title-delimiter-can-avoid-escaping]
-// gfm[impl inlines.links.title-cannot-appear-without-destination]
-// gfm[impl inlines.links.title-may-be-omitted]
-// gfm[impl inlines.links.title-must-be-separated-from-destination-by-whitespace]
+// [spec:gfm:req:inlines.links.link-title-definition]
+// [spec:gfm:syn:inlines.links.titles-may-use-single-quotes-double-quotes-or-parentheses]
+// [spec:gfm:syn:inlines.links.titles-allow-backslash-escapes-and-entity-references]
+// [spec:gfm:def:inlines.links.link-titles-may-span-lines-but-not-blank-lines]
+// [spec:gfm:syn:inlines.links.nested-balanced-quotes-in-titles-require-escaping]
+// [spec:gfm:syn:inlines.links.different-title-delimiter-can-avoid-escaping]
+// [spec:gfm:req:inlines.links.title-cannot-appear-without-destination]
+// [spec:gfm:syn:inlines.links.title-may-be-omitted]
+// [spec:gfm:syn:inlines.links.title-must-be-separated-from-destination-by-whitespace]
 fn split_destination_and_title(body: &str) -> Option<(String, Option<String>)> {
     let body_trimmed = body.trim();
     for (i, ch) in body_trimmed.char_indices() {
@@ -4991,7 +5008,7 @@ fn split_destination_and_title(body: &str) -> Option<(String, Option<String>)> {
     None
 }
 
-// gfm[impl leaf-blocks.html-blocks.non-type-6-tag-must-be-complete-and-alone-on-first-line]
+// [spec:gfm:syn:leaf-blocks.html-blocks.non-type-6-tag-must-be-complete-and-alone-on-first-line]
 fn classify_html_block_start(line: &str) -> Option<HtmlBlockStart> {
     let trimmed = trimmed_html_block_line(line)?;
     if starts_html_type_1(trimmed) {
@@ -5052,32 +5069,32 @@ fn html_block_is_closed_by_line(kind: HtmlBlockKind, line: &str) -> bool {
     }
 }
 
-// gfm[impl leaf-blocks.html-blocks.opening-tag-indent-up-to-three-spaces]
+// [spec:gfm:syn:leaf-blocks.html-blocks.opening-tag-indent-up-to-three-spaces]
 fn trimmed_html_block_line(line: &str) -> Option<&str> {
     let indent = leading_indent(line);
     (indent.columns <= 3).then_some(&line[indent.bytes..])
 }
 
-// gfm[impl leaf-blocks.html-blocks.type-1-pre-example]
-// gfm[impl leaf-blocks.html-blocks.type-1-script-example]
-// gfm[impl leaf-blocks.html-blocks.type-1-style-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-1-pre-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-1-script-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-1-style-example]
 fn starts_html_type_1(line: &str) -> bool {
     HTML_BLOCK_TYPE_1_TAGS
         .iter()
         .any(|tag| matches_html_tag_prefix(line, tag))
 }
 
-// gfm[impl leaf-blocks.html-blocks.type-2-comment-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-2-comment-example]
 fn starts_html_type_2(line: &str) -> bool {
     line.starts_with("<!--")
 }
 
-// gfm[impl leaf-blocks.html-blocks.type-3-processing-instruction-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-3-processing-instruction-example]
 fn starts_html_type_3(line: &str) -> bool {
     line.starts_with("<?")
 }
 
-// gfm[impl leaf-blocks.html-blocks.type-4-declaration-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-4-declaration-example]
 fn starts_html_type_4(line: &str) -> bool {
     line.starts_with("<!")
         && !line.starts_with("<!--")
@@ -5088,18 +5105,18 @@ fn starts_html_type_4(line: &str) -> bool {
             .is_some_and(|ch| ch.is_ascii_uppercase())
 }
 
-// gfm[impl leaf-blocks.html-blocks.type-5-cdata-example]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-5-cdata-example]
 fn starts_html_type_5(line: &str) -> bool {
     line.starts_with("<![CDATA[")
 }
 
-// gfm[impl leaf-blocks.html-blocks.type-6-examples]
-// gfm[impl leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-alone-on-line]
-// gfm[impl leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-valid]
-// gfm[impl leaf-blocks.html-blocks.type-6-may-start-with-closing-tag]
-// gfm[impl leaf-blocks.html-blocks.type-6-open-tag-need-not-be-closed]
-// gfm[impl leaf-blocks.html-blocks.type-6-opening-tag-may-be-partial-when-split-at-whitespace]
-// gfm[impl leaf-blocks.html-blocks.type-6-partial-tag-need-not-be-completed]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-examples]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-alone-on-line]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-initial-tag-need-not-be-valid]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-may-start-with-closing-tag]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-open-tag-need-not-be-closed]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-opening-tag-may-be-partial-when-split-at-whitespace]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-6-partial-tag-need-not-be-completed]
 fn starts_html_type_6(line: &str) -> bool {
     let Some(name) = parse_html_block_tag_start_name(line) else {
         return false;
@@ -5107,8 +5124,8 @@ fn starts_html_type_6(line: &str) -> bool {
     is_html_block_tag_name(name, HTML_BLOCK_TYPE_6_TAGS)
 }
 
-// gfm[impl leaf-blocks.html-blocks.type-7-example-cannot-interrupt-paragraph]
-// gfm[impl leaf-blocks.html-blocks.type-7-tag-name-may-be-anything]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-7-example-cannot-interrupt-paragraph]
+// [spec:gfm:syn:leaf-blocks.html-blocks.type-7-tag-name-may-be-anything]
 fn starts_html_type_7(line: &str) -> bool {
     looks_like_complete_html_tag_line(line)
 }
@@ -5153,7 +5170,7 @@ fn looks_like_complete_html_tag_line(line: &str) -> bool {
     parse_complete_html_tag_line(line).is_some()
 }
 
-// gfm[impl inlines.raw-html.tag-name-definition]
+// [spec:gfm:syn:inlines.raw-html.tag-name-definition]
 fn parse_html_tag_name_prefix(line: &str) -> Option<(&str, usize)> {
     let mut chars = line.char_indices();
     let (_, first) = chars.next()?;
@@ -5173,7 +5190,7 @@ fn parse_html_tag_name_prefix(line: &str) -> Option<(&str, usize)> {
     Some((&line[..end], end))
 }
 
-// gfm[impl inlines.raw-html.attribute-name-definition]
+// [spec:gfm:def:inlines.raw-html.attribute-name-definition]
 fn parse_html_attribute_name_prefix(line: &str) -> Option<usize> {
     let mut chars = line.char_indices();
     let (_, first) = chars.next()?;
@@ -5193,9 +5210,9 @@ fn parse_html_attribute_name_prefix(line: &str) -> Option<usize> {
     Some(end)
 }
 
-// gfm[impl inlines.raw-html.unquoted-attribute-value-definition]
-// gfm[impl inlines.raw-html.single-quoted-attribute-value-definition]
-// gfm[impl inlines.raw-html.double-quoted-attribute-value-definition]
+// [spec:gfm:def:inlines.raw-html.unquoted-attribute-value-definition]
+// [spec:gfm:def:inlines.raw-html.single-quoted-attribute-value-definition]
+// [spec:gfm:def:inlines.raw-html.double-quoted-attribute-value-definition]
 fn parse_html_attribute_value_prefix(line: &str) -> Option<usize> {
     let quote = line.chars().next()?;
     if quote == '"' || quote == '\'' {
@@ -5214,9 +5231,9 @@ fn parse_html_attribute_value_prefix(line: &str) -> Option<usize> {
     (end > 0).then_some(end)
 }
 
-// gfm[impl inlines.raw-html.attribute-definition]
-// gfm[impl inlines.raw-html.attribute-value-specification-definition]
-// gfm[impl inlines.raw-html.open-tag-definition]
+// [spec:gfm:def:inlines.raw-html.attribute-definition]
+// [spec:gfm:def:inlines.raw-html.attribute-value-specification-definition]
+// [spec:gfm:def:inlines.raw-html.open-tag-definition]
 fn parse_html_open_tag_prefix(line: &str) -> Option<(&str, usize)> {
     let rest = line.strip_prefix('<')?;
     if rest.starts_with('/') {
@@ -5262,7 +5279,7 @@ fn parse_html_open_tag_prefix(line: &str) -> Option<(&str, usize)> {
     }
 }
 
-// gfm[impl inlines.raw-html.closing-tag-definition]
+// [spec:gfm:def:inlines.raw-html.closing-tag-definition]
 fn parse_html_closing_tag_prefix(line: &str) -> Option<(&str, usize)> {
     let line = line.strip_prefix("</")?;
     let (name, name_len) = parse_html_tag_name_prefix(line)?;
@@ -5309,6 +5326,7 @@ fn is_html_whitespace(ch: char) -> bool {
     matches!(ch, ' ' | '\t' | '\n' | '\u{000B}' | '\u{000C}' | '\r')
 }
 
+#[allow(clippy::too_many_arguments)]
 fn parse_inline_children<Ext>(
     text: &str,
     extensions: &[Box<dyn Extension<Ext>>],
@@ -5337,7 +5355,7 @@ where
     parser.parse_until(None)
 }
 
-// gfm[impl inlines.images.html-rendering-typically-uses-plain-description-as-alt]
+// [spec:gfm:syn:inlines.images.html-rendering-typically-uses-plain-description-as-alt]
 fn contains_link<Ext>(nodes: &[Node<Ext>]) -> bool {
     nodes.iter().any(|node| match node {
         Node::Link { .. } => true,
@@ -5409,13 +5427,13 @@ where
     }
 }
 
-// gfm[impl container-blocks.task-list-items-extension.definition]
-// gfm[impl container-blocks.task-list-items-extension.marker-structure]
-// gfm[impl container-blocks.task-list-items-extension.whitespace-marker-is-unchecked]
-// gfm[impl container-blocks.task-list-items-extension.checkbox-interaction-is-unspecified]
-// gfm[impl container-blocks.task-list-items-extension.extension-wrapper]
-// gfm[impl container-blocks.task-list-items-extension.gfm-enables-task-list-extension]
-// gfm[impl container-blocks.task-list-items-extension.task-lists-may-be-arbitrarily-nested]
+// [spec:gfm:def:container-blocks.task-list-items-extension.definition]
+// [spec:gfm:def:container-blocks.task-list-items-extension.marker-structure]
+// [spec:gfm:sem:container-blocks.task-list-items-extension.whitespace-marker-is-unchecked]
+// [spec:gfm:req:container-blocks.task-list-items-extension.checkbox-interaction-is-unspecified]
+// [spec:gfm:def:container-blocks.task-list-items-extension.extension-wrapper]
+// [spec:gfm:sem:container-blocks.task-list-items-extension.gfm-enables-task-list-extension]
+// [spec:gfm:syn:container-blocks.task-list-items-extension.task-lists-may-be-arbitrarily-nested]
 fn normalize_task_item<Ext>(mut children: Vec<ParsedBlock<Ext>>) -> Vec<ParsedBlock<Ext>>
 where
 {
@@ -5496,7 +5514,7 @@ fn is_paragraph_continuation_candidate(line: &str) -> bool {
     if trimmed.starts_with('#') {
         let hashes = trimmed.chars().take_while(|c| *c == '#').count();
         let after = &trimmed[hashes..];
-        if hashes >= 1 && hashes <= 6 && (after.is_empty() || after.starts_with([' ', '\t'])) {
+        if (1..=6).contains(&hashes) && (after.is_empty() || after.starts_with([' ', '\t'])) {
             return false;
         }
     }
@@ -5511,7 +5529,7 @@ fn is_lazy_list_continuation(line: &str, lines: &[String], index: usize, gfm: bo
         && parse_fence_opener(line).is_none()
         && !is_thematic_break(line)
         && parse_reference_definition(lines, index).is_none()
-        && !(gfm && matches!(parse_table_delimiter(line), Some(_)))
+        && !(gfm && parse_table_delimiter(line).is_some())
         && !classify_html_block_start(line).is_some_and(|start| start.can_interrupt_paragraph)
         && !matches!(trim_up_to_three_spaces(line).chars().next(), Some('#'))
         && !(gfm
@@ -5529,7 +5547,7 @@ fn is_lazy_block_quote_continuation(line: &str, lines: &[String], index: usize, 
         && parse_fence_opener(line).is_none()
         && !is_thematic_break(line)
         && parse_reference_definition(lines, index).is_none()
-        && !(gfm && matches!(parse_table_delimiter(line), Some(_)))
+        && !(gfm && parse_table_delimiter(line).is_some())
         && !classify_html_block_start(line).is_some_and(|start| start.can_interrupt_paragraph)
         && !matches!(trim_up_to_three_spaces(line).chars().next(), Some('#'))
         && !(gfm
@@ -5538,7 +5556,7 @@ fn is_lazy_block_quote_continuation(line: &str, lines: &[String], index: usize, 
             && parse_table_delimiter(&lines[index + 1]).is_some())
 }
 
-// gfm[impl leaf-blocks.tables-extension.delimiter-row-structure]
+// [spec:gfm:def:leaf-blocks.tables-extension.delimiter-row-structure]
 fn parse_table_delimiter(line: &str) -> Option<Vec<Option<TableAlignment>>> {
     let cells = split_table_row(line);
     if cells.is_empty() {
@@ -5572,7 +5590,7 @@ fn parse_table_delimiter(line: &str) -> Option<Vec<Option<TableAlignment>>> {
     Some(out)
 }
 
-// gfm[impl leaf-blocks.tables-extension.escaped-pipes-are-literal-cell-content]
+// [spec:gfm:syn:leaf-blocks.tables-extension.escaped-pipes-are-literal-cell-content]
 fn split_table_row(line: &str) -> Vec<String> {
     let trimmed = line.trim();
     let core = trimmed.strip_prefix('|').unwrap_or(trimmed);
@@ -5733,10 +5751,10 @@ fn plain_text<Ext>(nodes: &[Node<Ext>]) -> String {
     out
 }
 
-// gfm[impl leaf-blocks.link-reference-definitions.label-matching-is-case-insensitive]
-// gfm[impl inlines.links.label-match-definition]
-// gfm[impl inlines.links.label-matching-collapses-consecutive-internal-whitespace]
-// gfm[impl inlines.links.label-matching-uses-unicode-case-fold]
+// [spec:gfm:sem:leaf-blocks.link-reference-definitions.label-matching-is-case-insensitive]
+// [spec:gfm:req:inlines.links.label-match-definition]
+// [spec:gfm:sem:inlines.links.label-matching-collapses-consecutive-internal-whitespace]
+// [spec:gfm:syn:inlines.links.label-matching-uses-unicode-case-fold]
 fn normalize_reference_label(label: &str) -> String {
     label
         .split_whitespace()
@@ -5745,19 +5763,19 @@ fn normalize_reference_label(label: &str) -> String {
         .to_lowercase()
 }
 
-// gfm[impl inlines.entity-and-numeric-character-references.references-produce-unicode-characters]
-// gfm[impl inlines.entity-and-numeric-character-references.decimal-numeric-reference-definition]
-// gfm[impl inlines.entity-and-numeric-character-references.hex-reference-definition]
-// gfm[impl inlines.entity-and-numeric-character-references.invalid-references-are-literal-text]
-// gfm[impl inlines.entity-and-numeric-character-references.entity-references-definition]
-// gfm[impl inlines.entity-and-numeric-character-references.named-entities-require-semicolon]
-// gfm[impl inlines.entity-and-numeric-character-references.parsers-need-not-preserve-source-form]
-// gfm[impl inlines.entity-and-numeric-character-references.references-are-literal-text-in-code]
-// gfm[impl inlines.entity-and-numeric-character-references.references-are-not-recognized-in-code]
-// gfm[impl inlines.entity-and-numeric-character-references.references-are-recognized-outside-code]
-// gfm[impl inlines.entity-and-numeric-character-references.references-cannot-replace-structural-markers]
-// gfm[impl inlines.entity-and-numeric-character-references.references-cannot-replace-structure-symbols]
-// gfm[impl inlines.entity-and-numeric-character-references.unknown-named-entities-are-literal]
+// [spec:gfm:sem:inlines.entity-and-numeric-character-references.references-produce-unicode-characters]
+// [spec:gfm:def:inlines.entity-and-numeric-character-references.decimal-numeric-reference-definition]
+// [spec:gfm:def:inlines.entity-and-numeric-character-references.hex-reference-definition]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.invalid-references-are-literal-text]
+// [spec:gfm:def:inlines.entity-and-numeric-character-references.entity-references-definition]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.named-entities-require-semicolon]
+// [spec:gfm:req:inlines.entity-and-numeric-character-references.parsers-need-not-preserve-source-form]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-are-literal-text-in-code]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-are-not-recognized-in-code]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-are-recognized-outside-code]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-cannot-replace-structural-markers]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.references-cannot-replace-structure-symbols]
+// [spec:gfm:syn:inlines.entity-and-numeric-character-references.unknown-named-entities-are-literal]
 fn parse_entity_reference(input: &str) -> Option<(usize, String)> {
     if !input.starts_with('&') {
         return None;
@@ -5786,7 +5804,7 @@ fn parse_entity_reference(input: &str) -> Option<(usize, String)> {
         })?;
         Some((end + 1, ch.to_string()))
     } else {
-        // gfm[impl inlines.entity-and-numeric-character-references.entity-references-definition]
+        // [spec:gfm:def:inlines.entity-and-numeric-character-references.entity-references-definition]
         let decoded = resolve_named_entity(entity)?;
         Some((end + 1, decoded.to_string()))
     }
@@ -5801,9 +5819,9 @@ fn resolve_named_entity(name: &str) -> Option<&'static str> {
         .map(|e| e.characters)
 }
 
-// gfm[impl inlines.autolinks.absolute-uri-definition]
-// gfm[impl inlines.autolinks.scheme-definition]
-// gfm[impl inlines.autolinks.autolink-schemes-are-case-insensitive]
+// [spec:gfm:def:inlines.autolinks.absolute-uri-definition]
+// [spec:gfm:def:inlines.autolinks.scheme-definition]
+// [spec:gfm:syn:inlines.autolinks.autolink-schemes-are-case-insensitive]
 fn looks_like_url(text: &str) -> bool {
     let Some(colon_pos) = text.find(':') else {
         return false;
@@ -5829,19 +5847,17 @@ fn looks_like_url(text: &str) -> bool {
         .any(|ch| ch.is_whitespace() || ch == '<' || ch == '>')
 }
 
-// gfm[impl inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
-// gfm[impl inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
-// gfm[impl inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
-// gfm[impl inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
-// gfm[impl inlines.autolinks-extension.left-angle-bracket-ends-autolink]
+// [spec:gfm:def:inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
+// [spec:gfm:syn:inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
+// [spec:gfm:syn:inlines.autolinks-extension.unmatched-trailing-right-parentheses-are-excluded]
+// [spec:gfm:syn:inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
+// [spec:gfm:syn:inlines.autolinks-extension.left-angle-bracket-ends-autolink]
 /// GFM extended www autolinks: the host portion of the URL must consist of
 /// dot-separated DNS labels, and the LAST TWO labels of the host must not
 /// contain underscores.
 fn is_valid_www_host(url: &str) -> bool {
     // Extract host: everything before the first '/', '?', '#'.
-    let host_end = url
-        .find(|c: char| matches!(c, '/' | '?' | '#'))
-        .unwrap_or(url.len());
+    let host_end = url.find(['/', '?', '#']).unwrap_or(url.len());
     let host = &url[..host_end];
     let labels: Vec<&str> = host.split('.').collect();
     let n = labels.len();
@@ -5882,14 +5898,14 @@ fn trim_autolink_trailing(url: &str) -> &str {
             }
         }
 
-        if last == b';' {
-            if let Some(amp) = url[..end].rfind('&') {
-                let entity = &url[amp + 1..end - 1];
-                if !entity.is_empty() && entity.chars().all(|c| c.is_ascii_alphanumeric()) {
-                    // Strip the entire &...; entity-like sequence
-                    end = amp;
-                    continue;
-                }
+        if last == b';'
+            && let Some(amp) = url[..end].rfind('&')
+        {
+            let entity = &url[amp + 1..end - 1];
+            if !entity.is_empty() && entity.chars().all(|c| c.is_ascii_alphanumeric()) {
+                // Strip the entire &...; entity-like sequence
+                end = amp;
+                continue;
             }
         }
 
@@ -5911,12 +5927,12 @@ const DISALLOWED_HTML_TAGS: &[&str] = &[
     "plaintext",
 ];
 
-// gfm[impl inlines.disallowed-raw-html-extension.disallowed-tags]
-// gfm[impl inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
-// gfm[impl inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
-// gfm[impl inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
-// gfm[impl inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
-// gfm[impl inlines.disallowed-raw-html-extension.extension-wrapper]
+// [spec:gfm:def:inlines.disallowed-raw-html-extension.disallowed-tags]
+// [spec:gfm:sem:inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
+// [spec:gfm:def:inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
+// [spec:gfm:sem:inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
+// [spec:gfm:sem:inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
+// [spec:gfm:def:inlines.disallowed-raw-html-extension.extension-wrapper]
 pub(crate) fn filter_disallowed_html(html: &str) -> String {
     let mut result = String::with_capacity(html.len());
     let mut i = 0;
@@ -5963,10 +5979,10 @@ pub(crate) fn filter_disallowed_html(html: &str) -> String {
     result
 }
 
-// gfm[impl inlines.autolinks-extension.extended-email-autolink-rules]
-// gfm[impl inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
-// gfm[impl inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign]
-// gfm[impl inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
+// [spec:gfm:def:inlines.autolinks-extension.extended-email-autolink-rules]
+// [spec:gfm:syn:inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
+// [spec:gfm:syn:inlines.autolinks-extension.dot-dash-and-underscore-rules-around-at-sign]
+// [spec:gfm:sem:inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
 fn looks_like_email(text: &str) -> bool {
     let Some((local, domain)) = text.split_once('@') else {
         return false;
@@ -5998,7 +6014,7 @@ fn looks_like_email(text: &str) -> bool {
     true
 }
 
-// gfm[impl preliminaries.characters-and-lines.character-class-definitions]
+// [spec:gfm:def:preliminaries.characters-and-lines.character-class-definitions]
 fn is_escapable(ch: char) -> bool {
     matches!(
         ch,
@@ -6044,7 +6060,7 @@ mod tests {
     use crate::node::{Node, SourceSpan, StreamItem};
     use crate::sink::VecSink;
 
-    // adv[verify markdown.input.byte-cap]
+    // [spec:adv:req:markdown.input.byte-cap/test]
     #[test]
     fn default_parser_has_no_input_cap() {
         let mut parser = Parser::<()>::new();
@@ -6055,7 +6071,8 @@ mod tests {
         parser.finish(&mut sink).expect("finish");
     }
 
-    // adv[verify markdown.input.byte-cap]
+    // [spec:adv:req:markdown.input.byte-cap/test]
+    // [spec:mw:def:core.error.stream-error/test]
     #[test]
     fn single_push_over_cap_rejected() {
         let mut parser = Parser::<()>::builder().with_max_input_bytes(1024).build();
@@ -6071,7 +6088,7 @@ mod tests {
         }
     }
 
-    // adv[verify markdown.input.byte-cap]
+    // [spec:adv:req:markdown.input.byte-cap/test]
     #[test]
     fn streaming_push_cumulative_trips_cap() {
         let mut parser = Parser::<()>::builder().with_max_input_bytes(10).build();
@@ -6086,7 +6103,7 @@ mod tests {
         ));
     }
 
-    // adv[verify markdown.input.byte-cap]
+    // [spec:adv:req:markdown.input.byte-cap/test]
     #[test]
     fn exactly_at_cap_ok() {
         let mut parser = Parser::<()>::builder().with_max_input_bytes(8).build();
@@ -6095,7 +6112,7 @@ mod tests {
         parser.finish(&mut sink).expect("finish ok");
     }
 
-    // adv[verify markdown.input.byte-cap]
+    // [spec:adv:req:markdown.input.byte-cap/test]
     #[test]
     fn usize_max_effectively_unlimited() {
         let mut parser = Parser::<()>::builder()
@@ -6188,6 +6205,8 @@ mod tests {
         }
     }
 
+    // [spec:mw:sem:core.stream.provisional/test]
+    // [spec:mw:def:core.sink.vec-sink/test]
     #[test]
     fn emits_stable_ids_for_provisional_emphasis_upgrade() {
         let mut parser = Parser::<()>::new();
@@ -6225,7 +6244,7 @@ mod tests {
         ));
     }
 
-    // gfm[verify leaf-blocks.setext-headings.structure]
+    // [spec:gfm:syn:leaf-blocks.setext-headings.structure/test]
     #[test]
     fn upgrades_setext_heading() {
         let mut parser = Parser::<()>::new();
@@ -6252,7 +6271,7 @@ mod tests {
         assert!(matches!(&second.node, Node::Heading { level, .. } if *level == 2));
     }
 
-    // gfm[verify leaf-blocks.fenced-code-blocks.content-continues-until-matching-closing-fence]
+    // [spec:gfm:syn:leaf-blocks.fenced-code-blocks.content-continues-until-matching-closing-fence/test]
     #[test]
     fn supports_fenced_code_blocks() {
         let mut parser = Parser::<()>::new();
@@ -6301,7 +6320,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .last()
+            .next_back()
             .unwrap();
 
         assert!(matches!(
@@ -6328,7 +6347,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .last()
+            .next_back()
             .unwrap();
 
         assert!(matches!(
@@ -6355,7 +6374,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .last()
+            .next_back()
             .unwrap();
 
         assert!(matches!(
@@ -6364,6 +6383,10 @@ mod tests {
         ));
     }
 
+    // [spec:mw:def:core.node.custom-payload/test]
+    // [spec:mw:def:core.ext.trait/test]
+    // [spec:mw:req:core.ext.dispatch-order/test]
+    // [spec:mw:req:core.ext.ctx-delegation/test]
     #[test]
     fn supports_inline_extension_hooks() {
         let mut parser = Parser::builder().with_extension(MathExtension).build();
@@ -6387,6 +6410,7 @@ mod tests {
         ));
     }
 
+    // [spec:mw:def:core.ext.inline-context/test]
     #[test]
     fn supports_recursive_inline_parse_from_extension() {
         // NoteInlineExtension captures `!![...]!!` and recursively parses
@@ -6436,6 +6460,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:def:core.ext.match-types/test]
     #[test]
     fn supports_block_extension_hooks() {
         let mut parser = Parser::builder().with_extension(NoteBlockExtension).build();
@@ -6466,8 +6491,8 @@ mod tests {
         assert!(matches!(&nodes[2], Node::Paragraph { .. }));
     }
 
-    // gfm[verify inlines.links.inline-link-definition]
-    // gfm[verify inlines.images.definition]
+    // [spec:gfm:syn:inlines.links.inline-link-definition/test]
+    // [spec:gfm:syn:inlines.images.definition/test]
     #[test]
     fn supports_inline_links_and_images() {
         let mut parser = Parser::<()>::new();
@@ -6487,7 +6512,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .last()
+            .next_back()
             .unwrap();
 
         let Node::Paragraph { children, .. } = final_node else {
@@ -6511,8 +6536,8 @@ mod tests {
         }));
     }
 
-    // gfm[verify leaf-blocks.link-reference-definitions.may-appear-before-or-after-uses]
-    // gfm[verify inlines.links.shortcut-reference-link-definition]
+    // [spec:gfm:sem:leaf-blocks.link-reference-definitions.may-appear-before-or-after-uses/test]
+    // [spec:gfm:syn:inlines.links.shortcut-reference-link-definition/test]
     #[test]
     fn resolves_reference_links_from_later_definitions() {
         let mut parser = Parser::<()>::new();
@@ -6543,7 +6568,7 @@ mod tests {
         ));
     }
 
-    // gfm[verify inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html]
+    // [spec:gfm:def:inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html/test]
     #[test]
     fn supports_inline_raw_html() {
         let mut parser = Parser::<()>::new();
@@ -6563,7 +6588,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .last()
+            .next_back()
             .unwrap();
 
         let Node::Paragraph { children, .. } = final_node else {
@@ -6580,7 +6605,7 @@ mod tests {
         assert_eq!(rendered, "before <span>hi</span> after");
     }
 
-    // gfm[verify leaf-blocks.html-blocks.definition]
+    // [spec:gfm:def:leaf-blocks.html-blocks.definition/test]
     #[test]
     fn supports_html_blocks() {
         let mut parser = Parser::<()>::new();
@@ -6598,7 +6623,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .last()
+            .next_back()
             .unwrap();
 
         assert!(matches!(
@@ -6607,7 +6632,7 @@ mod tests {
         ));
     }
 
-    // gfm[verify leaf-blocks.html-blocks.opening-tag-indent-up-to-three-spaces]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.opening-tag-indent-up-to-three-spaces/test]
     #[test]
     fn html_blocks_only_start_with_up_to_three_spaces_of_indent() {
         let mut parser = Parser::<()>::new();
@@ -6636,7 +6661,7 @@ mod tests {
         ));
     }
 
-    // gfm[verify leaf-blocks.html-blocks.type-7-example-cannot-interrupt-paragraph]
+    // [spec:gfm:syn:leaf-blocks.html-blocks.type-7-example-cannot-interrupt-paragraph/test]
     #[test]
     fn type_7_html_blocks_do_not_interrupt_paragraphs() {
         let mut parser = Parser::<()>::new();
@@ -6656,7 +6681,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .last()
+            .next_back()
             .unwrap();
 
         assert!(matches!(
@@ -6672,9 +6697,9 @@ mod tests {
         ));
     }
 
-    // gfm[verify inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
-    // gfm[verify inlines.autolinks.definition]
-    // gfm[verify inlines.autolinks-extension.extended-url-autolink-definition]
+    // [spec:gfm:def:inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters/test]
+    // [spec:gfm:syn:inlines.autolinks.definition/test]
+    // [spec:gfm:syn:inlines.autolinks-extension.extended-url-autolink-definition/test]
     #[test]
     fn supports_strikethrough_and_autolinks() {
         let mut parser = Parser::<()>::builder().with_gfm().build();
@@ -6697,7 +6722,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .last()
+            .next_back()
             .unwrap();
 
         let Node::Paragraph { children, .. } = final_node else {
@@ -6717,8 +6742,9 @@ mod tests {
         );
     }
 
-    // gfm[verify container-blocks.task-list-items-extension.definition]
-    // gfm[verify leaf-blocks.tables-extension.table-definition]
+    // [spec:gfm:def:container-blocks.task-list-items-extension.definition/test]
+    // [spec:gfm:def:leaf-blocks.tables-extension.table-definition/test]
+    // [spec:mw:def:core.node.table-shape/test]
     #[test]
     fn supports_task_list_items_and_tables() {
         let mut parser = Parser::<()>::builder().with_gfm().build();
@@ -6747,8 +6773,8 @@ mod tests {
         assert!(finals.iter().any(|node| matches!(node, Node::Table { .. })));
     }
 
-    // gfm[verify container-blocks.list-items.lazy-continuation-example]
-    // gfm[verify container-blocks.lists.loose-list-definition]
+    // [spec:gfm:syn:container-blocks.list-items.lazy-continuation-example/test]
+    // [spec:gfm:def:container-blocks.lists.loose-list-definition/test]
     #[test]
     fn detects_loose_lists_and_lazy_continuation() {
         let mut parser = Parser::<()>::new();
@@ -6780,8 +6806,8 @@ mod tests {
         ));
     }
 
-    // gfm[verify container-blocks.list-items.ordered-start-number-is-at-most-nine-digits]
-    // gfm[verify container-blocks.list-items.ordered-start-number-may-have-leading-zeroes]
+    // [spec:gfm:syn:container-blocks.list-items.ordered-start-number-is-at-most-nine-digits/test]
+    // [spec:gfm:syn:container-blocks.list-items.ordered-start-number-may-have-leading-zeroes/test]
     #[test]
     fn enforces_ordered_list_marker_width_rules() {
         let mut parser = Parser::<()>::new();
@@ -6816,7 +6842,7 @@ mod tests {
         )));
     }
 
-    // gfm[verify container-blocks.list-items.interrupting-ordered-list-must-start-at-one]
+    // [spec:gfm:syn:container-blocks.list-items.interrupting-ordered-list-must-start-at-one/test]
     #[test]
     fn ordered_lists_only_interrupt_paragraphs_at_one() {
         let mut parser = Parser::<()>::new();
@@ -6846,7 +6872,7 @@ mod tests {
         ));
     }
 
-    // gfm[verify container-blocks.list-items.empty-item-does-not-require-post-marker-spaces]
+    // [spec:gfm:syn:container-blocks.list-items.empty-item-does-not-require-post-marker-spaces/test]
     #[test]
     fn supports_empty_list_items_without_post_marker_space() {
         let mut parser = Parser::<()>::new();
@@ -6876,8 +6902,8 @@ mod tests {
         ));
     }
 
-    // gfm[verify container-blocks.list-items.interrupting-first-item-cannot-begin-with-blank-line]
-    // gfm[verify container-blocks.list-items.blank-line-start-makes-post-marker-spacing-irrelevant]
+    // [spec:gfm:syn:container-blocks.list-items.interrupting-first-item-cannot-begin-with-blank-line/test]
+    // [spec:gfm:syn:container-blocks.list-items.blank-line-start-makes-post-marker-spacing-irrelevant/test]
     #[test]
     fn blank_start_list_item_does_not_interrupt_paragraph_and_uses_normalized_indent() {
         let mut parser = Parser::<()>::new();
@@ -6900,7 +6926,7 @@ mod tests {
         assert!(matches!(finals.first(), Some(Node::Paragraph { .. })));
     }
 
-    // gfm[verify inlines.emphasis-and-strong-emphasis.both-multiples-of-three-allow-emphasis-match]
+    // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.both-multiples-of-three-allow-emphasis-match/test]
     #[test]
     fn preserves_chunk_invariant_for_nested_delimiters() {
         let input = "foo***bar***baz\n";
@@ -6941,7 +6967,7 @@ mod tests {
         assert_eq!(one_final, chunked_final);
     }
 
-    // gfm[verify container-blocks.list-items.sublists-follow-general-indentation-rules]
+    // [spec:gfm:thm:container-blocks.list-items.sublists-follow-general-indentation-rules/test]
     #[test]
     fn supports_nested_sublists() {
         let mut parser = Parser::<()>::new();
@@ -6971,7 +6997,7 @@ mod tests {
         ));
     }
 
-    // gfm[verify container-blocks.list-items.indented-code-must-be-four-spaces-beyond-content-indent]
+    // [spec:gfm:syn:container-blocks.list-items.indented-code-must-be-four-spaces-beyond-content-indent/test]
     #[test]
     fn supports_indented_code_inside_list_items() {
         let mut parser = Parser::<()>::new();
@@ -7000,7 +7026,7 @@ mod tests {
         ));
     }
 
-    // gfm[verify preliminaries.tabs.tabs-not-expanded-in-lines]
+    // [spec:gfm:sem:preliminaries.tabs.tabs-not-expanded-in-lines/test]
     #[test]
     fn preserves_tabs_in_non_structural_text() {
         let mut parser = Parser::<()>::new();
@@ -7028,6 +7054,7 @@ mod tests {
         ));
     }
 
+    // [spec:mw:req:core.stream.batch-ordering/test]
     #[test]
     fn deletes_blocks_that_turn_into_reference_definitions() {
         let mut parser = Parser::<()>::new();
@@ -7125,6 +7152,7 @@ mod tests {
         }
     }
 
+    // [spec:mw:def:core.error.taxonomy/test]
     #[test]
     fn rejects_new_input_after_finish() {
         let mut parser = Parser::<()>::new();

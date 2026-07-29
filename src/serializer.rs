@@ -14,6 +14,8 @@
 use crate::node::{AlertKind, Node, TableAlignment};
 
 /// Serialize a single node (block or inline) to canonical markdown.
+// [spec:mw:def:editing.serialize.entry-points]
+// [spec:mw:req:editing.serialize.round-trip]
 pub fn serialize<Ext>(node: &Node<Ext>) -> String {
     let mut out = String::new();
     write_block(node, &mut out, &mut WriteCtx::default());
@@ -22,6 +24,8 @@ pub fn serialize<Ext>(node: &Node<Ext>) -> String {
 
 /// Serialize a sequence of top-level blocks to canonical markdown, joined
 /// with blank-line separators.
+// [spec:mw:def:editing.serialize.entry-points]
+// [spec:mw:req:editing.serialize.round-trip]
 pub fn serialize_blocks<Ext>(blocks: &[Node<Ext>]) -> String {
     let mut out = String::new();
     let mut ctx = WriteCtx::default();
@@ -42,6 +46,7 @@ struct WriteCtx {
     bq_depth: u32,
 }
 
+// [spec:mw:sem:editing.serialize.block-forms]
 fn write_block<Ext>(node: &Node<Ext>, out: &mut String, ctx: &mut WriteCtx) {
     match node {
         Node::Document { children, .. } => {
@@ -317,6 +322,7 @@ fn write_table<Ext>(
     let _ = cols;
 }
 
+// [spec:mw:req:editing.serialize.escaping]
 fn write_table_row<Ext>(cells: &[Node<Ext>], out: &mut String) {
     out.push('|');
     for cell in cells {
@@ -335,6 +341,8 @@ fn write_inlines<Ext>(nodes: &[Node<Ext>], out: &mut String) {
     }
 }
 
+// [spec:mw:sem:editing.serialize.inline-forms]
+// [spec:mw:req:editing.serialize.escaping]
 fn write_inline<Ext>(node: &Node<Ext>, out: &mut String) {
     match node {
         Node::Text { text, .. } => out.push_str(text),
@@ -447,6 +455,7 @@ mod tests {
         SourceSpan::default()
     }
 
+    // [spec:mw:sem:editing.serialize.block-forms/test]
     #[test]
     fn paragraph_round_trips() {
         let n = Node::<()>::Paragraph {
@@ -459,6 +468,7 @@ mod tests {
         assert_eq!(serialize(&n), "hello\n");
     }
 
+    // [spec:mw:sem:editing.serialize.block-forms/test]
     #[test]
     fn heading_emits_atx_form() {
         let n = Node::<()>::Heading {
@@ -472,6 +482,7 @@ mod tests {
         assert_eq!(serialize(&n), "## Title\n");
     }
 
+    // [spec:mw:sem:editing.serialize.inline-forms/test]
     #[test]
     fn emphasis_uses_asterisks() {
         let n = Node::<()>::Paragraph {
@@ -487,6 +498,7 @@ mod tests {
         assert_eq!(serialize(&n), "*x*\n");
     }
 
+    // [spec:mw:sem:editing.serialize.block-forms/test]
     #[test]
     fn code_block_uses_fences() {
         let n = Node::<()>::CodeBlock {
@@ -497,12 +509,15 @@ mod tests {
         assert_eq!(serialize(&n), "```rust\nlet x = 1;\n```\n");
     }
 
+    // [spec:mw:sem:editing.serialize.block-forms/test]
     #[test]
     fn thematic_break() {
         let n = Node::<()>::ThematicBreak { source: s() };
         assert_eq!(serialize(&n), "---\n");
     }
 
+    // [spec:mw:sem:editing.serialize.block-forms/test]
+    // [spec:mw:def:core.node.alert-kinds/test]
     #[test]
     fn alert_serializes_with_tag() {
         let n = Node::<()>::Alert {
@@ -520,6 +535,7 @@ mod tests {
         assert_eq!(serialize(&n), "> [!WARNING]\n> be careful\n");
     }
 
+    // [spec:mw:sem:editing.serialize.block-forms/test]
     #[test]
     fn alert_with_custom_title_serializes_title_on_marker_line() {
         let n = Node::<()>::Alert {

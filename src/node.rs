@@ -1,5 +1,6 @@
 pub type CorrelationId = u64;
 
+// [spec:mw:sem:core.stream.provisional]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Emission<N> {
     pub id: CorrelationId,
@@ -7,6 +8,7 @@ pub struct Emission<N> {
     pub node: N,
 }
 
+// [spec:mw:def:core.stream.protocol]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StreamItem<N> {
     Upsert(Emission<N>),
@@ -20,6 +22,7 @@ pub enum TableAlignment {
     Right,
 }
 
+// [spec:mw:def:core.node.alert-kinds]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlertKind {
     Note,
@@ -36,6 +39,7 @@ pub enum AlertKind {
 /// exclusive and includes any trailing newline that belongs to the block.
 /// For inline nodes, the span includes the delimiters (e.g. `**bold**` spans
 /// both pairs of asterisks).
+// [spec:mw:def:core.span.half-open-bytes]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SourceSpan {
     pub start: usize,
@@ -47,6 +51,7 @@ impl SourceSpan {
         Self { start, end }
     }
 
+    // [spec:mw:req:core.span.non-inverted]
     pub const fn len(&self) -> usize {
         self.end - self.start
     }
@@ -55,16 +60,18 @@ impl SourceSpan {
         self.start == self.end
     }
 
+    // [spec:mw:sem:core.span.contains]
     pub fn contains(&self, offset: usize) -> bool {
         offset >= self.start && offset < self.end
     }
 }
 
-// gfm[impl blocks-and-inlines.container-and-leaf-blocks-definition]
-// gfm[impl container-blocks.definition]
-// gfm[impl container-blocks.general-recursive-definition-form]
-// gfm[impl container-blocks.syntax-is-defined-recursively]
-// gfm[impl container-blocks.generated-from-contents-rather-than-parse-recipe]
+// [spec:gfm:def:blocks-and-inlines.container-and-leaf-blocks-definition]
+// [spec:gfm:def:container-blocks.definition]
+// [spec:gfm:def:container-blocks.general-recursive-definition-form]
+// [spec:gfm:def:container-blocks.syntax-is-defined-recursively]
+// [spec:gfm:def:container-blocks.generated-from-contents-rather-than-parse-recipe]
+// [spec:mw:def:core.node.generic-tree]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Node<Ext = ()> {
     Document {
@@ -80,12 +87,12 @@ pub enum Node<Ext = ()> {
         children: Vec<Node<Ext>>,
         source: SourceSpan,
     },
-    // gfm[impl container-blocks.basic-kinds-are-block-quotes-and-list-items]
+    // [spec:gfm:def:container-blocks.basic-kinds-are-block-quotes-and-list-items]
     BlockQuote {
         children: Vec<Node<Ext>>,
         source: SourceSpan,
     },
-    // gfm[impl container-blocks.lists-are-meta-containers-for-list-items]
+    // [spec:gfm:def:container-blocks.lists-are-meta-containers-for-list-items]
     List {
         ordered: bool,
         start: Option<u64>,
@@ -97,12 +104,13 @@ pub enum Node<Ext = ()> {
         children: Vec<Node<Ext>>,
         source: SourceSpan,
     },
-    // gfm[impl container-blocks.task-list-items-extension.rendered-marker-becomes-semantic-checkbox]
+    // [spec:gfm:sem:container-blocks.task-list-items-extension.rendered-marker-becomes-semantic-checkbox]
     TaskItem {
         checked: bool,
         children: Vec<Node<Ext>>,
         source: SourceSpan,
     },
+    // [spec:mw:def:core.node.table-shape]
     Table {
         alignments: Vec<Option<TableAlignment>>,
         header: Vec<Node<Ext>>,
@@ -189,6 +197,7 @@ pub enum Node<Ext = ()> {
     ThematicBreak {
         source: SourceSpan,
     },
+    // [spec:mw:def:core.node.footnote-triple]
     FootnoteRef {
         label: String,
         number: u32,
@@ -226,6 +235,7 @@ pub enum Node<Ext = ()> {
         children: Vec<Node<Ext>>,
         source: SourceSpan,
     },
+    // [spec:mw:def:core.node.custom-payload]
     Custom {
         payload: Ext,
         children: Vec<Node<Ext>>,
@@ -240,6 +250,8 @@ impl<Ext> Node<Ext> {
     /// yields the `children` slice. For `Table` it yields header rows then
     /// data rows. Leaf nodes (`Text`, `CodeBlock`, `ThematicBreak`, etc.)
     /// yield nothing.
+    // [spec:mw:req:core.traversal.direct-children]
+    // [spec:mw:sem:core.traversal.table-child-order]
     pub fn for_each_child(&self, mut f: impl FnMut(&Node<Ext>)) {
         match self {
             Node::Document { children, .. }
@@ -294,6 +306,7 @@ impl<Ext> Node<Ext> {
     }
 
     /// Mutable variant of [`for_each_child`].
+    // [spec:mw:req:core.traversal.mutable-mirror]
     pub fn for_each_child_mut(&mut self, mut f: impl FnMut(&mut Node<Ext>)) {
         match self {
             Node::Document { children, .. }
@@ -349,18 +362,21 @@ impl<Ext> Node<Ext> {
 
     /// Pre-order walk over this node and all descendants. Convenience for
     /// inspecting an entire tree.
+    // [spec:mw:req:core.traversal.walk-preorder]
     pub fn walk(&self, f: &mut impl FnMut(&Node<Ext>)) {
         f(self);
         self.for_each_child(|child| child.walk(f));
     }
 
     /// Mutable variant of [`walk`].
+    // [spec:mw:req:core.traversal.mutable-mirror]
     pub fn walk_mut(&mut self, f: &mut impl FnMut(&mut Node<Ext>)) {
         f(self);
         self.for_each_child_mut(|child| child.walk_mut(f));
     }
 
     /// Returns a mutable reference to this node's `source` span.
+    // [spec:mw:req:core.node.source-accessors]
     pub fn source_mut(&mut self) -> &mut SourceSpan {
         match self {
             Node::Document { source, .. }
@@ -402,6 +418,7 @@ impl<Ext> Node<Ext> {
     }
 
     /// Returns the source span of this node.
+    // [spec:mw:req:core.node.source-accessors]
     pub fn source(&self) -> SourceSpan {
         match self {
             Node::Document { source, .. }

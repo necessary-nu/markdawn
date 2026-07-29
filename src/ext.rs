@@ -1,10 +1,12 @@
 use crate::node::Node;
 
+// [spec:mw:def:core.ext.match-types]
 pub struct InlineMatch<Ext> {
     pub consumed: usize,
     pub node: Node<Ext>,
 }
 
+// [spec:mw:def:core.ext.match-types]
 pub struct BlockMatch<Ext> {
     pub consumed_lines: usize,
     pub node: Node<Ext>,
@@ -15,6 +17,7 @@ pub struct BlockMatch<Ext> {
 /// like `:role[<text>](<target>)` can fully parse `<text>` as markdown
 /// (emphasis, code, nested roles, etc.) rather than treating it as a
 /// literal string.
+// [spec:mw:def:core.ext.inline-context]
 pub trait InlineContext<Ext> {
     /// Parse `source` as a fresh inline run. Returns the inline nodes.
     /// Reference definitions and footnote labels are NOT inherited from
@@ -22,6 +25,7 @@ pub trait InlineContext<Ext> {
     fn parse_inline(&self, source: &str) -> Vec<Node<Ext>>;
 }
 
+// [spec:mw:def:core.ext.trait]
 pub trait Extension<Ext>: Send + Sync {
     /// Called during inline parsing with the remaining input at the current
     /// position. Return `Some(..)` to consume `consumed` bytes and emit a node.
@@ -34,6 +38,7 @@ pub trait Extension<Ext>: Send + Sync {
     /// semantics, including other registered extensions. Defaults to
     /// delegating to [`Self::try_inline`] so existing extensions don't
     /// need changes.
+    // [spec:mw:req:core.ext.ctx-delegation]
     fn try_inline_ctx(
         &self,
         input: &str,
@@ -71,6 +76,7 @@ pub struct CodeBlockRewrite {
 /// This generalizes pikchr's pattern (hardcoded as `info == Some("pikchr")`
 /// inside the renderer) so downstream crates can register their own
 /// info-string handlers.
+// [spec:mw:def:core.rewriter.types]
 pub trait CodeBlockRewriter: Send + Sync {
     fn rewrite(&self, info: Option<&str>, literal: &str) -> Option<CodeBlockRewrite>;
 }

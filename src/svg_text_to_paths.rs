@@ -32,7 +32,7 @@ enum FamilyKind {
     Mono,
 }
 
-// adv[impl output.text-as-paths]
+// [spec:adv:req:output.text-as-paths]
 static SERIF: LazyLock<Face<'static>> = LazyLock::new(|| {
     Face::parse(LIBERATION_SERIF_DATA, 0).expect("LiberationSerif-Regular must parse")
 });
@@ -405,7 +405,7 @@ fn xml_escape_text(s: &str) -> String {
 mod tests {
     use super::*;
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     #[test]
     fn simple_text_converts_to_path_plus_overlay() {
         let svg = r#"<g><text text-anchor="middle" x="50" y="20" font-size="14" fill="black">Hi</text></g>"#;
@@ -416,7 +416,7 @@ mod tests {
         assert!(out.contains(">Hi</text>"), "got: {out}");
     }
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     #[test]
     fn unknown_anchor_treated_as_start() {
         let svg = r#"<text x="0" y="0" font-size="14">A</text>"#;
@@ -424,7 +424,7 @@ mod tests {
         assert!(out.contains("<path d="), "got: {out}");
     }
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     #[test]
     fn missing_glyph_leaves_original_text() {
         // U+10400 Deseret capital Long I — absent from all three
@@ -437,7 +437,7 @@ mod tests {
         assert!(!out.contains("<path d="), "got: {out}");
     }
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     #[test]
     fn xml_entities_in_content_are_decoded_then_reescaped() {
         let svg = r#"<text x="0" y="0" font-size="14">a&amp;b</text>"#;
@@ -445,14 +445,14 @@ mod tests {
         assert!(out.contains("a&amp;b"), "got: {out}");
     }
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     #[test]
     fn no_text_elements_unchanged() {
         let svg = "<svg><g><circle/></g></svg>";
         assert_eq!(text_to_paths(svg), svg);
     }
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     #[test]
     fn multiple_texts_all_converted() {
         let svg = concat!(
@@ -464,14 +464,14 @@ mod tests {
         assert_eq!(out.matches("<text").count(), 2, "got: {out}");
     }
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     #[test]
     fn pick_family_defaults_to_serif() {
         assert_eq!(pick_family(""), FamilyKind::Serif);
         assert_eq!(pick_family("Unknown,Foobar"), FamilyKind::Serif);
     }
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     #[test]
     fn pick_family_respects_generic_keywords() {
         assert_eq!(pick_family("Times,serif"), FamilyKind::Serif);
@@ -479,7 +479,7 @@ mod tests {
         assert_eq!(pick_family("Courier,monospace"), FamilyKind::Mono);
     }
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     #[test]
     fn pick_family_case_insensitive() {
         assert_eq!(pick_family("HELVETICA"), FamilyKind::Sans);
@@ -487,7 +487,7 @@ mod tests {
         assert_eq!(pick_family("COURIER NEW"), FamilyKind::Mono);
     }
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     // A space in Liberation Mono has a very different advance than in
     // Liberation Serif (mono is fixed-width, ~600 units; serif is
     // ~250). The translate() on the second <path> element tells us
@@ -507,7 +507,7 @@ mod tests {
         );
     }
 
-    // adv[verify output.text-as-paths]
+    // [spec:adv:req:output.text-as-paths/test]
     // Regression: `write_f64`'s 2-decimal rounding was applied to the
     // glyph scale, so `font-size 14 / upem 2048 ≈ 0.00684` shipped as
     // `0.01` and glyphs rendered ~46% oversized vs. the cursor advance.

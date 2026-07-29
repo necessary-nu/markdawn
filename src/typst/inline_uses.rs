@@ -22,6 +22,7 @@
 
 use std::collections::HashMap;
 
+// [spec:mw:req:typst.svg.inline-uses]
 pub(crate) fn inline_uses(svg: &str) -> String {
     let bodies = collect_symbol_bodies(svg);
     rewrite(svg, &bodies)
@@ -169,6 +170,7 @@ fn extract_attr<'a>(head: &'a str, name: &str) -> Option<&'a str> {
 mod tests {
     use super::*;
 
+    // [spec:mw:req:typst.svg.inline-uses/test]
     #[test]
     fn inlines_use_into_g_with_symbol_body() {
         let svg = r##"<svg><defs><symbol id="g1" overflow="visible"><path d="M0 0h10"/></symbol></defs><use xlink:href="#g1" x="5" y="7" fill="#000" fill-rule="nonzero"/></svg>"##;
@@ -184,6 +186,7 @@ mod tests {
         assert!(out.contains(r##"<path d="M0 0h10"/>"##), "got: {out}");
     }
 
+    // [spec:mw:req:typst.svg.inline-uses/test]
     #[test]
     fn unknown_use_id_emits_empty_g() {
         let svg = r##"<svg><use xlink:href="#missing" x="1" y="2"/></svg>"##;
@@ -202,6 +205,7 @@ mod tests {
         assert!(out.contains("translate(10 20)"));
     }
 
+    // [spec:mw:req:typst.svg.inline-uses/test]
     #[test]
     fn does_not_eat_unrelated_user_tag() {
         // Hypothetical sibling tag that starts with "use" — must not

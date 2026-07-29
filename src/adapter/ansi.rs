@@ -37,6 +37,10 @@ impl std::error::Error for AnsiError {}
 /// Target terminal's color depth. Callers pick based on environment
 /// detection; the adapter downgrades truecolor to the nearest 256 or
 /// 16 entry as needed so output stays readable on older terminals.
+// Configuration surface only: the render path emits fixed SGR literals
+// and never reads this field, so no truecolour value is downgraded and
+// `Basic16` does not change a single output byte.
+// [spec:mw:sem:ansi.adapter.color-depth-inert]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorDepth {
     Basic16,
@@ -110,6 +114,7 @@ impl<'a, Ext> AnsiWalker<'a, Ext> {
 
 /// The ANSI adapter. Stateless across renders; all configuration lives
 /// on `AnsiOptions`.
+// [spec:mw:def:ansi.adapter.surface]
 pub struct AnsiAdapter<R = ()> {
     custom: R,
     options: AnsiOptions,
@@ -304,6 +309,10 @@ impl<R> AnsiAdapter<R> {
             Node::TableRow { .. } | Node::TableCell { .. } => {
                 // Handled via the parent Table node only.
             }
+            // Three-way dispatch on the first word of the info string.
+            // All three forms guarantee a trailing newline plus a blank
+            // separator line.
+            // [spec:mw:req:ansi.adapter.code-block]
             Node::CodeBlock { info, literal, .. } => {
                 let lang = info
                     .as_deref()
@@ -507,6 +516,13 @@ impl<R> AnsiAdapter<R> {
         Ok(())
     }
 
+    // Emphasis / strong / strikethrough close with their *specific*
+    // disable codes (23 / 22 / 29) so an enclosing style survives the
+    // inner run; `ESC[0m` there would strip it. Runs that set a
+    // background or combine attributes close with `ESC[0m` and so
+    // cannot be relied on to preserve an enclosing style. Note 22
+    // clears dim as well as bold.
+    // [spec:mw:req:ansi.adapter.reset-discipline]
     fn write_inline<Ext>(&self, node: &Node<Ext>, out: &mut String) -> Result<(), AnsiError>
     where
         R: RenderAnsiCustom<Ext>,
@@ -545,6 +561,10 @@ impl<R> AnsiAdapter<R> {
                 self.write_inlines(children, out)?;
                 out.push_str("\x1b[0m");
             }
+            // ST-terminated, not BEL-terminated. `destination` is
+            // written verbatim in both forms — neither escaped nor
+            // validated, so an ESC in it would end the sequence early.
+            // [spec:mw:req:ansi.adapter.links]
             Node::Link {
                 destination,
                 children,
@@ -718,6 +738,7 @@ impl<R> AnsiAdapter<R> {
 }
 
 /// Streaming sink wrapper (symmetrical with `HtmlSink` / `TypstSink`).
+// [spec:mw:def:ansi.adapter.surface]
 pub struct AnsiSink<S, R = ()> {
     inner: S,
     adapter: AnsiAdapter<R>,
@@ -773,6 +794,7 @@ where
 /// Visible column length — strips ANSI escapes and counts UTF-8 chars.
 /// Good enough for wrapping / column-width arithmetic; doesn't do
 /// wcwidth (treats each char as width 1).
+// [spec:mw:req:ansi.adapter.wrapping]
 fn visible_len(s: &str) -> usize {
     let mut count = 0usize;
     let mut chars = s.chars();
@@ -813,6 +835,12 @@ fn visible_len(s: &str) -> usize {
 /// at the start of the continuation line. The algorithm is deliberately
 /// simple: split on whitespace, honor hard-break newlines verbatim, and
 /// don't try to break very long words.
+// Over-long words must not be broken: splitting mid-token could sever
+// an escape sequence. Escapes cost zero columns and ride along with
+// their word, so a wrapped line may carry a style opened on a previous
+// one. Splitting on whitespace collapses space runs and drops leading
+// whitespace.
+// [spec:mw:req:ansi.adapter.wrapping]
 fn write_wrapped(input: &str, initial_col: usize, width: usize, out: &mut String) {
     if width == 0 {
         out.push_str(input);
@@ -880,6 +908,7 @@ mod tests {
         assert!(out.contains("━"));
     }
 
+    // [spec:mw:req:ansi.adapter.reset-discipline/test]
     #[test]
     fn emphasis_and_strong_wrap_content() {
         let para: Node<()> = Node::Paragraph {
@@ -901,6 +930,7 @@ mod tests {
         assert!(out.contains("\x1b[1mbold\x1b[22m"));
     }
 
+    // [spec:mw:req:ansi.adapter.links/test]
     #[test]
     fn link_emits_osc8_by_default() {
         let link: Node<()> = Node::Link {
@@ -915,6 +945,7 @@ mod tests {
         assert!(out.contains("\x1b]8;;\x1b\\"));
     }
 
+    // [spec:mw:req:ansi.adapter.code-block/test]
     #[test]
     fn ansi_code_block_passes_through_verbatim() {
         let block: Node<()> = Node::CodeBlock {
@@ -926,6 +957,7 @@ mod tests {
         assert!(out.contains("\x1b[31mred\x1b[0m"));
     }
 
+    // [spec:mw:req:ansi.adapter.code-block/test]
     #[test]
     fn non_ansi_code_block_indents_with_bg() {
         let block: Node<()> = Node::CodeBlock {
@@ -985,6 +1017,8 @@ mod tests {
         assert!(out.contains("4. four"));
     }
 
+    // [spec:mw:req:ansi.adapter.wrapping/test]
+    // [spec:mw:def:ansi.adapter.surface/test]
     #[test]
     fn wrap_respects_width_option() {
         let para: Node<()> = Node::Paragraph {

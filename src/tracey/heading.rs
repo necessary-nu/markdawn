@@ -17,6 +17,7 @@ pub struct Heading {
 ///
 /// Lowercases ASCII, keeps `[a-z0-9.]`, replaces other runs with single hyphens,
 /// and trims leading/trailing hyphens.
+// [spec:mw:req:traceyext.heading.slug]
 pub fn slugify(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
     let mut last_was_hyphen = true;
@@ -47,11 +48,13 @@ mod tests {
         assert_eq!(slugify("Hello World"), "hello-world");
     }
 
+    // [spec:mw:req:traceyext.heading.slug/test]
     #[test]
     fn special_chars() {
         assert_eq!(slugify("My API (v2)"), "my-api-v2");
     }
 
+    // [spec:mw:req:traceyext.heading.slug/test]
     #[test]
     fn dots_preserved() {
         assert_eq!(slugify("i.have.dots"), "i.have.dots");
@@ -62,6 +65,7 @@ mod tests {
         assert_eq!(slugify("a   b"), "a-b");
     }
 
+    // [spec:mw:req:traceyext.heading.slug/test]
     #[test]
     fn trim_edges() {
         assert_eq!(slugify("  Hello  "), "hello");

@@ -41,6 +41,7 @@ use crate::parser::Parser;
 /// Parser + renderer configuration. Mirrors the parser feature flags.
 /// `Clone + PartialEq + Default` so it can be used as a `Markdown`
 /// component prop.
+// [spec:mw:def:dioxus.surface.options]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DioxusOptions {
     pub gfm: bool,
@@ -101,7 +102,7 @@ pub struct Renderer<R = ()> {
     html_filter: crate::HtmlFilter,
     alert_icons: Option<AlertIconFn>,
     #[cfg(feature = "highlight")]
-    highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SpanHighlighter>>>,
+    highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SyntaxHighlighter>>>,
     code_block_rewriters: Vec<Box<dyn crate::ext::CodeBlockRewriter>>,
 }
 
@@ -154,7 +155,7 @@ impl<R> Renderer<R> {
     #[cfg(feature = "highlight")]
     pub fn with_highlighter<H>(self, highlighter: H) -> Self
     where
-        H: crate::highlight::SpanHighlighter + 'static,
+        H: crate::highlight::SyntaxHighlighter + 'static,
     {
         *self.highlighter.borrow_mut() = Some(Box::new(highlighter));
         self
@@ -180,6 +181,7 @@ where
     R: RenderDioxusCustom<()>,
 {
     /// Parse `source` and render the resulting block list.
+    // [spec:mw:sem:dioxus.render.totality]
     pub fn render(&self, source: &str) -> Element {
         let mut builder = Parser::<()>::builder();
         if self.options.gfm {
@@ -209,6 +211,7 @@ where
 
 impl<R> Renderer<R> {
     /// Render a single `Node` (block or inline) as a Dioxus `Element`.
+    // [spec:mw:req:dioxus.structure.vdom-agreement]
     pub fn render_node<Ext>(&self, node: &Node<Ext>) -> Element
     where
         R: RenderDioxusCustom<Ext>,
@@ -259,6 +262,7 @@ impl<R> Renderer<R> {
                 self.render_code_block(info.as_deref(), literal)
             }
             Node::ThematicBreak { .. } => rsx! { hr {} },
+            // [spec:mw:req:dioxus.html.host-element]
             Node::Html { html, .. } => {
                 let safe = self.html_filter.filter(html);
                 rsx! { div { dangerous_inner_html: safe } }
@@ -335,6 +339,7 @@ impl<R> Renderer<R> {
         }
     }
 
+    // [spec:mw:req:core.node.alert-title-fallback]
     fn render_alert<Ext>(
         &self,
         kind: AlertKind,
@@ -587,6 +592,8 @@ impl<R> Renderer<R> {
         }
     }
 
+    // [spec:mw:req:core.rewriter.dispatch-order]
+    // [spec:mw:req:core.rewriter.render-time-only]
     fn render_code_block(&self, info: Option<&str>, literal: &str) -> Element {
         // 0. user-registered rewriters. The first one that returns Some
         //    substitutes info + literal for the rest of the pipeline; a
@@ -692,12 +699,9 @@ impl<R> Renderer<R> {
         if let Some(lang) = info_lang.filter(|s| !s.is_empty()) {
             let mut borrow = self.highlighter.borrow_mut();
             if let Some(hl) = borrow.as_mut() {
-                if let Some(spans) = hl.spans(lang, literal) {
-                    let html = arborium::advanced::spans_to_html(
-                        literal,
-                        spans,
-                        &arborium::advanced::HtmlFormat::default(),
-                    );
+                // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
+                if let Ok(spans) = hl.highlight(lang, literal) {
+                    let html = crate::highlight::spans_to_html(literal, spans);
                     let class = format!("language-{lang}");
                     return rsx! {
                         pre {
@@ -718,6 +722,7 @@ impl<R> Renderer<R> {
 }
 
 /// Drop-in component for `rsx!` composition.
+// [spec:mw:req:dioxus.props.inert]
 #[component]
 pub fn Markdown(source: String, #[props(default)] options: DioxusOptions) -> Element {
     render_markdown(&source, options)
@@ -726,6 +731,7 @@ pub fn Markdown(source: String, #[props(default)] options: DioxusOptions) -> Ele
 /// Parse `source` and render the resulting block list as a single `Element`.
 /// For pikchr / syntax-highlighter / custom-extension support, build a
 /// [`Renderer`] instead.
+// [spec:mw:def:dioxus.surface.entry-points]
 pub fn render_markdown(source: &str, options: DioxusOptions) -> Element {
     Renderer::default().with_options(options).render(source)
 }
@@ -875,7 +881,7 @@ mod tests {
         assert!(html.contains(">click</a>"));
     }
 
-    // adv[verify markdown.url-allowlist]
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn javascript_link_href_is_stripped() {
         let html = ssr(render_markdown(
@@ -926,6 +932,7 @@ mod tests {
         assert!(html.contains("let x = 1;"));
     }
 
+    // [spec:mw:def:dioxus.surface.options/test]
     #[test]
     fn alert_renders_github_class_structure() {
         let html = ssr(render_markdown(
@@ -961,6 +968,7 @@ mod tests {
         assert!(html.contains("body paragraph"));
     }
 
+    // [spec:mw:req:core.node.alert-title-fallback/test]
     #[test]
     fn alert_without_title_keeps_default_label() {
         let html = ssr(render_markdown(
@@ -976,6 +984,8 @@ mod tests {
         );
     }
 
+    // [spec:mw:req:dioxus.structure.vdom-agreement/test]
+    // [spec:mw:req:core.node.table-cell-alignment/test]
     #[test]
     fn table_alignment_emits_text_align_style() {
         let src = "| a | b |\n|:--|---:|\n| 1 | 2 |";
@@ -990,6 +1000,7 @@ mod tests {
         assert!(html.contains("style=\"text-align: right\""));
     }
 
+    // [spec:mw:def:core.node.footnote-triple/test]
     #[test]
     fn footnote_ref_renders_sup_link() {
         let src = "see[^1]\n\n[^1]: a footnote";
@@ -1087,6 +1098,7 @@ mod tests {
         assert!(html.contains("id=\"fn-1\""), "got: {html}");
     }
 
+    // [spec:mw:req:core.node.footnote-numbering/test]
     #[test]
     fn footnote_definition_appends_backref() {
         let src = "see[^1]\n\n[^1]: a footnote";
@@ -1102,6 +1114,8 @@ mod tests {
         assert!(html.contains("↩"), "expected backref arrow: {html}");
     }
 
+    // [spec:mw:req:dioxus.html.host-element/test]
+    // [spec:mw:req:core.html-filter.default-safe/test]
     #[test]
     fn html_block_strips_dangerous_tags() {
         let src = "<script>alert('xss')</script>\n\nsafe";
@@ -1261,13 +1275,18 @@ mod tests {
         use std::rc::Rc;
 
         struct StubHl(Rc<Cell<bool>>);
-        impl crate::highlight::SpanHighlighter for StubHl {
-            fn spans(&mut self, _lang: &str, _src: &str) -> Option<Vec<arborium::advanced::Span>> {
+        impl crate::highlight::SyntaxHighlighter for StubHl {
+            fn highlight(
+                &mut self,
+                _lang: &str,
+                _src: &str,
+            ) -> Result<Vec<crate::SyntaxSpan>, crate::HighlightError> {
                 self.0.set(true);
-                None // fall back to plain rendering
+                Err(crate::HighlightError::new("no grammar"))
             }
         }
 
+        // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback/test]
         let invoked = Rc::new(Cell::new(false));
         let html = ssr(Renderer::default()
             .with_highlighter(StubHl(invoked.clone()))
@@ -1277,6 +1296,7 @@ mod tests {
             "highlighter should be queried for `rust` block"
         );
         assert!(html.contains("class=\"language-rust\""), "got: {html}");
+        assert!(html.contains("foo"), "plain fallback lost source: {html}");
     }
 
     #[cfg(feature = "highlight")]
@@ -1286,10 +1306,14 @@ mod tests {
         use std::rc::Rc;
 
         struct StubHl(Rc<Cell<u32>>);
-        impl crate::highlight::SpanHighlighter for StubHl {
-            fn spans(&mut self, _lang: &str, _src: &str) -> Option<Vec<arborium::advanced::Span>> {
+        impl crate::highlight::SyntaxHighlighter for StubHl {
+            fn highlight(
+                &mut self,
+                _lang: &str,
+                _src: &str,
+            ) -> Result<Vec<crate::SyntaxSpan>, crate::HighlightError> {
                 self.0.set(self.0.get() + 1);
-                None
+                Err(crate::HighlightError::new("unexpected call"))
             }
         }
 
@@ -1300,6 +1324,7 @@ mod tests {
         assert_eq!(calls.get(), 0, "no info string → highlighter not called");
     }
 
+    // [spec:mw:def:core.rewriter.types/test]
     #[test]
     fn code_block_rewriter_substitutes_info_and_literal() {
         struct StubRewriter;
@@ -1337,6 +1362,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:req:core.rewriter.dispatch-order/test]
     #[test]
     fn code_block_rewriter_passes_through_non_matching() {
         struct NeverMatches;

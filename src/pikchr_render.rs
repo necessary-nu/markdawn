@@ -14,11 +14,11 @@ use std::time::Duration;
 /// Reject pikchr source larger than this many bytes before calling
 /// libpikchr. Large enough for realistic diagrams; small enough that
 /// OOM / CPU-bomb attempts fail fast.
-// adv[impl pikchr.input.byte-cap]
+// [spec:adv:req:pikchr.input.byte-cap]
 pub const MAX_PIKCHR_BYTES: usize = 256 * 1024;
 
 /// Wall-clock budget for a single pikchr render. Mirrors graphviz.
-// adv[impl pikchr.render.timeout]
+// [spec:adv:req:pikchr.render.timeout]
 pub const PIKCHR_RENDER_TIMEOUT_SECS: u64 = 10;
 
 /// Thread stack size for the pikchr render worker.
@@ -65,7 +65,7 @@ impl fmt::Display for PikchrError {
 
 impl std::error::Error for PikchrError {}
 
-// adv[impl pikchr.render.serialise]
+// [spec:adv:req:pikchr.render.serialise]
 static RENDER_LOCK: Mutex<()> = Mutex::new(());
 
 /// Render a pikchr source as SVG with the default timeout.
@@ -94,8 +94,8 @@ pub fn render_with_timeout(source: &str, timeout: Duration) -> Result<String, Pi
         let (tx, rx) =
             mpsc::channel::<Result<Result<String, PikchrError>, Box<dyn std::any::Any + Send>>>();
 
-        // adv[impl pikchr.render.timeout]
-        // adv[impl pikchr.render.panic-capture]
+        // [spec:adv:req:pikchr.render.timeout]
+        // [spec:adv:req:pikchr.render.panic-capture]
         std::thread::Builder::new()
             .stack_size(RENDER_STACK_BYTES)
             .name("markdawn-pikchr-render".to_owned())
@@ -137,7 +137,7 @@ fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> String {
 mod tests {
     use super::*;
 
-    // adv[verify pikchr.input.byte-cap]
+    // [spec:adv:req:pikchr.input.byte-cap/test]
     #[test]
     fn oversize_input_rejected() {
         let huge = "a".repeat(MAX_PIKCHR_BYTES + 1);
@@ -154,14 +154,14 @@ mod tests {
         assert!(svg.contains("<svg"), "got: {svg}");
     }
 
-    // adv[verify pikchr.render.timeout]
+    // [spec:adv:req:pikchr.render.timeout/test]
     #[test]
     fn timeout_fires_with_zero_budget() {
         let err = render_with_timeout(r#"box "Hi""#, Duration::from_millis(0)).unwrap_err();
         assert!(matches!(err, PikchrError::TimedOut), "got: {err:?}");
     }
 
-    // adv[verify pikchr.render.panic-capture]
+    // [spec:adv:req:pikchr.render.panic-capture/test]
     #[test]
     fn panic_variant_round_trips_through_display() {
         let err = PikchrError::Panicked("boom".to_owned());
@@ -170,7 +170,7 @@ mod tests {
         assert!(s.contains("boom"), "got: {s}");
     }
 
-    // adv[verify pikchr.render.serialise]
+    // [spec:adv:req:pikchr.render.serialise/test]
     #[test]
     fn concurrent_renders_serialize() {
         let handles: Vec<_> = (0..8)

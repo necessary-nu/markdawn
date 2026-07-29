@@ -13,6 +13,9 @@ use wasm_bindgen::prelude::*;
 
 // ----- Helpers -----------------------------------------------------
 
+// Every fallible entry point routes through here, so a Rust error reaches JS
+// as a thrown `Error` rather than as an unwind out of the wasm frame.
+// [spec:mw:req:ffi.safety.no-unwind]
 fn js_err<E: std::fmt::Display>(e: E) -> JsValue {
     JsError::new(&e.to_string()).into()
 }
@@ -72,6 +75,7 @@ impl md::Sink<md::Node<()>> for HtmlPipeline {
 /// Parse `source` and render it to HTML in one shot. Equivalent to
 /// `Parser::new()` + `push_str(source)` + `finish()` with a default
 /// `HtmlAdapter`.
+// [spec:mw:def:ffi.host.wasm-bindgen]
 #[wasm_bindgen(js_name = parseToHtml)]
 pub fn parse_to_html(source: &str) -> Result<String, JsValue> {
     let mut p = md::Parser::<()>::builder().with_all().build();
@@ -175,6 +179,9 @@ impl Default for JsParserBuilder {
 /// chunks via `pushStr`, then `finish()` to flush the final block.
 /// Call `renderHtml()` at any time to read the accumulating HTML
 /// (provisional in-progress blocks included).
+// The JS wrapper owns this box and releases it via `free()`; there is no
+// caller-visible pointer and no manual free function on this surface.
+// [spec:mw:def:ffi.host.wasm-bindgen]
 #[wasm_bindgen(js_name = Parser)]
 pub struct JsParser {
     parser: md::Parser<()>,

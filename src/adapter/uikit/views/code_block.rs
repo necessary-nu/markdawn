@@ -10,6 +10,7 @@ const INSET: f64 = 12.0;
 const CORNER_RADIUS: f64 = 8.0;
 const BADGE_INSET: f64 = 6.0;
 
+// [spec:mw:def:uikit.layout.code-block-view]
 pub fn build_code_block_view(
     literal: &str,
     language: Option<&str>,

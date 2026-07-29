@@ -30,6 +30,7 @@ use super::views::graphviz;
 use super::views::pikchr;
 use super::views::{blockquote, code_block, table, thematic_break};
 
+// [spec:mw:def:uikit.surface.block-sink]
 pub struct BlockSink<R = ()> {
     renderer: TextRenderer<R>,
     stack_view: Retained<UIStackView>,
@@ -37,7 +38,7 @@ pub struct BlockSink<R = ()> {
     element_map: ElementMap,
     mtm: MainThreadMarker,
     #[cfg(feature = "highlight")]
-    highlighter: Option<Box<dyn crate::highlight::SpanHighlighter>>,
+    highlighter: Option<Box<dyn crate::highlight::SyntaxHighlighter>>,
     #[cfg(feature = "pikchr")]
     pikchr: bool,
     #[cfg(feature = "graphviz")]
@@ -125,13 +126,12 @@ impl<R> BlockSink<R> {
         }
     }
 
-    /// Install a syntax highlighter for fenced code blocks. Any
-    /// `arborium::advanced::HighlightSpans` implementation works; failures
-    /// silently fall back to plain monospace rendering.
+    /// Install a renderer-neutral syntax highlighter for fenced code blocks.
+    /// Failures silently fall back to plain monospace rendering.
     #[cfg(feature = "highlight")]
     pub fn with_highlighter<H>(mut self, highlighter: H) -> Self
     where
-        H: arborium::advanced::HighlightSpans + 'static,
+        H: crate::highlight::SyntaxHighlighter + 'static,
     {
         self.highlighter = Some(Box::new(highlighter));
         self
@@ -205,6 +205,7 @@ impl<R> BlockSink<R> {
         NSAttributedString::initWithAttributedString(NSAttributedString::alloc(), result.as_super())
     }
 
+    // [spec:mw:req:core.stream.upsert-replaces]
     fn apply_upsert<Ext>(&mut self, emission: Emission<Node<Ext>>) -> Result<(), UIKitError>
     where
         R: RenderUIKitCustom<Ext>,
@@ -226,6 +227,7 @@ impl<R> BlockSink<R> {
         }
     }
 
+    // [spec:mw:req:uikit.compartments.text-run-coalescing]
     fn append_text_block<Ext>(
         &mut self,
         id: CorrelationId,
@@ -309,6 +311,7 @@ impl<R> BlockSink<R> {
         Ok(())
     }
 
+    // [spec:mw:req:uikit.compartments.text-run-coalescing]
     fn append_block_view<Ext>(
         &mut self,
         id: CorrelationId,
@@ -393,7 +396,8 @@ impl<R> BlockSink<R> {
                 }
                 #[cfg(feature = "highlight")]
                 let highlighted = info.as_deref().and_then(|lang| {
-                    let spans = self.highlighter.as_mut()?.spans(lang, literal)?;
+                    // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
+                    let spans = self.highlighter.as_mut()?.highlight(lang, literal).ok()?;
                     let style = self.renderer.style();
                     let font = super::attrs::monospaced_font(style, style.body_font_size);
                     Some(super::syntax::build_highlighted(
@@ -514,6 +518,7 @@ impl<R> BlockSink<R> {
         }
     }
 
+    // [spec:mw:req:uikit.compartments.range-bookkeeping]
     fn replace_text_block<Ext>(
         &mut self,
         id: CorrelationId,
@@ -630,6 +635,8 @@ impl<R> BlockSink<R> {
         self.remove_id(id);
     }
 
+    // [spec:mw:req:uikit.compartments.range-bookkeeping]
+    // [spec:mw:req:uikit.compartments.text-run-coalescing]
     fn remove_id(&mut self, id: CorrelationId) {
         let Some(loc) = self.element_map.swap_remove(&id) else {
             return;
@@ -709,6 +716,7 @@ where
     }
 }
 
+// [spec:mw:req:uikit.compartments.text-run-coalescing]
 fn is_text_block<E>(node: &Node<E>) -> bool {
     matches!(
         node,
@@ -874,6 +882,7 @@ mod tests {
         })
     }
 
+    // [spec:mw:req:uikit.compartments.text-run-coalescing/test]
     #[test]
     fn thematic_break_creates_block_view_compartment() {
         // ThematicBreak should NOT merge into surrounding text runs — it's its own divider view.
@@ -890,6 +899,7 @@ mod tests {
         assert!(matches!(sink.compartments[2], Compartment::TextRun { .. }));
     }
 
+    // [spec:mw:req:uikit.compartments.text-run-coalescing/test]
     #[test]
     fn two_paragraphs_share_one_text_run() {
         let mut sink = BlockSink::new(test_mtm());
@@ -900,6 +910,7 @@ mod tests {
         assert!(text.contains("alpha") && text.contains("beta"), "{text:?}");
     }
 
+    // [spec:mw:req:uikit.compartments.text-run-coalescing/test]
     #[test]
     fn paragraph_then_table_creates_two_compartments() {
         let mut sink = BlockSink::new(test_mtm());
@@ -913,6 +924,7 @@ mod tests {
         ));
     }
 
+    // [spec:mw:req:uikit.compartments.text-run-coalescing/test]
     #[test]
     fn paragraph_table_paragraph_creates_three_compartments() {
         let mut sink = BlockSink::new(test_mtm());
@@ -928,6 +940,7 @@ mod tests {
         assert!(matches!(sink.compartments[2], Compartment::TextRun { .. }));
     }
 
+    // [spec:mw:req:uikit.compartments.text-run-coalescing/test]
     #[test]
     fn delete_only_block_removes_text_run() {
         let mut sink = BlockSink::new(test_mtm());
@@ -937,6 +950,7 @@ mod tests {
         assert_eq!(sink.compartments.len(), 0);
     }
 
+    // [spec:mw:req:uikit.compartments.range-bookkeeping/test]
     #[test]
     fn delete_one_of_many_keeps_text_run_with_shifted_ranges() {
         let mut sink = BlockSink::new(test_mtm());
@@ -953,6 +967,7 @@ mod tests {
         assert!(after.contains("aaa") && after.contains("ccc") && !after.contains("bbb"));
     }
 
+    // [spec:mw:req:uikit.compartments.range-bookkeeping/test]
     #[test]
     fn streaming_provisional_paragraph_appends_only_tail() {
         // Simulate streaming: a provisional paragraph grows by one token at a time.
@@ -982,6 +997,8 @@ mod tests {
         assert!(text.contains("Hello world from markdawn"), "{text:?}");
     }
 
+    // [spec:mw:req:uikit.compartments.range-bookkeeping/test]
+    // [spec:mw:req:core.stream.upsert-replaces/test]
     #[test]
     fn upsert_replaces_text_block_in_run() {
         let mut sink = BlockSink::new(test_mtm());

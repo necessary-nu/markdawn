@@ -7,6 +7,7 @@ use objc2_ui_kit::{
 
 use super::style::UIKitStyle;
 
+// [spec:mw:req:uikit.attributes.font-resolution]
 fn font_named_or<F>(name: Option<&String>, size: f64, fallback: F) -> Retained<UIFont>
 where
     F: FnOnce() -> Retained<UIFont>,
@@ -19,6 +20,7 @@ where
     }
 }
 
+// [spec:mw:req:uikit.attributes.font-resolution]
 fn maybe_scale_font(font: Retained<UIFont>, style: &UIKitStyle) -> Retained<UIFont> {
     if style.use_dynamic_type {
         UIFontMetrics::defaultMetrics().scaledFontForFont(&font)
@@ -38,6 +40,7 @@ pub(crate) fn body_font_with_size(style: &UIKitStyle, size: f64) -> Retained<UIF
     maybe_scale_font(font, style)
 }
 
+// [spec:mw:sem:uikit.attributes.inherited-traits]
 pub(crate) fn italic_font(base: &UIFont) -> Retained<UIFont> {
     let size = unsafe { base.pointSize() };
     let descriptor = unsafe { base.fontDescriptor() };
@@ -61,6 +64,7 @@ pub(crate) fn monospaced_font(style: &UIKitStyle, size: f64) -> Retained<UIFont>
 /// Build a monospaced font that matches the pointSize of an already-scaled
 /// base font, without re-applying Dynamic Type scaling. Use this for inline
 /// code spans inside already-scaled text (paragraphs, headings, etc.).
+// [spec:mw:req:uikit.attributes.font-resolution]
 pub(crate) fn monospaced_font_matching(style: &UIKitStyle, base: &UIFont) -> Retained<UIFont> {
     let size = unsafe { base.pointSize() };
     font_named_or(style.code_font_name.as_ref(), size, || {
@@ -68,6 +72,7 @@ pub(crate) fn monospaced_font_matching(style: &UIKitStyle, base: &UIFont) -> Ret
     })
 }
 
+// [spec:mw:sem:uikit.attributes.inherited-traits]
 pub(crate) fn heading_font(style: &UIKitStyle, level: u8) -> Retained<UIFont> {
     let idx = (level.saturating_sub(1) as usize).min(5);
     let size = style.body_font_size * style.heading_scale[idx];
@@ -75,6 +80,7 @@ pub(crate) fn heading_font(style: &UIKitStyle, level: u8) -> Retained<UIFont> {
     add_trait_to_font(&base, UIFontDescriptorSymbolicTraits::TraitBold)
 }
 
+// [spec:mw:sem:uikit.attributes.inherited-traits]
 pub(crate) fn add_trait_to_font(
     font: &UIFont,
     trait_to_add: UIFontDescriptorSymbolicTraits,
@@ -93,6 +99,7 @@ pub(crate) fn add_trait_to_font(
 // --- Paragraph style helpers ---
 
 /// Apply blockquote indentation to a paragraph style if depth > 0.
+// [spec:mw:req:uikit.layout.blockquote]
 fn apply_bq_indent(ps: &NSMutableParagraphStyle, style: &UIKitStyle, bq_depth: u32) {
     if bq_depth > 0 {
         let offset = style.blockquote_indent * bq_depth as f64;
@@ -134,6 +141,7 @@ pub(crate) fn paragraph_style_heading(
     ps
 }
 
+// [spec:mw:req:uikit.layout.list-item]
 pub(crate) fn paragraph_style_list_item(
     style: &UIKitStyle,
     depth: u32,

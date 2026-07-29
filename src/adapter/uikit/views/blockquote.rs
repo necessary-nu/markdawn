@@ -9,6 +9,7 @@ const BAR_WIDTH: f64 = 3.0;
 const BAR_LEFT_MARGIN: f64 = 4.0;
 const CONTENT_LEFT_MARGIN: f64 = 16.0;
 
+// [spec:mw:req:uikit.layout.blockquote]
 pub fn build_blockquote_view(
     content: &NSAttributedString,
     style: &UIKitStyle,

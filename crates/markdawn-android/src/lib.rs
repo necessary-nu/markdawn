@@ -142,6 +142,7 @@ fn parse_to_vdom_json(source: &str, options_json: &str) -> Result<String, String
 }
 
 /// Streaming parser: push chunks, `finish`, drain reconciliation events.
+// [spec:mw:def:ffi.ownership.handle]
 struct VdomParser {
     parser: md::Parser<()>,
     pipeline: VdomPipeline,
@@ -215,6 +216,7 @@ impl VdomDocument {
 /// global store. The JNI analogue of Swift's `Markdawn.loadLanguage` — but the
 /// `dlsym`+call runs here in Rust, since Kotlin can't take the address of the
 /// `mw_register_grammar` C symbol to pass across.
+// [spec:mw:def:ffi.plugin.grammar-registration]
 fn register_language(name: &str) -> bool {
     type RegisterFn = unsafe extern "C" fn(
         *const c_char,
@@ -243,6 +245,9 @@ fn register_language(name: &str) -> bool {
 // JNI surface — class `nu.necessary.markdawn.Native`
 // ===================================================================
 
+// A null `JString` and an unconvertible one both degrade to "" — no failure
+// path here can raise, so callers keep their own error reporting.
+// [spec:mw:req:ffi.safety.null-guard]
 fn jstr(env: &mut JNIEnv, s: &JString) -> String {
     if s.is_null() {
         return String::new();
@@ -260,6 +265,7 @@ fn throw(env: &mut JNIEnv, msg: &str) {
     let _ = env.throw_new("java/lang/RuntimeException", msg);
 }
 
+// [spec:mw:def:ffi.host.jni]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_parseToVdom<'local>(
     mut env: JNIEnv<'local>,
@@ -304,6 +310,9 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_parserNew<'local>(
     Box::into_raw(Box::new(VdomParser::new(&options))) as jlong
 }
 
+// A parse error becomes a pending Java exception, never an unwind through the
+// JNI frame.
+// [spec:mw:req:ffi.safety.no-unwind]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_parserPush<'local>(
     mut env: JNIEnv<'local>,
@@ -346,6 +355,7 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_parserTakeEvents<'local
     }
 }
 
+// [spec:mw:req:ffi.ownership.handle-release]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_parserFree<'local>(
     _env: JNIEnv<'local>,
@@ -434,6 +444,7 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_documentTakeEvents<'loc
     }
 }
 
+// [spec:mw:req:ffi.ownership.handle-release]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_documentFree<'local>(
     _env: JNIEnv<'local>,
@@ -479,6 +490,7 @@ mod tests {
             .find_map(|t| find(t, &|n| n.get("tag").and_then(Value::as_str) == Some(tag)))
     }
 
+    // [spec:mw:def:html.vdom.model/test]
     #[test]
     fn props_serialize_as_object() {
         let trees = blocks(&parse_to_vdom_json("[x](https://example.com)", "{}").unwrap());
@@ -494,6 +506,7 @@ mod tests {
         );
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn javascript_link_destination_is_neutralized() {
         let trees = blocks(&parse_to_vdom_json("[x](javascript:alert(1))", "{}").unwrap());
@@ -505,6 +518,7 @@ mod tests {
         assert_eq!(href, Some(""), "javascript: href must be empty");
     }
 
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn javascript_image_source_is_neutralized() {
         let trees = blocks(&parse_to_vdom_json("![x](javascript:alert(1))", "{}").unwrap());
@@ -516,6 +530,9 @@ mod tests {
         assert_eq!(src, Some(""), "javascript: src must be empty");
     }
 
+    // Math reaches the host through the `Raw` variant, which the serde
+    // projection emits as an `html` key.
+    // [spec:mw:def:html.vdom.model/test]
     #[test]
     fn inline_math_is_raw_svg() {
         let trees = blocks(&parse_to_vdom_json("$x^2$", "{}").unwrap());
@@ -530,6 +547,9 @@ mod tests {
         );
     }
 
+    // A diagram is a `Raw` node carrying both `html` and `props`, both of
+    // which the serde projection must surface to the host.
+    // [spec:mw:def:html.vdom.model/test]
     #[test]
     fn pikchr_code_block_is_an_accessible_inline_svg() {
         let trees = blocks(&parse_to_vdom_json("```pikchr\nbox \"Hello\"\n```\n", "{}").unwrap());
@@ -548,6 +568,10 @@ mod tests {
         );
     }
 
+    // Exercises the filter policy, not the JNI binding: `{}` must
+    // sanitize and an explicit `unrestricted` must pass through.
+    // [spec:mw:req:core.html-filter.default-safe/test]
+    // [spec:mw:def:core.html-filter.modes/test]
     #[test]
     fn raw_html_toggle() {
         let src = "<script>alert(1)</script>\n";
@@ -583,6 +607,11 @@ mod tests {
         map.into_values().collect()
     }
 
+    // Collapsing the event stream by correlation id must reproduce the
+    // one-shot render: position-keyed slot ids that stay put across
+    // reparses, and upserts applied as create-or-replace.
+    // [spec:mw:req:core.stream.slot-identity/test]
+    // [spec:mw:req:core.stream.upsert-replaces/test]
     #[test]
     fn streaming_matches_static() {
         let src = "# Title\n\nA paragraph with **bold** and `code`.\n\n- one\n- two\n\n> a quote\n";

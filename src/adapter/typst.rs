@@ -43,6 +43,7 @@ impl std::error::Error for TypstError {}
 ///
 /// Custom renderers receive a [`TypstWalker`] that can recurse into
 /// child nodes using the same rules the top-level walker uses.
+// [spec:mw:def:typst.adapter.surface]
 pub trait RenderTypstCustom<Ext> {
     fn render_custom(
         &self,
@@ -89,6 +90,7 @@ impl<'a, Ext> TypstWalker<'a, Ext> {
 }
 
 /// Typst-emitting adapter.
+// [spec:mw:def:typst.adapter.surface]
 pub struct TypstAdapter<R = ()> {
     custom: R,
 }
@@ -148,6 +150,7 @@ impl<R> TypstAdapter<R> {
         Ok(out)
     }
 
+    // [spec:mw:sem:typst.adapter.block-mapping]
     fn write_block<Ext>(&self, node: &Node<Ext>, out: &mut String) -> Result<(), TypstError>
     where
         R: RenderTypstCustom<Ext>,
@@ -382,6 +385,7 @@ impl<R> TypstAdapter<R> {
         Ok(())
     }
 
+    // [spec:mw:sem:typst.adapter.inline-mapping]
     fn write_inline<Ext>(&self, node: &Node<Ext>, out: &mut String) -> Result<(), TypstError>
     where
         R: RenderTypstCustom<Ext>,
@@ -534,6 +538,7 @@ impl<R> TypstAdapter<R> {
         Ok(())
     }
 
+    // [spec:mw:sem:typst.adapter.block-mapping]
     fn write_table<Ext>(
         &self,
         alignments: &[Option<TableAlignment>],
@@ -596,6 +601,7 @@ impl<R> TypstAdapter<R> {
 }
 
 /// Streaming sink wrapper.
+// [spec:mw:def:typst.adapter.surface]
 pub struct TypstSink<S, R = ()> {
     inner: S,
     adapter: TypstAdapter<R>,
@@ -656,6 +662,7 @@ where
 /// content; the linewise-only markers (`=`, `+`, `-`) we only escape
 /// when they appear at the start of a fresh line, which we track via
 /// the text's leading-whitespace prefix.
+// [spec:mw:req:typst.adapter.escaping]
 fn write_typst_text(text: &str, out: &mut String) {
     for ch in text.chars() {
         match ch {
@@ -671,6 +678,7 @@ fn write_typst_text(text: &str, out: &mut String) {
 
 /// Inside a `"..."` string literal: backslash-escape `\` and `"`; let
 /// everything else through unchanged.
+// [spec:mw:req:typst.adapter.escaping]
 fn write_typst_string_literal(text: &str, out: &mut String) {
     for ch in text.chars() {
         match ch {
@@ -685,6 +693,7 @@ fn write_typst_string_literal(text: &str, out: &mut String) {
 
 /// Emit a Typst raw block. Picks a fence length one longer than the
 /// longest backtick run in the literal so the fence is unambiguous.
+// [spec:mw:req:typst.adapter.escaping]
 fn write_raw_block(lang: Option<&str>, literal: &str, out: &mut String) {
     let fence_len = longest_backtick_run(literal) + 1;
     let fence_len = fence_len.max(3);
@@ -707,6 +716,7 @@ fn write_raw_block(lang: Option<&str>, literal: &str, out: &mut String) {
 }
 
 /// Emit a Typst inline raw span. Same fence-length logic as for blocks.
+// [spec:mw:req:typst.adapter.escaping]
 fn write_raw_inline(literal: &str, out: &mut String) {
     let fence_len = longest_backtick_run(literal) + 1;
     for _ in 0..fence_len {
@@ -817,6 +827,7 @@ mod tests {
         TypstAdapter::new().render_node(&node).unwrap()
     }
 
+    // [spec:mw:sem:typst.adapter.block-mapping/test]
     #[test]
     fn renders_heading_and_paragraph() {
         let doc = Node::<()>::Document {
@@ -844,6 +855,7 @@ mod tests {
         assert!(out.contains("world"));
     }
 
+    // [spec:mw:sem:typst.adapter.inline-mapping/test]
     #[test]
     fn renders_emphasis_strong_link() {
         let para = Node::<()>::Paragraph {
@@ -888,6 +900,7 @@ mod tests {
         assert!(out.contains("#link(\"https://silo.dev\")[site]"));
     }
 
+    // [spec:mw:req:typst.adapter.escaping/test]
     #[test]
     fn renders_code_block_with_language_and_inline_code() {
         let doc = Node::<()>::Document {
@@ -912,6 +925,7 @@ mod tests {
         assert!(out.contains("`Vec`"));
     }
 
+    // [spec:mw:sem:typst.adapter.block-mapping/test]
     #[test]
     fn renders_ordered_list_with_start() {
         let list = Node::<()>::List {
@@ -948,6 +962,7 @@ mod tests {
         assert!(out.contains("[four]"));
     }
 
+    // [spec:mw:sem:typst.adapter.block-mapping/test]
     #[test]
     fn renders_alert_as_admonition_call() {
         let alert = Node::<()>::Alert {
@@ -968,6 +983,7 @@ mod tests {
         assert!(out.contains("body"));
     }
 
+    // [spec:mw:req:typst.adapter.escaping/test]
     #[test]
     fn escapes_typst_specials_in_text() {
         let para = Node::<()>::Paragraph {
@@ -982,6 +998,7 @@ mod tests {
         assert!(out.contains("\\$math"));
     }
 
+    // [spec:mw:def:typst.adapter.surface/test]
     #[test]
     fn stream_item_passes_id_through() {
         let adapter: TypstAdapter<()> = TypstAdapter::new();

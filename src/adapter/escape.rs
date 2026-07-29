@@ -4,6 +4,7 @@
 
 /// Percent-encode a URL for an `href`/`src`/`id` attribute, leaving the
 /// URL-safe characters (and already-encoded `%XX`) untouched.
+// [spec:mw:req:html.escape.url]
 pub(crate) fn escape_href(url: &str, out: &mut String) {
     use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 
@@ -34,6 +35,7 @@ pub(crate) fn escape_href(url: &str, out: &mut String) {
 }
 
 /// HTML-escape text for a text node or a quoted attribute value.
+// [spec:mw:req:html.escape.text]
 pub(crate) fn escape_html(text: &str, out: &mut String) {
     for ch in text.chars() {
         match ch {

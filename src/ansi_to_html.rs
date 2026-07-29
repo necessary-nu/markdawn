@@ -11,6 +11,9 @@ use vte::{Params, Parser, Perform};
 
 /// Default entry point — parse `source` and return an HTML fragment
 /// with inline `<span style="…">` runs and OSC 8 `<a>` wrappers.
+// Fragment only — no enclosing element, no `<pre>`. Callers that need
+// the rendered result of cursor traffic must use `terminal` instead.
+// [spec:mw:def:ansi.to-html.entry]
 pub fn ansi_to_html(source: &str) -> String {
     let mut parser: Parser = Parser::new();
     let mut writer = HtmlWriter::default();
@@ -23,6 +26,7 @@ pub fn ansi_to_html(source: &str) -> String {
 /// characters alone (with HTML-escaping). Used for the "show source"
 /// pane so readers can inspect the sequences without the browser
 /// interpreting them.
+// [spec:mw:syn:ansi.annotated.labels]
 pub fn ansi_to_annotated_source(source: &str) -> String {
     let mut parser: Parser = Parser::new();
     let mut writer = AnnotatedSourceWriter::default();
@@ -50,6 +54,10 @@ impl HtmlWriter {
         self.out
     }
 
+    // At most one span open at a time, never nested; opening is lazy so
+    // a run of escapes with no text between them emits nothing, and a
+    // plain style never produces an empty `<span style="">`.
+    // [spec:mw:req:ansi.to-html.span-discipline]
     fn open_span(&mut self) {
         if self.open_span {
             return;
@@ -82,6 +90,7 @@ impl HtmlWriter {
         self.open_span();
     }
 
+    // [spec:mw:req:ansi.to-html.text-and-controls]
     fn push_char(&mut self, c: char) {
         if !self.open_span && !self.current.is_plain() {
             self.open_span();
@@ -101,12 +110,16 @@ impl Perform for HtmlWriter {
         self.push_char(c);
     }
 
+    // [spec:mw:req:ansi.to-html.text-and-controls]
     fn execute(&mut self, byte: u8) {
         // C0 controls we want to preserve: newline, tab, carriage
         // return. Everything else gets dropped.
         match byte {
             b'\n' | b'\t' | b'\r' => {
                 // Newlines happen outside of spans for clean output.
+                // `current` is deliberately left intact, so the next
+                // printable char reopens an equivalent span and colour
+                // carries across lines the way a terminal shows it.
                 self.close_span();
                 self.out.push(byte as char);
             }
@@ -114,6 +127,7 @@ impl Perform for HtmlWriter {
         }
     }
 
+    // [spec:mw:req:ansi.to-html.non-sgr-dropped]
     fn csi_dispatch(
         &mut self,
         params: &Params,
@@ -122,10 +136,15 @@ impl Perform for HtmlWriter {
         action: char,
     ) {
         // Only SGR (final `m`) changes visible style. Everything else is
-        // cursor / screen manipulation — ignore.
+        // cursor / screen manipulation — ignore. Dropping must be total:
+        // no output, no placeholder, no mutation of `current`.
         if action != 'm' {
             return;
         }
+        // Parameters mutate one running style left to right, so a later
+        // param overrides an earlier one and a mid-list `0` resets what
+        // the same escape already accumulated.
+        // [spec:mw:sem:ansi.to-html.sgr-accumulation]
         let mut iter = params.iter().peekable();
         if iter.peek().is_none() {
             // Bare `ESC [m` is a reset.
@@ -133,6 +152,10 @@ impl Perform for HtmlWriter {
             self.flush_pending_style();
             return;
         }
+        // Only the first sub-parameter of each param is read, so the
+        // colon-delimited colour forms are not honoured. Unrecognised
+        // codes are skipped without aborting the rest of the sequence.
+        // [spec:mw:req:ansi.to-html.sgr-params]
         while let Some(param) = iter.next() {
             let code = param.first().copied().unwrap_or(0);
             match code {
@@ -173,6 +196,10 @@ impl Perform for HtmlWriter {
         self.flush_pending_style();
     }
 
+    // Close the span before touching the anchor in both directions, so
+    // spans nest strictly inside `<a>` and never straddle its boundary.
+    // The URL is passed through verbatim — no scheme allowlist here.
+    // [spec:mw:req:ansi.to-html.osc8]
     fn osc_dispatch(&mut self, params: &[&[u8]], _bell_terminated: bool) {
         // OSC 8 hyperlinks: `ESC ] 8 ; params ; URL ST`.
         if params.first().map(|p| p.as_ref()) != Some(b"8".as_slice()) {
@@ -200,6 +227,10 @@ impl Perform for HtmlWriter {
     }
 }
 
+// Operands come off the caller's iterator, so an unrecognised selector
+// swallows only itself and the remaining params fall back to the outer
+// SGR loop. A truncated list leaves the colour unchanged.
+// [spec:mw:req:ansi.to-html.extended-color]
 fn parse_extended_color<'a, I>(iter: &mut I) -> Option<Color>
 where
     I: Iterator<Item = &'a [u16]>,
@@ -233,6 +264,7 @@ impl AnnotatedSourceWriter {
     }
 }
 
+// [spec:mw:syn:ansi.annotated.labels]
 impl Perform for AnnotatedSourceWriter {
     fn print(&mut self, c: char) {
         match c {
@@ -319,6 +351,9 @@ impl Perform for AnnotatedSourceWriter {
 mod tests {
     use super::*;
 
+    // [spec:mw:def:ansi.to-html.entry/test]
+    // [spec:mw:req:ansi.to-html.span-discipline/test]
+    // [spec:mw:sem:ansi.to-html.sgr-accumulation/test]
     #[test]
     fn sgr_red_text_becomes_colored_span() {
         let out = ansi_to_html("\x1b[31mred\x1b[0m plain");
@@ -326,6 +361,8 @@ mod tests {
         assert!(out.contains("red</span> plain"));
     }
 
+    // [spec:mw:req:ansi.to-html.sgr-params/test]
+    // [spec:mw:req:ansi.style.css-emission/test]
     #[test]
     fn bold_italic_together() {
         let out = ansi_to_html("\x1b[1;3mbi\x1b[0m");
@@ -334,12 +371,15 @@ mod tests {
         assert!(out.contains("bi</span>"));
     }
 
+    // [spec:mw:def:ansi.style.color/test]
+    // [spec:mw:req:ansi.to-html.extended-color/test]
     #[test]
     fn truecolor_fg() {
         let out = ansi_to_html("\x1b[38;2;255;100;50mhot\x1b[0m");
         assert!(out.contains("color:#ff6432"));
     }
 
+    // [spec:mw:sem:ansi.style.palette-resolution/test]
     #[test]
     fn ansi256_palette() {
         // 201 is the 6-6-cube magenta near the corner.
@@ -347,6 +387,7 @@ mod tests {
         assert!(out.contains("color:#"));
     }
 
+    // [spec:mw:req:ansi.to-html.osc8/test]
     #[test]
     fn osc8_hyperlink_roundtrips() {
         let out = ansi_to_html("\x1b]8;;https://silo.dev\x1b\\click\x1b]8;;\x1b\\");
@@ -355,12 +396,14 @@ mod tests {
         assert!(out.contains("</a>"));
     }
 
+    // [spec:mw:req:ansi.to-html.text-and-controls/test]
     #[test]
     fn html_entities_escaped() {
         let out = ansi_to_html("<x & y>");
         assert_eq!(out, "&lt;x &amp; y&gt;");
     }
 
+    // [spec:mw:req:ansi.to-html.non-sgr-dropped/test]
     #[test]
     fn non_sgr_csi_is_dropped() {
         // Cursor to home and clear screen should not leak into output.
@@ -368,6 +411,7 @@ mod tests {
         assert_eq!(out, "hello");
     }
 
+    // [spec:mw:syn:ansi.annotated.labels/test]
     #[test]
     fn annotated_source_labels_escape_sequences() {
         let source = "\x1b[31mred\x1b[0m";

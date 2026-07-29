@@ -58,6 +58,7 @@ const QUOTE_BAR: Color = Color::from_rgb(0.80, 0.80, 0.82);
 /// inline rich-text spans, so hosts with dark or custom themes should provide
 /// both foreground and background colours explicitly with
 /// [`Renderer::with_code_style`].
+// [spec:mw:def:iced.renderer.code-style]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IcedCodeStyle {
     /// Fenced-code surface colour.
@@ -85,6 +86,7 @@ impl Default for IcedCodeStyle {
 }
 
 /// Parser + renderer configuration. Mirrors the parser feature flags.
+// [spec:mw:def:iced.renderer.options]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct IcedOptions {
     pub gfm: bool,
@@ -130,6 +132,7 @@ impl IcedOptions {
 /// Events emitted by the rendered widget tree. Use
 /// [`Element::map`](crate::iced_shim::Element::map) to lift these into the host
 /// application's message enum.
+// [spec:mw:def:iced.renderer.url-events]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum Url {
@@ -142,6 +145,7 @@ pub enum Url {
 }
 
 /// Plug-in for rendering [`Node::Custom`] payloads.
+// [spec:mw:def:iced.renderer.custom-extension]
 pub trait RenderIcedCustom<Ext> {
     fn render_custom(&self, payload: &Ext, children: &[Node<Ext>]) -> Element<'static, Url>;
 }
@@ -182,7 +186,7 @@ pub struct Renderer<R = ()> {
     custom: R,
     html_filter: crate::HtmlFilter,
     #[cfg(feature = "highlight")]
-    highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SpanHighlighter>>>,
+    highlighter: core::cell::RefCell<Option<Box<dyn crate::highlight::SyntaxHighlighter>>>,
     code_block_rewriters: Vec<Box<dyn crate::ext::CodeBlockRewriter>>,
     /// Shared cross-block selection. Cloned into every emitted
     /// SelectableRichText so they coordinate drag-select state.
@@ -193,11 +197,11 @@ pub struct Renderer<R = ()> {
     /// pikchr/mathml/graphviz, killing scroll FPS.
     pub(crate) svg_cache: core::cell::RefCell<std::collections::HashMap<u64, CachedSvg>>,
     /// Memoize syntax-highlighter output by (lang, source) — same
-    /// reason as svg_cache. arborium's tokenization is expensive and
+    /// reason as svg_cache. Provider tokenization is expensive and
     /// would otherwise rerun on every scroll event.
     #[cfg(feature = "highlight")]
     pub(crate) highlight_cache:
-        core::cell::RefCell<std::collections::HashMap<u64, Vec<arborium::advanced::Span>>>,
+        core::cell::RefCell<std::collections::HashMap<u64, Vec<crate::SyntaxSpan>>>,
 }
 
 impl Default for Renderer<()> {
@@ -245,7 +249,7 @@ impl<R> Renderer<R> {
     #[cfg(feature = "highlight")]
     pub fn with_highlighter<H>(self, highlighter: H) -> Self
     where
-        H: crate::highlight::SpanHighlighter + 'static,
+        H: crate::highlight::SyntaxHighlighter + 'static,
     {
         *self.highlighter.borrow_mut() = Some(Box::new(highlighter));
         self
@@ -270,6 +274,8 @@ where
 {
     /// Parse `source` and render the resulting block list as a single
     /// `Element`. Returns an empty column on parse failure.
+    // [spec:mw:req:iced.renderer.parse-failure-empty]
+    // [spec:mw:req:iced.renderer.selection-group-wrap]
     pub fn render(&self, source: &str) -> Element<'static, Url> {
         let mut builder = Parser::<()>::builder();
         if self.options.gfm {
@@ -316,6 +322,8 @@ where
 
 impl<R> Renderer<R> {
     /// Render a single pre-parsed node.
+    // [spec:mw:sem:iced.renderer.block-widgets]
+    // [spec:mw:sem:iced.copy.non-selectable-content]
     pub fn render_node<Ext>(&self, node: &Node<Ext>, task_id: &Cell<u64>) -> Element<'static, Url>
     where
         R: RenderIcedCustom<Ext>,
@@ -704,6 +712,8 @@ impl<R> Renderer<R> {
         container(body).width(Length::Fill).align_x(align_x).into()
     }
 
+    // [spec:mw:req:iced.renderer.code-block-dispatch]
+    // [spec:mw:req:iced.renderer.render-cache]
     fn render_code_block(&self, info: Option<&str>, literal: &str) -> Element<'static, Url> {
         // 0. user-registered rewriters.
         let rewrite_owned;
@@ -853,7 +863,7 @@ impl<R> Renderer<R> {
             };
         }
 
-        // 2. syntax highlighter (feature-gated). Cached: arborium's
+        // 2. syntax highlighter (feature-gated). Cached because
         //    tokenization is the per-render hot path on scroll.
         #[cfg(feature = "highlight")]
         if let Some(lang) = info_lang.filter(|s| !s.is_empty()) {
@@ -863,7 +873,10 @@ impl<R> Renderer<R> {
                 Some(s) => Some(s),
                 None => {
                     let mut borrow = self.highlighter.borrow_mut();
-                    let computed = borrow.as_mut().and_then(|hl| hl.spans(lang, literal));
+                    // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
+                    let computed = borrow
+                        .as_mut()
+                        .and_then(|hl| hl.highlight(lang, literal).ok());
                     if let Some(ref s) = computed {
                         self.highlight_cache
                             .borrow_mut()
@@ -975,6 +988,7 @@ impl<R> Renderer<R> {
         }
     }
 
+    // [spec:mw:req:iced.renderer.link-safety]
     fn push_inline_atom<Ext>(
         &self,
         node: &Node<Ext>,
@@ -1228,6 +1242,7 @@ fn blend_italic(base: Font) -> Font {
     }
 }
 
+// [spec:mw:req:iced.renderer.theme-independence]
 fn code_block_style(code_style: IcedCodeStyle) -> container::Style {
     let mut style = container::Style::default();
     style.background = Some(Background::Color(code_style.block_background));
@@ -1240,6 +1255,7 @@ fn code_block_style(code_style: IcedCodeStyle) -> container::Style {
     style
 }
 
+// [spec:mw:req:iced.renderer.image-policy]
 fn render_image(destination: &str, _title: Option<&str>, alt: &str) -> Element<'static, Url> {
     if !crate::url_safety::is_safe_url(destination) {
         return text(alt.to_string()).into();
@@ -1598,9 +1614,9 @@ fn render_footnote_ref(
 #[cfg(feature = "highlight")]
 fn highlight_to_spans(
     src: &str,
-    spans: &[arborium::advanced::Span],
+    spans: &[crate::SyntaxSpan],
 ) -> Vec<crate::iced_shim::widget::text::Span<'static, String>> {
-    // arborium emits potentially OVERLAPPING / nested spans (an
+    // Providers may emit OVERLAPPING / nested spans (an
     // identifier inside a function-call inside a statement, etc.).
     // The naive sequential walker emitted overlapping bytes multiple
     // times — that's why every token appeared duplicated.
@@ -1629,7 +1645,7 @@ fn highlight_to_spans(
             continue;
         }
         // Pick innermost (smallest-range) span covering [lo, hi).
-        let mut best: Option<&arborium::advanced::Span> = None;
+        let mut best: Option<&crate::SyntaxSpan> = None;
         for s in spans {
             let s_lo = (s.start as usize).min(len);
             let s_hi = (s.end as usize).min(len);
@@ -1637,7 +1653,11 @@ fn highlight_to_spans(
                 match best {
                     None => best = Some(s),
                     Some(b) => {
-                        if (s.end - s.start) < (b.end - b.start) {
+                        let span_width = s.end.saturating_sub(s.start);
+                        let best_width = b.end.saturating_sub(b.start);
+                        if span_width < best_width
+                            || (span_width == best_width && s.pattern_index > b.pattern_index)
+                        {
                             best = Some(s);
                         }
                     }
@@ -1692,6 +1712,7 @@ mod tests {
         let _ = render_default("hello **world**");
     }
 
+    // [spec:mw:sem:iced.renderer.block-widgets/test]
     #[test]
     fn heading_renders() {
         let _ = render_default(
@@ -1749,6 +1770,7 @@ mod tests {
         let _ = render_default("[click](https://example.com)");
     }
 
+    // [spec:mw:req:iced.renderer.link-safety/test]
     #[test]
     fn javascript_link_does_not_become_clickable() {
         // Smoke test: should not panic and the unsafe URL should be
@@ -1802,6 +1824,7 @@ mod tests {
             .render("term\n: definition\n");
     }
 
+    // [spec:mw:def:iced.renderer.custom-extension/test]
     #[test]
     fn custom_renderer_is_invoked() {
         use std::cell::Cell as StdCell;
@@ -1895,6 +1918,7 @@ mod tests {
         let _ = render_default("![alt](some/local/path.png)");
     }
 
+    // [spec:mw:req:iced.renderer.image-policy/test]
     #[test]
     fn image_remote_url_falls_back_to_alt() {
         let _ = render_default("![alt](https://example.com/x.png)");
@@ -1908,6 +1932,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:req:iced.renderer.image-policy/test]
     #[test]
     fn image_javascript_url_is_stripped() {
         // Should not panic and should degrade to alt text.
@@ -2037,6 +2062,7 @@ mod tests {
         let _ = render_default("```rust\nfn x() {");
     }
 
+    // [spec:mw:req:iced.renderer.code-block-dispatch/test]
     #[cfg(feature = "graphviz")]
     #[test]
     fn provisional_dot_block_strips_diagram_info() {
@@ -2060,6 +2086,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:req:iced.renderer.render-cache/test]
     #[cfg(feature = "graphviz")]
     #[test]
     fn closed_dot_block_still_dispatches() {

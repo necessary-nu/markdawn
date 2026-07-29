@@ -21,6 +21,7 @@
 //! ```
 
 /// In-document navigation target encoded in a markdawn URL.
+// [spec:mw:def:core.url.scheme]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MarkdawnUrl {
     /// A tap on a `[^label]` footnote reference. The `label` is the original
@@ -31,6 +32,7 @@ pub enum MarkdawnUrl {
 /// Parse a URL string. Returns `Some` if the URL uses the `markdawn:` scheme
 /// and matches a known navigation target; `None` otherwise (e.g., http/https
 /// links that should open externally).
+// [spec:mw:req:core.url.parse-strictness]
 pub fn parse_markdawn_url(url: &str) -> Option<MarkdawnUrl> {
     let body = url.strip_prefix("markdawn:")?;
     if let Some(label) = body.strip_prefix("footnote/") {
@@ -45,6 +47,7 @@ pub fn parse_markdawn_url(url: &str) -> Option<MarkdawnUrl> {
 mod tests {
     use super::*;
 
+    // [spec:mw:def:core.url.scheme/test]
     #[test]
     fn parses_footnote_url() {
         assert_eq!(
@@ -60,6 +63,7 @@ mod tests {
         assert_eq!(parse_markdawn_url("https://example.com"), None);
     }
 
+    // [spec:mw:req:core.url.parse-strictness/test]
     #[test]
     fn returns_none_for_unknown_markdawn_path() {
         assert_eq!(parse_markdawn_url("markdawn:wat"), None);

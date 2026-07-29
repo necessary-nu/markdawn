@@ -58,6 +58,7 @@ impl fmt::Display for FrontmatterError {
 impl std::error::Error for FrontmatterError {}
 
 /// Strip frontmatter from a markdown document without parsing it.
+// [spec:mw:syn:traceyext.frontmatter.delimiters]
 pub fn strip_frontmatter(markdown: &str) -> StrippedFrontmatter<'_> {
     let (delimiter, format) = if markdown.starts_with("+++\n") || markdown.starts_with("+++\r\n") {
         ("+++", FrontmatterFormat::Toml)
@@ -121,6 +122,7 @@ pub fn strip_frontmatter(markdown: &str) -> StrippedFrontmatter<'_> {
 /// Returns the parsed frontmatter and the markdown body following it. If no
 /// frontmatter delimiters are present, the body is the original input and the
 /// frontmatter is `Frontmatter::default()`.
+// [spec:mw:syn:traceyext.frontmatter.delimiters]
 pub fn parse_frontmatter(markdown: &str) -> Result<(Frontmatter, &str), FrontmatterError> {
     let stripped = strip_frontmatter(markdown);
     let frontmatter = match (stripped.raw, stripped.format) {
@@ -137,6 +139,7 @@ pub fn parse_frontmatter(markdown: &str) -> Result<(Frontmatter, &str), Frontmat
 mod tests {
     use super::*;
 
+    // [spec:mw:syn:traceyext.frontmatter.delimiters/test]
     #[test]
     fn yaml_frontmatter() {
         let md = "---\ntitle: My Doc\nweight: 42\n---\n# Content";
@@ -146,6 +149,7 @@ mod tests {
         assert_eq!(body, "# Content");
     }
 
+    // [spec:mw:syn:traceyext.frontmatter.delimiters/test]
     #[test]
     fn toml_frontmatter() {
         let md = "+++\ntitle = \"My Doc\"\nweight = 42\n+++\n# Content";
@@ -163,6 +167,7 @@ mod tests {
         assert_eq!(body, "# Just Content");
     }
 
+    // [spec:mw:syn:traceyext.frontmatter.delimiters/test]
     #[test]
     fn unterminated_frontmatter_is_body() {
         let md = "---\ntitle: foo\n# Body";

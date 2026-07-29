@@ -20,6 +20,7 @@ impl fmt::Display for HandlerError {
 impl std::error::Error for HandlerError {}
 
 /// Render the opening and closing HTML for a requirement definition.
+// [spec:mw:def:traceyext.handler.traits]
 pub trait ReqHandler: Send + Sync {
     /// Opening HTML — runs before the body content. Typical output is the
     /// container `<div>` and any badges/affordances.
@@ -33,6 +34,7 @@ pub trait ReqHandler: Send + Sync {
 /// Customize how inline `` `code` `` spans render to HTML.
 ///
 /// Returning `None` falls back to the default `<code>…</code>`.
+// [spec:mw:def:traceyext.handler.traits]
 pub trait InlineCodeHandler: Send + Sync {
     fn render(&self, code: &str) -> Option<String>;
 }
@@ -41,6 +43,7 @@ pub trait InlineCodeHandler: Send + Sync {
 /// `DefaultReqHandler` shape so existing CSS selectors keep working.
 pub struct DefaultReqHandler;
 
+// [spec:mw:def:traceyext.handler.traits]
 impl ReqHandler for DefaultReqHandler {
     fn start(&self, req: &ReqDefinition) -> Result<String, HandlerError> {
         Ok(format!(

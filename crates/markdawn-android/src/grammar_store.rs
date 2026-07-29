@@ -41,6 +41,10 @@ pub fn global_store() -> &'static Arc<GrammarStore> {
 /// lengths. `lang_fn` must be the raw function pointer obtained from
 /// `LanguageFn::into_raw` (i.e. `unsafe extern "C" fn() -> *const ()`),
 /// erased to `*const c_void`.
+// The name is copied and the three query sources are consumed by grammar
+// compilation before returning, so only `lang_fn` outlives the call — the
+// plugin image backing it must stay resident.
+// [spec:mw:req:ffi.ownership.borrowed-input]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_register_grammar(
     name: *const c_char,

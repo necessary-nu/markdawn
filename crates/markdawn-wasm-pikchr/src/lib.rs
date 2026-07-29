@@ -10,6 +10,7 @@ use wasm_bindgen::prelude::*;
 /// byte-identical to the inline pikchr blocks the HTML/vdom adapters
 /// produce. Returns `undefined` on parse failure or oversize output so
 /// the caller can fall back to showing the source.
+// [spec:mw:sem:ffi.render-shim.lazy-module]
 #[wasm_bindgen]
 pub fn render(source: &str) -> Option<String> {
     markdawn::render_pikchr_to_svg(source)

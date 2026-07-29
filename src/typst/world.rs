@@ -25,12 +25,14 @@ use typst::{Library, LibraryExt, World};
 static BUNDLED_PACKAGES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/assets/typst-packages");
 
 /// Process-wide library + font book + fonts, built once.
+// [spec:mw:def:typst.world.hermetic]
 struct Shared {
     library: LazyHash<Library>,
     book: LazyHash<FontBook>,
     fonts: Vec<Font>,
 }
 
+// [spec:mw:def:typst.world.hermetic]
 fn shared() -> &'static Shared {
     static CELL: OnceLock<Shared> = OnceLock::new();
     CELL.get_or_init(|| {
@@ -75,6 +77,7 @@ impl RenderWorld {
     }
 }
 
+// [spec:mw:def:typst.world.hermetic]
 impl World for RenderWorld {
     fn library(&self) -> &LazyHash<Library> {
         &shared().library
@@ -119,6 +122,7 @@ impl World for RenderWorld {
 
 /// Resolve a `FileId` to bundled bytes. Only `@preview/...` packages we
 /// ship are reachable; everything else maps to `FileError::NotFound`.
+// [spec:mw:req:typst.packages.offline-resolution]
 fn read_package_file(id: FileId) -> FileResult<&'static [u8]> {
     let VirtualRoot::Package(spec) = id.root() else {
         return Err(FileError::NotFound(
@@ -136,6 +140,7 @@ fn read_package_file(id: FileId) -> FileResult<&'static [u8]> {
 
 /// Build the `preview/{name}/{version}/{path}` lookup key inside the
 /// bundled `Dir`. Returns `None` for unknown namespaces.
+// [spec:mw:req:typst.packages.offline-resolution]
 fn bundled_package_relative_path(spec: &PackageSpec, inner: &Path) -> Option<std::path::PathBuf> {
     if spec.namespace.as_str() != "preview" {
         return None;
@@ -157,6 +162,7 @@ fn bundled_package_relative_path(spec: &PackageSpec, inner: &Path) -> Option<std
 /// Names + versions we ship. Must match the on-disk vendor tree under
 /// `assets/typst-packages/preview/`. `oxifmt` is an indirect dep of
 /// `cetz` — bundle it so cetz can resolve `#import "@preview/oxifmt:..."`.
+// [spec:mw:req:typst.packages.offline-resolution]
 const BUNDLED: &[(&str, &str)] = &[("syntree", "0.2.1"), ("cetz", "0.5.0"), ("oxifmt", "1.0.0")];
 
 fn is_bundled(name: &EcoString, version: &str) -> bool {

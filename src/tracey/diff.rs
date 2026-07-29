@@ -158,6 +158,7 @@ fn diff_words(old: &str, new: &str) -> String {
 
 /// Block-level markdown diff. Removed blocks are wrapped in `~~~~`, added
 /// blocks in `****`. Matching equal blocks are emitted unchanged.
+// [spec:mw:sem:traceyext.diff.markdown]
 pub fn diff_markdown(old: &str, new: &str) -> String {
     let old_blocks = parse_blocks(old);
     let new_blocks = parse_blocks(new);
@@ -182,6 +183,7 @@ pub fn diff_markdown(old: &str, new: &str) -> String {
 /// Like [`diff_markdown`], but consecutive remove/add pairs of matching block
 /// variants get a word-level diff inside the block instead of being wholesale
 /// strike/strong.
+// [spec:mw:sem:traceyext.diff.markdown]
 pub fn diff_markdown_inline(old: &str, new: &str) -> String {
     let old_blocks = parse_blocks(old);
     let new_blocks = parse_blocks(new);
@@ -250,6 +252,7 @@ pub fn diff_markdown_inline(old: &str, new: &str) -> String {
 mod tests {
     use super::*;
 
+    // [spec:mw:sem:traceyext.diff.markdown/test]
     #[test]
     fn identical_passes_through() {
         let md = "# Hello\n\nWorld.";
@@ -259,6 +262,7 @@ mod tests {
         assert!(!out.contains("**"));
     }
 
+    // [spec:mw:sem:traceyext.diff.markdown/test]
     #[test]
     fn word_change_uses_inline_diff() {
         let old = "The fox is quick.";
@@ -268,6 +272,7 @@ mod tests {
         assert!(out.contains("**fast.**"));
     }
 
+    // [spec:mw:sem:traceyext.diff.markdown/test]
     #[test]
     fn block_removal() {
         let old = "First paragraph.\n\nSecond paragraph.";

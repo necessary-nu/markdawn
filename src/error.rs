@@ -2,11 +2,13 @@ use core::fmt;
 
 /// Byte offset into the parser's normalized buffer where an issue was
 /// detected.
+// [spec:mw:sem:core.error.location]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ErrorLocation {
     pub byte_offset: usize,
 }
 
+// [spec:mw:def:core.error.taxonomy]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     AlreadyFinished,
@@ -61,6 +63,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+// [spec:mw:def:core.error.stream-error]
 #[derive(Debug)]
 pub enum StreamError<E> {
     Parser(Error),

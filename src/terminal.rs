@@ -31,6 +31,10 @@ pub const MAX_AUTO_ROWS: u16 = 200;
 /// One rendered cell: the Unicode character the terminal would draw at
 /// this position plus the style it would draw it with. Wide characters
 /// claim two consecutive cells (the second cell has an empty string).
+// `ch` is a `String`, not a `char`, because a cell may hold a whole
+// grapheme cluster. `is_blank` is the predicate both renderers trim
+// trailing run-out with.
+// [spec:mw:def:ansi.term.grid]
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Cell {
     pub ch: String,
@@ -45,6 +49,7 @@ impl Cell {
 
 /// Owned snapshot of the visible terminal after feeding bytes. This is
 /// the stable output shape — callers render it however they like.
+// [spec:mw:def:ansi.term.grid]
 #[derive(Clone, Debug)]
 pub struct TermGrid {
     pub rows: u16,
@@ -63,6 +68,11 @@ impl TermGrid {
 }
 
 /// Stateful emulator. Feed bytes any number of times, then snapshot.
+// A real emulator sits underneath, so cursor movement, erases, scroll
+// regions, wrapping at `cols` and alt-screen swaps take effect on the
+// grid rather than being dropped: the snapshot is what a human sees,
+// not the literal bytestream. No streaming equivalent exists.
+// [spec:mw:def:ansi.term.emulator]
 pub struct TermEmulator {
     parser: vt100::Parser,
 }
@@ -130,6 +140,7 @@ fn grid_from_screen(screen: &vt100::Screen) -> TermGrid {
     }
 }
 
+// [spec:mw:req:ansi.term.style-mapping]
 fn cell_from_vt100(cell: &vt100::Cell) -> Cell {
     let ch = if cell.has_contents() {
         cell.contents().to_string()
@@ -149,6 +160,9 @@ fn cell_from_vt100(cell: &vt100::Cell) -> Cell {
     Cell { ch, style }
 }
 
+// The `n < 16` split is what lets `color_to_sgr` recover the short
+// 30-37 / 90-97 forms when re-encoding.
+// [spec:mw:req:ansi.term.style-mapping]
 fn vt100_color(c: vt100::Color) -> Option<Color> {
     match c {
         vt100::Color::Default => None,
@@ -162,6 +176,11 @@ fn vt100_color(c: vt100::Color) -> Option<Color> {
 /// with `<span style="…">` runs for styled cells. Trailing blanks on
 /// each row are trimmed. Use the same `<pre>` wrapper the ANSI block
 /// toggle markup already provides.
+// Adjacent cells with equal styles coalesce into one span, so a styled
+// run is never split cell-by-cell and a plain run stays bare. An empty
+// `ch` renders as a space so a wide char's trailing half doesn't
+// shorten the line.
+// [spec:mw:req:ansi.term.html-runs]
 pub fn render_grid_html(grid: &TermGrid) -> String {
     let mut out = String::with_capacity(grid.rows as usize * grid.cols as usize);
     for (row_idx, row) in grid.cells.iter().enumerate() {
@@ -196,6 +215,10 @@ pub fn render_grid_html(grid: &TermGrid) -> String {
 
 /// Render a `TermGrid` as plain ANSI text (SGR + OSC 0 title only).
 /// Newlines between rows; trailing blanks trimmed.
+// Reset-then-set, not differential: `ESC[0m` precedes every style
+// change (including a change *into* plain) and closes a row that ended
+// non-plain, so no attribute can leak past its cell range.
+// [spec:mw:syn:ansi.term.ansi-encoding]
 pub fn render_grid_ansi(grid: &TermGrid) -> String {
     let mut out = String::new();
     for (row_idx, row) in grid.cells.iter().enumerate() {
@@ -226,6 +249,7 @@ pub fn render_grid_ansi(grid: &TermGrid) -> String {
     out
 }
 
+// [spec:mw:syn:ansi.term.ansi-encoding]
 fn style_to_sgr(style: &CellStyle) -> String {
     let mut parts: Vec<String> = Vec::new();
     if style.bold {
@@ -259,6 +283,7 @@ fn style_to_sgr(style: &CellStyle) -> String {
     }
 }
 
+// [spec:mw:syn:ansi.term.ansi-encoding]
 fn color_to_sgr(c: Color, bg: bool) -> String {
     let base = if bg { 40 } else { 30 };
     match c {
@@ -305,6 +330,11 @@ pub fn ansi_snapshot_to_ansi(literal: &str, cols: Option<u16>, rows: Option<u16>
 
 /// Low-level snapshot constructor — returns the `TermGrid` so callers
 /// can inspect cells / cursor directly. Internal but exposed for tests.
+// `cols` is load-bearing — the emulator wraps on it — so it is clamped
+// to at least 1. An explicit `rows` is honoured verbatim with no trim.
+// The cursor row participates in the auto-trim maximum precisely so the
+// trim never cuts above where the next write would land.
+// [spec:mw:req:ansi.term.auto-size]
 pub fn ansi_snapshot_grid(literal: &str, cols: Option<u16>, rows: Option<u16>) -> TermGrid {
     let cols = cols.unwrap_or(DEFAULT_COLS).max(1);
     // First pass: feed into a tall emulator to find out how many rows
@@ -344,6 +374,7 @@ pub fn ansi_snapshot_grid(literal: &str, cols: Option<u16>, rows: Option<u16>) -
 mod tests {
     use super::*;
 
+    // [spec:mw:def:ansi.term.emulator/test]
     #[test]
     fn erase_display_clears_prior_content() {
         // Print foo, then clear display + home cursor, then print X.
@@ -367,6 +398,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:req:ansi.term.style-mapping/test]
     #[test]
     fn sgr_colors_roundtrip_in_snapshot() {
         let html = ansi_snapshot_to_html("\x1b[31mred\x1b[0m", Some(20), Some(2));
@@ -376,6 +408,8 @@ mod tests {
         );
     }
 
+    // [spec:mw:req:ansi.term.html-runs/test]
+    // [spec:mw:def:ansi.style.cell-style/test]
     #[test]
     fn plain_text_renders_without_spans() {
         let html = ansi_snapshot_to_html("hello", Some(20), Some(2));
@@ -383,6 +417,8 @@ mod tests {
         assert!(html.starts_with("hello"));
     }
 
+    // [spec:mw:req:ansi.term.auto-size/test]
+    // [spec:mw:def:ansi.term.grid/test]
     #[test]
     fn snapshot_auto_trims_trailing_blank_rows() {
         // Only one row of content — `rows=None` should auto-trim the

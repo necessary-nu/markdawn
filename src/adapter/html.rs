@@ -44,6 +44,7 @@ impl From<HtmlError> for VdomError {
     }
 }
 
+// [spec:mw:def:html.custom.hook]
 pub trait RenderHtmlCustom<Ext> {
     fn render_custom(
         &self,
@@ -69,6 +70,7 @@ impl<Ext> RenderHtmlCustom<Ext> for () {
 /// the same trailing-newline rule the old `HtmlAdapter` applied.
 struct HtmlCustomBridge<R>(R);
 
+// [spec:mw:sem:html.custom.bridge]
 impl<Ext, R> RenderVdomCustom<Ext> for HtmlCustomBridge<R>
 where
     R: RenderHtmlCustom<Ext>,
@@ -130,11 +132,11 @@ impl<R> HtmlAdapter<R> {
 
 #[cfg(feature = "highlight")]
 impl<R> HtmlAdapter<R> {
-    /// Install a syntax highlighter. Any `arborium::advanced::HighlightSpans`
-    /// implementation works. Failures fall back to plain `<pre><code>`.
+    /// Install a renderer-neutral syntax highlighter. Failures fall back to
+    /// plain `<pre><code>`.
     pub fn with_highlighter<H>(mut self, highlighter: H) -> Self
     where
-        H: arborium::advanced::HighlightSpans + 'static,
+        H: crate::highlight::SyntaxHighlighter + 'static,
     {
         self.inner = self.inner.with_highlighter(highlighter);
         self
@@ -169,6 +171,7 @@ impl<R> HtmlAdapter<R> {
 }
 
 impl<R> HtmlAdapter<R> {
+    // [spec:mw:req:html.render.serializer-over-vdom]
     pub fn render<Ext>(&self, item: StreamItem<Node<Ext>>) -> Result<StreamItem<String>, HtmlError>
     where
         R: RenderHtmlCustom<Ext>,
@@ -190,6 +193,7 @@ impl<R> HtmlAdapter<R> {
 
 // ----- VNode → HTML serializer -------------------------------------
 
+// [spec:mw:sem:html.serialize.emission]
 fn vnode_to_html(node: &VNode, out: &mut String) {
     match node {
         VNode::Text { text } => escape_html(text, out),
@@ -259,6 +263,7 @@ fn vnode_to_html(node: &VNode, out: &mut String) {
     }
 }
 
+// [spec:mw:req:html.escape.attribute-contexts]
 fn write_attrs(props: &Props, out: &mut String) {
     for (key, val) in props.iter() {
         match val {
@@ -372,6 +377,7 @@ mod tests {
         }
     }
 
+    // [spec:mw:req:html.render.serializer-over-vdom/test]
     #[test]
     fn renders_html_upsert_with_same_id_and_provisional_flag() {
         let adapter = HtmlAdapter::new();
@@ -399,6 +405,7 @@ mod tests {
         );
     }
 
+    // [spec:mw:req:html.render.serializer-over-vdom/test]
     #[test]
     fn passes_delete_through_unchanged() {
         let adapter = HtmlAdapter::new();
@@ -408,6 +415,7 @@ mod tests {
         assert_eq!(rendered, StreamItem::Delete { id: 9 });
     }
 
+    // [spec:mw:sem:html.serialize.emission/test]
     #[test]
     fn renders_lists_and_block_quotes() {
         let adapter = HtmlAdapter::new();
@@ -446,6 +454,8 @@ mod tests {
         );
     }
 
+    // [spec:mw:def:html.adapter.surface/test]
+    // [spec:mw:def:core.sink.trait/test]
     #[test]
     fn html_sink_wraps_existing_sink() {
         let inner = VecSink::<String>::new();
@@ -471,7 +481,52 @@ mod tests {
         );
     }
 
-    // adv[verify markdown.url-allowlist]
+    // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback/test]
+    // [spec:mw:req:html.escape.text/test]
+    #[cfg(feature = "highlight")]
+    #[test]
+    fn highlighter_error_falls_back_to_plain_code() {
+        struct FailingHighlighter;
+
+        impl crate::SyntaxHighlighter for FailingHighlighter {
+            fn highlight(
+                &mut self,
+                _language_hint: &str,
+                _source: &str,
+            ) -> Result<Vec<crate::SyntaxSpan>, crate::HighlightError> {
+                Err(crate::HighlightError::new("provider unavailable"))
+            }
+        }
+
+        let rendered = HtmlAdapter::new()
+            .with_highlighter(FailingHighlighter)
+            .render(StreamItem::Upsert(Emission {
+                id: 12,
+                provisional: false,
+                node: Node::<()>::CodeBlock {
+                    info: Some("rust".to_owned()),
+                    literal: "<tag>".to_owned(),
+                    source: SourceSpan::default(),
+                },
+            }))
+            .unwrap();
+
+        let StreamItem::Upsert(emission) = rendered else {
+            panic!("expected upsert")
+        };
+        assert!(
+            emission.node.contains("&lt;tag&gt;"),
+            "plain fallback lost or failed to escape source: {}",
+            emission.node
+        );
+        assert!(
+            !emission.node.contains("<a-"),
+            "failed highlighting emitted styled markup: {}",
+            emission.node
+        );
+    }
+
+    // [spec:adv:req:markdown.url-allowlist/test]
     #[test]
     fn javascript_link_destination_is_stripped() {
         let adapter = HtmlAdapter::new();
@@ -536,6 +591,8 @@ mod tests {
         );
     }
 
+    // [spec:mw:def:html.custom.hook/test]
+    // [spec:mw:sem:html.custom.bridge/test]
     #[test]
     fn custom_renderer_handles_custom_nodes() {
         let adapter = HtmlAdapter::<()>::with_custom_renderer(MathRenderer);

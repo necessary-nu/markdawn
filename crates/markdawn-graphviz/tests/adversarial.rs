@@ -44,7 +44,7 @@ use std::time::Duration;
 
 // ----- A2: existing caps (regression) -----
 
-// adv[verify input.byte-cap]
+// [spec:adv:req:input.byte-cap/test]
 #[test]
 fn a2_1_oversize_input_rejected() {
     let huge = "a".repeat(MAX_DOT_BYTES + 1);
@@ -52,7 +52,7 @@ fn a2_1_oversize_input_rejected() {
     assert!(matches!(err, GraphvizError::InputTooLarge(_)));
 }
 
-// adv[verify input.brace-depth-cap]
+// [spec:adv:req:input.brace-depth-cap/test]
 #[test]
 fn a2_2_deep_outer_braces_rejected() {
     let src = format!(
@@ -64,7 +64,7 @@ fn a2_2_deep_outer_braces_rejected() {
     assert!(matches!(err, GraphvizError::InputTooDeep(_)));
 }
 
-// adv[verify input.byte-cap] — user's checklist: "1MB of `{`".
+// [spec:adv:req:input.byte-cap/test] — user's checklist: "1MB of `{`".
 #[test]
 fn a2_3_megabyte_of_open_braces_rejected_by_byte_cap() {
     let src = "{".repeat(1024 * 1024);
@@ -72,7 +72,7 @@ fn a2_3_megabyte_of_open_braces_rejected_by_byte_cap() {
     assert!(matches!(err, GraphvizError::InputTooLarge(_)));
 }
 
-// adv[verify input.byte-cap] — user's checklist: `/*` + megabytes of garbage.
+// [spec:adv:req:input.byte-cap/test] — user's checklist: `/*` + megabytes of garbage.
 #[test]
 fn a2_4_megabyte_unterminated_comment_rejected_by_byte_cap() {
     let mut src = String::from("/*");
@@ -81,7 +81,7 @@ fn a2_4_megabyte_unterminated_comment_rejected_by_byte_cap() {
     assert!(matches!(err, GraphvizError::InputTooLarge(_)));
 }
 
-// adv[verify input.byte-cap] — user's checklist: `"` + 1MB of `a`.
+// [spec:adv:req:input.byte-cap/test] — user's checklist: `"` + 1MB of `a`.
 #[test]
 fn a2_5_megabyte_unterminated_string_rejected_by_byte_cap() {
     let mut src = String::from("digraph { A [label=\"");
@@ -91,7 +91,7 @@ fn a2_5_megabyte_unterminated_string_rejected_by_byte_cap() {
     assert!(matches!(err, GraphvizError::InputTooLarge(_)));
 }
 
-// adv[verify input.byte-cap] — user's checklist: 100k deep nested subgraphs.
+// [spec:adv:req:input.byte-cap/test] — user's checklist: 100k deep nested subgraphs.
 // At ~11 bytes each, 100k levels is >1 MB so the byte cap triggers first.
 #[test]
 fn a2_6_100k_deep_subgraphs_rejected_by_byte_cap() {
@@ -130,7 +130,7 @@ fn a3_2_unterminated_string_does_not_hang() {
 
 // ----- A4: graph-structure DoS (bytes → edges amplification) -----
 
-// adv[verify input.edge-cap]
+// [spec:adv:req:input.edge-cap/test]
 #[test]
 fn a4_1_fanout_rejected() {
     let mut src = String::from("digraph { A -> { ");
@@ -166,7 +166,7 @@ fn a4_2_set_to_set_rejected_by_edge_cap() {
     assert!(matches!(err, GraphvizError::TooManyEdges(_)));
 }
 
-// adv[verify input.subgraph-cap]
+// [spec:adv:req:input.subgraph-cap/test]
 #[test]
 fn a4_4_too_many_subgraphs_rejected() {
     let mut src = String::from("digraph { ");
@@ -181,7 +181,7 @@ fn a4_4_too_many_subgraphs_rejected() {
     );
 }
 
-// adv[verify input.node-cap]
+// [spec:adv:req:input.node-cap/test]
 #[test]
 fn a4_3_too_many_flat_nodes_rejected() {
     let mut src = String::from("digraph { ");
@@ -195,7 +195,7 @@ fn a4_3_too_many_flat_nodes_rejected() {
 
 // ----- A5: recursive attacks (bypass outer brace scanner) -----
 
-// adv[verify input.record-depth-cap]
+// [spec:adv:req:input.record-depth-cap/test]
 #[test]
 fn a5_1_record_label_recursion_rejected() {
     let mut payload = String::new();
@@ -210,7 +210,7 @@ fn a5_1_record_label_recursion_rejected() {
     assert!(matches!(err, GraphvizError::RecordLabelTooDeep(_)));
 }
 
-// adv[verify input.html-depth-cap]
+// [spec:adv:req:input.html-depth-cap/test]
 #[test]
 fn a5_2_html_label_recursion_rejected() {
     let mut src = String::from("digraph { A [label=<");
@@ -226,7 +226,7 @@ fn a5_2_html_label_recursion_rejected() {
     assert!(matches!(err, GraphvizError::HtmlLabelTooDeep(_)));
 }
 
-// adv[verify neutralise.layout-override]
+// [spec:adv:req:neutralise.layout-override/test]
 #[test]
 fn a5_4_layout_override_neutralised() {
     // `layout=neato` should be renamed by the scrubber so libgraphviz
@@ -241,7 +241,7 @@ fn a5_4_layout_override_neutralised() {
 
 // ----- A6: external-resource attrs -----
 
-// adv[verify neutralise.external-file-attrs]
+// [spec:adv:req:neutralise.external-file-attrs/test]
 #[test]
 fn a6_1_image_path_does_not_open_file() {
     // `image="/etc/passwd"` should be renamed; libgraphviz never sees
@@ -422,7 +422,7 @@ fn observe_timing_under_edge_cap() {
 
 // ----- A14: per-list attr flood + rank-constraint DoS -----
 
-// adv[verify input.attribute-cap]
+// [spec:adv:req:input.attribute-cap/test]
 #[test]
 fn a14_1_single_list_with_many_attrs_rejected() {
     let mut src = String::from("digraph { A [");
@@ -437,7 +437,7 @@ fn a14_1_single_list_with_many_attrs_rejected() {
     );
 }
 
-// adv[verify input.node-cap] — rank=same with many entries.
+// [spec:adv:req:input.node-cap/test] — rank=same with many entries.
 #[test]
 fn a14_2_rank_same_flood_rejected() {
     let mut src = String::from("digraph { subgraph { rank=same; ");
@@ -454,7 +454,7 @@ fn a14_2_rank_same_flood_rejected() {
 
 // ----- A15: wall-clock render timeout -----
 
-// adv[verify render.serialise]
+// [spec:adv:req:render.serialise/test]
 #[test]
 fn a15_0_concurrent_renders_serialize_via_mutex() {
     // Spawn N renders concurrently. With the process-global Mutex
@@ -475,7 +475,7 @@ fn a15_0_concurrent_renders_serialize_via_mutex() {
     }
 }
 
-// adv[verify render.timeout]
+// [spec:adv:req:render.timeout/test]
 #[test]
 fn a15_1_timeout_fires_on_benign_input_with_zero_budget() {
     // Zero-timeout guarantees the recv_timeout elapses before the
@@ -494,7 +494,7 @@ fn a15_2_timeout_display_message() {
     assert!(s.to_lowercase().contains("timeout"), "got: {s}");
 }
 
-// adv[verify render.staged-timeout]
+// [spec:adv:req:render.staged-timeout/test]
 #[test]
 fn a15_4_staged_timeout_variants_display() {
     let errs = [
@@ -509,7 +509,7 @@ fn a15_4_staged_timeout_variants_display() {
     }
 }
 
-// adv[verify render.process-isolation]
+// [spec:adv:sem:render.process-isolation/test]
 // Only exercised on Linux where the forked path is actually selected;
 // macOS falls back to in-thread and this test isn't meaningful there.
 #[cfg(target_os = "linux")]
@@ -524,7 +524,7 @@ fn a15_6_fork_isolation_catches_simulated_crash() {
     assert!(svg.contains("<svg"));
 }
 
-// adv[verify render.process-isolation]
+// [spec:adv:sem:render.process-isolation/test]
 #[test]
 fn a15_7_fork_variants_display() {
     let errs = [
@@ -538,7 +538,7 @@ fn a15_7_fork_variants_display() {
     }
 }
 
-// adv[verify render.staged-timeout]
+// [spec:adv:req:render.staged-timeout/test]
 #[test]
 fn a15_5_staged_budget_constants_sane() {
     // Per-stage budgets should fit comfortably inside the overall
@@ -553,7 +553,7 @@ fn a15_5_staged_budget_constants_sane() {
     );
 }
 
-// adv[verify render.panic-capture]
+// [spec:adv:req:render.panic-capture/test]
 #[test]
 fn a15_3_panic_variant_round_trips_through_display() {
     // A rendering panic would arrive as GraphvizError::Panicked via the
@@ -568,7 +568,7 @@ fn a15_3_panic_variant_round_trips_through_display() {
 
 // ----- A13: HTML-label IMG + processing-instruction attribute surfaces -----
 
-// adv[verify neutralise.html-img-tag]
+// [spec:adv:req:neutralise.html-img-tag/test]
 #[test]
 fn a13_1_img_src_in_html_label_neutralised() {
     // Scrubber renames <IMG ...> → <_IMG ...> so graphviz's HTML-label
@@ -578,7 +578,7 @@ fn a13_1_img_src_in_html_label_neutralised() {
     assert!(!svg.contains("/etc/passwd"), "leaked: {svg}");
 }
 
-// adv[verify neutralise.external-file-attrs]
+// [spec:adv:req:neutralise.external-file-attrs/test]
 #[test]
 fn a13_2_stylesheet_attribute_neutralised() {
     // `stylesheet=` is now renamed by the scrubber, so the value never
