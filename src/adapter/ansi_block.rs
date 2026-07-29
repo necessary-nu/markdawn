@@ -277,7 +277,7 @@ impl<R> AnsiAdapter<R> {
             // The transcript's own colours are the only truecolour the
             // adapter ever re-encodes, so this is where a depth downgrade
             // actually bites.
-            // [spec:mw:req:ansi.adapter.color-depth-inert+1]
+            // [spec:mw:req:ansi.adapter.color-depth+1]
             for row in &mut grid.cells {
                 for cell in row.iter_mut() {
                     cell.style.fg = cell

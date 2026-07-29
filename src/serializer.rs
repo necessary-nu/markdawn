@@ -611,7 +611,7 @@ mod tests {
     }
 
     // [spec:mw:sem:editing.serialize.block-forms+1/test]
-    // [spec:mw:def:core.node.alert-kinds/test]
+    // [spec:mw:req:core.node.alert-title-fallback+1/test]
     #[test]
     fn alert_serializes_with_tag() {
         let n = Node::<()>::Alert {

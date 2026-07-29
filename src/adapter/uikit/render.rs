@@ -28,7 +28,7 @@ use super::data_uri;
 use super::style::UIKitStyle;
 use super::svg;
 
-// [spec:mw:sem:uikit.media.image-source]
+// [spec:mw:sem:uikit.media.image-source+1]
 pub(crate) struct PendingImage {
     pub url: String,
     pub attachment: Retained<NSTextAttachment>,
@@ -780,28 +780,37 @@ fn attributed_string(
 }
 
 /// Try to render an HTML chunk as an SVG `NSTextAttachment` (image-based, not view provider).
-// [spec:mw:req:uikit.media.svg-raster]
+// [spec:mw:req:uikit.media.svg-raster+1]
 fn try_render_svg_html(html: &str) -> Option<Retained<NSMutableAttributedString>> {
     if !svg::is_svg_data(html.as_bytes()) {
         return None;
     }
-    let image = svg::render_svg(html.as_bytes())?;
+    // The chunk is verbatim document text, so it is sanitised before
+    // CoreSVG parses it.
+    let image = svg::render_svg_sanitized(html.as_bytes())?;
     Some(make_image_attachment(&image))
 }
 
 /// Try to load an image from an Image node's `destination` URI.
 ///
+/// - The destination is first put through the same allow-list the
+///   markup-emitting adapters use, so control characters, unknown
+///   schemes and non-image `data:` media types never get this far.
 /// - `data:` URIs are decoded synchronously (base64 or percent-encoded).
 /// - Remote URLs (http/https) create a placeholder attachment and push a
 ///   `PendingImage` into `ctx.pending_images`. The BlockSink drains these
 ///   after insertion and registers them with the async image_loader.
 /// - If an image was previously loaded and cached, uses it immediately.
-// [spec:mw:sem:uikit.media.image-source]
+// [spec:mw:sem:uikit.media.image-source+1]
 fn try_load_image(uri: &str, ctx: &RenderCtx) -> Option<Retained<NSMutableAttributedString>> {
+    if !crate::url_safety::is_safe_image_url(uri) {
+        return None;
+    }
+
     // 1. data: URI — synchronous
     if let Some(parsed) = data_uri::parse_data_uri(uri) {
-        let image = if parsed.mime.contains("svg") {
-            svg::render_svg(&parsed.bytes)?
+        let image = if data_uri::is_svg_media_type(parsed.mime) {
+            svg::render_svg_sanitized(&parsed.bytes)?
         } else {
             let ns_data = NSData::with_bytes(&parsed.bytes);
             UIImage::imageWithData(&ns_data)?

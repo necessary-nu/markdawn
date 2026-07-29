@@ -74,16 +74,13 @@ its source spans, the `StreamItem` streaming protocol, the `Sink` and
 > therefore read alignment off the cell and never need to walk back up to
 > the `Table`.
 
-> [spec:mw:def:core.node.alert-kinds]
-> `AlertKind` enumerates the five GitHub alert kinds — `Note`, `Tip`,
-> `Important`, `Warning`, `Caution` — carried by `Node::Alert` alongside
-> an optional custom `title` taken from `> [!KIND] Title`.
-
-> [spec:mw:req:core.node.alert-title-fallback]
-> When `Node::Alert.title` is `None`, a renderer MUST substitute its own
-> default label for the kind (`Note`, `Tip`, `Important`, `Warning`,
-> `Caution`). When it is `Some`, the custom title MUST replace the
-> default label entirely rather than being appended to it.
+> [spec:mw:req:core.node.alert-title-fallback+1]
+> `AlertKind` is the five GitHub alert kinds — `Note`, `Tip`, `Important`,
+> `Warning`, `Caution` — and `Node::Alert` carries one of them alongside an
+> optional custom `title` taken from `> [!KIND] Title`. When that `title`
+> is `None`, a renderer MUST substitute its own default label for the kind.
+> When it is `Some`, the custom title MUST replace the default label
+> entirely rather than being appended to it.
 
 > [spec:mw:def:core.node.footnote-triple]
 > Footnotes are three variants. `FootnoteRef { label, number, ref_num }`

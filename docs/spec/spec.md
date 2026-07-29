@@ -3373,7 +3373,6 @@ In the examples, the `→` character is used to represent tabs.
 > <h1>aaa</h1>
 > ````````````````````````````````
 
-> [spec:gfm:def:leaf-blocks.blank-lines.extension-wrapper]
 > <div class="extension">
 
 ## Tables (extension)
@@ -3599,7 +3598,6 @@ In the examples, the `→` character is used to represent tabs.
 > </table>
 > ````````````````````````````````
 
-> [spec:gfm:def:leaf-blocks.tables-extension.extension-wrapper]
 > </div>
 
 # Container blocks
@@ -4528,7 +4526,7 @@ In the examples, the `→` character is used to represent tabs.
 > <p>bar</p>
 > ````````````````````````````````
 
-> [spec:gfm:thm:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
+> [spec:gfm:sem:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
 > This is not a significant restriction, because when a block begins
 > with 1-3 spaces indent, the indentation can always be removed without
 > a change in interpretation, allowing rule #1 to be applied.  So, in
@@ -5016,7 +5014,7 @@ In the examples, the `→` character is used to represent tabs.
 > 6. "To put a code block within a list item, the code block needs to be
 >    indented twice — 8 spaces or two tabs."
 
-> [spec:gfm:thm:container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
+> [spec:gfm:def:container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
 > These rules specify that a paragraph under a list item must be indented
 > four spaces (presumably, from the left margin, rather than the start of
 > the list marker, but this is not said), and that code under a list item
@@ -5195,7 +5193,6 @@ In the examples, the `→` character is used to represent tabs.
 > four-space rule in cases where the list marker plus its initial indentation
 > takes four spaces (a common case), but diverge in other cases.
 
-> [spec:gfm:def:container-blocks.list-items.motivation.extension-wrapper]
 > <div class="extension">
 
 ## Task list items (extension)
@@ -5258,7 +5255,6 @@ In the examples, the `→` character is used to represent tabs.
 > </ul>
 > ````````````````````````````````
 
-> [spec:gfm:def:container-blocks.task-list-items-extension.extension-wrapper]
 > </div>
 
 ## Lists
@@ -5379,7 +5375,6 @@ In the examples, the `→` character is used to represent tabs.
 > - a plane ticket
 > ```
 
-> [spec:gfm:sem:container-blocks.lists.second-reason-is-principle-of-uniformity]
 > Second, we are attracted to a
 
 > [spec:gfm:def:container-blocks.lists.principle-of-uniformity-definition]
@@ -5412,7 +5407,7 @@ In the examples, the `→` character is used to represent tabs.
 > - a plane ticket
 > ```
 
-> [spec:gfm:thm:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
+> [spec:gfm:sem:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
 > by itself should be a paragraph followed by a nested sublist.
 
 > [spec:gfm:thm:container-blocks.lists.uniformity-supports-list-interruption]
@@ -6380,12 +6375,11 @@ In the examples, the `→` character is used to represent tabs.
 > <p><code>foo   bar  baz</code></p>
 > ````````````````````````````````
 
-> [spec:gfm:req:inlines.code-spans.browser-rendering-may-collapse-spaces]
+> [spec:gfm:req:inlines.code-spans.browser-rendering-may-collapse-spaces+1]
 > Note that browsers will typically collapse consecutive spaces
 > when rendering `<code>` elements, so it is recommended that
 > the following CSS be used:
-
-> [spec:gfm:sem:inlines.code-spans.code-white-space-pre-wrap]
+>
 >     code{white-space: pre-wrap;}
 
 > [spec:gfm:syn:inlines.code-spans.backslashes-are-literal]
@@ -6547,7 +6541,7 @@ In the examples, the `→` character is used to represent tabs.
 > no emphasis: foo_bar_baz
 > ```
 
-> [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
+> [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
 > The rules given below capture all of these patterns, while allowing
 > for efficient parsing strategies that do not backtrack.
 
@@ -7779,7 +7773,6 @@ In the examples, the `→` character is used to represent tabs.
 > <p>__a<a href="http://foo.bar/?q=__">http://foo.bar/?q=__</a></p>
 > ````````````````````````````````
 
-> [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.extension-wrapper]
 > <div class="extension">
 
 ## Strikethrough (extension)
@@ -7810,7 +7803,6 @@ In the examples, the `→` character is used to represent tabs.
 > <p>new paragraph~~.</p>
 > ````````````````````````````````
 
-> [spec:gfm:syn:inlines.strikethrough-extension.extension-wrapper]
 > </div>
 
 ## Links
@@ -9282,7 +9274,6 @@ In the examples, the `→` character is used to represent tabs.
 > <p>foo@bar.example.com</p>
 > ````````````````````````````````
 
-> [spec:gfm:syn:inlines.autolinks.extension-wrapper]
 > <div class="extension">
 
 ## Autolinks (extension)
@@ -9467,7 +9458,6 @@ In the examples, the `→` character is used to represent tabs.
 > <p>a.b-c_d@a.b_</p>
 > ````````````````````````````````
 
-> [spec:gfm:syn:inlines.autolinks-extension.extension-wrapper]
 > </div>
 
 ## Raw HTML
@@ -9739,7 +9729,6 @@ In the examples, the `→` character is used to represent tabs.
 > <p>&lt;a href=&quot;&quot;&quot;&gt;</p>
 > ````````````````````````````````
 
-> [spec:gfm:def:inlines.raw-html.extension-wrapper]
 > <div class="extension">
 
 ## Disallowed Raw HTML (extension)
@@ -9786,7 +9775,6 @@ In the examples, the `→` character is used to represent tabs.
 > </blockquote>
 > ````````````````````````````````
 
-> [spec:gfm:def:inlines.disallowed-raw-html-extension.extension-wrapper]
 > </div>
 
 ## Hard line breaks
@@ -9995,7 +9983,6 @@ In the examples, the `→` character is used to represent tabs.
 > <p>Multiple     spaces</p>
 > ````````````````````````````````
 
-> [spec:gfm:def:inlines.textual-content.end-tests-marker]
 > <!-- END TESTS -->
 
 # Appendix: A parsing strategy
@@ -10112,7 +10099,6 @@ In the examples, the `→` character is used to represent tabs.
 > -> document
 > ```
 
-> [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-example-line]
 > The first line of our text,
 >
 > ``` markdown
@@ -10132,7 +10118,6 @@ In the examples, the `→` character is used to represent tabs.
 >          "Lorem ipsum dolor"
 > ```
 
-> [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-example-line]
 > The next line,
 >
 > ``` markdown
@@ -10150,7 +10135,6 @@ In the examples, the `→` character is used to represent tabs.
 >          "Lorem ipsum dolor\nsit amet."
 > ```
 
-> [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-example-line]
 > The third line,
 >
 > ``` markdown
@@ -10174,7 +10158,6 @@ In the examples, the `→` character is used to represent tabs.
 >              "Qui *quodsi iracundia*"
 > ```
 
-> [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-example-line]
 > The fourth line,
 >
 > ``` markdown
@@ -10290,7 +10273,6 @@ In the examples, the `→` character is used to represent tabs.
 >   + If we don't, then we remove the opening delimiter from the
 >     delimiter stack and return a literal text node `]`.
 
-> [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case]
 >   + If we do, then
 
 > [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-builds-node-children]
@@ -10301,8 +10283,11 @@ In the examples, the `→` character is used to represent tabs.
 >     * We run *process emphasis* on these inlines, with the `[` opener
 >       as `stack_bottom`.
 
-> [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener]
->     * We remove the opening delimiter.
+> [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener+1]
+>     * We remove the opening delimiter. Once the link or image node has
+>       been emitted, its opening `[` or `![` delimiter is dropped from the
+>       [delimiter stack]; leaving it in place would let a later `]` match
+>       an opener whose text has already been consumed.
 
 > [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-deactivates-earlier-openers]
 >     * If we have a link (and not an image), we also set all
@@ -10380,32 +10365,3 @@ In the examples, the `→` character is used to represent tabs.
 > [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-cleans-up-stack]
 > After we're done, we remove all delimiters above `stack_bottom` from the
 > delimiter stack.
-
-# Markdawn renderer contracts
-
-## Syntax highlighting boundary
-
-Markdawn consumes semantic highlighting spans but does not own the parser
-runtime, language catalog, or application provider policy.
-
-> [spec:gfm:req:markdawn.highlighting.boundary.api]
-> Markdawn MUST expose public, renderer-neutral `SyntaxHighlighter`,
-> `SyntaxSpan`, and `HighlightError` types. The boundary MUST use only
-> Markdawn-owned types and MUST return
-> `Result<Vec<SyntaxSpan>, HighlightError>`.
-
-> [spec:gfm:req:markdawn.highlighting.boundary.span-semantics]
-> `SyntaxSpan` MUST preserve UTF-8 byte offsets, half-open `[start, end)`
-> ranges, raw capture names, overlapping and nested spans, and the
-> query-pattern priority used to resolve otherwise equivalent captures.
-
-> [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
-> A syntax-highlighting failure MUST remain a `HighlightError` at the
-> highlighter boundary. Each renderer MUST catch that error and render the
-> original source as plain code.
-
-> [spec:gfm:req:markdawn.highlighting.boundary.arborium-transition]
-> While Markdawn retains its legacy Arborium feature, Arborium highlighters
-> MUST adapt to `SyntaxHighlighter` without exposing Arborium span or error
-> types to renderers, and the adapter MUST preserve every span field and the
-> provider diagnostic.

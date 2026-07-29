@@ -12,10 +12,10 @@ children (
         priority 0
         implements {
             main (
-                [spec:gfm:req:markdawn.highlighting.boundary.api]
-                [spec:gfm:req:markdawn.highlighting.boundary.span-semantics]
-                [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
-                [spec:gfm:req:markdawn.highlighting.boundary.arborium-transition]
+                [spec:mw:req:highlighting.api]
+                [spec:mw:req:highlighting.span-semantics]
+                [spec:mw:req:highlighting.error-fallback]
+                [spec:mw:req:highlighting.arborium-transition]
             )
         }
         log (
@@ -85,7 +85,6 @@ children (
                 priority 1
                 implements {
                     main (
-                        [spec:gfm:def:leaf-blocks.blank-lines.extension-wrapper]
                         [spec:gfm:def:leaf-blocks.fenced-code-blocks.code-fence-uses-backticks-or-tildes]
                         [spec:gfm:def:leaf-blocks.fenced-code-blocks.opening-fence-may-include-info-string]
                         [spec:gfm:def:leaf-blocks.html-blocks.definition]
@@ -95,7 +94,6 @@ children (
                         [spec:gfm:def:leaf-blocks.setext-headings.multiline-heading-has-four-interpretations]
                         [spec:gfm:def:leaf-blocks.setext-headings.underline-uses-equals-or-dashes]
                         [spec:gfm:def:leaf-blocks.tables-extension.delimiter-row-structure]
-                        [spec:gfm:def:leaf-blocks.tables-extension.extension-wrapper]
                         [spec:gfm:def:leaf-blocks.tables-extension.gfm-enables-table-extension]
                         [spec:gfm:def:leaf-blocks.tables-extension.table-definition]
                         [spec:gfm:def:leaf-blocks.thematic-breaks.structure]
@@ -327,7 +325,6 @@ children (
                         [spec:gfm:def:container-blocks.generated-from-contents-rather-than-parse-recipe]
                         [spec:gfm:def:container-blocks.list-items.bullet-marker-definition]
                         [spec:gfm:def:container-blocks.list-items.marker-definition]
-                        [spec:gfm:def:container-blocks.list-items.motivation.extension-wrapper]
                         [spec:gfm:def:container-blocks.list-items.ordered-marker-definition]
                         [spec:gfm:def:container-blocks.lists-are-meta-containers-for-list-items]
                         [spec:gfm:def:container-blocks.lists.definition]
@@ -340,7 +337,6 @@ children (
                         [spec:gfm:def:container-blocks.lists.tight-list-definition]
                         [spec:gfm:def:container-blocks.syntax-is-defined-recursively]
                         [spec:gfm:def:container-blocks.task-list-items-extension.definition]
-                        [spec:gfm:def:container-blocks.task-list-items-extension.extension-wrapper]
                         [spec:gfm:def:container-blocks.task-list-items-extension.marker-structure]
                         [spec:gfm:req:container-blocks.task-list-items-extension.checkbox-interaction-is-unspecified]
                         [spec:gfm:sem:container-blocks.block-quotes.consecutiveness-rationale]
@@ -365,7 +361,6 @@ children (
                         [spec:gfm:sem:container-blocks.lists.markdown-pl-disallows-this-to-avoid-hard-wrapped-numeral-lists]
                         [spec:gfm:sem:container-blocks.lists.markdown-pl-still-allows-block-quotes-to-interrupt-paragraphs]
                         [spec:gfm:sem:container-blocks.lists.outer-list-may-be-loose-while-inner-list-is-tight]
-                        [spec:gfm:sem:container-blocks.lists.second-reason-is-principle-of-uniformity]
                         [spec:gfm:sem:container-blocks.lists.single-paragraph-list-is-tight]
                         [spec:gfm:sem:container-blocks.lists.starting-with-one-should-prevent-most-spurious-captures]
                         [spec:gfm:sem:container-blocks.task-list-items-extension.gfm-enables-task-list-extension]
@@ -466,12 +461,12 @@ children (
                         [spec:gfm:thm:container-blocks.block-quotes.blank-line-required-before-following-paragraph]
                         [spec:gfm:thm:container-blocks.block-quotes.indented-code-needs-five-spaces-after-marker]
                         [spec:gfm:thm:container-blocks.block-quotes.nested-block-quotes-may-omit-continuation-markers]
-                        [spec:gfm:thm:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
-                        [spec:gfm:thm:container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
                         [spec:gfm:thm:container-blocks.list-items.sublists-follow-general-indentation-rules]
-                        [spec:gfm:thm:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
                         [spec:gfm:thm:container-blocks.lists.uniformity-preserves-nested-list-meaning]
                         [spec:gfm:thm:container-blocks.lists.uniformity-supports-list-interruption]
+                        [spec:gfm:sem:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
+                        [spec:gfm:def:container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
+                        [spec:gfm:sem:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
                     )
                 }
                 deps (parsing.preliminaries parsing.document-model)
@@ -499,7 +494,6 @@ children (
                         [spec:gfm:def:inlines.code-spans.backtick-string-definition]
                         [spec:gfm:def:inlines.code-spans.definition]
                         [spec:gfm:def:inlines.disallowed-raw-html-extension.disallowed-tags]
-                        [spec:gfm:def:inlines.disallowed-raw-html-extension.extension-wrapper]
                         [spec:gfm:def:inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
                         [spec:gfm:def:inlines.emphasis-and-strong-emphasis.delimiter-run-definition]
                         [spec:gfm:def:inlines.emphasis-and-strong-emphasis.delimiter-run-example]
@@ -539,7 +533,6 @@ children (
                         [spec:gfm:def:inlines.raw-html.closing-tag-definition]
                         [spec:gfm:def:inlines.raw-html.declaration-definition]
                         [spec:gfm:def:inlines.raw-html.double-quoted-attribute-value-definition]
-                        [spec:gfm:def:inlines.raw-html.extension-wrapper]
                         [spec:gfm:def:inlines.raw-html.html-comment-definition]
                         [spec:gfm:def:inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html]
                         [spec:gfm:def:inlines.raw-html.html-tag-definition]
@@ -550,7 +543,6 @@ children (
                         [spec:gfm:def:inlines.soft-line-breaks.regular-line-break-produces-softbreak]
                         [spec:gfm:def:inlines.strikethrough-extension.gfm-enables-strikethrough-extension]
                         [spec:gfm:def:inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
-                        [spec:gfm:def:inlines.textual-content.end-tests-marker]
                         [spec:gfm:req:inlines.code-spans.browser-rendering-may-collapse-spaces]
                         [spec:gfm:req:inlines.entity-and-numeric-character-references.parsers-need-not-preserve-source-form]
                         [spec:gfm:req:inlines.images.reference-image-labels-are-case-insensitive]
@@ -563,7 +555,6 @@ children (
                         [spec:gfm:sem:inlines.autolinks-extension.plus-is-allowed-before-but-not-after-at-sign]
                         [spec:gfm:sem:inlines.backslash-escapes.escaped-characters-lose-special-meaning]
                         [spec:gfm:sem:inlines.code-spans.all-space-content-is-not-trimmed]
-                        [spec:gfm:sem:inlines.code-spans.code-white-space-pre-wrap]
                         [spec:gfm:sem:inlines.code-spans.edge-space-trimming-allows-literal-backticks-at-edges]
                         [spec:gfm:sem:inlines.code-spans.edge-space-trimming-requires-space-on-both-sides]
                         [spec:gfm:sem:inlines.code-spans.interior-spaces-are-preserved]
@@ -612,7 +603,6 @@ children (
                         [spec:gfm:syn:inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
                         [spec:gfm:syn:inlines.autolinks-extension.extended-url-autolink-definition]
                         [spec:gfm:syn:inlines.autolinks-extension.extended-www-autolink-definition]
-                        [spec:gfm:syn:inlines.autolinks-extension.extension-wrapper]
                         [spec:gfm:syn:inlines.autolinks-extension.left-angle-bracket-ends-autolink]
                         [spec:gfm:syn:inlines.autolinks-extension.trailing-parenthesis-check-applies-only-at-link-end]
                         [spec:gfm:syn:inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
@@ -623,7 +613,6 @@ children (
                         [spec:gfm:syn:inlines.autolinks.backslash-escapes-do-not-work-inside-email-autolinks]
                         [spec:gfm:syn:inlines.autolinks.definition]
                         [spec:gfm:syn:inlines.autolinks.email-autolink-definition]
-                        [spec:gfm:syn:inlines.autolinks.extension-wrapper]
                         [spec:gfm:syn:inlines.autolinks.invalid-autolink-example]
                         [spec:gfm:syn:inlines.autolinks.spec-accepts-some-absolute-uris-that-are-not-valid-uris]
                         [spec:gfm:syn:inlines.backslash-escapes.any-ascii-punctuation-may-be-escaped]
@@ -674,7 +663,6 @@ children (
                         [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.emphasis-requires-matching-delimiters]
                         [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.empty-asterisk-emphasis-is-not-allowed]
                         [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.empty-underscore-emphasis-is-not-allowed]
-                        [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.extension-wrapper]
                         [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-double-underscore-closing-is-forbidden]
                         [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-allowed]
                         [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.intraword-emphasis-is-disallowed]
@@ -788,12 +776,11 @@ children (
                         [spec:gfm:syn:inlines.raw-html.simple-open-tag-examples]
                         [spec:gfm:syn:inlines.raw-html.tag-grammar-follows]
                         [spec:gfm:syn:inlines.raw-html.tag-name-definition]
-                        [spec:gfm:syn:inlines.strikethrough-extension.extension-wrapper]
                         [spec:gfm:syn:inlines.strikethrough-extension.new-paragraph-ends-strikethrough-parse]
                         [spec:gfm:syn:inlines.textual-content.uninterpreted-characters-are-parsed-as-text]
                         [spec:gfm:thm:inlines.code-spans.backslash-escapes-are-never-needed]
                         [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.double-asterisk-closing-cannot-fall-back-to-single-asterisk-rule]
-                        [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
+                        [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
                     )
                 }
                 deps (parsing.preliminaries parsing.document-model)
@@ -811,19 +798,15 @@ children (
                         [spec:gfm:def:appendix-a-parsing-strategy.reference-implementations-use-this-parsing-strategy]
                         [spec:gfm:sem:appendix-a-parsing-strategy.overview.parsing-has-two-phases]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.each-line-may-close-open-or-append]
-                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-example-line]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-line-opens-block-quote-and-paragraph]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.four-line-example-shows-tree-evolution]
-                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-example-line]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-line-opens-second-list-item]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.initial-tree-is-just-document]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.lines-can-be-discarded-after-incorporation]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.phase-1-line-processing-procedure]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.reference-definitions-are-detected-at-paragraph-close]
-                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-example-line]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-line-is-lazy-continuation]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.setext-underlines-convert-paragraphs]
-                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-example-line]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-line-closes-paragraph-and-opens-list]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.closing-bracket-triggers-link-search]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.end-of-input-triggers-emphasis-processing]
@@ -833,7 +816,6 @@ children (
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-runs-emphasis-processing]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-scan-backward]
-                        [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-advances]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-chooses-node-kind]
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.process-emphasis-cleans-up-stack]
@@ -1007,12 +989,12 @@ children (
                         [spec:mw:req:ansi.to-html.sgr-params]
                         [spec:mw:req:ansi.to-html.span-discipline]
                         [spec:mw:req:ansi.to-html.text-and-controls]
-                        [spec:mw:sem:ansi.adapter.color-depth-inert]
                         [spec:mw:sem:ansi.style.palette-resolution]
                         [spec:mw:sem:ansi.to-html.sgr-accumulation]
-                        [spec:mw:syn:ansi.annotated.labels]
-                        [spec:mw:syn:ansi.term.ansi-encoding]
                         [spec:mw:req:ansi.to-html.osc8+1]
+                        [spec:mw:req:ansi.adapter.color-depth]
+                        [spec:mw:sem:ansi.annotated.labels]
+                        [spec:mw:sem:ansi.term.ansi-encoding]
                     )
                 }
                 deps (core)
@@ -1191,12 +1173,27 @@ children (
                 id defects.ffi-string-free-cross-heap
                 title "Per-module mw_string_free routing is unenforced across wasm heaps"
                 priority 1
+                sealed true
                 log (
                     {
                         at 2026-07-29T18:00:18.55352Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Investigated; no runtime check is possible and none was invented. Inside a wasm module a pointer is just an offset into that module's linear memory, so an offset minted by another module is indistinguishable from a native one. Two candidate defences were considered and rejected as weaker than they look: an address registry (offsets collide across modules with high probability, turning a cross-heap free into a double-free of the checking module's own live allocation) and a magic-header canary (needs hand-rolled alloc/dealloc in four crates and breaks the documented CString::into_raw contract). What landed is documentation only — the rewritten rule plus per-module Safety docs stating that mw_string_free validates nothing beyond null, and a comment at the actual enforcement point in web/index.template.html. The pairing is correct today by encapsulation rather than enforcement: loadRenderer's closure allocates, reads and frees resultPtr against its own module and never hands the pointer out. Nothing stops a future caller, and since every module exports the symbol under the same name a crossed call would link and run rather than fail. Two genuine fixes exist, both changing the exported C ABI and so out of this node's scope: unique per-module free symbols (mw_render_graphviz_string_free etc.), making an accidental cross-call a missing-export error; or module-owned buffers, removing host ownership entirely. Either requires bumping ffi.render-shim.lazy-module, editing three build.rs export lists and the frontend, and rebuilding the emscripten artifacts. Node stays open pending that decision."
+                    }
+
+                    {
+                        at 2026-07-29T19:06:00.095011Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Resolved by making the free symbol engine-qualified per lazily-loaded module: mw_render_graphviz_string_free, mw_render_pikchr_string_free, mw_render_typst_string_free. A plugin-to-plugin or core-pointer-to-plugin crossing is now an unresolvable symbol — an emscripten ccall resolution throw — rather than a silent cross-heap free. The two primary modules (markdawn-wasm-emscripten and the markdawn-swift staticlib) deliberately keep the unqualified mw_string_free: the Swift side has a single allocator and no second heap, and it is published ABI declared in include/markdawn.h, the three xcframework headers and Markdawn.swift, so renaming would be churn with no safety delta. The asymmetry is now itself the signal — unprefixed means core heap, mw_render_<engine>_ prefixed means that plugin's heap. One crossing remains expressible and is still held by encapsulation only: handing a render module's pointer to the core module's mw_string_free, which cannot happen today because a render module's raw pointer never leaves loadRenderer's closure. DEPLOYMENT: the emscripten artifacts are gitignored build outputs and could not be rebuilt in this environment. web/markdawn_render_{graphviz,pikchr,typst}.js and their .wasm still export the old mw_string_free, and web/index.html must be regenerated from index.template.html. Until that rebuild happens the checked-in template names symbols the stale artifacts do not export, so diagram rendering throws at the free call — the intended failure mode, but the demo page is broken until the artifacts are regenerated."
+                    }
+
+                    {
+                        at 2026-07-29T19:06:03.76415Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -1359,18 +1356,45 @@ children (
                 id defects.spec-junk-rules
                 title "12 gfm rules have content-free bodies from the spec.txt conversion"
                 priority 2
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T19:15:46.516141Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id defects.highlighting-rules-misfiled
                 title "markdawn.highlighting.* sits in the gfm grammar spec, not mw"
                 priority 2
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T19:15:56.342543Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id defects.core-spec-padding
                 title "core def-layer rules restate declarations without adding constraint"
                 priority 2
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T19:16:04.836944Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
@@ -1392,6 +1416,15 @@ children (
                 id defects.verb-misassignment
                 title "Several gfm thm rules derive nothing; assorted mw verb mismatches"
                 priority 2
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T19:16:00.938296Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
@@ -1442,12 +1475,20 @@ children (
                 id defects.uikit-image-allowlist-bypass
                 title "UIKit image path never applies the URL allow-list"
                 priority 1
+                sealed true
                 log (
                     {
                         at 2026-07-29T17:57:55.093342Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "`try_load_image` (src/adapter/uikit/render.rs:799) never calls `is_safe_image_url`, while every other image-emitting adapter does — vdom.rs:852, dioxus.rs:760, iced/render.rs:1260. Consequences: every `data:` media type is decoded rather than only `data:image/*`, so the narrowing documented at url_safety.rs:71-91 does not apply here; the SVG branch selects on `parsed.mime.contains(\"svg\")`, a substring test over the whole header including parameters, so `data:text/html;charset=svg,<svg…>` routes attacker bytes into the private CoreSVG parser under a non-image media type; and there is no control-character rejection, which `is_safe_url` performs specifically to stop `jav\\tascript:` smuggling. Network fetch is gated by a literal http:// / https:// prefix test, so smuggling cannot reach NSURLSession today, but that is incidental rather than the allow-list. Current behaviour is documented as-is in `uikit.media.image-source`; wiring the allow-list in is a behaviour change, which is this node."
+                    }
+
+                    {
+                        at 2026-07-29T19:12:26.785785Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -1456,12 +1497,34 @@ children (
                 id defects.uikit-svg-sanitiser-bypass
                 title "UIKit SVG rasterisation bypasses the sanitiser"
                 priority 1
+                sealed true
                 log (
                     {
                         at 2026-07-29T17:57:58.599439Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Nothing under src/adapter/uikit/ references `svg_sanitize`. Three paths hand attacker-influenced bytes straight to `CGSVGDocumentCreateFromData`, a private Apple API resolved via dlsym: raw markdown HTML chunks that sniff as SVG (`try_render_svg_html`, block and inline), `data:` URIs whose header contains \"svg\", and remote fetch responses that sniff as SVG (`image_loader::handle_completion`). The last is sharpest — payload is whatever an arbitrary http(s) server returns, MAX_SVG_BYTES (5 MB) is not applied on that path, and the only bound is MAX_SVG_DIMENSION (4096 pt), checked after CoreSVG has already parsed. Caveat for weighing severity: CoreSVG rasterises to a UIImage rather than into a live DOM, so script execution — the sanitiser's primary target — is not obviously reachable. Residual exposure is unsanitised unbounded input into an undocumented private parser, plus whatever external-resource fetching CoreSVG performs for `<image href>` / `<use href>`, which the sanitiser's URL allow-list normally gates. Current behaviour documented as-is in `uikit.media.svg-raster`."
+                    }
+
+                    {
+                        at 2026-07-29T19:12:29.708089Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id defects.uikit-diagram-engine-output-unsanitised
+                title "UIKit diagram views pass raw engine SVG to the rasteriser"
+                priority 1
+                log (
+                    {
+                        at 2026-07-29T19:12:16.986668Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found while fixing defects.uikit-svg-sanitiser-bypass; same class, separate site. views/graphviz.rs:23, views/pikchr.rs:23 and views/typst.rs:23 call the engines directly (markdawn_graphviz::render_dot_to_svg, crate::pikchr_render::render, crate::typst::render) and hand the output straight to render_svg — no sanitiser, no MAX_SVG_BYTES. Every other adapter funnels engine output through lib.rs::finalize_diagram_svg, which sanitises and outlines text. Engine input is attacker-controlled markdown, so the exposure is the same class as the three paths already fixed. Left alone deliberately: it is governed by uikit.diagram.view-factory, which that task was not authorised to bump, and routing through render_pikchr_to_svg / render_graphviz_to_svg / render_typst_to_svg would additionally apply text-to-path outlining — a visual change that should be a deliberate decision rather than a side effect of a security fix. math.rs:56 also uses raw render_svg but on mathml-core output from our own renderer, which is not attacker-shaped in the same way. Decide whether these views should use the shared finalize path (accepting the outlining change) or gain a sanitise-only variant."
                     }
                 )
             }
@@ -1480,7 +1543,6 @@ children (
                 [spec:mw:def:core.ext.match-types]
                 [spec:mw:def:core.ext.trait]
                 [spec:mw:def:core.html-filter.modes]
-                [spec:mw:def:core.node.alert-kinds]
                 [spec:mw:def:core.node.custom-payload]
                 [spec:mw:def:core.node.footnote-triple]
                 [spec:mw:def:core.node.generic-tree]

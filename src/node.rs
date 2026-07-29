@@ -22,7 +22,7 @@ pub enum TableAlignment {
     Right,
 }
 
-// [spec:mw:def:core.node.alert-kinds]
+// [spec:mw:req:core.node.alert-title-fallback+1]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlertKind {
     Note,

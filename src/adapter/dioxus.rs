@@ -346,7 +346,7 @@ impl<R> Renderer<R> {
         }
     }
 
-    // [spec:mw:req:core.node.alert-title-fallback]
+    // [spec:mw:req:core.node.alert-title-fallback+1]
     fn render_alert<Ext>(
         &self,
         kind: AlertKind,
@@ -728,7 +728,7 @@ impl<R> Renderer<R> {
         if let Some(lang) = info_lang.filter(|s| !s.is_empty()) {
             let mut borrow = self.highlighter.borrow_mut();
             if let Some(hl) = borrow.as_mut() {
-                // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
+                // [spec:mw:req:highlighting.error-fallback]
                 if let Ok(spans) = hl.highlight(lang, literal) {
                     let html = crate::highlight::spans_to_html(literal, spans);
                     let class = format!("language-{lang}");

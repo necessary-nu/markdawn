@@ -127,11 +127,13 @@ function highlightPreview() {
 // Lazy-load + render diagram blocks. Each renderer is its own
 // emscripten module fetched on first encounter, then cached for the
 // life of the page.
+// `free` is the module's own engine-qualified symbol, not the core module's
+// `mw_string_free` — see the note in loadRenderer.
 const diagramRenderers = {
-  dot:      { js: "./markdawn_render_graphviz.js", fn: "mw_render_dot" },
-  graphviz: { js: "./markdawn_render_graphviz.js", fn: "mw_render_dot" },
-  typst:    { js: "./markdawn_render_typst.js",    fn: "mw_render_typst" },
-  pikchr:   { js: "./markdawn_render_pikchr.js",   fn: "mw_render_pikchr" },
+  dot:      { js: "./markdawn_render_graphviz.js", fn: "mw_render_dot",    free: "mw_render_graphviz_string_free" },
+  graphviz: { js: "./markdawn_render_graphviz.js", fn: "mw_render_dot",    free: "mw_render_graphviz_string_free" },
+  typst:    { js: "./markdawn_render_typst.js",    fn: "mw_render_typst",  free: "mw_render_typst_string_free" },
+  pikchr:   { js: "./markdawn_render_pikchr.js",   fn: "mw_render_pikchr", free: "mw_render_pikchr_string_free" },
 };
 const moduleCache = {};
 
@@ -140,11 +142,14 @@ async function loadRenderer(spec) {
     moduleCache[spec.js] = (async () => {
       const mod = await import(spec.js);
       const M = await mod.default();
-      // Every module exports `mw_string_free` under that one name over its own
-      // linear memory, and neither side can detect a pointer from the wrong
-      // heap. Nothing but this closure keeps them paired: `resultPtr` is
-      // allocated, read and freed against `M` here and never handed out, so
-      // callers only ever see the decoded string. Keep it that way.
+      // Each module allocates over its own linear memory and neither side can
+      // detect a pointer from the wrong heap, so the free symbol is qualified
+      // by engine: `spec.free` names an export only `M` carries, and aiming it
+      // at any other module throws on symbol resolution instead of corrupting
+      // that module's heap. `resultPtr` is still allocated, read and freed
+      // against `M` inside this closure and never handed out, which is what
+      // keeps the core module's unqualified `mw_string_free` out of reach of a
+      // render module's pointer. Keep it that way.
       const render = (source) => {
         const bytes = new TextEncoder().encode(source);
         const ptr = M._malloc(bytes.length);
@@ -155,7 +160,7 @@ async function loadRenderer(spec) {
         try {
           return M.UTF8ToString(resultPtr);
         } finally {
-          M.ccall("mw_string_free", null, ["number"], [resultPtr]);
+          M.ccall(spec.free, null, ["number"], [resultPtr]);
         }
       };
       return { render };

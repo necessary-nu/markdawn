@@ -13,7 +13,7 @@ use arborium::advanced::HighlightSpans;
 ///
 /// Ranges are half-open (`start..end`). Spans may overlap or nest, and
 /// `pattern_index` retains query priority when equivalent ranges compete.
-// [spec:gfm:req:markdawn.highlighting.boundary.span-semantics]
+// [spec:mw:req:highlighting.span-semantics]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyntaxSpan {
     /// Inclusive UTF-8 byte offset.
@@ -59,7 +59,7 @@ impl fmt::Display for HighlightError {
 impl std::error::Error for HighlightError {}
 
 /// Produces renderer-neutral semantic spans for source code.
-// [spec:gfm:req:markdawn.highlighting.boundary.api]
+// [spec:mw:req:highlighting.api]
 pub trait SyntaxHighlighter {
     /// Highlight `source` using the supplied language hint.
     fn highlight(
@@ -73,7 +73,7 @@ pub trait SyntaxHighlighter {
 ///
 /// The blanket implementation intentionally terminates at Markdawn-owned
 /// types. Renderers never receive Arborium spans or errors.
-// [spec:gfm:req:markdawn.highlighting.boundary.arborium-transition]
+// [spec:mw:req:highlighting.arborium-transition]
 #[cfg(feature = "highlight")]
 impl<H> SyntaxHighlighter for H
 where
@@ -154,9 +154,9 @@ mod tests {
         }
     }
 
-    // [spec:gfm:req:markdawn.highlighting.boundary.api/test]
-    // [spec:gfm:req:markdawn.highlighting.boundary.span-semantics/test]
-    // [spec:gfm:req:markdawn.highlighting.boundary.arborium-transition/test]
+    // [spec:mw:req:highlighting.api/test]
+    // [spec:mw:req:highlighting.span-semantics/test]
+    // [spec:mw:req:highlighting.arborium-transition/test]
     #[test]
     fn arborium_adapter_preserves_neutral_span_contract() {
         let expected = vec![
@@ -182,8 +182,8 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback/test]
-    // [spec:gfm:req:markdawn.highlighting.boundary.arborium-transition/test]
+    // [spec:mw:req:highlighting.error-fallback/test]
+    // [spec:mw:req:highlighting.arborium-transition/test]
     #[test]
     fn arborium_adapter_preserves_provider_diagnostic() {
         let mut highlighter = StubArborium {
@@ -195,7 +195,7 @@ mod tests {
         assert_eq!(error.message(), "query compilation failed");
     }
 
-    // [spec:gfm:req:markdawn.highlighting.boundary.span-semantics/test]
+    // [spec:mw:req:highlighting.span-semantics/test]
     #[test]
     fn html_transition_respects_byte_ranges_and_pattern_priority() {
         let spans = vec![

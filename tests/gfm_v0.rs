@@ -572,7 +572,6 @@ fn gfm_html_block_passthrough() {
 }
 
 // [spec:gfm:def:inlines.strikethrough-extension.gfm-enables-strikethrough-extension/test]
-// [spec:gfm:syn:inlines.strikethrough-extension.extension-wrapper/test]
 // [spec:gfm:def:inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters/test]
 #[test]
 fn gfm_strikethrough() {
@@ -994,8 +993,7 @@ fn gfm_code_span_interior_spaces_are_preserved() {
     assert_eq!(html, "<p><code>foo   bar  baz</code></p>\n");
 }
 
-// [spec:gfm:req:inlines.code-spans.browser-rendering-may-collapse-spaces/test]
-// [spec:gfm:sem:inlines.code-spans.code-white-space-pre-wrap/test]
+// [spec:gfm:req:inlines.code-spans.browser-rendering-may-collapse-spaces+1/test]
 #[test]
 fn gfm_code_span_browser_rendering_note() {
     // These rules are advisory notes about CSS rendering (code{white-space: pre-wrap;}).
@@ -1278,10 +1276,8 @@ fn gfm_autolink_trailing_parens() {
     );
 }
 
-// [spec:gfm:def:inlines.raw-html.extension-wrapper/test]
 // [spec:gfm:def:inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension/test]
 // [spec:gfm:sem:inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing/test]
-// [spec:gfm:def:inlines.disallowed-raw-html-extension.extension-wrapper/test]
 // [spec:gfm:def:inlines.disallowed-raw-html-extension.disallowed-tags/test]
 // [spec:gfm:sem:inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket/test]
 // [spec:gfm:sem:inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched/test]
@@ -2066,7 +2062,6 @@ fn gfm_paragraph_trailing_spaces_stripped() {
 // ---------------------------------------------------------------------------
 
 // [spec:gfm:sem:leaf-blocks.blank-lines.blank-lines-definition/test]
-// [spec:gfm:def:leaf-blocks.blank-lines.extension-wrapper/test]
 #[test]
 fn gfm_blank_lines_between_blocks() {
     let html = render_html(&parse_final_nodes("  \n\naaa\n  \n\n# aaa\n\n  \n"));
@@ -2798,7 +2793,6 @@ fn gfm_link_ref_def_multiline_label_invalid() {
 // [spec:gfm:def:leaf-blocks.tables-extension.delimiter-row-structure/test]
 // [spec:gfm:syn:leaf-blocks.tables-extension.header-and-delimiter-row-must-have-matching-cell-count/test]
 // [spec:gfm:def:leaf-blocks.tables-extension.gfm-enables-table-extension/test]
-// [spec:gfm:def:leaf-blocks.tables-extension.extension-wrapper/test]
 #[test]
 fn gfm_table_delimiter_row_structure() {
     let html = render_html(&parse_final_nodes(
@@ -3416,9 +3410,8 @@ fn gfm_emphasis_within_emphasis_underscore() {
 // [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-markdown-description/test]
 // [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-markdown-description-quoted/test]
 // [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-rules-leave-nesting-underdetermined/test]
-// [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking/test]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking/test]
 // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.ambiguity-resolution-principles/test]
-// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.extension-wrapper/test]
 // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.literal-asterisk-cannot-edge-asterisk-emphasis/test]
 // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.literal-underscore-cannot-edge-underscore-delimiters/test]
 #[test]
@@ -4343,7 +4336,7 @@ fn gfm_list_item_four_space_indent_is_code() {
     );
 }
 
-// [spec:gfm:thm:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized/test]
+// [spec:gfm:sem:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized/test]
 #[test]
 fn gfm_list_item_leading_indent_normalized() {
     let html = render_html(&parse_final_nodes("  - foo\n"));
@@ -4618,7 +4611,7 @@ fn gfm_list_four_space_marker_is_code() {
 }
 
 // [spec:gfm:syn:container-blocks.lists.nested-example-is-list-item-with-sublist/test]
-// [spec:gfm:thm:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way/test]
+// [spec:gfm:sem:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way/test]
 #[test]
 fn gfm_list_nested_sublist_example() {
     let html = render_html(&parse_final_nodes("- a\n  - b\n    - c\n"));
@@ -4646,7 +4639,6 @@ fn gfm_list_start_number() {
 }
 
 // [spec:gfm:def:container-blocks.lists.principle-of-uniformity-definition/test]
-// [spec:gfm:sem:container-blocks.lists.second-reason-is-principle-of-uniformity/test]
 // [spec:gfm:thm:container-blocks.lists.uniformity-preserves-nested-list-meaning/test]
 // [spec:gfm:thm:container-blocks.lists.uniformity-supports-list-interruption/test]
 #[test]
@@ -4673,7 +4665,6 @@ fn gfm_task_list_nested() {
 }
 
 // [spec:gfm:req:container-blocks.task-list-items-extension.checkbox-interaction-is-unspecified/test]
-// [spec:gfm:def:container-blocks.task-list-items-extension.extension-wrapper/test]
 #[test]
 fn gfm_task_list_checkbox_interaction_and_wrapper() {
     // The spec says checkbox interaction is unspecified; we just verify the HTML output
@@ -4691,7 +4682,7 @@ fn gfm_task_list_checkbox_interaction_and_wrapper() {
 // ---------------------------------------------------------------------------
 
 // [spec:gfm:syn:container-blocks.list-items.motivation.original-markdown-spec-quoted/test]
-// [spec:gfm:thm:container-blocks.list-items.motivation.original-rule-implies-four-space-rule/test]
+// [spec:gfm:def:container-blocks.list-items.motivation.original-rule-implies-four-space-rule/test]
 // [spec:gfm:sem:container-blocks.list-items.motivation.four-space-rule-is-arbitrary/test]
 // [spec:gfm:syn:container-blocks.list-items.motivation.preferred-parse-is-single-list/test]
 #[test]
@@ -4797,16 +4788,6 @@ fn gfm_motivation_two_space_inside_block_quote() {
         html,
         "<blockquote>\n<ul>\n<li>foo\nbar</li>\n</ul>\n</blockquote>\n"
     );
-}
-
-// [spec:gfm:def:container-blocks.list-items.motivation.extension-wrapper/test]
-#[test]
-fn gfm_motivation_extension_wrapper() {
-    // The motivation section explains the rationale for the list item rules
-    // This test verifies the resulting behavior
-    let html = render_html(&parse_final_nodes("- foo\n  - bar\n    - baz\n"));
-    assert!(html.contains("<ul>"));
-    assert!(html.matches("<li>").count() == 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -5053,15 +5034,6 @@ fn gfm_textual_content_internal_spaces_preserved() {
     assert_eq!(html, "<p>Multiple     spaces</p>\n");
 }
 
-// [spec:gfm:def:inlines.textual-content.end-tests-marker/test]
-#[test]
-fn gfm_textual_content_end_tests_marker() {
-    // The end-tests marker signals the end of the spec's example tests.
-    // Verify the parser handles a simple document without issue.
-    let html = render_html(&parse_final_nodes("done\n"));
-    assert_eq!(html, "<p>done</p>\n");
-}
-
 // ---------------------------------------------------------------------------
 // Appendix A: Overview
 // ---------------------------------------------------------------------------
@@ -5098,13 +5070,9 @@ fn gfm_appendix_parsing_two_phases() {
 
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.four-line-example-shows-tree-evolution/test]
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.initial-tree-is-just-document/test]
-// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-example-line/test]
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-line-opens-block-quote-and-paragraph/test]
-// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-example-line/test]
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-line-is-lazy-continuation/test]
-// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-example-line/test]
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-line-closes-paragraph-and-opens-list/test]
-// [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-example-line/test]
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-line-opens-second-list-item/test]
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.each-line-may-close-open-or-append/test]
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.phase-1-line-processing-procedure/test]
@@ -5261,9 +5229,8 @@ fn gfm_appendix_emphasis_algorithm_openers_bottom_tracking() {
 
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.closing-bracket-triggers-link-search/test]
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-scan-backward/test]
-// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case/test]
 // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-builds-node-children/test]
-// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener/test]
+// [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener+1/test]
 #[test]
 fn gfm_appendix_link_algorithm_success() {
     // `]` triggers a backward scan for `[`, then `(` triggers inline link parsing.
@@ -5303,7 +5270,6 @@ fn gfm_appendix_link_algorithm_failure_and_deactivation() {
 // Standard autolinks (angle-bracket delimited)
 // ---------------------------------------------------------------------------
 
-// [spec:gfm:syn:inlines.autolinks.extension-wrapper/test]
 // [spec:gfm:def:inlines.autolinks.uri-autolink-definition/test]
 // [spec:gfm:def:inlines.autolinks.absolute-uri-definition/test]
 // [spec:gfm:def:inlines.autolinks.scheme-definition/test]
@@ -5433,7 +5399,6 @@ fn gfm_invalid_autolinks() {
 // Extended autolinks (GFM extension) - additional rules
 // ---------------------------------------------------------------------------
 
-// [spec:gfm:syn:inlines.autolinks-extension.extension-wrapper/test]
 // [spec:gfm:def:inlines.autolinks-extension.extended-email-autolink-definition/test]
 // [spec:gfm:def:inlines.autolinks-extension.extended-email-autolink-rules/test]
 // [spec:gfm:syn:inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme/test]

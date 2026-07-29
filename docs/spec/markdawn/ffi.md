@@ -39,29 +39,39 @@ per entry point.
 > pointer value is either a live handle or undefined behaviour. A handle MUST
 > NOT be used after its destructor returns.
 
-> [spec:mw:req:ffi.ownership.string-free+1]
+> [spec:mw:req:ffi.ownership.string-free+2]
 > Every `*mut c_char` returned across the C ABI is a `CString::into_raw`
 > allocation whose ownership transfers to the caller, and the caller MUST
-> return it to `mw_string_free` — never to `free`, to `Module._free`, or to any
-> other deallocator. Exactly four functions return such a pointer:
-> `mw_state_render`, `mw_render_dot`, `mw_render_typst` and `mw_render_pikchr`.
-> `mw_string_free` treats null as a no-op, so the null that a failing render
-> returns may be passed through unchecked. Because each lazily-loaded
-> emscripten module links its own allocator over its own linear memory, a
-> pointer MUST be released by the `mw_string_free` exported by the same module
-> that produced it; the copies exported by the core module and by each
-> `markdawn-render-*` module are not interchangeable, and crossing them frees
-> an address in the wrong heap. That pairing is a caller obligation the callee
-> cannot check. Inside a wasm module a pointer is an offset into that module's
-> own linear memory, so an offset minted elsewhere is indistinguishable from a
-> native one; `mw_string_free` validates nothing beyond null, and no provenance
-> test it could perform would be sound. The invariant is held one level up, in
-> the frontend: the raw pointer never leaves the per-module closure in
-> `crates/markdawn-wasm-emscripten/web/index.template.html` that allocates,
-> reads and releases it, so no caller-side code is ever in a position to pair a
-> pointer with the wrong module. That is encapsulation, not enforcement —
-> every module exports the function under the *same* name, so a future caller
-> that did cross them would link and run rather than fail.
+> return it to the deallocator belonging to the module that minted it — never
+> to `free`, to `Module._free`, or to any other deallocator. Exactly four
+> functions return such a pointer, and each has exactly one matching free:
+> `mw_state_render`/`mw_string_free` on the core module (and on the Swift
+> staticlib, which is the same ABI in a process that loads only one of them),
+> `mw_render_dot`/`mw_render_graphviz_string_free`,
+> `mw_render_typst`/`mw_render_typst_string_free`, and
+> `mw_render_pikchr`/`mw_render_pikchr_string_free` on the three lazily-loaded
+> `markdawn-render-*` modules. Every one of those frees treats null as a no-op,
+> so the null a failing render returns may be passed through unchecked.
+>
+> The pairing matters because each emscripten module links its own allocator
+> over its own linear memory. A pointer is an offset into the heap of the module
+> that minted it, an offset minted elsewhere is indistinguishable from a native
+> one, and no provenance test the callee could perform would be sound — these
+> functions validate nothing beyond null, and releasing an offset in the wrong
+> heap corrupts it. Enforcement therefore lives in the symbol names rather than
+> in a runtime check: each render module exports its free under a name unique to
+> that module, so naming the wrong module's free is a reference to a symbol that
+> module does not export, and the call fails to resolve instead of freeing an
+> unrelated live allocation. The core module deliberately keeps the unprefixed
+> `mw_string_free`: it is the primary ABI, shared verbatim with the Swift
+> staticlib and its published header, and the absence of an engine prefix is
+> what identifies the core heap. One crossing consequently stays expressible —
+> handing a render module's pointer to the core module's `mw_string_free` — and
+> that one is still held by encapsulation: in
+> `crates/markdawn-wasm-emscripten/web/index.template.html` a render module's
+> raw pointer never leaves the per-module closure that allocates, reads and
+> releases it, so no caller-side code is ever in a position to pair one with the
+> core module.
 
 > [spec:mw:req:ffi.ownership.borrowed-input]
 > Pointers passed *into* the ABI are borrowed for the duration of the call and
@@ -203,22 +213,27 @@ per entry point.
 > `crates/markdawn-swift/generate-plugins.sh` and are not tracked in the
 > repository.
 
-> [spec:mw:sem:ffi.render-shim.lazy-module]
+> [spec:mw:sem:ffi.render-shim.lazy-module+1]
 > Diagram engines are not bundled into the core wasm module. Each is built as
-> its own emscripten module from a `markdawn-render-<engine>` crate exporting
-> `mw_render_<engine>(ptr: *const u8, len: usize) -> *mut c_char` alongside
-> `mw_string_free`, `malloc` and `free`, under a distinct
-> `EXPORT_NAME=createMarkdawn<Engine>` so several modules can coexist on one
-> page. The core render leaves a diagram block as
-> `<pre><code class="language-<lang>">`; the frontend scans each freshly
-> rendered preview for those blocks, marks every match before starting async
-> work so a re-entrant render pass cannot double-process it, `import()`s the
-> matching module on first encounter, and caches the instantiated module for
+> its own emscripten module from a `markdawn-render-<engine>` crate exporting a
+> render entry point of shape `(ptr: *const u8, len: usize) -> *mut c_char`
+> (`mw_render_dot` for graphviz, `mw_render_typst`, `mw_render_pikchr`)
+> alongside `mw_render_<engine>_string_free`, `malloc` and `free`, under a
+> distinct `EXPORT_NAME=createMarkdawn<Engine>` so several modules can coexist
+> on one page. The free is qualified by engine rather than shared: coexisting
+> modules do not share a heap, and a name no other module exports makes a
+> crossed free an unresolved symbol instead of a silent cross-heap free — see
+> `[spec:mw:req:ffi.ownership.string-free]`. The core render leaves a diagram
+> block as `<pre><code class="language-<lang>">`; the frontend scans each
+> freshly rendered preview for those blocks, marks every match before starting
+> async work so a re-entrant render pass cannot double-process it, `import()`s
+> the matching module on first encounter, and caches the instantiated module for
 > the life of the page. To render, the host copies the source into *that*
-> module's heap with `_malloc` plus `HEAPU8.set`, calls `mw_render_<engine>`,
+> module's heap with `_malloc` plus `HEAPU8.set`, calls the render entry point,
 > frees the input, and — only when the result is non-null — reads it with
-> `UTF8ToString` and releases it with the same module's `mw_string_free`. A
-> null result means the render failed and the caller leaves the original code
-> block in place. The wasm-bindgen frontend uses the same lazy-module split but
-> reaches it through a `wasm-bindgen` entry point (`markdawn-wasm-pikchr`'s
-> `render`) rather than the C ABI, signalling the same failure as `undefined`.
+> `UTF8ToString` and releases it with that same module's
+> `mw_render_<engine>_string_free`. A null result means the render failed and
+> the caller leaves the original code block in place. The wasm-bindgen frontend
+> uses the same lazy-module split but reaches it through a `wasm-bindgen` entry
+> point (`markdawn-wasm-pikchr`'s `render`) rather than the C ABI, signalling
+> the same failure as `undefined`.

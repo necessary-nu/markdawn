@@ -481,7 +481,7 @@ mod tests {
         );
     }
 
-    // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback/test]
+    // [spec:mw:req:highlighting.error-fallback/test]
     // [spec:mw:req:html.escape.text/test]
     #[cfg(feature = "highlight")]
     #[test]

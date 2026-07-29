@@ -397,7 +397,7 @@ impl<R> BlockSink<R> {
                 }
                 #[cfg(feature = "highlight")]
                 let highlighted = info.as_deref().and_then(|lang| {
-                    // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
+                    // [spec:mw:req:highlighting.error-fallback]
                     let spans = self.highlighter.as_mut()?.highlight(lang, literal).ok()?;
                     let style = self.renderer.style();
                     let font = super::attrs::monospaced_font(style, style.body_font_size);

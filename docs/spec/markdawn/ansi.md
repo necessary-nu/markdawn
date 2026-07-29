@@ -178,7 +178,7 @@ behind `terminal`.
 
 ## Consuming — annotated source pane
 
-> [spec:mw:syn:ansi.annotated.labels]
+> [spec:mw:sem:ansi.annotated.labels]
 > `ansi_to_annotated_source(source)` returns a fragment in which every
 > escape is rendered as *visible text* wrapped in
 > `<span class="ansi-esc">…</span>`, so a reader can inspect the
@@ -263,7 +263,7 @@ behind `terminal`.
 > shorten the line. Rows are joined by `\n` with no newline after the
 > last row, leaving the enclosing `<pre>` to the caller.
 
-> [spec:mw:syn:ansi.term.ansi-encoding]
+> [spec:mw:sem:ansi.term.ansi-encoding]
 > `render_grid_ansi` re-encodes a grid as SGR text using
 > reset-then-set rather than differential updates: on every style change
 > it writes `ESC[0m` first — including a change *into* a plain style —
@@ -298,7 +298,7 @@ behind `terminal`.
 > `AnsiError::Sink` carries a stringified downstream error from
 > `AnsiSink`, the streaming wrapper symmetrical with `HtmlSink`.
 
-> [spec:mw:req:ansi.adapter.color-depth-inert+1]
+> [spec:mw:req:ansi.adapter.color-depth+1]
 > `ColorDepth` is `Basic16` / `Ansi256` / `TrueColor` and defaults to
 > `Ansi256`. Every colour the adapter emits MUST pass through the
 > quantiser for the configured depth before it is encoded as SGR, so no

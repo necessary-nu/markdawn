@@ -10,12 +10,12 @@ use std::ffi::{CString, c_char};
 
 /// Render a DOT source string to SVG. Returns a newly-allocated,
 /// NUL-terminated UTF-8 string the caller must release via
-/// `mw_string_free`. Returns null on render failure (the caller
+/// `mw_render_graphviz_string_free`. Returns null on render failure (the caller
 /// should leave the original code block in place).
 ///
 /// # Safety
 /// `ptr` must point to `len` readable bytes of UTF-8.
-// [spec:mw:sem:ffi.render-shim.lazy-module]
+// [spec:mw:sem:ffi.render-shim.lazy-module+1]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_render_dot(ptr: *const u8, len: usize) -> *mut c_char {
     if ptr.is_null() {
@@ -39,11 +39,12 @@ pub unsafe extern "C" fn mw_render_dot(ptr: *const u8, len: usize) -> *mut c_cha
 /// yet freed. This is this module's allocator over this module's linear memory;
 /// a pointer minted by the core module or by another `markdawn-render-*` module
 /// is an offset into a different heap, and nothing here can tell the two apart
-/// — null is the only argument this function can reject. Keeping the pairing
-/// straight is the caller's job.
-// [spec:mw:req:ffi.ownership.string-free+1]
+/// — null is the only argument this function can reject. The engine-qualified
+/// name is the guard: no other module exports it, so naming it against the
+/// wrong module fails to resolve rather than freeing into the wrong heap.
+// [spec:mw:req:ffi.ownership.string-free+2]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mw_string_free(ptr: *mut c_char) {
+pub unsafe extern "C" fn mw_render_graphviz_string_free(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
     }
@@ -56,10 +57,11 @@ mod tests {
     use std::ffi::CStr;
 
     // The half of the ownership contract a single module can be held to: what
-    // `mw_render_dot` mints, this module's `mw_string_free` takes back, and
-    // null passes through untouched. The cross-module half is not testable
-    // from here — or checkable at runtime at all; see the rule.
-    // [spec:mw:req:ffi.ownership.string-free+1/test]
+    // `mw_render_dot` mints, this module's engine-qualified free takes back,
+    // and null passes through untouched. The cross-module half is not testable
+    // from here — it needs two loaded wasm modules, and is not checkable at
+    // runtime at all; the link-time guard is the engine-qualified name itself.
+    // [spec:mw:req:ffi.ownership.string-free+2/test]
     #[test]
     fn rendered_string_round_trips_through_this_modules_free() {
         let src = "digraph { a -> b }";
@@ -67,13 +69,13 @@ mod tests {
         assert!(!ptr.is_null(), "a well-formed graph must render");
         let svg = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_owned();
         assert!(svg.contains("<svg"), "got: {svg}");
-        unsafe { mw_string_free(ptr) };
-        unsafe { mw_string_free(core::ptr::null_mut()) };
+        unsafe { mw_render_graphviz_string_free(ptr) };
+        unsafe { mw_render_graphviz_string_free(core::ptr::null_mut()) };
     }
 
     // A failing render hands back null, which the caller may pass straight to
-    // `mw_string_free`.
-    // [spec:mw:sem:ffi.render-shim.lazy-module/test]
+    // `mw_render_graphviz_string_free`.
+    // [spec:mw:sem:ffi.render-shim.lazy-module+1/test]
     #[test]
     fn non_utf8_source_yields_null() {
         let bytes = [0xFFu8, 0xFE];

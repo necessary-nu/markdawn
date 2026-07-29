@@ -1013,6 +1013,13 @@ assertions (
     {id defects.core-span-population, kind @complete, author "brendan@necessary.nu", at 2026-07-29T18:02:13.97021Z}
     {id defects.ansi-feature-gaps, kind @complete, author "brendan@necessary.nu", at 2026-07-29T18:02:17.754386Z}
     {id defects.uikit-media-unspecd, kind @complete, author "brendan@necessary.nu", at 2026-07-29T18:02:47.551678Z}
+    {id defects.ffi-string-free-cross-heap, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:06:03.76415Z}
+    {id defects.uikit-image-allowlist-bypass, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:12:26.785785Z}
+    {id defects.uikit-svg-sanitiser-bypass, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:12:29.708089Z}
+    {id defects.spec-junk-rules, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:15:46.516141Z}
+    {id defects.highlighting-rules-misfiled, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:15:56.342543Z}
+    {id defects.verb-misassignment, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:16:00.938296Z}
+    {id defects.core-spec-padding, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:16:04.836944Z}
 )
 
 impl_evidence (

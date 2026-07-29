@@ -224,24 +224,31 @@ font, colour, and spacing decision is resolved.
 
 ## Images and async loading
 
-> [spec:mw:sem:uikit.media.image-source]
-> An image destination is resolved by three ordered attempts: a
-> `data:` URI is decoded and rasterised inline; otherwise a
-> destination already in the loader's image cache produces its
-> attachment immediately; otherwise a destination beginning with
-> the literal `http://` or `https://` produces a placeholder
-> attachment and queues a `PendingImage` on the `RenderCtx`.
-> Anything else — and any of the three attempts that fails to
-> produce an image — falls back to the alt text rendered as
-> `[alt]` in the surrounding font, so a destination that cannot be
-> displayed still occupies its place in the run. The destination is
-> not checked against the crate's URL allow-list: `is_safe_image_url`
-> gates the adapters that emit markup, but has no call site on this
-> path, so the accepted set is exactly what those three attempts
-> accept. Every `data:` media type is decoded, not only
-> `data:image/*`, and the effective restriction on network access is
-> the literal `http`/`https` prefix test rather than the
-> allow-list's scheme grammar and control-character rejection.
+> [spec:mw:sem:uikit.media.image-source+1]
+> An image destination MUST first satisfy the crate's image URL
+> allow-list — the same `is_safe_image_url` that gates the adapters
+> emitting markup, which rejects a destination containing any ASCII
+> control character, admits only allow-listed schemes, and relaxes
+> to `data:` solely for a `data:image/` prefix. A destination that
+> fails it yields no image, so a `data:text/html;…` payload and a
+> control-character `javascript:` smuggling attempt are refused
+> here exactly as they are there. A destination that passes is
+> resolved by three ordered attempts: a `data:` URI is decoded and
+> rasterised inline; otherwise a destination already in the loader's
+> image cache produces its attachment immediately; otherwise a
+> destination beginning with the literal `http://` or `https://`
+> produces a placeholder attachment and queues a `PendingImage` on
+> the `RenderCtx`. A decoded `data:` payload reaches the SVG
+> rasteriser only when its media type says SVG: the header up to the
+> first `;`, parameters dropped and surrounding whitespace trimmed,
+> MUST equal `image/svg+xml` or `image/svg` case-insensitively —
+> a whole-value comparison, never a substring search, so a header
+> carrying the letters `svg` only in a parameter or a longer subtype
+> cannot route its bytes into the SVG parser. Every other payload
+> goes to `UIImage`'s decoder. Anything else — and any of the three
+> attempts that fails to produce an image — falls back to the alt
+> text rendered as `[alt]` in the surrounding font, so a destination
+> that cannot be displayed still occupies its place in the run.
 
 > [spec:mw:sem:uikit.image.async-load]
 > A queued `PendingImage` is fetched once per URL. The loader holds
@@ -300,7 +307,7 @@ font, colour, and spacing decision is resolved.
 > when base64 decoding fails; percent-decoding has no failure mode
 > and passes an invalid escape through as its literal bytes.
 
-> [spec:mw:req:uikit.media.svg-raster]
+> [spec:mw:req:uikit.media.svg-raster+1]
 > SVG reaches UIKit as a `UIImage`, never as a view. Bytes are
 > recognised as SVG only when an opening `<svg` appears within the
 > first kilobyte and a closing `</svg>` within the last,
@@ -316,14 +323,26 @@ font, colour, and spacing decision is resolved.
 > once the image is built, and the autoreleased result retained. A
 > rendered image MUST be rejected when its canvas is non-finite,
 > non-positive, or exceeds 4096 points on either axis, since the
-> attachment bounds taken from it drive TextKit layout. That is the
-> whole of the checking on this path: bytes are not passed through
-> `svg_sanitize`, so neither its element and URL allow-list nor its
-> `MAX_SVG_BYTES` cap applies here, unlike on the adapters that
-> emit SVG into markup. Failure at any step yields no image and
-> each caller degrades on its own terms — an HTML chunk that sniffs
-> as SVG but does not rasterise falls back to showing its source in
-> the monospaced face.
+> attachment bounds taken from it drive TextKit layout.
+>
+> SVG that originated outside this crate MUST NOT reach CoreSVG
+> unchecked: a raw HTML chunk in the document, a decoded `data:`
+> payload and the body of a remote fetch are all attacker-shaped
+> input to a private XML parser. Such bytes MUST be refused when
+> they exceed `MAX_SVG_BYTES` or are not valid UTF-8 — the
+> sanitiser reads text, and a byte stream it cannot read is dropped
+> rather than forwarded — then passed through `svg_sanitize`, with
+> only its output handed to the rasteriser; an input the sanitiser
+> empties out yields no image. Both the cap and the sanitiser apply
+> to the source, before any parse, so the canvas rejection above is
+> a second bound rather than the first. The unsanitised entry point
+> remains only for SVG this crate produced itself: math typesetting
+> and the diagram-engine views.
+>
+> Failure at any step yields no image and each caller degrades on
+> its own terms — an HTML chunk that sniffs as SVG but does not
+> rasterise falls back to showing its source in the monospaced
+> face.
 
 ## Math and diagram views
 

@@ -44,6 +44,25 @@ pub fn parse_data_uri(uri: &str) -> Option<DataUri<'_>> {
     Some(DataUri { mime, bytes })
 }
 
+/// True when `mime` — a media type as returned by [`parse_data_uri`] —
+/// names the SVG image type.
+///
+/// The header is matched as a media type rather than searched for a
+/// substring: parameters after the first `;` are dropped and what
+/// remains must equal `image/svg+xml`, or the shorter `image/svg` some
+/// producers emit, case-insensitively. A substring test would accept
+/// `text/html;charset=svg`, routing a payload that declares a scripting
+/// media type into the SVG parser.
+// [spec:mw:sem:uikit.media.image-source+1]
+pub fn is_svg_media_type(mime: &str) -> bool {
+    let base = match mime.split_once(';') {
+        Some((base, _parameters)) => base,
+        None => mime,
+    };
+    let base = base.trim_ascii();
+    base.eq_ignore_ascii_case("image/svg+xml") || base.eq_ignore_ascii_case("image/svg")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,5 +113,43 @@ mod tests {
         let uri = "data:image/svg+xml;base64,PHN2\nZy8\n+";
         let parsed = parse_data_uri(uri).unwrap();
         assert_eq!(parsed.bytes, b"<svg/>");
+    }
+
+    // [spec:mw:sem:uikit.media.image-source+1/test]
+    #[test]
+    fn svg_media_type_accepts_the_svg_image_types() {
+        assert!(is_svg_media_type("image/svg+xml"));
+        assert!(is_svg_media_type("IMAGE/SVG+XML"));
+        assert!(is_svg_media_type("image/svg"));
+        assert!(is_svg_media_type("image/svg+xml;charset=utf-8"));
+        assert!(is_svg_media_type(" image/svg+xml "));
+    }
+
+    /// The predicate must not be a substring test: a header carrying
+    /// `svg` in its subtype tail or in a parameter still declares a
+    /// media type that is not SVG, and its payload must not reach the
+    /// SVG parser.
+    // [spec:mw:sem:uikit.media.image-source+1/test]
+    #[test]
+    fn svg_media_type_rejects_svg_as_a_substring() {
+        assert!(!is_svg_media_type("text/html;charset=svg"));
+        assert!(!is_svg_media_type("text/html;svg"));
+        assert!(!is_svg_media_type("image/png;name=logo.svg"));
+        assert!(!is_svg_media_type("application/svg+xml"));
+        assert!(!is_svg_media_type("image/svg+xml-ish"));
+        assert!(!is_svg_media_type("text/plain;charset=US-ASCII"));
+    }
+
+    /// The media type of a header with no `;base64` suffix still parses
+    /// out of the parameters the parser returns verbatim.
+    // [spec:mw:sem:uikit.media.image-source+1/test]
+    #[test]
+    fn parsed_header_feeds_the_media_type_predicate() {
+        let hostile = parse_data_uri("data:text/html;charset=svg,%3Csvg%3E%3C%2Fsvg%3E").unwrap();
+        assert_eq!(hostile.mime, "text/html;charset=svg");
+        assert!(!is_svg_media_type(hostile.mime));
+
+        let genuine = parse_data_uri("data:image/svg+xml;base64,PHN2Zy8+").unwrap();
+        assert!(is_svg_media_type(genuine.mime));
     }
 }

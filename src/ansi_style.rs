@@ -114,7 +114,7 @@ fn rgb_distance(a: (u8, u8, u8), b: (u8, u8, u8)) -> u32 {
 // The search covers 16–255: the 6x6x6 cube and the greyscale ramp. The
 // 16 base entries are excluded because a terminal is free to retheme
 // them, so quantising onto one would not reproduce the requested hue.
-// [spec:mw:req:ansi.adapter.color-depth-inert+1]
+// [spec:mw:req:ansi.adapter.color-depth+1]
 pub fn rgb_to_ansi256(r: u8, g: u8, b: u8) -> u8 {
     let target = (r, g, b);
     let mut best = 16u8;
@@ -130,7 +130,7 @@ pub fn rgb_to_ansi256(r: u8, g: u8, b: u8) -> u8 {
 }
 
 /// Nearest named-palette entry for a truecolour triple.
-// [spec:mw:req:ansi.adapter.color-depth-inert+1]
+// [spec:mw:req:ansi.adapter.color-depth+1]
 pub fn rgb_to_named(r: u8, g: u8, b: u8) -> u8 {
     let target = (r, g, b);
     let mut best = 0u8;
@@ -150,7 +150,7 @@ pub fn rgb_to_named(r: u8, g: u8, b: u8) -> u8 {
 
 /// Nearest named-palette entry for a 256-color index. Indices below 16
 /// already name an entry and pass through untouched.
-// [spec:mw:req:ansi.adapter.color-depth-inert+1]
+// [spec:mw:req:ansi.adapter.color-depth+1]
 pub fn ansi256_to_named(n: u8) -> u8 {
     if n < 16 {
         return n;
@@ -160,7 +160,7 @@ pub fn ansi256_to_named(n: u8) -> u8 {
 }
 
 /// SGR parameter text for one colour, as a foreground or a background.
-// [spec:mw:syn:ansi.term.ansi-encoding]
+// [spec:mw:sem:ansi.term.ansi-encoding]
 pub fn color_to_sgr(c: Color, bg: bool) -> String {
     let base: u16 = if bg { 40 } else { 30 };
     match c {
@@ -263,7 +263,7 @@ mod tests {
         assert_eq!(named_rgb(16), None);
     }
 
-    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    // [spec:mw:req:ansi.adapter.color-depth+1/test]
     #[test]
     fn truecolor_quantises_onto_the_cube_and_ramp() {
         // Exact cube entries must come back unchanged.
@@ -282,7 +282,7 @@ mod tests {
         }
     }
 
-    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    // [spec:mw:req:ansi.adapter.color-depth+1/test]
     #[test]
     fn palette_and_truecolor_quantise_onto_named_entries() {
         // Named entries reproduce themselves exactly.
@@ -308,7 +308,7 @@ mod tests {
         }
     }
 
-    // [spec:mw:syn:ansi.term.ansi-encoding/test]
+    // [spec:mw:sem:ansi.term.ansi-encoding/test]
     #[test]
     fn color_to_sgr_recovers_short_forms() {
         assert_eq!(color_to_sgr(Color::Named(1), false), "31");

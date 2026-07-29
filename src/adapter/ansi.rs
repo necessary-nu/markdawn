@@ -45,7 +45,7 @@ impl std::error::Error for AnsiError {}
 // the adapter's own palette-index backgrounds collapse to named entries
 // under `Basic16` and a `terminal` transcript's truecolour cells are
 // quantised before they are re-encoded.
-// [spec:mw:req:ansi.adapter.color-depth-inert+1]
+// [spec:mw:req:ansi.adapter.color-depth+1]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorDepth {
     Basic16,
@@ -159,7 +159,7 @@ impl AnsiAdapter<()> {
 // Truecolour reaches 16 colours in one step rather than by way of the
 // 256 cube: routing through the intermediate would quantise twice and
 // land further from the requested hue.
-// [spec:mw:req:ansi.adapter.color-depth-inert+1]
+// [spec:mw:req:ansi.adapter.color-depth+1]
 fn downgrade(color: Color, depth: ColorDepth) -> Color {
     match depth {
         ColorDepth::TrueColor => color,
@@ -182,7 +182,7 @@ impl<R> AnsiAdapter<R> {
     }
 
     /// SGR parameter text for `color` at the configured depth.
-    // [spec:mw:req:ansi.adapter.color-depth-inert+1]
+    // [spec:mw:req:ansi.adapter.color-depth+1]
     fn sgr_color(&self, color: Color, bg: bool) -> String {
         color_to_sgr(downgrade(color, self.options.color), bg)
     }
@@ -676,7 +676,7 @@ mod tests {
         assert!(first_line.chars().count() <= 14, "got `{first_line}`");
     }
 
-    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    // [spec:mw:req:ansi.adapter.color-depth+1/test]
     #[test]
     fn downgrade_maps_each_depth() {
         for (depth, expected) in [
@@ -706,7 +706,7 @@ mod tests {
         }
     }
 
-    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    // [spec:mw:req:ansi.adapter.color-depth+1/test]
     #[test]
     fn basic16_reduces_the_code_block_band() {
         let block = code_block("rust", "fn main() {}\n");
@@ -720,7 +720,7 @@ mod tests {
         );
     }
 
-    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    // [spec:mw:req:ansi.adapter.color-depth+1/test]
     #[test]
     fn basic16_reduces_the_code_span_background() {
         let span: Node<()> = Node::CodeSpan {
@@ -731,7 +731,7 @@ mod tests {
         assert!(render_at(span, ColorDepth::Basic16).contains("\x1b[40m"));
     }
 
-    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    // [spec:mw:req:ansi.adapter.color-depth+1/test]
     #[test]
     fn named_runs_are_identical_at_every_depth() {
         let heading: Node<()> = Node::Heading {
@@ -753,7 +753,7 @@ mod tests {
         }
     }
 
-    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    // [spec:mw:req:ansi.adapter.color-depth+1/test]
     #[cfg(feature = "terminal")]
     #[test]
     fn terminal_transcript_colors_follow_the_depth() {

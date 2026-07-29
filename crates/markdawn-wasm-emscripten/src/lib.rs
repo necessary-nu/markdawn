@@ -178,11 +178,12 @@ pub unsafe extern "C" fn mw_state_finish(state: *mut State) -> u32 {
     if s.finish().is_ok() { 0 } else { 1 }
 }
 
-/// Caller owns the returned pointer and must release it via `mw_string_free`.
+/// Caller owns the returned pointer and must release it via this module's
+/// `mw_string_free`.
 ///
 /// # Safety
 /// `state` must be a pointer returned by `mw_state_new` and not yet freed.
-// [spec:mw:req:ffi.ownership.string-free+1]
+// [spec:mw:req:ffi.ownership.string-free+2]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_render(state: *const State) -> *mut c_char {
     if state.is_null() {
@@ -197,9 +198,11 @@ pub unsafe extern "C" fn mw_state_render(state: *const State) -> *mut c_char {
 
 /// # Safety
 /// `ptr` must be a pointer returned by `mw_state_render` and not yet freed.
-// Frees against this module's heap only — a pointer minted by one of the
-// lazily-loaded render modules must go back to that module's copy.
-// [spec:mw:req:ffi.ownership.string-free+1]
+// Frees against this module's heap only. This is the core module, so it keeps
+// the unqualified name; each lazily-loaded render module exports its free under
+// an engine-qualified name instead, and a pointer minted by one of them must go
+// back to that name rather than here.
+// [spec:mw:req:ffi.ownership.string-free+2]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_string_free(ptr: *mut c_char) {
     if ptr.is_null() {
@@ -345,7 +348,7 @@ mod tests {
     // The half of the ownership contract this module can enforce: a pointer it
     // minted goes back to its own `mw_string_free`. Which module a pointer came
     // from is not something the callee can check — see the rule.
-    // [spec:mw:req:ffi.ownership.string-free+1/test]
+    // [spec:mw:req:ffi.ownership.string-free+2/test]
     #[test]
     fn rendered_string_round_trips_through_this_modules_free() {
         let state = mw_state_new();

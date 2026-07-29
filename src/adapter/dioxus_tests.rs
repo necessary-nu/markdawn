@@ -181,7 +181,7 @@ fn alert_custom_title_overrides_default_label() {
     assert!(html.contains("body paragraph"));
 }
 
-// [spec:mw:req:core.node.alert-title-fallback/test]
+// [spec:mw:req:core.node.alert-title-fallback+1/test]
 #[test]
 fn alert_without_title_keeps_default_label() {
     let html = dioxus_ssr::render_element(render_markdown(
@@ -515,7 +515,7 @@ fn highlighter_path_invoked_for_known_language() {
         }
     }
 
-    // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback/test]
+    // [spec:mw:req:highlighting.error-fallback/test]
     let invoked = Rc::new(Cell::new(false));
     let html = dioxus_ssr::render_element(
         Renderer::default()

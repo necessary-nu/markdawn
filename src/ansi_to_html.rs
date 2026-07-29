@@ -26,7 +26,7 @@ pub fn ansi_to_html(source: &str) -> String {
 /// characters alone (with HTML-escaping). Used for the "show source"
 /// pane so readers can inspect the sequences without the browser
 /// interpreting them.
-// [spec:mw:syn:ansi.annotated.labels]
+// [spec:mw:sem:ansi.annotated.labels]
 pub fn ansi_to_annotated_source(source: &str) -> String {
     let mut parser: Parser = Parser::new();
     let mut writer = AnnotatedSourceWriter::default();
@@ -298,7 +298,7 @@ impl AnnotatedSourceWriter {
     }
 }
 
-// [spec:mw:syn:ansi.annotated.labels]
+// [spec:mw:sem:ansi.annotated.labels]
 impl Perform for AnnotatedSourceWriter {
     fn print(&mut self, c: char) {
         match c {
@@ -521,7 +521,7 @@ mod tests {
         assert_eq!(out, "hello");
     }
 
-    // [spec:mw:syn:ansi.annotated.labels/test]
+    // [spec:mw:sem:ansi.annotated.labels/test]
     #[test]
     fn annotated_source_labels_escape_sequences() {
         let source = "\x1b[31mred\x1b[0m";

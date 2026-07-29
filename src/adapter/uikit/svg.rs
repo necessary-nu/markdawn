@@ -37,7 +37,7 @@ const SYM_CREATE_FROM_DATA: &str = "Q0dTVkdEb2N1bWVudENyZWF0ZUZyb21EYXRh";
 const SYM_RELEASE: &str = "Q0dTVkdEb2N1bWVudFJlbGVhc2U=";
 const SEL_IMAGE_WITH_DOC: &str = "X2ltYWdlV2l0aENHU1ZHRG9jdW1lbnQ6";
 
-// [spec:mw:req:uikit.media.svg-raster]
+// [spec:mw:req:uikit.media.svg-raster+1]
 fn ensure_loaded() -> Option<&'static CoreSVGSymbols> {
     CORE_SVG
         .get_or_init(|| unsafe {
@@ -72,7 +72,7 @@ unsafe fn resolve_symbol(b64: &str) -> Option<*const std::ffi::c_void> {
 /// This is intentionally conservative: it rules out arbitrary XML/HTML that just
 /// happens to contain "svg" as a substring, and ignores trailing whitespace/junk
 /// after the closing tag.
-// [spec:mw:req:uikit.media.svg-raster]
+// [spec:mw:req:uikit.media.svg-raster+1]
 pub fn is_svg_data(data: &[u8]) -> bool {
     let close = b"</svg>";
     let open = b"<svg";
@@ -97,11 +97,42 @@ pub fn is_svg_data(data: &[u8]) -> bool {
 /// exceeds this in either axis are rejected to prevent runaway TextKit layout.
 const MAX_SVG_DIMENSION: f64 = 4096.0;
 
+/// Sanitise externally-sourced SVG bytes, then rasterise them.
+///
+/// `CGSVGDocumentCreateFromData` is a private XML parser we hand raw
+/// bytes to, so every SVG that did not originate inside this crate —
+/// a raw HTML chunk in the markdown, a decoded `data:` payload, a
+/// remote fetch response — goes through here rather than through
+/// [`render_svg`] directly.
+///
+/// Three guards run before CoreSVG sees anything. The source is capped
+/// at [`crate::svg_sanitize::MAX_SVG_BYTES`], because a parser bound
+/// on the *rendered* canvas says nothing about the cost of parsing.
+/// It must be valid UTF-8: the sanitiser operates on `str`, and a byte
+/// stream it cannot read is rejected rather than passed through
+/// unchecked. Then [`crate::svg_sanitize::sanitize_svg`] applies the
+/// element and URL allow-list; an input it empties out yields no image.
+// [spec:mw:req:uikit.media.svg-raster+1]
+pub fn render_svg_sanitized(data: &[u8]) -> Option<Retained<UIImage>> {
+    if data.len() > crate::svg_sanitize::MAX_SVG_BYTES {
+        return None;
+    }
+    let source = std::str::from_utf8(data).ok()?;
+    let sanitized = crate::svg_sanitize::sanitize_svg(source);
+    if sanitized.is_empty() {
+        return None;
+    }
+    render_svg(sanitized.as_bytes())
+}
+
 /// Render SVG data to a vector `UIImage` via CoreSVG.
+///
+/// Only for SVG this crate generated itself; anything derived from the
+/// document goes through [`render_svg_sanitized`].
 ///
 /// Returns `None` if CoreSVG symbols are unavailable, the data fails to parse,
 /// or the resulting image is too large (> [`MAX_SVG_DIMENSION`] in either axis).
-// [spec:mw:req:uikit.media.svg-raster]
+// [spec:mw:req:uikit.media.svg-raster+1]
 pub fn render_svg(data: &[u8]) -> Option<Retained<UIImage>> {
     let syms = ensure_loaded()?;
 
@@ -148,7 +179,7 @@ pub fn render_svg(data: &[u8]) -> Option<Retained<UIImage>> {
 /// The selector is known to take a single `CGSVGDocumentRef` argument and return
 /// an autoreleased `id`. If Apple ever changes the calling convention, return type,
 /// or autorelease semantics of this private method, this transmute is unsound.
-// [spec:mw:req:uikit.media.svg-raster]
+// [spec:mw:req:uikit.media.svg-raster+1]
 unsafe fn msg_send_image_with_doc(sel: Sel, doc: CGSVGDocumentRef) -> Option<Retained<UIImage>> {
     unsafe extern "C" {
         fn objc_msgSend();
@@ -178,7 +209,7 @@ fn base64_decode(s: &str) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
 
-    // [spec:mw:req:uikit.media.svg-raster/test]
+    // [spec:mw:req:uikit.media.svg-raster+1/test]
     #[test]
     fn detects_svg_data() {
         assert!(is_svg_data(b"<svg width=\"10\"></svg>"));
@@ -195,7 +226,7 @@ mod tests {
         assert!(!is_svg_data(b"<svg starts but never ends"));
     }
 
-    // [spec:mw:req:uikit.media.svg-raster/test]
+    // [spec:mw:req:uikit.media.svg-raster+1/test]
     #[test]
     fn base64_decodes_known_strings() {
         let decoded = base64_decode(SYM_CREATE_FROM_DATA).unwrap();
@@ -213,5 +244,45 @@ mod tests {
             std::str::from_utf8(&decoded).unwrap(),
             "_imageWithCGSVGDocument:"
         );
+    }
+
+    /// A source past the byte cap is refused before the sanitiser runs,
+    /// so neither it nor CoreSVG ever parses it.
+    // [spec:mw:req:uikit.media.svg-raster+1/test]
+    #[test]
+    fn sanitized_render_rejects_oversize_source() {
+        let mut oversize = Vec::with_capacity(crate::svg_sanitize::MAX_SVG_BYTES + 64);
+        oversize.extend_from_slice(b"<svg xmlns=\"http://www.w3.org/2000/svg\">");
+        oversize.resize(crate::svg_sanitize::MAX_SVG_BYTES + 1, b' ');
+        oversize.extend_from_slice(b"</svg>");
+        assert!(is_svg_data(&oversize), "the payload does sniff as SVG");
+        assert!(render_svg_sanitized(&oversize).is_none());
+    }
+
+    /// Bytes the sanitiser cannot read are dropped, not forwarded raw.
+    // [spec:mw:req:uikit.media.svg-raster+1/test]
+    #[test]
+    fn sanitized_render_rejects_non_utf8_source() {
+        let mut bad = b"<svg xmlns=\"http://www.w3.org/2000/svg\"><title>".to_vec();
+        bad.extend_from_slice(&[0xF0, 0x28, 0x8C, 0xBC]);
+        bad.extend_from_slice(b"</title></svg>");
+        assert!(is_svg_data(&bad), "the payload does sniff as SVG");
+        assert!(std::str::from_utf8(&bad).is_err());
+        assert!(render_svg_sanitized(&bad).is_none());
+    }
+
+    /// What CoreSVG receives is the sanitiser's output, so an SVG-shaped
+    /// HTML chunk loses its script and event handlers on the way in while
+    /// its drawing survives.
+    // [spec:mw:req:uikit.media.svg-raster+1/test]
+    #[test]
+    fn sanitized_render_forwards_only_sanitised_bytes() {
+        let hostile = br#"<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(1)</script><circle cx="5" cy="5" r="3"/></svg>"#;
+        assert!(is_svg_data(hostile), "the payload does sniff as SVG");
+        let forwarded = crate::svg_sanitize::sanitize_svg(std::str::from_utf8(hostile).unwrap());
+        assert!(!forwarded.contains("<script"), "got: {forwarded}");
+        assert!(!forwarded.contains("onload"), "got: {forwarded}");
+        assert!(!forwarded.contains("alert"), "got: {forwarded}");
+        assert!(forwarded.contains("<circle"), "got: {forwarded}");
     }
 }

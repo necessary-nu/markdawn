@@ -223,7 +223,7 @@ pub fn render_grid_html(grid: &TermGrid) -> String {
 // Reset-then-set, not differential: `ESC[0m` precedes every style
 // change (including a change *into* plain) and closes a row that ended
 // non-plain, so no attribute can leak past its cell range.
-// [spec:mw:syn:ansi.term.ansi-encoding]
+// [spec:mw:sem:ansi.term.ansi-encoding]
 pub fn render_grid_ansi(grid: &TermGrid) -> String {
     let mut out = String::new();
     for (row_idx, row) in grid.cells.iter().enumerate() {
@@ -254,7 +254,7 @@ pub fn render_grid_ansi(grid: &TermGrid) -> String {
     out
 }
 
-// [spec:mw:syn:ansi.term.ansi-encoding]
+// [spec:mw:sem:ansi.term.ansi-encoding]
 fn style_to_sgr(style: &CellStyle) -> String {
     let mut parts: Vec<String> = Vec::new();
     if style.bold {

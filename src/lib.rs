@@ -42,7 +42,15 @@ mod parser;
 pub mod pikchr_render;
 mod serializer;
 mod sink;
-#[cfg(any(feature = "graphviz", feature = "pikchr", feature = "typst"))]
+// The UIKit adapter sanitises every externally-sourced SVG before it
+// reaches CoreSVG, so iOS needs this module whether or not a diagram
+// engine is compiled in.
+#[cfg(any(
+    feature = "graphviz",
+    feature = "pikchr",
+    feature = "typst",
+    target_os = "ios"
+))]
 mod svg_sanitize;
 #[cfg(any(feature = "graphviz", feature = "pikchr", feature = "typst"))]
 mod svg_text_to_paths;

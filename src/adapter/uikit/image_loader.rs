@@ -138,6 +138,7 @@ pub fn cancel(url: &str) {
 
 // [spec:mw:sem:uikit.image.async-load]
 // [spec:mw:req:uikit.image.cancellation]
+// [spec:mw:req:uikit.media.svg-raster+1]
 fn handle_completion(url: &str, data_ptr: *mut NSData, error_ptr: *mut NSError) {
     if !error_ptr.is_null() || data_ptr.is_null() {
         fail(url);
@@ -146,10 +147,12 @@ fn handle_completion(url: &str, data_ptr: *mut NSData, error_ptr: *mut NSError) 
 
     let data: &NSData = unsafe { &*data_ptr };
 
-    // Try SVG first, otherwise UIImage
+    // Try SVG first, otherwise UIImage. The body is whatever the server
+    // chose to send, so the SVG branch sanitises and size-caps it before
+    // CoreSVG parses it.
     let bytes = unsafe { data.as_bytes_unchecked() };
     let image = if svg::is_svg_data(bytes) {
-        svg::render_svg(bytes)
+        svg::render_svg_sanitized(bytes)
     } else {
         UIImage::imageWithData(data)
     };

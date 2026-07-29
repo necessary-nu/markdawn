@@ -1,13 +1,21 @@
 // The export set and the distinct `EXPORT_NAME` are what let this module be
-// instantiated alongside the core module without their heaps colliding.
-// [spec:mw:sem:ffi.render-shim.lazy-module]
+// instantiated alongside the core module without their heaps colliding. The
+// free is exported under an engine-qualified name that no other module carries,
+// so a free aimed at the wrong module is an unresolved symbol.
+// [spec:mw:sem:ffi.render-shim.lazy-module+1]
 fn main() {
     let target = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     if target != "emscripten" {
         return;
     }
 
-    let exports = ["_mw_render_dot", "_mw_string_free", "_malloc", "_free"].join(",");
+    let exports = [
+        "_mw_render_dot",
+        "_mw_render_graphviz_string_free",
+        "_malloc",
+        "_free",
+    ]
+    .join(",");
     let runtime_methods = [
         "cwrap",
         "ccall",

@@ -651,13 +651,9 @@ impl<Ext> Parser<Ext> {
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.initial-tree-is-just-document]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.lines-can-be-discarded-after-incorporation]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.four-line-example-shows-tree-evolution]
-    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-example-line]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.first-line-opens-block-quote-and-paragraph]
-    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-example-line]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.second-line-is-lazy-continuation]
-    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-example-line]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.third-line-closes-paragraph-and-opens-list]
-    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-example-line]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-1-block-structure.fourth-line-opens-second-list-item]
     fn parse_block_lines(
         &self,
@@ -705,7 +701,6 @@ impl<Ext> Parser<Ext> {
             'block: {
                 // [spec:gfm:sem:leaf-blocks.blank-lines.blank-lines-definition]
                 // [spec:gfm:sem:leaf-blocks.blank-lines.blank-lines-at-beginning-end-document-are-also-ignored]
-                // [spec:gfm:def:leaf-blocks.blank-lines.extension-wrapper]
                 if lines[index].trim().is_empty() {
                     index += 1;
                     break 'block;
@@ -1080,7 +1075,7 @@ impl<Ext> Parser<Ext> {
     // [spec:gfm:sem:container-blocks.lists.blank-lines-inside-code-block-do-not-make-list-loose]
     // [spec:gfm:syn:container-blocks.lists.commonmark-allows-list-interruption]
     // [spec:gfm:sem:container-blocks.lists.consecutive-block-elements-without-blank-line-keep-list-tight]
-    // [spec:gfm:thm:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
+    // [spec:gfm:sem:container-blocks.lists.corresponding-standalone-example-should-parse-the-same-way]
     // [spec:gfm:syn:container-blocks.lists.four-space-indented-marker-is-code-block]
     // [spec:gfm:syn:container-blocks.lists.items-may-be-separated-by-blank-lines]
     // [spec:gfm:syn:container-blocks.lists.items-need-not-use-uniform-indentation]
@@ -1093,7 +1088,6 @@ impl<Ext> Parser<Ext> {
     // [spec:gfm:syn:container-blocks.lists.only-lists-starting-with-one-may-interrupt-paragraphs]
     // [spec:gfm:sem:container-blocks.lists.outer-list-may-be-loose-while-inner-list-is-tight]
     // [spec:gfm:def:container-blocks.lists.principle-of-uniformity-definition]
-    // [spec:gfm:sem:container-blocks.lists.second-reason-is-principle-of-uniformity]
     // [spec:gfm:sem:container-blocks.lists.single-paragraph-list-is-tight]
     // [spec:gfm:syn:container-blocks.lists.starting-with-one-can-still-cause-unintended-list-capture]
     // [spec:gfm:sem:container-blocks.lists.starting-with-one-should-prevent-most-spurious-captures]
@@ -1194,7 +1188,7 @@ impl<Ext> Parser<Ext> {
     // [spec:gfm:syn:container-blocks.list-items.items-may-start-with-one-blank-line-and-still-be-nonempty]
     // [spec:gfm:syn:container-blocks.list-items.laziness-works-inside-nested-structures]
     // [spec:gfm:syn:container-blocks.list-items.lazy-continuation-may-delete-only-part-of-indent]
-    // [spec:gfm:thm:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
+    // [spec:gfm:sem:container-blocks.list-items.leading-indent-up-to-three-spaces-can-be-normalized]
     // [spec:gfm:syn:container-blocks.list-items.list-may-be-first-block-in-item]
     // [spec:gfm:syn:container-blocks.list-items.list-may-start-or-end-with-empty-item]
     // [spec:gfm:syn:container-blocks.list-items.may-begin-with-at-most-one-blank-line]
@@ -1208,7 +1202,6 @@ impl<Ext> Parser<Ext> {
     // [spec:gfm:syn:container-blocks.list-items.sublist-example-three-spaces-not-enough-for-wider-marker]
     // [spec:gfm:syn:container-blocks.list-items.sublist-example-two-space-indent]
     // [spec:gfm:syn:container-blocks.list-items.thematic-break-line-is-not-a-list-item]
-    // [spec:gfm:def:container-blocks.list-items.motivation.extension-wrapper]
     // [spec:gfm:syn:container-blocks.list-items.motivation.fixed-indent-from-marker-is-an-alternative]
     // [spec:gfm:sem:container-blocks.list-items.motivation.fixed-margin-indentation-is-unintuitive]
     // [spec:gfm:syn:container-blocks.list-items.motivation.fixed-marker-indent-breaks-code-patterns]
@@ -1219,7 +1212,7 @@ impl<Ext> Parser<Ext> {
     // [spec:gfm:syn:container-blocks.list-items.motivation.marker-width-determines-indentation]
     // [spec:gfm:sem:container-blocks.list-items.motivation.no-rule-avoids-breaking-all-existing-documents]
     // [spec:gfm:syn:container-blocks.list-items.motivation.original-markdown-spec-quoted]
-    // [spec:gfm:thm:container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
+    // [spec:gfm:def:container-blocks.list-items.motivation.original-rule-implies-four-space-rule]
     // [spec:gfm:syn:container-blocks.list-items.motivation.preferred-parse-is-single-list]
     // [spec:gfm:syn:container-blocks.list-items.motivation.spec-preserves-eight-space-code-pattern]
     // [spec:gfm:syn:container-blocks.list-items.motivation.two-space-rule-allows-underindented-content]
@@ -1569,7 +1562,6 @@ impl<Ext> Parser<Ext> {
     // [spec:gfm:def:leaf-blocks.tables-extension.delimiter-row-structure]
     // [spec:gfm:syn:leaf-blocks.tables-extension.header-and-delimiter-row-must-have-matching-cell-count]
     // [spec:gfm:syn:leaf-blocks.tables-extension.table-ends-at-blank-line-or-other-block]
-    // [spec:gfm:def:leaf-blocks.tables-extension.extension-wrapper]
     // [spec:gfm:def:leaf-blocks.tables-extension.gfm-enables-table-extension]
     // [spec:gfm:syn:leaf-blocks.tables-extension.rows-consist-of-pipe-separated-cells]
     // [spec:gfm:sem:leaf-blocks.tables-extension.body-rows-may-have-fewer-or-more-cells-than-header]
@@ -3342,7 +3334,6 @@ where
     // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.strong-emphasis-requires-matching-delimiters]
     // [spec:gfm:syn:inlines.textual-content.uninterpreted-characters-are-parsed-as-text]
     // [spec:gfm:sem:inlines.textual-content.internal-spaces-are-preserved]
-    // [spec:gfm:def:inlines.textual-content.end-tests-marker]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.end-of-input-triggers-emphasis-processing]
     // [spec:mw:req:core.ext.inline-match-validity]
     fn parse_until(&mut self, stop: Option<&str>) -> Result<Vec<Node<Ext>>, Error> {
@@ -3650,8 +3641,7 @@ where
     // [spec:gfm:sem:inlines.code-spans.all-space-content-is-not-trimmed]
     // [spec:gfm:thm:inlines.code-spans.backslash-escapes-are-never-needed]
     // [spec:gfm:syn:inlines.code-spans.backslashes-are-literal]
-    // [spec:gfm:req:inlines.code-spans.browser-rendering-may-collapse-spaces]
-    // [spec:gfm:sem:inlines.code-spans.code-white-space-pre-wrap]
+    // [spec:gfm:req:inlines.code-spans.browser-rendering-may-collapse-spaces+1]
     // [spec:gfm:syn:inlines.code-spans.autolink-wins-when-autolink-parses-first]
     // [spec:gfm:syn:inlines.code-spans.html-tag-wins-when-tag-parses-first]
     // [spec:gfm:syn:inlines.code-spans.code-span-prevents-link-parse]
@@ -3853,7 +3843,6 @@ where
 
     // [spec:gfm:def:inlines.strikethrough-extension.strikethrough-uses-double-tilde-delimiters]
     // [spec:gfm:syn:inlines.strikethrough-extension.new-paragraph-ends-strikethrough-parse]
-    // [spec:gfm:syn:inlines.strikethrough-extension.extension-wrapper]
     // [spec:gfm:def:inlines.strikethrough-extension.gfm-enables-strikethrough-extension]
     fn try_delimited(&mut self, delim: &str, strong: bool) -> Result<Option<Node<Ext>>, Error> {
         let remaining = self.remaining();
@@ -4000,10 +3989,9 @@ where
 
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.closing-bracket-triggers-link-search]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-scan-backward]
-    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-success-case]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-failure-case]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-builds-node-children]
-    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener]
+    // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-removes-opener+1]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-deactivates-earlier-openers]
     // [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.look-for-link-or-image-runs-emphasis-processing]
     fn try_link_or_image(&mut self) -> Result<Option<Node<Ext>>, Error> {
@@ -4098,7 +4086,6 @@ where
     // [spec:gfm:def:inlines.raw-html.html-like-tag-text-is-parsed-as-raw-html]
     // [spec:gfm:def:inlines.raw-html.html-tag-definition]
     // [spec:gfm:syn:inlines.raw-html.tag-grammar-follows]
-    // [spec:gfm:def:inlines.raw-html.extension-wrapper]
     // [spec:gfm:syn:inlines.raw-html.simple-open-tag-examples]
     // [spec:gfm:syn:inlines.raw-html.custom-tag-names-are-allowed]
     // [spec:gfm:syn:inlines.raw-html.custom-tag-and-attribute-names-are-allowed]
@@ -4116,7 +4103,6 @@ where
     // [spec:gfm:sem:inlines.disallowed-raw-html-extension.filtering-replaces-leading-angle-bracket]
     // [spec:gfm:sem:inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
     // [spec:gfm:sem:inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
-    // [spec:gfm:def:inlines.disallowed-raw-html-extension.extension-wrapper]
     // [spec:gfm:def:inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
     fn try_html_inline(&mut self) -> Option<String> {
         let remaining = self.remaining();
@@ -4165,7 +4151,6 @@ where
     // [spec:gfm:syn:inlines.autolinks.backslash-escapes-do-not-work-inside-email-autolinks]
     // [spec:gfm:def:inlines.autolinks.email-address-definition]
     // [spec:gfm:def:inlines.autolinks.email-address-regex]
-    // [spec:gfm:syn:inlines.autolinks.extension-wrapper]
     // [spec:gfm:syn:inlines.autolinks.invalid-autolink-example]
     // [spec:gfm:syn:inlines.autolinks.spec-accepts-some-absolute-uris-that-are-not-valid-uris]
     // [spec:gfm:def:inlines.autolinks.valid-email-autolink-example]
@@ -4218,7 +4203,6 @@ where
     // [spec:gfm:syn:inlines.autolinks-extension.extended-email-autolinks-insert-mailto-scheme]
     // [spec:gfm:syn:inlines.autolinks-extension.extended-autolink-path-validation]
     // [spec:gfm:def:inlines.autolinks-extension.gfm-enables-extended-autolinks]
-    // [spec:gfm:syn:inlines.autolinks-extension.extension-wrapper]
     // [spec:gfm:syn:inlines.autolinks-extension.left-angle-bracket-ends-autolink]
     // [spec:gfm:def:inlines.autolinks-extension.trailing-punctuation-is-excluded-from-autolinks]
     // [spec:gfm:syn:inlines.autolinks-extension.trailing-semicolon-is-excluded-when-it-looks-like-entity]
@@ -4376,14 +4360,13 @@ fn flush_text_piece<Ext>(pieces: &mut Vec<InlinePiece<Ext>>, text: &mut String) 
 // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-12-puts-excess-underscores-outside-emphasis]
 // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-13-applies-to-long-delimiter-runs]
 // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rule-13-requires-different-directly-nested-delimiters]
-// [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
+// [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
 // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.rules-illustrated-by-examples]
 // [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.less-common-but-useful-emphasis-patterns]
 // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.ambiguity-resolution-principles]
 // [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-markdown-description]
 // [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-markdown-description-quoted]
 // [spec:gfm:sem:inlines.emphasis-and-strong-emphasis.original-rules-leave-nesting-underdetermined]
-// [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.extension-wrapper]
 // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.literal-asterisk-cannot-edge-asterisk-emphasis]
 // [spec:gfm:syn:inlines.emphasis-and-strong-emphasis.literal-underscore-cannot-edge-underscore-delimiters]
 // [spec:gfm:def:appendix-a-parsing-strategy.phase-2-inline-structure.an-algorithm-for-parsing-nested-emphasis-and-links.trickiest-inline-case]
@@ -5402,7 +5385,6 @@ where
 // [spec:gfm:def:container-blocks.task-list-items-extension.marker-structure]
 // [spec:gfm:sem:container-blocks.task-list-items-extension.whitespace-marker-is-unchecked]
 // [spec:gfm:req:container-blocks.task-list-items-extension.checkbox-interaction-is-unspecified]
-// [spec:gfm:def:container-blocks.task-list-items-extension.extension-wrapper]
 // [spec:gfm:sem:container-blocks.task-list-items-extension.gfm-enables-task-list-extension]
 // [spec:gfm:syn:container-blocks.task-list-items-extension.task-lists-may-be-arbitrarily-nested]
 fn normalize_task_item<Ext>(mut children: Vec<ParsedBlock<Ext>>) -> Vec<ParsedBlock<Ext>>
@@ -5726,7 +5708,6 @@ const DISALLOWED_HTML_TAGS: &[&str] = &[
 // [spec:gfm:def:inlines.disallowed-raw-html-extension.gfm-enables-tagfilter-extension]
 // [spec:gfm:sem:inlines.disallowed-raw-html-extension.all-other-html-tags-are-left-untouched]
 // [spec:gfm:sem:inlines.disallowed-raw-html-extension.disallowed-tags-change-html-parsing]
-// [spec:gfm:def:inlines.disallowed-raw-html-extension.extension-wrapper]
 pub(crate) fn filter_disallowed_html(html: &str) -> String {
     let mut result = String::with_capacity(html.len());
     let mut i = 0;

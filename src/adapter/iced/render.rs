@@ -873,7 +873,7 @@ impl<R> Renderer<R> {
                 Some(s) => Some(s),
                 None => {
                     let mut borrow = self.highlighter.borrow_mut();
-                    // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
+                    // [spec:mw:req:highlighting.error-fallback]
                     let computed = borrow
                         .as_mut()
                         .and_then(|hl| hl.highlight(lang, literal).ok());

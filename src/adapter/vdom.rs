@@ -328,7 +328,7 @@ impl<R> VdomAdapter<R> {
             .filter(|s| !s.is_empty())?;
         let mut borrow = self.highlighter.borrow_mut();
         let hl = borrow.as_mut()?;
-        // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback]
+        // [spec:mw:req:highlighting.error-fallback]
         let spans = hl.highlight(lang, literal).ok()?;
         let html = crate::highlight::spans_to_html(literal, spans);
         let code = El::new("code")

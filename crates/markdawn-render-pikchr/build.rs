@@ -4,7 +4,13 @@ fn main() {
         return;
     }
 
-    let exports = ["_mw_render_pikchr", "_mw_string_free", "_malloc", "_free"].join(",");
+    let exports = [
+        "_mw_render_pikchr",
+        "_mw_render_pikchr_string_free",
+        "_malloc",
+        "_free",
+    ]
+    .join(",");
     let runtime_methods = [
         "cwrap",
         "ccall",

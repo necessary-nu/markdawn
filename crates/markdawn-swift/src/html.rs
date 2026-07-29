@@ -183,7 +183,7 @@ pub unsafe extern "C" fn mw_state_finish(state: *mut State) -> u32 {
 ///
 /// # Safety
 /// `state` must be a pointer returned by `mw_state_new` and not yet freed.
-// [spec:mw:req:ffi.ownership.string-free+1]
+// [spec:mw:req:ffi.ownership.string-free+2]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_render(state: *const State) -> *mut c_char {
     if state.is_null() {
@@ -198,7 +198,11 @@ pub unsafe extern "C" fn mw_state_render(state: *const State) -> *mut c_char {
 
 /// # Safety
 /// `ptr` must be a pointer returned by `mw_state_render` and not yet freed.
-// [spec:mw:req:ffi.ownership.string-free+1]
+// The Swift staticlib links one allocator into the host process and the grammar
+// plugins it loads never mint a `*mut c_char`, so there is no second heap here
+// to confuse this with — it keeps the unqualified name the published header
+// declares.
+// [spec:mw:req:ffi.ownership.string-free+2]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_string_free(ptr: *mut c_char) {
     if ptr.is_null() {
@@ -322,7 +326,7 @@ mod tests {
         unsafe { mw_state_free(state) };
     }
 
-    // [spec:mw:req:ffi.ownership.string-free+1/test]
+    // [spec:mw:req:ffi.ownership.string-free+2/test]
     #[test]
     fn rendered_string_round_trips_through_this_modules_free() {
         let state = mw_state_new();
