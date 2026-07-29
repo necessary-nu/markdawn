@@ -223,6 +223,72 @@ fn which_side_is_the_line_start_follows_the_lines_base_direction() {
     assert_eq!(far(&mixed_rtl), (Some(mixed_rtl.len()), Some(0)));
 }
 
+// ----- glyph order ------------------------------------------------------
+
+// [spec:mw:req:iced.paint.bidi-runs+1/test]
+#[test]
+fn glyph_order_follows_the_lines_base_direction() {
+    const RTL: &str = "\u{5d0}\u{5d1}\u{5d2}";
+
+    /// `(base_rtl, glyphs)` for the single visual line of `content`.
+    fn line_of(content: &str) -> (bool, Vec<(usize, usize, f32, f32)>) {
+        let (paragraph, _) = laid_out(content);
+        let rtl = paragraph.buffer().layout_runs().next().expect("a line").rtl;
+        (rtl, glyphs_of(&paragraph, 0))
+    }
+    let ascending = |g: &[(usize, usize, f32, f32)]| g.windows(2).all(|w| w[0].2 < w[1].2);
+    let descending = |g: &[(usize, usize, f32, f32)]| g.windows(2).all(|w| w[0].2 > w[1].2);
+    let bytes_ascending = |g: &[(usize, usize, f32, f32)]| g.windows(2).all(|w| w[0].0 < w[1].0);
+
+    // Base-LTR: boxes march rightwards. Pure LTR is the degenerate case
+    // where logical and visual order coincide, which is what made
+    // "screen-left-to-right visual order" look like a general rule.
+    let (rtl, g) = line_of("abc");
+    assert!(!rtl);
+    assert!(ascending(&g) && bytes_ascending(&g));
+
+    // Still base-LTR with an RTL run embedded: boxes keep ascending, but
+    // the embedded run's byte ranges are permuted.
+    let mixed_ltr = format!("abc {RTL}");
+    let (rtl, g) = line_of(&mixed_ltr);
+    assert!(!rtl);
+    assert!(ascending(&g), "base-LTR boxes ascend in x");
+    assert!(!bytes_ascending(&g), "the embedded RTL run reverses bytes");
+
+    // Base-RTL: boxes march LEFTWARDS. The first glyph carries the first
+    // bytes and sits at the greatest x; the last ends the line at x == 0.
+    let (rtl, g) = line_of(RTL);
+    assert!(rtl);
+    assert!(descending(&g), "base-RTL boxes descend in x: {g:?}");
+    assert_eq!(g.first().copied().map(|x| (x.0, x.1)), Some((0, 2)));
+    assert!(g.first().unwrap().2 > g.last().unwrap().2);
+    assert_eq!(g.last().unwrap().2, 0.0);
+
+    // Base-RTL with an LTR run embedded: boxes still descend throughout,
+    // and the embedded run permutes bytes.
+    let mixed_rtl = format!("{RTL} abc");
+    let (rtl, g) = line_of(&mixed_rtl);
+    assert!(rtl);
+    assert!(descending(&g), "base-RTL boxes descend in x: {g:?}");
+    assert!(!bytes_ascending(&g), "the embedded LTR run reverses bytes");
+
+    // The consequence for painting: the ascending-x precondition of
+    // `group_in_selection_glyphs` does not hold for a base-RTL line, so
+    // a logically contiguous selection of one is not coalesced. The
+    // rectangles still tile the selected glyphs exactly, so the painted
+    // region is right even though the decomposition is per-glyph.
+    let (_, g) = line_of(RTL);
+    let rects = group_in_selection_glyphs(&g, 0, RTL.len());
+    assert_eq!(rects.len(), g.len(), "one rectangle per glyph, not one run");
+    let leftmost = g.iter().map(|x| x.2).fold(f32::MAX, f32::min);
+    let rightmost = g.iter().map(|x| x.3).fold(f32::MIN, f32::max);
+    assert_eq!(
+        rects.iter().map(|r| r.1 - r.0).sum::<f32>(),
+        rightmost - leftmost,
+        "the rectangles tile the glyph extent without gap or overlap"
+    );
+}
+
 // ----- selected-text extraction -----------------------------------------
 
 fn state_for(content: &str) -> State<RealParagraph> {

@@ -113,6 +113,31 @@ on the corresponding `MARKDAWN_GV_NO_FORK` define from `build.rs` in
 goes through the in-process render path. Wasm sandboxes already
 provide the isolation the fork wrapper was buying.
 
+#### Demo page
+
+`crates/markdawn-wasm-emscripten/web/` is a browser playground — editor
+pane, HTML preview, lazily-loaded diagram renderers. Only
+`index.template.html` is committed; `index.html` and the eight
+`*.{js,wasm}` artifacts are generated and gitignored, so a fresh clone
+has nothing to serve until they are built.
+
+```sh
+crates/markdawn-wasm-emscripten/serve.sh
+```
+
+Needs `emscripten` and the `wasm32-unknown-emscripten` target (as
+above) plus `python3`. The script builds the core bundle and the three
+render crates — one `cargo build` each, because Cargo unifies features
+across packages built together — copies the artifacts into `web/`,
+inlines `examples/sample.md` into the template, and serves the result on
+port 8000.
+
+Re-run it after touching the Rust side. Each render module exports an
+engine-qualified free symbol (`mw_render_typst_string_free` and
+friends) that the page resolves by name, so artifacts older than the
+Rust source throw at the free call instead of quietly rendering stale
+output. A demo page failing there wants a rebuild, not a bug hunt.
+
 ## Workspace layout
 
 ```

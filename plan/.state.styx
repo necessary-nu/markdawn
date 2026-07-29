@@ -1024,6 +1024,9 @@ assertions (
     {id defects.test-coverage-gaps, kind @complete, author "brendan@necessary.nu", at 2026-07-29T22:39:25.842578Z}
     {id defects.lint-command-feature-coverage, kind @complete, author "brendan@necessary.nu", at 2026-07-29T23:18:54.367159Z}
     {id defects.spec-bodies-inaccurate, kind @complete, author "brendan@necessary.nu", at 2026-07-29T23:37:32.547901Z}
+    {id defects.iced-bidi-doc-misattached, kind @complete, author "brendan@necessary.nu", at 2026-07-29T23:56:04.467845Z}
+    {id defects.wasm-demo-build-undocumented, kind @complete, author "brendan@necessary.nu", at 2026-07-29T23:56:07.94455Z}
+    {id defects.uikit-syntax-logic-apple-bound, kind @complete, author "brendan@necessary.nu", at 2026-07-29T23:57:50.982215Z}
 )
 
 impl_evidence (

@@ -304,26 +304,54 @@ line they belong to.
 > the glyphs so selected text stays readable. A widget whose bounds
 > do not intersect the viewport draws nothing at all.
 
-> [spec:mw:req:iced.paint.bidi-runs]
+> [spec:mw:req:iced.paint.bidi-runs+1]
 > The highlight MUST be painted per visual line as one rectangle per
 > *visually contiguous* run of selected glyphs, each rectangle
 > taking the line's top and height and the run's horizontal extent,
 > with glyph byte ranges shifted by their line's offset before being
-> compared against the selection. A mixed-bidi line therefore yields
-> several rectangles with gaps between them, matching what
-> `Range::getClientRects()` produces in browsers; one rectangle
-> spanning first to last selected glyph would highlight text that is
-> not selected.
+> compared against the selection. One rectangle spanning first to
+> last selected glyph would highlight text that is not selected.
+>
+> The glyphs of a `LayoutRun` are ordered along the line's own reading
+> direction, decided by its base direction (`LayoutRun::rtl`) exactly
+> as in `[spec:mw:sem:iced.hit-test.outside-glyphs]` — NOT by whether
+> the line contains RTL text, and NOT screen-left-to-right
+> unconditionally. On a base-LTR line `x` ascends across the whole
+> line; on a base-RTL line `x` descends, so `"אבג"` places the glyph
+> for bytes 0..2 at the greatest `x` and the final glyph at `x == 0`.
+> Within either, an embedded run of opposing direction permutes byte
+> ranges while its boxes continue along the base direction. Grouping
+> MUST therefore consider glyph boxes in ascending-`x` order rather
+> than in the order cosmic-text supplies them.
+>
+> Gaps between rectangles arise from *byte* discontinuity, not from
+> the presence of RTL text: a selection whose logical range covers
+> only part of an embedded reversed run leaves the unselected glyphs
+> of that run as a hole, yielding several rectangles as
+> `Range::getClientRects()` does in browsers. A logically contiguous
+> selection of a single-direction line is one rectangle whichever
+> direction that is; see `[spec:mw:sem:iced.paint.glyph-run-grouping]`
+> for the coalescing predicate.
 
-> [spec:mw:sem:iced.paint.glyph-run-grouping]
+> [spec:mw:sem:iced.paint.glyph-run-grouping+1]
 > A glyph counts as selected when its byte range half-open overlaps
 > the selection (`glyph_start < hi && glyph_end > lo`), so an empty
 > range selects no glyph and paints nothing. Selected glyphs are
-> walked in visual order and coalesced into one run while the
-> horizontal gap between successive glyph boxes stays within
-> `ADJACENCY_EPSILON_PX` (0.5), so sub-pixel layout and kerning do
-> not shatter a run into hairline rectangles; a larger gap closes
-> the current run and opens a new one.
+> walked in the order supplied and coalesced into one run while the
+> next glyph's left edge stays within `ADJACENCY_EPSILON_PX` (0.5) of
+> the open run's right edge, so sub-pixel layout and kerning do not
+> shatter a run into hairline rectangles; a larger separation closes
+> the current run and opens a new one. An unselected glyph always
+> closes the open run.
+>
+> That comparison equals the true gap between adjacent glyph boxes
+> only while the boxes ascend in `x`, so ascending-`x` order is a
+> PRECONDITION on the caller. Fed boxes that descend — what
+> `layout_runs()` yields for a base-RTL line — it reads two abutting
+> boxes as separated by the sum of their advances and coalesces
+> nothing, emitting one rectangle per glyph. Byte ranges, by contrast,
+> may be permuted freely: an embedded reversed run is the normal case
+> and grouping depends on geometry alone.
 
 ## Inline replaced atoms
 

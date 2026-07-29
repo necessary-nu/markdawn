@@ -1593,12 +1593,20 @@ children (
                 id defects.wasm-demo-build-undocumented
                 title "README never mentions serve.sh, so the demo page cannot be built from a clone"
                 priority 2
+                sealed true
                 log (
                     {
                         at 2026-07-29T21:49:25.392491Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "crates/markdawn-wasm-emscripten/.gitignore excludes web/index.html and all eight web/*.{js,wasm} artifacts, and README.md contains no reference to serve.sh anywhere. So a fresh clone has web/index.template.html but no way to discover that crates/markdawn-wasm-emscripten/serve.sh is what turns it into a working page — it builds the four crates for wasm32-unknown-emscripten, copies the artifacts, inlines examples/sample.md into the template, and serves on :8000. The README's emscripten section documents the raw cargo build command but not the demo workflow. Made worse by the free-symbol rename in this batch: a stale artifact set now throws at the free call rather than merely being out of date, so someone with old artifacts sees a broken page rather than an old one. Fix is a few lines in README.md pointing at serve.sh and noting the artifacts are generated. Surfaced while rebuilding the artifacts after the mw_render_&lt;engine&gt;_string_free rename."
+                    }
+
+                    {
+                        at 2026-07-29T23:56:07.94455Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -1665,12 +1673,20 @@ children (
                 id defects.uikit-syntax-logic-apple-bound
                 title "Pure span logic is Apple-bound only by its return type, blocking host tests"
                 priority 2
+                sealed true
                 log (
                     {
                         at 2026-07-29T22:39:08.401994Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "uikit.syntax.capture-fallback, uikit.syntax.span-bounds and uikit.syntax.span-priority are pure data transformations — dotted-prefix capture-name fallback, UTF-8 to UTF-16 offset conversion with clamping, and a widest-first span sort. None of them needs Apple runtime objects to compute. They are untestable on this host only because capture_default_color returns Retained&lt;UIColor&gt; and the sort and bounds logic is inlined into build_highlighted, inside a subtree gated on cfg(target_os = \"ios\"). Extracting a platform-neutral capture_color_name(&amp;str) -&gt; Option&lt;&amp;str&gt;, the span-ordering comparator, and utf16_offset into a module that is not cfg-gated would make all three host-testable and would let the same logic be shared with any future non-Apple renderer that consumes spans. This is a refactor rather than a test gap, which is why it was filed separately instead of being done under defects.test-coverage-gaps. Worth noting span-bounds is the clamping rule — the review that first surfaced the uikit gaps called it \"the sharpest gap\" precisely because stale spans after an edit are a real failure mode and nothing verifies the clamp."
+                    }
+
+                    {
+                        at 2026-07-29T23:57:50.982215Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -1679,12 +1695,90 @@ children (
                 id defects.iced-bidi-doc-misattached
                 title "Bidi paint doc sits above the wrong function and misstates glyph order"
                 priority 2
+                sealed true
                 log (
                     {
                         at 2026-07-29T23:37:00.341604Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "src/adapter/iced/selectable.rs:1203-1225 has two /// blocks glued together: the \"Paint a selection highlight per UAX #9...\" doc belonging to paint_bidi_selection sits directly above hit_test_global_byte's own doc, so it documents the wrong function. Two consequences. First, a reader of hit_test_global_byte gets paint semantics. Second, the stray block asserts glyphs are \"in screen-left-to-right visual order\", which is false: a probe with real cosmic-text layout on the RTL string אבג puts glyphs[0] at x=15.05 and glyphs[2] at x=0.0 — logical order with descending x. That claim governs iced.paint.bidi-runs, so fixing it likely means correcting that rule body and bumping it, not just moving a comment. Found while closing defects.spec-bodies-inaccurate, which established that the hit-test discriminator is the line's base direction (LayoutRun::rtl) rather than whether the line contains RTL — the same confusion is probably what produced this doc."
+                    }
+
+                    {
+                        at 2026-07-29T23:56:04.467845Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id defects.wasm-bindgen-demo-undocumented
+                title "Second demo page and the wasm-pack toolchain are entirely undocumented"
+                priority 2
+                log (
+                    {
+                        at 2026-07-29T23:46:21.957413Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Exact parallel to defects.wasm-demo-build-undocumented, found while closing it. crates/markdawn-wasm-bindgen/serve.sh builds the wasm32-unknown-unknown playground via wasm-pack and serves two pages on port 8001 — an HTML target (index.html) and a Preact/vdom target (vdom.html) — with its own .gitignore excluding /web/*.wasm, /web/markdawn_wasm_*.{js,d.ts}, /web/index.html and /web/vdom.html. So both pages are generated and undiscoverable from a clone, same as the emscripten one was. Worse: grepping the README for wasm-pack returns nothing, so the toolchain prerequisite itself is undocumented — a reader cannot even install what they need. Fix is the same shape as the one just landed: a short README subsection naming the script, the wasm-pack prerequisite, the two pages and the port. Left unfixed because it is a different target section and wasm-pack was not available to verify the workflow end to end."
+                    }
+                )
+            }
+
+            {
+                id defects.demo-highlighting-needs-cdn
+                title "Demo highlighting comes from a CDN, so offline it looks like a broken feature"
+                priority 2
+                log (
+                    {
+                        at 2026-07-29T23:46:26.312253Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Syntax highlighting on the emscripten demo page does not come from the wasm build at all — it is a jsDelivr CDN script tag at crates/markdawn-wasm-emscripten/web/index.template.html:10, loading @arborium/arborium@1/dist/arborium.iife.js. Offline, or behind a network policy that blocks jsDelivr, the page loads and renders correctly but code blocks stay unhighlighted. The failure presents as a broken `highlight` feature in the wasm build rather than as a missing external resource, which is the wrong diagnosis to hand someone. Options: vendor the script next to the other generated artifacts, document the dependency plainly, or add a load-failure notice on the page. Note the highlight feature genuinely does work in the wasm build — this is only about where the demo page sources its highlighter, so nothing about the library is at fault."
+                    }
+                )
+            }
+
+            {
+                id defects.readme-workspace-layout-stale
+                title "README workspace layout lists one crate of about 110"
+                priority 2
+                log (
+                    {
+                        at 2026-07-29T23:46:29.750907Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "README's `## Workspace layout` section lists only markdawn-graphviz under crates/, while the workspace has roughly 110 members: the four wasm crates (wasm-bindgen, wasm-emscripten, wasm-pikchr), the three markdawn-render-* lazy shims, markdawn-swift, markdawn-android, and about 104 generated markdawn-swift-lang-* grammar plugins. This matters more now that the newly added Demo page section points a reader at crates/markdawn-wasm-emscripten/ — their only map of the workspace omits the directory they are being sent to. Worth deciding how to represent the 104 generated plugin crates: enumerating them would drown the section, so probably one line noting they are generated by crates/markdawn-swift/generate-plugins.sh and gitignored."
+                    }
+                )
+            }
+
+            {
+                id defects.iced-rtl-selection-rect-per-glyph
+                title "Base-RTL selection paints one rectangle per glyph instead of per run"
+                priority 2
+                log (
+                    {
+                        at 2026-07-29T23:55:46.973227Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found while closing defects.iced-bidi-doc-misattached, verified with real headless cosmic-text layout rather than inferred.\n\npaint_bidi_selection feeds layout_runs() glyphs straight into group_in_selection_glyphs, whose adjacency test computes next.x_left - run.x_right and so presumes glyph boxes ascend in x. That holds only when the line's base direction is LTR. LayoutRun::glyphs is ordered along the line's own reading direction — logical order per bidi run, runs sequenced along the base direction — so x ascends iff !run.rtl. On a base-RTL line the precondition is violated, two abutting boxes read as separated by the sum of their advances, coalescing never fires, and grouping degenerates to one rectangle per glyph: אבג gives 3 glyphs and 3 rects, אבג abc gives 7 and 7, the same with niqqud gives 11 and 11.\n\nImportantly this is a decomposition defect, not a wrong-pixels defect — that was checked, not assumed. The per-glyph rects tile the selected extent exactly: no gaps, no overlap, summed widths equal rightmost minus leftmost. It is not the \"one contiguous rectangle swallowing unselected text\" failure mode.\n\nWhat it does cost: it violates iced.paint.bidi-runs' own MUST of one rectangle per visually contiguous run; it multiplies fill_quad calls by glyph count on RTL text; and with the translucent 0.35-alpha fill at non-integer coordinates, abutting quads are a plausible source of visible seams at every glyph boundary — that last one is a risk rather than a confirmed artifact, since it needs a real surface to observe. Negative-width rects are reachable in principle if a merge happened under descending order, but effectively unreachable because the merge needs both advances to sum under 0.5px; the worst observed real case is a zero-width rect from a combining mark.\n\nFix is one line of intent — sort glyph boxes by x_left before grouping, or compare against the facing edge — but it changes rect counts, so the existing grouping fixtures move with it and iced.paint.glyph-run-grouping (now v1) would likely need another bump."
+                    }
+                )
+            }
+
+            {
+                id defects.iced-duplicates-span-logic-divergently
+                title "iced reimplements capture fallback, priority and bounds, two of them wrongly"
+                priority 1
+                log (
+                    {
+                        at 2026-07-29T23:57:40.498607Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found while extracting the platform-neutral span logic for defects.uikit-syntax-logic-apple-bound. src/adapter/iced/render.rs reimplements all three transformations that now live in src/highlight.rs, and two of the three disagree with the spec the UIKit path is held to.\n\n1. scope_color (render.rs:1693-1709) does scope.split('.').next() — it takes only the FIRST dotted component rather than walking successively shorter prefixes. So `string.escape` collapses to `string` in iced while resolving to its own Escape accent on UIKit. It also carries a second hardcoded palette, so the two adapters can drift in colour as well as in resolution.\n\n2. highlight_to_spans (render.rs:1663-1681) resolves priority as an innermost-wins plus higher-pattern_index-wins selection loop — the inverse formulation of order_spans' widest-first sort. Same intent, opposite construction, so they can disagree on ties.\n\n3. The same function clamps out-of-range offsets with .min(len) at render.rs:1648-1649 and :1665-1666, where uikit.syntax.span-bounds requires DISCARDING an out-of-range span. So a stale span after an edit renders clamped-and-styled in iced and unstyled in UIKit — the divergence is user-visible, not cosmetic.\n\nFiled P1 rather than P2 because (3) is a spec conformance difference between two shipping renderers, not a tidiness issue. The fix is for the iced path to consume SyntaxAccent + capture_accent + order_spans + utf16_range so there is one capture vocabulary, one priority policy and one bounds policy. Note that would also let the three uikit.syntax.* rules be restated as renderer-neutral rules rather than UIKit-specific ones, since the logic is no longer Apple-bound — worth deciding at the same time."
                     }
                 )
             }

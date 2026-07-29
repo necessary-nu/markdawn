@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build the wasm bundle, copy it next to index.html, then serve.
 # Run from anywhere; paths are absolute relative to this script.
+# Documented under "Demo page" in the repo README.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -891,15 +891,26 @@ enum Clipped {
 }
 
 /// Pure helper for unit-testing the per-line bidi grouping logic.
-/// Takes a slice of glyphs in visual (left-to-right) order, each as
-/// `(g_lo, g_hi, x_left, x_right)` where `[g_lo, g_hi)` is the glyph's
-/// logical byte range and `[x_left, x_right]` is its horizontal extent.
-/// Returns one `(x_start, x_end)` pair per visually-contiguous run of
-/// glyphs whose byte range overlaps `[lo, hi)`.
+/// Takes a slice of glyphs, each as `(g_lo, g_hi, x_left, x_right)`
+/// where `[g_lo, g_hi)` is the glyph's logical byte range and
+/// `[x_left, x_right]` is its horizontal extent. Returns one
+/// `(x_start, x_end)` pair per visually-contiguous run of glyphs whose
+/// byte range overlaps `[lo, hi)`.
+///
+/// PRECONDITION: the glyphs must be in ascending-`x_left` order. Runs
+/// are extended by comparing the next glyph's `x_left` against the
+/// open run's right edge, which only measures the true inter-box gap
+/// when the boxes march rightwards. Byte ranges may be permuted
+/// freely — that is what an embedded reversed bidi run looks like —
+/// but the boxes may not go backwards.
+///
+/// `paragraph.buffer().layout_runs()` satisfies this for a base-LTR
+/// line and violates it for a base-RTL one, where `x` descends; see
+/// `paint_bidi_selection`.
 ///
 /// This is the algorithmic core of `paint_bidi_selection`, extracted
 /// so it can be unit-tested without an iced runtime.
-// [spec:mw:sem:iced.paint.glyph-run-grouping]
+// [spec:mw:sem:iced.paint.glyph-run-grouping+1]
 fn group_in_selection_glyphs(
     glyphs: &[(usize, usize, f32, f32)],
     lo: usize,
@@ -1066,11 +1077,14 @@ fn substitute_atoms_in_range<P: text::Paragraph>(state: &State<P>, lo: usize, hi
 /// index (set by iced's `with_spans` bridge), so we can recognize
 /// atom glyphs in the post-layout glyph stream.
 ///
-/// Per visual line (one `LayoutRun`), we walk glyphs left-to-right,
-/// accumulate consecutive same-atom glyphs into a bounding rect, and
-/// emit a `draw_svg` call for each completed run. This produces ONE
-/// SVG draw per atom per visual line — matches inline-block
-/// rendering in browsers.
+/// Per visual line (one `LayoutRun`), we walk glyphs in the order
+/// cosmic-text supplies them, accumulate consecutive same-atom glyphs
+/// into a bounding rect, and emit a `draw_svg` call for each completed
+/// run. This produces ONE SVG draw per atom per visual line — matches
+/// inline-block rendering in browsers. Runs are broken on span index
+/// and the rect is accumulated with `min`/`max`, so unlike
+/// `group_in_selection_glyphs` this is indifferent to whether `x`
+/// ascends or descends across the line.
 // [spec:mw:req:iced.atom.baseline-paint]
 fn paint_atoms<R: text::Renderer + svg::Renderer>(
     renderer: &mut R,
@@ -1200,22 +1214,6 @@ fn emit_atom_svg<R: svg::Renderer>(
     renderer.draw_svg(svg_widget, bounds + translation, widget_bounds);
 }
 
-/// Paint a selection highlight per UAX #9 / CSS Pseudo-Elements 4 §3.5.
-///
-/// Walks `paragraph.buffer().layout_runs()` directly via cosmic-text.
-/// One `LayoutRun` per visual line; within each, glyphs are in
-/// screen-left-to-right visual order and carry their logical byte
-/// range (`start`/`end`) plus position (`x`, `w`). For each visual
-/// line, glyphs whose byte range overlaps the selection are grouped
-/// into visually-contiguous runs and painted as one rectangle each.
-/// Mixed-bidi lines naturally produce multiple rectangles with gaps
-/// — matching the rendering Range::getClientRects() returns in
-/// browsers.
-///
-/// Falls back to a no-op if the concrete `Renderer::Paragraph` isn't
-/// `iced_graphics::text::Paragraph` (the only impl in iced 0.14, but
-/// the trait is open). Legitimate fallback: no highlight is better
-/// than a wrong one.
 /// Hit-test a point against the paragraph's cosmic-text Buffer
 /// directly, returning a flat_text-global byte offset. iced's
 /// `Hit::CharOffset` discards the line index and only reports
@@ -1242,7 +1240,42 @@ fn hit_test_global_byte<P: text::Paragraph + 'static>(
     paragraph.hit_test(point).map(|h| h.cursor())
 }
 
-// [spec:mw:req:iced.paint.bidi-runs]
+/// Paint a selection highlight per UAX #9 / CSS Pseudo-Elements 4 §3.5.
+///
+/// Walks `paragraph.buffer().layout_runs()` directly via cosmic-text.
+/// One `LayoutRun` per visual line; within each, glyphs carry their
+/// logical byte range (`start`/`end`) plus position (`x`, `w`).
+///
+/// Glyphs arrive in the visual order the line itself *reads*, which is
+/// screen-left-to-right only when the line's base direction is LTR.
+/// The discriminator is `LayoutRun::rtl` (the line's bidi paragraph
+/// level), not whether the line contains any RTL text:
+///
+/// * base-LTR (`rtl == false`) — `x` ascends across the whole line,
+///   including a line like `"abc אבג"` that embeds an RTL run; the
+///   embedded run's byte ranges are permuted, but its glyph boxes are
+///   still laid left to right.
+/// * base-RTL (`rtl == true`) — `x` *descends*: `"אבג"` places
+///   `glyphs[0]` (bytes 0..2) at the far right and the last glyph at
+///   `x == 0.0`. An embedded LTR run (`"אבג abc"`) permutes bytes the
+///   same way, but the boxes keep marching leftwards.
+///
+/// So glyph order is neither purely logical nor purely
+/// screen-left-to-right: it is logical order per bidi run, with the
+/// runs themselves sequenced along the base direction.
+///
+/// For each visual line, glyphs whose byte range overlaps the
+/// selection are grouped into visually-contiguous runs and painted as
+/// one rectangle each. A base-LTR line that embeds a reversed run
+/// therefore produces multiple rectangles with gaps between them —
+/// matching the rendering `Range::getClientRects()` returns in
+/// browsers.
+///
+/// Falls back to a no-op if the concrete `Renderer::Paragraph` isn't
+/// `iced_graphics::text::Paragraph` (the only impl in iced 0.14, but
+/// the trait is open). Legitimate fallback: no highlight is better
+/// than a wrong one.
+// [spec:mw:req:iced.paint.bidi-runs+1]
 fn paint_bidi_selection<R: text::Renderer>(
     renderer: &mut R,
     paragraph: &R::Paragraph,
@@ -1698,10 +1731,10 @@ mod tests {
 
     // ─── group_in_selection_glyphs (UAX #9 painting core) ───────
 
-    // [spec:mw:sem:iced.paint.glyph-run-grouping/test]
+    // [spec:mw:sem:iced.paint.glyph-run-grouping+1/test]
     #[test]
     fn grouping_pure_ltr_contiguous() {
-        // Bytes monotonic with visual idx; a single contiguous run.
+        // Bytes monotonic with x; a single contiguous run.
         let glyphs = [
             (0, 1, 0.0, 10.0),
             (1, 2, 10.0, 20.0),
@@ -1712,27 +1745,32 @@ mod tests {
         assert_eq!(group_in_selection_glyphs(&glyphs, 1, 3), vec![(10.0, 30.0)],);
     }
 
-    // [spec:mw:req:iced.paint.bidi-runs/test]
+    // [spec:mw:req:iced.paint.bidi-runs+1/test]
     #[test]
-    fn grouping_pure_rtl_contiguous() {
-        // RTL: visual order left-to-right but bytes descending.
+    fn grouping_reversed_run_in_a_base_ltr_line() {
+        // A wholly-reversed run inside a base-LTR line: boxes still
+        // ascend in x, only the byte ranges are permuted. (This is NOT
+        // what a base-RTL line looks like — there x descends; see
+        // `glyph_order_follows_the_lines_base_direction`.)
         let glyphs = [
-            (3, 4, 0.0, 10.0), // visually leftmost = last logical
+            (3, 4, 0.0, 10.0), // leftmost box = last logical byte
             (2, 3, 10.0, 20.0),
             (1, 2, 20.0, 30.0),
-            (0, 1, 30.0, 40.0), // visually rightmost = first logical
+            (0, 1, 30.0, 40.0), // rightmost box = first logical byte
         ];
-        // Selection [1, 3): glyphs at visual idx 1 and 2 (bytes 1,2,3 overlap).
+        // Selection [1, 3): the two middle boxes (bytes 1,2 overlap).
         assert_eq!(group_in_selection_glyphs(&glyphs, 1, 3), vec![(10.0, 30.0)],);
     }
 
-    // [spec:mw:req:iced.paint.bidi-runs/test]
+    // [spec:mw:req:iced.paint.bidi-runs+1/test]
     #[test]
     fn grouping_mixed_bidi_two_rects_with_gap() {
-        // "Hello عربي world" simplified — visual order left to right.
-        // visual idx 0..4 = LTR bytes 0..4
-        // visual idx 4..8 = RTL bytes 4..8 in reverse logical order
-        // visual idx 8..12 = LTR bytes 8..12
+        // "Hello عربي world" simplified. Base-LTR, so boxes ascend in x
+        // across the whole line and the embedded RTL run only permutes
+        // byte ranges:
+        // idx 0..4  = LTR bytes 0..4
+        // idx 4..8  = RTL bytes 4..8 in reverse logical order
+        // idx 8..12 = LTR bytes 8..12
         let glyphs = [
             (0, 1, 0.0, 10.0),    // 'H' visual 0
             (1, 2, 10.0, 20.0),   // 'e' visual 1
@@ -1761,7 +1799,7 @@ mod tests {
         );
     }
 
-    // [spec:mw:sem:iced.paint.glyph-run-grouping/test]
+    // [spec:mw:sem:iced.paint.glyph-run-grouping+1/test]
     #[test]
     fn grouping_empty_selection_yields_no_rects() {
         let glyphs = [(0, 1, 0.0, 10.0), (1, 2, 10.0, 20.0)];
@@ -1772,7 +1810,7 @@ mod tests {
         );
     }
 
-    // [spec:mw:sem:iced.paint.glyph-run-grouping/test]
+    // [spec:mw:sem:iced.paint.glyph-run-grouping+1/test]
     #[test]
     fn grouping_subpixel_gap_coalesces() {
         // Two glyphs whose x extents are 0.3 px apart should merge.
