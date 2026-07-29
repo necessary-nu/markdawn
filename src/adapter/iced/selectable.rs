@@ -153,6 +153,12 @@ impl Selection {
 /// width in the text flow but renders as an arbitrary widget. Modeled
 /// after browsers' inline-block / Flutter's `WidgetSpan`.
 // [spec:mw:def:iced.widget.inline-atom]
+// `Span` is the large variant (~334 bytes of `text::Span`) and also the
+// overwhelmingly common one — every text run in a document is one, and
+// `view()` rebuilds the whole atom vec on each iced message. Boxing it
+// to even out the variants would trade a fixed 230 bytes of enum slack
+// for a heap allocation per text run on the render hot path.
+#[allow(clippy::large_enum_variant)]
 pub enum InlineAtom<'a, F = crate::iced_shim::Font> {
     /// A regular text span — same as `text::Span` to `iced::widget::rich_text`.
     Span(text::Span<'a, String, F>),
@@ -333,7 +339,7 @@ where
                 // Build a non-breaking placeholder of digits wide
                 // enough to occupy ≈ em_width worth of horizontal space.
                 let n = ((em_width / PLACEHOLDER_EM_ADVANCE).ceil() as usize).max(1);
-                let placeholder: String = std::iter::repeat(PLACEHOLDER_CHAR).take(n).collect();
+                let placeholder: String = std::iter::repeat_n(PLACEHOLDER_CHAR, n).collect();
                 let mut placeholder_span = text::Span::new(placeholder).color(Color::TRANSPARENT);
                 if let Some(href) = link.clone() {
                     placeholder_span = placeholder_span.link(href);
@@ -799,24 +805,21 @@ where
                 shell.request_redraw();
             }
             Event::Mouse(mouse::Event::CursorMoved { .. }) => {
-                if self.selection.is_dragging() {
-                    if let Some(pos) = cursor.position() {
-                        self.selection.drag_to(pos);
-                        shell.request_redraw();
-                    }
+                if self.selection.is_dragging()
+                    && let Some(pos) = cursor.position()
+                {
+                    self.selection.drag_to(pos);
+                    shell.request_redraw();
                 }
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 // Link click resolution.
-                if let Some(handler) = &self.on_link_click {
-                    if let Some(pressed) = state.span_pressed.take() {
-                        if Some(pressed) == state.hovered_link {
-                            if let Some(link) = self.spans.get(pressed).and_then(|s| s.link.clone())
-                            {
-                                shell.publish(handler(link));
-                            }
-                        }
-                    }
+                if let Some(handler) = &self.on_link_click
+                    && let Some(pressed) = state.span_pressed.take()
+                    && Some(pressed) == state.hovered_link
+                    && let Some(link) = self.spans.get(pressed).and_then(|s| s.link.clone())
+                {
+                    shell.publish(handler(link));
                 }
                 self.selection.release();
                 shell.request_redraw();
@@ -1086,50 +1089,50 @@ fn paint_atoms<R: text::Renderer + svg::Renderer>(
         // cosmic-text's absolute baseline y for this visual line.
         // We paint atoms with their alphabetic baseline aligned here.
         let baseline_y = run.line_y;
-        let mut current: Option<(usize, f32, f32, f32)> = None; // (span_idx, x_min, x_max, font_size)
+        let mut current: Option<AtomRun> = None;
         for glyph in run.glyphs {
             let span_idx = glyph.metadata;
             let is_atom = atom_meta.get(span_idx).and_then(|a| a.as_ref()).is_some();
             let g_x0 = glyph.x;
             let g_x1 = glyph.x + glyph.w;
             let g_size = glyph.font_size;
+            let glyph_run = AtomRun {
+                span_idx,
+                x_min: g_x0,
+                x_max: g_x1,
+                font_size: g_size,
+            };
             match current {
-                Some((idx, x_min, x_max, size)) if is_atom && idx == span_idx => {
-                    current = Some((idx, x_min.min(g_x0), x_max.max(g_x1), size));
+                Some(cur) if is_atom && cur.span_idx == span_idx => {
+                    current = Some(AtomRun {
+                        x_min: cur.x_min.min(g_x0),
+                        x_max: cur.x_max.max(g_x1),
+                        ..cur
+                    });
                 }
-                Some((idx, x_min, x_max, size)) => {
+                Some(cur) => {
                     emit_atom_svg(
                         renderer,
                         atom_meta,
-                        idx,
-                        x_min,
-                        x_max,
+                        cur,
                         baseline_y,
-                        size,
                         translation,
                         widget_bounds,
                     );
-                    current = if is_atom {
-                        Some((span_idx, g_x0, g_x1, g_size))
-                    } else {
-                        None
-                    };
+                    current = if is_atom { Some(glyph_run) } else { None };
                 }
                 None if is_atom => {
-                    current = Some((span_idx, g_x0, g_x1, g_size));
+                    current = Some(glyph_run);
                 }
                 None => {}
             }
         }
-        if let Some((idx, x_min, x_max, size)) = current {
+        if let Some(cur) = current {
             emit_atom_svg(
                 renderer,
                 atom_meta,
-                idx,
-                x_min,
-                x_max,
+                cur,
                 baseline_y,
-                size,
                 translation,
                 widget_bounds,
             );
@@ -1137,18 +1140,26 @@ fn paint_atoms<R: text::Renderer + svg::Renderer>(
     }
 }
 
-fn emit_atom_svg<R: svg::Renderer>(
-    renderer: &mut R,
-    atom_meta: &[Option<AtomMeta>],
+/// The stretch of placeholder glyphs one Replaced atom occupies on a
+/// single visual line: which span it belongs to, its horizontal extent,
+/// and the font size cosmic-text shaped those glyphs at.
+#[derive(Clone, Copy)]
+struct AtomRun {
     span_idx: usize,
     x_min: f32,
     x_max: f32,
+    font_size: f32,
+}
+
+fn emit_atom_svg<R: svg::Renderer>(
+    renderer: &mut R,
+    atom_meta: &[Option<AtomMeta>],
+    atom_run: AtomRun,
     baseline_y: f32,
-    placeholder_font_size: f32,
     translation: Vector,
     widget_bounds: Rectangle,
 ) {
-    let Some(atom) = atom_meta.get(span_idx).and_then(|a| a.as_ref()) else {
+    let Some(atom) = atom_meta.get(atom_run.span_idx).and_then(|a| a.as_ref()) else {
         return;
     };
     // Paint at the SVG's NATURAL dimensions — not the placeholder
@@ -1163,17 +1174,17 @@ fn emit_atom_svg<R: svg::Renderer>(
     // slack (placeholder digits being slightly wider than the SVG
     // due to PLACEHOLDER_EM_ADVANCE approximation) is balanced
     // left/right.
-    let svg_width = atom.em_width * placeholder_font_size;
-    let svg_height = atom.em_height * placeholder_font_size;
-    let placeholder_width = x_max - x_min;
+    let svg_width = atom.em_width * atom_run.font_size;
+    let svg_height = atom.em_height * atom_run.font_size;
+    let placeholder_width = atom_run.x_max - atom_run.x_min;
     let x_offset = ((placeholder_width - svg_width) / 2.0).max(0.0);
     // Empirical 2px upward bias: mathml-core's reported baseline
     // sits slightly below the text's optical baseline at typical
     // body sizes, so the math reads as "sinking" without the lift.
     const BASELINE_LIFT_PX: f32 = 0.75;
-    let svg_top = baseline_y - atom.em_baseline * placeholder_font_size - BASELINE_LIFT_PX;
+    let svg_top = baseline_y - atom.em_baseline * atom_run.font_size - BASELINE_LIFT_PX;
     let bounds = Rectangle {
-        x: x_min + x_offset,
+        x: atom_run.x_min + x_offset,
         y: svg_top,
         width: svg_width,
         height: svg_height,
@@ -1407,11 +1418,11 @@ where
                 }
             }
             Event::Mouse(mouse::Event::CursorMoved { .. }) => {
-                if self.selection.is_dragging() {
-                    if let Some(pos) = cursor.position() {
-                        self.selection.drag_to(pos);
-                        shell.request_redraw();
-                    }
+                if self.selection.is_dragging()
+                    && let Some(pos) = cursor.position()
+                {
+                    self.selection.drag_to(pos);
+                    shell.request_redraw();
                 }
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {

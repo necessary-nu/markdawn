@@ -46,17 +46,12 @@ impl std::error::Error for AnsiError {}
 // under `Basic16` and a `terminal` transcript's truecolour cells are
 // quantised before they are re-encoded.
 // [spec:mw:req:ansi.adapter.color-depth+1]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ColorDepth {
     Basic16,
+    #[default]
     Ansi256,
     TrueColor,
-}
-
-impl Default for ColorDepth {
-    fn default() -> Self {
-        ColorDepth::Ansi256
-    }
 }
 
 /// Render configuration.

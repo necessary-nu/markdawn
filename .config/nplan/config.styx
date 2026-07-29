@@ -7,11 +7,16 @@ platforms (
                 cmd "cargo fmt --all -- --check"
                 fix "cargo fmt --all"
             }
+            // Both checks carry every headless-safe feature: without them
+            // the modules behind each flag are compiled out and neither
+            // linted nor tested. `iced-app` stays out — it needs a window
+            // and a GPU surface — but plain `iced` shapes text through a
+            // process-global FontSystem and runs headless.
             lint {
-                cmd "cargo clippy --no-deps -p markdawn -p markdawn-graphviz --all-targets -- -D warnings"
+                cmd "cargo clippy --no-deps -p markdawn -p markdawn-graphviz --all-targets --features markdawn/ansi,markdawn/terminal,markdawn/dioxus,markdawn/pikchr,markdawn/graphviz,markdawn/typst,markdawn/serde,markdawn/tracey,markdawn/iced -- -D warnings"
             }
             test {
-                cmd "cargo nextest run --workspace --features markdawn/ansi,markdawn/terminal,markdawn/dioxus,markdawn/pikchr,markdawn/graphviz,markdawn/typst,markdawn/serde,markdawn/tracey"
+                cmd "cargo nextest run --workspace --features markdawn/ansi,markdawn/terminal,markdawn/dioxus,markdawn/pikchr,markdawn/graphviz,markdawn/typst,markdawn/serde,markdawn/tracey,markdawn/iced"
             }
         }
     }

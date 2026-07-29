@@ -96,7 +96,7 @@ impl World for RenderWorld {
             return Ok(self.main_source.clone());
         }
         let bytes = read_package_file(id)?;
-        let text = std::str::from_utf8(&bytes)
+        let text = std::str::from_utf8(bytes)
             .map_err(|_| FileError::InvalidUtf8)?
             .to_owned();
         Ok(Source::new(id, text))
@@ -135,7 +135,7 @@ fn read_package_file(id: FileId) -> FileResult<&'static [u8]> {
     BUNDLED_PACKAGES
         .get_file(&rel)
         .map(|f| f.contents())
-        .ok_or_else(|| FileError::NotFound(rel.into()))
+        .ok_or_else(|| FileError::NotFound(rel))
 }
 
 /// Build the `preview/{name}/{version}/{path}` lookup key inside the

@@ -168,6 +168,17 @@ pub(crate) enum CachedSvg {
         /// Set for math atoms; None for code-block diagrams.
         atom_metrics: Option<MathMetrics>,
     },
+    /// A remembered failure, carrying the renderer's message.
+    //
+    // The only reader is `render_diagram_error`, which exists only when a
+    // diagram engine feature is on; the always-compiled math path falls
+    // back to the LaTeX source in monospace without surfacing the
+    // message. So the payload is written-never-read in exactly one
+    // configuration, and the allow is scoped to it.
+    #[cfg_attr(
+        not(any(feature = "pikchr", feature = "graphviz", feature = "typst")),
+        allow(dead_code)
+    )]
     Err(String),
 }
 
@@ -535,14 +546,13 @@ impl<R> Renderer<R> {
         let inner = Column::new().spacing(4).push(header).push(body);
         container(inner)
             .padding(Padding::default().left(12).right(12).top(8).bottom(8))
-            .style(move |_theme: &Theme| {
-                let mut style = container::Style::default();
-                style.border = Border {
+            .style(move |_theme: &Theme| container::Style {
+                border: Border {
                     color: accent,
                     width: 1.0,
                     radius: 4.0.into(),
-                };
-                style
+                },
+                ..container::Style::default()
             })
             .into()
     }
@@ -560,8 +570,7 @@ impl<R> Renderer<R> {
     {
         let start = start.unwrap_or(1);
         let mut col = Column::new().spacing(if tight { 2 } else { 6 });
-        let mut idx: u64 = 0;
-        for child in children {
+        for (idx, child) in (0_u64..).zip(children) {
             let marker = if ordered {
                 format!("{}.", start + idx)
             } else {
@@ -582,7 +591,6 @@ impl<R> Renderer<R> {
             ]
             .spacing(4);
             col = col.push(row_widget);
-            idx += 1;
         }
         col.into()
     }
@@ -600,17 +608,16 @@ impl<R> Renderer<R> {
     {
         let mut col = Column::new().spacing(if tight { 2 } else { 6 });
         for (i, child) in children.iter().enumerate() {
-            if tight {
-                if let Node::Paragraph {
+            if tight
+                && let Node::Paragraph {
                     children: inlines, ..
                 } = child
-                {
-                    if i > 0 {
-                        col = col.push(text(" "));
-                    }
-                    col = col.push(self.render_paragraph(inlines));
-                    continue;
+            {
+                if i > 0 {
+                    col = col.push(text(" "));
                 }
+                col = col.push(self.render_paragraph(inlines));
+                continue;
             }
             col = col.push(self.render_node(child, task_id));
         }
@@ -1024,11 +1031,11 @@ impl<R> Renderer<R> {
                 }
             }
             Node::Subscript { children, .. } => {
-                if let Some(plain) = flatten_to_plain(children) {
-                    if let Some(unicode) = to_unicode_subscript(&plain) {
-                        out.push(InlineAtom::Span(span(unicode).font(base_font)));
-                        return;
-                    }
+                if let Some(plain) = flatten_to_plain(children)
+                    && let Some(unicode) = to_unicode_subscript(&plain)
+                {
+                    out.push(InlineAtom::Span(span(unicode).font(base_font)));
+                    return;
                 }
                 // Fallback: scaled-down text (no Unicode equivalent
                 // for some characters, or children contain nested
@@ -1040,11 +1047,11 @@ impl<R> Renderer<R> {
                 }
             }
             Node::Superscript { children, .. } => {
-                if let Some(plain) = flatten_to_plain(children) {
-                    if let Some(unicode) = to_unicode_superscript(&plain) {
-                        out.push(InlineAtom::Span(span(unicode).font(base_font)));
-                        return;
-                    }
+                if let Some(plain) = flatten_to_plain(children)
+                    && let Some(unicode) = to_unicode_superscript(&plain)
+                {
+                    out.push(InlineAtom::Span(span(unicode).font(base_font)));
+                    return;
                 }
                 let mut nested = Vec::new();
                 self.collect_inline_atoms(children, &mut nested, base_font);
@@ -1244,15 +1251,16 @@ fn blend_italic(base: Font) -> Font {
 
 // [spec:mw:req:iced.renderer.theme-independence]
 fn code_block_style(code_style: IcedCodeStyle) -> container::Style {
-    let mut style = container::Style::default();
-    style.background = Some(Background::Color(code_style.block_background));
-    style.text_color = Some(code_style.block_foreground);
-    style.border = Border {
-        color: code_style.block_border,
-        width: 1.0,
-        radius: 3.0.into(),
-    };
-    style
+    container::Style {
+        background: Some(Background::Color(code_style.block_background)),
+        text_color: Some(code_style.block_foreground),
+        border: Border {
+            color: code_style.block_border,
+            width: 1.0,
+            radius: 3.0.into(),
+        },
+        ..container::Style::default()
+    }
 }
 
 // [spec:mw:req:iced.renderer.image-policy+1]
@@ -1361,13 +1369,12 @@ fn try_inline_image_atom(destination: &str, alt: &str) -> Option<InlineAtom<'sta
         percent_decode(rest).into_bytes()
     } else if let Some(rest) = destination.strip_prefix(prefix_plain) {
         percent_decode(rest).into_bytes()
-    } else if let Some(rest) = destination.strip_prefix(prefix_b64) {
+    } else {
         use base64::Engine;
+        let rest = destination.strip_prefix(prefix_b64)?;
         base64::engine::general_purpose::STANDARD
             .decode(rest.trim())
             .ok()?
-    } else {
-        return None;
     };
     let (px_w, px_h) = parse_svg_dimensions(&svg_bytes)?;
     const BODY_FONT: f32 = 16.0;
@@ -1669,10 +1676,10 @@ fn highlight_to_spans(
             }
         }
         let mut sp = span(src[lo..hi].to_string()).font(MONOSPACE);
-        if let Some(s) = best {
-            if let Some((r, g, b)) = scope_color(&s.capture) {
-                sp = sp.color(Color::from_rgb(r, g, b));
-            }
+        if let Some(s) = best
+            && let Some((r, g, b)) = scope_color(&s.capture)
+        {
+            sp = sp.color(Color::from_rgb(r, g, b));
         }
         out.push(sp);
     }

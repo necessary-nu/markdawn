@@ -209,7 +209,7 @@ fn strip_leading_marker_from_inlines<Ext>(children: &mut Vec<Node<Ext>>, mut to_
             Node::Text { text, source } => {
                 let take = to_strip.min(text.len());
                 let new = text[take..].to_string();
-                let trimmed = new.trim_start_matches(|c: char| c == ' ' || c == '\t');
+                let trimmed = new.trim_start_matches([' ', '\t']);
                 let drop_extra = new.len() - trimmed.len();
                 let new = trimmed.to_string();
                 *source = SourceSpan::new(source.start + take + drop_extra, source.end);

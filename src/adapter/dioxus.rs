@@ -461,19 +461,18 @@ impl<R> Renderer<R> {
     where
         R: RenderDioxusCustom<Ext>,
     {
-        if tight {
-            if let Node::Paragraph {
+        if tight
+            && let Node::Paragraph {
                 children: inlines, ..
             } = child
-            {
-                // Tight list: skip the <p> wrapper, optionally insert a soft
-                // break between consecutive paragraphs.
-                let leading_break = idx > 0;
-                return rsx! {
-                    if leading_break { "\n" }
-                    {self.render_children(inlines)}
-                };
-            }
+        {
+            // Tight list: skip the <p> wrapper, optionally insert a soft
+            // break between consecutive paragraphs.
+            let leading_break = idx > 0;
+            return rsx! {
+                if leading_break { "\n" }
+                {self.render_children(inlines)}
+            };
         }
         let _ = total;
         self.render_node(child)
@@ -686,30 +685,30 @@ impl<R> Renderer<R> {
 
         // 1. pikchr (feature-gated)
         #[cfg(feature = "pikchr")]
-        if self.options.pikchr && info_lang == Some("pikchr") {
-            if let Ok(svg) = crate::pikchr_render::render(literal) {
-                if svg.len() <= crate::svg_sanitize::MAX_SVG_BYTES {
-                    let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
-                    let final_svg = crate::svg_text_to_paths::text_to_paths(&sanitized);
-                    return rsx! {
-                        div { class: "pikchr", dangerous_inner_html: final_svg }
-                    };
-                }
-            }
+        if self.options.pikchr
+            && info_lang == Some("pikchr")
+            && let Ok(svg) = crate::pikchr_render::render(literal)
+            && svg.len() <= crate::svg_sanitize::MAX_SVG_BYTES
+        {
+            let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
+            let final_svg = crate::svg_text_to_paths::text_to_paths(&sanitized);
+            return rsx! {
+                div { class: "pikchr", dangerous_inner_html: final_svg }
+            };
         }
 
         // 1b. graphviz (feature-gated)
         #[cfg(feature = "graphviz")]
-        if self.options.graphviz && matches!(info_lang, Some("dot") | Some("graphviz")) {
-            if let Ok(svg) = markdawn_graphviz::render_dot_to_svg(literal) {
-                if svg.len() <= crate::svg_sanitize::MAX_SVG_BYTES {
-                    let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
-                    let final_svg = crate::svg_text_to_paths::text_to_paths(&sanitized);
-                    return rsx! {
-                        div { class: "graphviz", dangerous_inner_html: final_svg }
-                    };
-                }
-            }
+        if self.options.graphviz
+            && matches!(info_lang, Some("dot") | Some("graphviz"))
+            && let Ok(svg) = markdawn_graphviz::render_dot_to_svg(literal)
+            && svg.len() <= crate::svg_sanitize::MAX_SVG_BYTES
+        {
+            let sanitized = crate::svg_sanitize::sanitize_svg(&svg);
+            let final_svg = crate::svg_text_to_paths::text_to_paths(&sanitized);
+            return rsx! {
+                div { class: "graphviz", dangerous_inner_html: final_svg }
+            };
         }
 
         // 1c. typst (feature-gated)

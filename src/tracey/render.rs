@@ -142,23 +142,17 @@ pub fn render(markdown: &str, opts: &RenderOptions) -> Result<Document, RenderEr
     }
 
     // Collect headings, reqs, paragraphs, and inline code spans.
-    let mut headings = Vec::new();
-    let mut reqs = Vec::new();
-    let mut elements = Vec::new();
-    let mut inline_code_spans = Vec::new();
-    let mut heading_stack: Vec<(u8, String)> = Vec::new();
+    let mut sink = MetadataSink::default();
     for node in &nodes {
-        collect_metadata(
-            node,
-            markdown,
-            base_offset,
-            &mut headings,
-            &mut reqs,
-            &mut elements,
-            &mut inline_code_spans,
-            &mut heading_stack,
-        );
+        collect_metadata(node, markdown, base_offset, &mut sink);
     }
+    let MetadataSink {
+        headings,
+        reqs,
+        elements,
+        inline_code_spans,
+        ..
+    } = sink;
 
     // Pre-render each Req Custom node's body HTML into a string so we can drop
     // it into the document via Node::Html. We use a fresh HtmlAdapter (no
@@ -227,17 +221,25 @@ fn build_html_adapter() -> HtmlAdapter<()> {
     adapter
 }
 
+/// Accumulators threaded through [`collect_metadata`]'s recursive walk:
+/// the document-order outputs plus the ancestor-heading stack that
+/// drives hierarchical heading ids.
+#[derive(Default)]
+struct MetadataSink {
+    headings: Vec<Heading>,
+    reqs: Vec<ReqDefinition>,
+    elements: Vec<DocElement>,
+    inline_code_spans: Vec<InlineCodeSpan>,
+    heading_stack: Vec<(u8, String)>,
+}
+
 // [spec:mw:req:traceyext.span.absolute-offsets]
 // [spec:mw:req:traceyext.heading.slug]
 fn collect_metadata(
     node: &Node<TraceyExt>,
     source: &str,
     base_offset: usize,
-    headings: &mut Vec<Heading>,
-    reqs: &mut Vec<ReqDefinition>,
-    elements: &mut Vec<DocElement>,
-    inline_code_spans: &mut Vec<InlineCodeSpan>,
-    heading_stack: &mut Vec<(u8, String)>,
+    sink: &mut MetadataSink,
 ) {
     match node {
         Node::Heading {
@@ -251,16 +253,20 @@ fn collect_metadata(
 
             // Pop any deeper-or-equal-level frames so the stack reflects
             // strictly-shallower ancestors of the current heading.
-            while heading_stack.last().is_some_and(|(lvl, _)| *lvl >= *level) {
-                heading_stack.pop();
+            while sink
+                .heading_stack
+                .last()
+                .is_some_and(|(lvl, _)| *lvl >= *level)
+            {
+                sink.heading_stack.pop();
             }
 
             // Hierarchical id: ancestor slugs joined by `--`.
-            let id = if heading_stack.is_empty() {
+            let id = if sink.heading_stack.is_empty() {
                 slug.clone()
             } else {
                 let mut acc = String::new();
-                for (_, parent) in heading_stack.iter() {
+                for (_, parent) in sink.heading_stack.iter() {
                     acc.push_str(parent);
                     acc.push_str("--");
                 }
@@ -268,7 +274,7 @@ fn collect_metadata(
                 acc
             };
 
-            heading_stack.push((*level, slug));
+            sink.heading_stack.push((*level, slug));
 
             let h = Heading {
                 title,
@@ -276,8 +282,8 @@ fn collect_metadata(
                 level: *level,
                 line,
             };
-            headings.push(h.clone());
-            elements.push(DocElement::Heading(h));
+            sink.headings.push(h.clone());
+            sink.elements.push(DocElement::Heading(h));
         }
         Node::Custom {
             payload: TraceyExt::Req(p),
@@ -302,11 +308,11 @@ fn collect_metadata(
                 raw,
                 html: body_html,
             };
-            reqs.push(req.clone());
-            elements.push(DocElement::Req(req));
+            sink.reqs.push(req.clone());
+            sink.elements.push(DocElement::Req(req));
             // Walk children for inline code spans only (no nested reqs/headings expected).
             for child in children {
-                collect_inline_code(child, source, base_offset, inline_code_spans);
+                collect_inline_code(child, source, base_offset, &mut sink.inline_code_spans);
             }
         }
         Node::Paragraph {
@@ -314,27 +320,18 @@ fn collect_metadata(
             children,
         } => {
             let line = byte_offset_to_line(source, span.start + base_offset);
-            elements.push(DocElement::Paragraph(Paragraph {
+            sink.elements.push(DocElement::Paragraph(Paragraph {
                 line,
                 offset: span.start + base_offset,
             }));
             for child in children {
-                collect_inline_code(child, source, base_offset, inline_code_spans);
+                collect_inline_code(child, source, base_offset, &mut sink.inline_code_spans);
             }
         }
         _ => {
             // Recurse into containers.
             walk_block_children(node, |child| {
-                collect_metadata(
-                    child,
-                    source,
-                    base_offset,
-                    headings,
-                    reqs,
-                    elements,
-                    inline_code_spans,
-                    heading_stack,
-                );
+                collect_metadata(child, source, base_offset, sink);
             });
         }
     }
@@ -447,9 +444,7 @@ fn req_raw_text(source: &str, span: &MdSpan, base_offset: usize, p: &ReqPayload)
     // Strip the marker and any leading whitespace after it.
     let marker_rel = p.marker_offset.saturating_sub(abs_start);
     let after_marker = block.get(marker_rel + p.marker_length..).unwrap_or(block);
-    after_marker
-        .trim_start_matches(|c: char| c == ' ' || c == '\t')
-        .to_string()
+    after_marker.trim_start_matches([' ', '\t']).to_string()
 }
 
 fn render_children_to_html(children: &[Node<TraceyExt>]) -> String {

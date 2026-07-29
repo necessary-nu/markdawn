@@ -45,10 +45,8 @@ static CONFIG: LazyLock<SanitizerConfig> = LazyLock::new(|| {
         for el in elements.iter_mut() {
             let is_svg_a =
                 el.name == "a" && el.namespace.as_deref() == Some("http://www.w3.org/2000/svg");
-            if is_svg_a {
-                if let Some(attrs) = el.attributes.as_mut() {
-                    attrs.push(SanitizerAttribute::xlink("href"));
-                }
+            if is_svg_a && let Some(attrs) = el.attributes.as_mut() {
+                attrs.push(SanitizerAttribute::xlink("href"));
             }
         }
     }
@@ -78,10 +76,18 @@ pub fn sanitize_svg(svg: &str) -> String {
 mod tests {
     use super::*;
 
+    // Exercises the guard rather than the constant: the cap is enforced
+    // in `crate::finalize_diagram_svg`, the shared tail every diagram
+    // engine funnels through before its SVG reaches the host document.
     // [spec:adv:req:output.size-cap/test]
+    #[cfg(any(feature = "pikchr", feature = "graphviz", feature = "typst"))]
     #[test]
-    fn size_cap_constant_bounds_expected() {
-        assert!(MAX_SVG_BYTES >= 1024 * 1024);
+    fn oversize_svg_never_reaches_host_document() {
+        let under_cap = r#"<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>"#.to_owned();
+        assert!(crate::finalize_diagram_svg(under_cap).is_some());
+
+        let over_cap = " ".repeat(MAX_SVG_BYTES + 1);
+        assert_eq!(crate::finalize_diagram_svg(over_cap), None);
     }
 
     // [spec:adv:req:output.no-stylesheet-pi/test]

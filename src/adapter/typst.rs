@@ -467,9 +467,9 @@ impl<R> TypstAdapter<R> {
                     if alt.is_empty() {
                         out.push_str("(image)");
                     } else {
-                        out.push_str("_");
+                        out.push('_');
                         write_typst_text(alt, out);
-                        out.push_str("_");
+                        out.push('_');
                     }
                     out.push(']');
                 } else {

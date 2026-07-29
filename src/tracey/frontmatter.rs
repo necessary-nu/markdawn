@@ -90,10 +90,10 @@ pub fn strip_frontmatter(markdown: &str) -> StrippedFrontmatter<'_> {
 
     let mut best_match: Option<(usize, usize)> = None;
     for pattern in &closing_patterns {
-        if let Some(pos) = search_area.find(pattern) {
-            if best_match.is_none() || pos < best_match.unwrap().0 {
-                best_match = Some((pos, pattern.len()));
-            }
+        if let Some(pos) = search_area.find(pattern)
+            && best_match.is_none_or(|(best, _)| pos < best)
+        {
+            best_match = Some((pos, pattern.len()));
         }
     }
 

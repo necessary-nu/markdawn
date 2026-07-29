@@ -122,7 +122,7 @@ fn grid_from_screen(screen: &vt100::Screen) -> TermGrid {
         for col in 0..cols {
             let cell = screen
                 .cell(row, col)
-                .map(|c| cell_from_vt100(c))
+                .map(cell_from_vt100)
                 .unwrap_or_default();
             line.push(cell);
         }
@@ -333,7 +333,7 @@ pub fn ansi_snapshot_grid(literal: &str, cols: Option<u16>, rows: Option<u16>) -
     let cols = cols.unwrap_or(DEFAULT_COLS).max(1);
     // First pass: feed into a tall emulator to find out how many rows
     // the content actually needs, then clip down. 200 is the hard cap.
-    let probe_rows = rows.unwrap_or(MAX_AUTO_ROWS).min(MAX_AUTO_ROWS).max(1);
+    let probe_rows = rows.unwrap_or(MAX_AUTO_ROWS).clamp(1, MAX_AUTO_ROWS);
     let mut emu = TermEmulator::with_size(probe_rows, cols, 0);
     emu.feed_str(literal);
     let grid = emu.snapshot();

@@ -39,6 +39,13 @@ children (
                 kind @note
                 text "Read-only API survey of ntreesitter vs arborium, findings for planning the backend swap.\n\nBLOCKER — grammar coverage. arborium ships 104 grammars; ntreesitter-catalog ships 11 (c, cpp, html, javascript, json, lean, markdown, rust, silo, tsx, typescript). 93 missing, including bash, python, go, java, ruby, php, swift, kotlin, css, yaml, toml, sql. imports/inventory.json shows a deliberate staged import from arborium at revision 2d7ac7f1 with blake3-pinned provenance, so this is a backlog rather than an oversight — but the import cadence is not determinable from the repos and no schedule is credible until it is answered.\n\nPLUGIN PROTOCOL IS A REDESIGN, NOT A RENAME. Per-language `mw_lang_<name>_init(RegisterFn)` becomes one universal `ntreesitter_provider_v1()` returning a repr(C) descriptor; the callback handoff inverts (host pulls a descriptor rather than the plugin calling mw_register_grammar, which has no counterpart). The single-symbol model breaks the current loader design — you cannot dlsym the same symbol from 104 cdylibs without per-handle resolution, so the Swift and JNI loaders need reworking. Descriptor surface is much wider than the current template emits: aliases, extensions, exact filenames, injection targets, parser ABI and provenance hashes, none of which exist in arborium's per-language crates. ntreesitter defines the ABI but ships no dynamic loader — that stays markdawn's job.\n\nNO HTML EMITTER. arborium::advanced::spans_to_html has no ntreesitter equivalent; markdawn must own a span-to-HTML serializer (src/highlight.rs:118-127).\n\nSPAN SEMANTICS — one real divergence. Byte offsets, half-open ranges, raw capture names and nesting all survive. But `priority` is NOT arborium's `pattern_index`: it is a monotonic emission-order counter assigned after the upstream engine resolves query precedence, not highlights.scm line order. Losing captures are never surfaced, so re-deciding equal-range captures by query order is gone rather than renamed. Partially-overlapping non-nested spans cannot occur (strict stack), making the word \"overlapping\" in highlighting.span-semantics inaccurate.\n\nOTHER DESIGN DECISIONS NEEDED. Registry construction is fallible and rejects ambiguous aliases at build time, where arborium tolerated collisions — with 104 merged alias sets, collisions are likely and unpredictable until descriptors exist. DynamicRegistry hands out immutable generation-tracked snapshots, so VdomPipeline pinning a store at construction will silently not see late-registered languages. HighlightOutput carries a new `diagnostics` vec for non-fatal partial-injection failures that the current boundary cannot express. ntreesitter vendors tree-sitter 0.26.8 with links = \"tree-sitter\" and pins tree-sitter-language =0.1.7, while markdawn's swift lang crates depend on 0.1 — check for a links collision early.\n\nSPEC RULES NEEDING REWRITE: highlighting.span-semantics (priority and overlapping wording), uikit.syntax.span-priority (names pattern_index explicitly), highlighting.arborium-transition (retire or generalise to provider-transition), highlighting.api (needs a diagnostics clause). uikit.syntax.capture-fallback and span-bounds are unaffected.\n\nBUILD: ntreesitter generates parsers at build time from grammar.json + scanner.c with blake3 verification rather than shipping ~100 MB of pre-generated static data, so build time rises and artifact size falls, per-crate. Feature story maps cleanly (catalog has one feature per language, default all). wasm is first-class and spec'd, unlike arborium."
             }
+
+            {
+                at 2026-07-29T22:56:18.029406Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator has parked the arborium-to-ntreesitter migration: ntreesitter is still being built out and is not relevant to markdawn right now. This supersedes the scope widening recorded earlier — the backend swap is NOT active work on this node. What remains in scope here is the original renderer-neutral SyntaxHighlighter / SyntaxSpan / HighlightError seam, which is exactly the right thing to finish regardless: it is what lets the backend be swapped later without touching every renderer again. Keep arborium behind the seam. The survey findings recorded above stay valid as preparation and should be re-read rather than re-derived when the migration is picked up; the gating fact is that ntreesitter's catalog covers 11 languages against arborium's 104, with a tooled but per-file-curated import (xtask import / catalog / normalization / metadata, 230 provenance-tracked entries for those 11). Do not re-open the migration until the operator raises it."
+            }
         )
     }
 
@@ -1598,14 +1605,29 @@ children (
 
             {
                 id defects.lint-command-feature-coverage
-                title "Declared lint check runs default features, so feature-gated modules are never linted"
+                title "Declared checks skip feature-gated code, including all of iced"
                 priority 1
+                sealed true
                 log (
                     {
                         at 2026-07-29T21:54:31.405713Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Direct sibling of defects.test-command-feature-coverage, which was fixed by adding the seven headless-safe features to the test command. The lint command has the identical hole and was not fixed at the same time: `cargo clippy --no-deps -p markdawn -p markdawn-graphviz --all-targets -- -D warnings` runs under default features (highlight-all-languages), so every module behind ansi, terminal, dioxus, pikchr, graphviz, typst, serde or tracey is compiled out and never linted. Adding the same feature set surfaces 12 pre-existing clippy errors in src/adapter/typst.rs, src/svg_sanitize.rs, src/svg_text_to_paths.rs, src/typst/world.rs and src/typst/mod.rs — single_char_add_str, collapsible_if, needless_borrow, useless_conversion, assertions_on_constants. None are new; they have simply never been visible to the gate. Fixing means clearing those 12 first, then extending the lint command to match the test command's feature set, otherwise the gate goes red on landing. Note the iced features stay out of both commands (iced-app needs a window and GPU surface), so iced remains unlinted by design and carries its own known clippy debt. Surfaced by the agent fixing defects.uikit-diagram-engine-output-unsanitised, which ran clippy with features on to check its own work."
+                    }
+
+                    {
+                        at 2026-07-29T22:57:05.912034Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Widened to absorb the retired defects.iced-excluded-from-gate. Full scope now: (1) clear the 12 pre-existing clippy errors that the seven headless-safe features expose in src/adapter/typst.rs, src/svg_sanitize.rs, src/svg_text_to_paths.rs, src/typst/world.rs and src/typst/mod.rs — single_char_add_str, collapsible_if, needless_borrow, useless_conversion, assertions_on_constants; (2) clear the 17 pre-existing lints under --features iced in src/adapter/iced/render.rs and selectable.rs — explicit_counter_loop, collapsible_if, field_reassign_with_default, one dead_code; (3) add the seven features plus iced to the lint command in .config/nplan/config.styx; (4) add iced to the test command, which currently misses 36 tests written for iced rules plus every pre-existing iced test. Order matters: clear the lints before extending the commands, or the gate goes red on landing. iced-app stays out of both — it needs a window and a GPU surface, unlike iced."
+                    }
+
+                    {
+                        at 2026-07-29T23:18:54.367159Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -1620,20 +1642,6 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found while closing defects.test-coverage-gaps: four rule bodies assert things the implementation does not do. Each was caught by someone trying to write the test the rule implies and finding it fail.\n\n1. core.error.location — says byte_offset is \"an offset into the parser's normalized buffer — after line-ending and tab normalization\". Both halves false. Every top-level InlineParser is constructed with base_offset: 0 (src/parser.rs:1979, :5300), so the offset is relative to the containing block's inline run, not the buffer — a CRLF document with an error on line 3 reports offset 1 where the normalized-buffer offset is 6. And normalize_chunk (src/parser.rs:2253) maps only NUL to U+FFFD and CR/CRLF to LF; there is no tab normalization anywhere. Left impl-only rather than annotated, because a verify site would attest to a contract the code does not honour.\n\n2. editing.serialize.round-trip v1 — one clause stale: \"Subscript and Superscript come back as Html\". They do not. promote_semantic_html (src/parser.rs:1993) unconditionally promotes <sub>/<sup> back to Node::Subscript/Superscript, so they round-trip faithfully. Every other documented loss in that rule was verified and is real.\n\n3. iced.hit-test.outside-glyphs — the bidi clause is wrong. It says a point right of every glyph is the logical end of the line's byte coverage \"under LTR, RTL and mixed-bidi layout alike\". For a pure-RTL line, buffer().hit(5000, y) resolves to 0 — the logical start. The LTR clauses are all verified and correct.\n\n4. iced.renderer.parse-failure-empty — describes dead code, not merely hard-to-reach code. Renderer::render builds its own parser with no extensions and no max_input_bytes, and the only three Error variants a parse can yield are InputTooLarge (needs a cap), InvalidExtensionMatch (needs an extension) and MalformedEventStream (an Option::ok_or on str::chars().next() that cannot fire for valid UTF-8). The Err(_) => column![] arm is unreachable under the public API. Either the rule should say so, or the arm should go.\n\nFixing these means rewriting the bodies and bumping versions; for (4) it may mean deleting code instead."
-                    }
-                )
-            }
-
-            {
-                id defects.iced-excluded-from-gate
-                title "iced feature is in neither the test nor the lint check"
-                priority 1
-                log (
-                    {
-                        at 2026-07-29T22:38:41.978601Z
-                        author "brendan@necessary.nu"
-                        kind @note
-                        text "Third instance of the same class as defects.test-command-feature-coverage and defects.lint-command-feature-coverage. `--features markdawn/iced` appears in neither the test nor the lint command in .config/nplan/config.styx, so every iced test — including 36 written while closing defects.test-coverage-gaps — never runs under the gate, and src/adapter/iced/ is never linted. Both are green-or-fixable rather than blocked: `cargo nextest run --workspace --features markdawn/iced` passes with 881 tests, but `cargo clippy --features iced --all-targets -- -D warnings` fails with 17 pre-existing lints in render.rs and selectable.rs (explicit_counter_loop, collapsible_if, field_reassign_with_default, one dead_code). The original reason for excluding iced was that iced-app needs a window and a GPU surface — but note that is `iced-app`, not `iced`. A useful discovery from the test work: iced_graphics::text::Paragraph shapes through a process-global FontSystem, so real cosmic-text glyph layout IS available headless, which is how the hit-test rules got genuinely tested. So `iced` alone may well be gate-safe; verify, clear the 17 lints, then add it to both commands. Keep iced-app out."
                     }
                 )
             }

@@ -1022,6 +1022,7 @@ assertions (
     {id defects.core-spec-padding, kind @complete, author "brendan@necessary.nu", at 2026-07-29T19:16:04.836944Z}
     {id defects.uikit-diagram-engine-output-unsanitised, kind @complete, author "brendan@necessary.nu", at 2026-07-29T21:54:36.84092Z}
     {id defects.test-coverage-gaps, kind @complete, author "brendan@necessary.nu", at 2026-07-29T22:39:25.842578Z}
+    {id defects.lint-command-feature-coverage, kind @complete, author "brendan@necessary.nu", at 2026-07-29T23:18:54.367159Z}
 )
 
 impl_evidence (

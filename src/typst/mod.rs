@@ -250,14 +250,12 @@ fn format_diagnostics<W: typst::World>(
             s.push('\n');
         }
         s.push_str(&diag.message);
-        if let Some(id) = diag.span.id() {
-            if let Ok(source) = world.source(id) {
-                if let Some(range) = world.range(diag.span) {
-                    if let Some((line, col)) = source.lines().byte_to_line_column(range.start) {
-                        s.push_str(&format!(" (line {}, col {})", line + 1, col + 1));
-                    }
-                }
-            }
+        if let Some(id) = diag.span.id()
+            && let Ok(source) = world.source(id)
+            && let Some(range) = world.range(diag.span)
+            && let Some((line, col)) = source.lines().byte_to_line_column(range.start)
+        {
+            s.push_str(&format!(" (line {}, col {})", line + 1, col + 1));
         }
         for hint in &diag.hints {
             s.push_str("\n  hint: ");

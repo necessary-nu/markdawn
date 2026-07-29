@@ -94,12 +94,13 @@ pub fn text_to_paths(svg: &str) -> String {
     let mut i = 0;
     while i < svg.len() {
         let rest_bytes = &svg.as_bytes()[i..];
-        if rest_bytes[0] == b'<' && starts_with_ci(rest_bytes, b"<text") {
-            if let Some((consumed, replacement)) = try_convert_text(rest_bytes) {
-                out.push_str(&replacement);
-                i += consumed;
-                continue;
-            }
+        if rest_bytes[0] == b'<'
+            && starts_with_ci(rest_bytes, b"<text")
+            && let Some((consumed, replacement)) = try_convert_text(rest_bytes)
+        {
+            out.push_str(&replacement);
+            i += consumed;
+            continue;
         }
         let ch = svg[i..].chars().next().unwrap();
         out.push(ch);
@@ -144,10 +145,7 @@ fn try_convert_text(bytes: &[u8]) -> Option<(usize, String)> {
         if ch.is_control() {
             continue;
         }
-        let (face, glyph_id) = match find_glyph(ch, primary) {
-            Some(p) => p,
-            None => return None,
-        };
+        let (face, glyph_id) = find_glyph(ch, primary)?;
         let upem = face.units_per_em();
         if upem == 0 {
             return None;
@@ -349,22 +347,22 @@ fn unescape_xml(s: &str) -> String {
     let mut i = 0;
     let bytes = s.as_bytes();
     while i < bytes.len() {
-        if bytes[i] == b'&' {
-            if let Some(end) = bytes[i..].iter().position(|&b| b == b';') {
-                let entity = &s[i + 1..i + end];
-                let replaced = match entity {
-                    "amp" => Some('&'),
-                    "lt" => Some('<'),
-                    "gt" => Some('>'),
-                    "quot" => Some('"'),
-                    "apos" => Some('\''),
-                    _ => None,
-                };
-                if let Some(c) = replaced {
-                    out.push(c);
-                    i += end + 1;
-                    continue;
-                }
+        if bytes[i] == b'&'
+            && let Some(end) = bytes[i..].iter().position(|&b| b == b';')
+        {
+            let entity = &s[i + 1..i + end];
+            let replaced = match entity {
+                "amp" => Some('&'),
+                "lt" => Some('<'),
+                "gt" => Some('>'),
+                "quot" => Some('"'),
+                "apos" => Some('\''),
+                _ => None,
+            };
+            if let Some(c) = replaced {
+                out.push(c);
+                i += end + 1;
+                continue;
             }
         }
         let ch = s[i..].chars().next().unwrap_or('\0');
