@@ -131,17 +131,22 @@ behind `terminal`.
 > character arrives — so a run of escapes with no text between them
 > collapses to nothing. `finish` closes the open span before returning.
 
-> [spec:mw:req:ansi.to-html.osc8]
+> [spec:mw:req:ansi.to-html.osc8+1]
 > An OSC dispatch is acted on only when its first parameter is exactly
 > `8`; every other OSC is dropped. The URL is the *third* parameter
 > (index 2), matching the `ESC ] 8 ; params ; URL ST` shape; an absent
 > or empty URL is the closing form and only closes the anchor. Opening
 > and closing MUST both close any open `<span>` *before* touching the
 > `<a>`, so spans always nest strictly inside anchors and never straddle
-> the anchor boundary; `finish` likewise closes span before link. The
-> emitted `href` escapes `&`, `<` and `"` — `>` is deliberately not
-> escaped, being inert inside a quoted attribute — and the URL is
-> otherwise passed through verbatim: no scheme allowlist, percent-
+> the anchor boundary; `finish` likewise closes span before link.
+>
+> The URL MUST be checked against the scheme allow-list
+> (`[spec:adv:req:markdown.url-allowlist]`) before it is emitted. A URL
+> that fails yields an empty `href`; the `<a>` is still written, because
+> suppressing it would leave the run with no closing tag and break the
+> nesting invariant above. An accepted URL is escaped for `&`, `<` and
+> `"` — `>` is deliberately not escaped, being inert inside a quoted
+> attribute — and is otherwise passed through verbatim: no percent-
 > encoding or normalisation is applied at this layer.
 
 > [spec:mw:req:ansi.to-html.text-and-controls]

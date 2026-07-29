@@ -198,8 +198,8 @@ impl Perform for HtmlWriter {
 
     // Close the span before touching the anchor in both directions, so
     // spans nest strictly inside `<a>` and never straddle its boundary.
-    // The URL is passed through verbatim — no scheme allowlist here.
-    // [spec:mw:req:ansi.to-html.osc8]
+    // [spec:mw:req:ansi.to-html.osc8+1]
+    // [spec:adv:req:markdown.url-allowlist]
     fn osc_dispatch(&mut self, params: &[&[u8]], _bell_terminated: bool) {
         // OSC 8 hyperlinks: `ESC ] 8 ; params ; URL ST`.
         if params.first().map(|p| p.as_ref()) != Some(b"8".as_slice()) {
@@ -213,13 +213,20 @@ impl Perform for HtmlWriter {
             return; // Closing sequence.
         }
         let url = String::from_utf8_lossy(url).into_owned();
+        // The fragment this emits is spliced directly into host HTML, so a
+        // disallowed scheme is neutralised to an empty href. The anchor is
+        // still emitted: dropping it would leave the run without a closing
+        // tag and break the span-nesting invariant above.
+        let safe = crate::url_safety::is_safe_url(&url);
         self.out.push_str("<a href=\"");
-        for ch in url.chars() {
-            match ch {
-                '&' => self.out.push_str("&amp;"),
-                '<' => self.out.push_str("&lt;"),
-                '"' => self.out.push_str("&quot;"),
-                _ => self.out.push(ch),
+        if safe {
+            for ch in url.chars() {
+                match ch {
+                    '&' => self.out.push_str("&amp;"),
+                    '<' => self.out.push_str("&lt;"),
+                    '"' => self.out.push_str("&quot;"),
+                    _ => self.out.push(ch),
+                }
             }
         }
         self.out.push_str("\">");
@@ -387,13 +394,50 @@ mod tests {
         assert!(out.contains("color:#"));
     }
 
-    // [spec:mw:req:ansi.to-html.osc8/test]
+    // [spec:mw:req:ansi.to-html.osc8+1/test]
     #[test]
     fn osc8_hyperlink_roundtrips() {
         let out = ansi_to_html("\x1b]8;;https://silo.dev\x1b\\click\x1b]8;;\x1b\\");
         assert!(out.contains("<a href=\"https://silo.dev\">"));
         assert!(out.contains("click"));
         assert!(out.contains("</a>"));
+    }
+
+    // [spec:mw:req:ansi.to-html.osc8+1/test]
+    // [spec:adv:req:markdown.url-allowlist/test]
+    #[test]
+    fn osc8_disallowed_scheme_yields_empty_href() {
+        for url in [
+            "javascript:alert(1)",
+            "vbscript:msgbox(1)",
+            "data:text/html;base64,PHNjcmlwdD4=",
+            // Control characters are stripped during browser scheme
+            // parsing, so this reaches `javascript:` if passed through.
+            "jav\tascript:alert(1)",
+        ] {
+            let out = ansi_to_html(&format!("\x1b]8;;{url}\x1b\\click\x1b]8;;\x1b\\"));
+            assert!(
+                out.contains("<a href=\"\">"),
+                "expected neutralised href for {url:?}, got: {out}"
+            );
+            assert!(!out.contains("javascript:"), "leaked scheme for {url:?}");
+            assert!(!out.contains("vbscript:"), "leaked scheme for {url:?}");
+            // The anchor still closes, so span nesting stays intact.
+            assert!(out.contains("</a>"), "unclosed anchor for {url:?}");
+            assert!(out.contains("click"), "lost link text for {url:?}");
+        }
+    }
+
+    // [spec:mw:req:ansi.to-html.osc8+1/test]
+    #[test]
+    fn osc8_relative_and_fragment_urls_are_allowed() {
+        for url in ["/docs/index.html", "#anchor", "notes.md"] {
+            let out = ansi_to_html(&format!("\x1b]8;;{url}\x1b\\go\x1b]8;;\x1b\\"));
+            assert!(
+                out.contains(&format!("<a href=\"{url}\">")),
+                "expected {url:?} to survive, got: {out}"
+            );
+        }
     }
 
     // [spec:mw:req:ansi.to-html.text-and-controls/test]

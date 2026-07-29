@@ -27,6 +27,7 @@ children (
             }
         )
     }
+
     {
         id parsing
         title "Markdown parsing"
@@ -36,7 +37,6 @@ children (
                 id parsing.preliminaries
                 title "Characters, lines, tabs and whitespace"
                 priority 1
-                deps (core)
                 implements {
                     main (
                         [spec:gfm:def:preliminaries.characters-and-lines.ascii-punctuation-character-definition]
@@ -61,12 +61,13 @@ children (
                         [spec:gfm:syn:preliminaries.characters-and-lines.valid-commonmark-document]
                     )
                 }
+                deps (core)
             }
+
             {
                 id parsing.document-model
                 title "Blocks, inlines and precedence"
                 priority 1
-                deps (core)
                 implements {
                     main (
                         [spec:gfm:def:blocks-and-inlines.container-and-leaf-blocks-definition]
@@ -75,12 +76,13 @@ children (
                         [spec:gfm:thm:blocks-and-inlines.precedence.two-phase-parsing]
                     )
                 }
+                deps (core)
             }
+
             {
                 id parsing.leaf-blocks
                 title "Leaf block grammar"
                 priority 1
-                deps (parsing.preliminaries parsing.document-model)
                 implements {
                     main (
                         [spec:gfm:def:leaf-blocks.blank-lines.extension-wrapper]
@@ -308,12 +310,13 @@ children (
                         [spec:gfm:thm:leaf-blocks.html-blocks.types-1-through-5-may-contain-blank-lines]
                     )
                 }
+                deps (parsing.preliminaries parsing.document-model)
             }
+
             {
                 id parsing.container-blocks
                 title "Container block grammar"
                 priority 1
-                deps (parsing.preliminaries parsing.document-model)
                 implements {
                     main (
                         [spec:gfm:def:container-blocks.basic-kinds-are-block-quotes-and-list-items]
@@ -471,12 +474,13 @@ children (
                         [spec:gfm:thm:container-blocks.lists.uniformity-supports-list-interruption]
                     )
                 }
+                deps (parsing.preliminaries parsing.document-model)
             }
+
             {
                 id parsing.inlines
                 title "Inline grammar and emphasis resolution"
                 priority 1
-                deps (parsing.preliminaries parsing.document-model)
                 implements {
                     main (
                         [spec:gfm:def:inlines.autolinks-extension.definition]
@@ -792,12 +796,13 @@ children (
                         [spec:gfm:thm:inlines.emphasis-and-strong-emphasis.rules-capture-patterns-without-backtracking]
                     )
                 }
+                deps (parsing.preliminaries parsing.document-model)
             }
+
             {
                 id parsing.strategy
                 title "Two-phase parsing algorithm"
                 priority 1
-                deps (parsing.leaf-blocks parsing.container-blocks parsing.inlines)
                 implements {
                     main (
                         [spec:gfm:def:appendix-a-parsing-strategy.overview.document-is-represented-as-tree-of-blocks]
@@ -848,9 +853,11 @@ children (
                         [spec:gfm:sem:appendix-a-parsing-strategy.phase-2-inline-structure.phase-2-parses-inline-content]
                     )
                 }
+                deps (parsing.leaf-blocks parsing.container-blocks parsing.inlines)
             }
         )
     }
+
     {
         id rendering
         title "Rendering adapters"
@@ -860,7 +867,6 @@ children (
                 id rendering.html
                 title "HTML and virtual-DOM adapters"
                 priority 2
-                deps (core)
                 implements {
                     main (
                         [spec:mw:def:html.adapter.surface]
@@ -874,12 +880,13 @@ children (
                         [spec:mw:sem:html.serialize.emission]
                     )
                 }
+                deps (core)
             }
+
             {
                 id rendering.dioxus
                 title "Dioxus SSR adapter"
                 priority 2
-                deps (rendering.html)
                 implements {
                     main (
                         [spec:mw:def:dioxus.surface.entry-points]
@@ -890,12 +897,13 @@ children (
                         [spec:mw:sem:dioxus.render.totality]
                     )
                 }
+                deps (rendering.html)
             }
+
             {
                 id rendering.iced
                 title "Iced GUI adapter and text selection"
                 priority 2
-                deps (core markdawn-highlighter-boundary)
                 implements {
                     main (
                         [spec:mw:def:iced.copy.fragment]
@@ -946,12 +954,13 @@ children (
                         [spec:mw:sem:iced.selection.release-finalizes]
                     )
                 }
+                deps (core markdawn-highlighter-boundary)
             }
+
             {
                 id rendering.uikit
                 title "UIKit adapter"
                 priority 2
-                deps (core markdawn-highlighter-boundary)
                 implements {
                     main (
                         [spec:mw:def:uikit.layout.code-block-view]
@@ -970,12 +979,13 @@ children (
                         [spec:mw:sem:uikit.syntax.span-priority]
                     )
                 }
+                deps (core markdawn-highlighter-boundary)
             }
+
             {
                 id rendering.ansi
                 title "ANSI emission and terminal emulation"
                 priority 2
-                deps (core)
                 implements {
                     main (
                         [spec:mw:def:ansi.adapter.surface]
@@ -994,7 +1004,6 @@ children (
                         [spec:mw:req:ansi.term.style-mapping]
                         [spec:mw:req:ansi.to-html.extended-color]
                         [spec:mw:req:ansi.to-html.non-sgr-dropped]
-                        [spec:mw:req:ansi.to-html.osc8]
                         [spec:mw:req:ansi.to-html.sgr-params]
                         [spec:mw:req:ansi.to-html.span-discipline]
                         [spec:mw:req:ansi.to-html.text-and-controls]
@@ -1003,14 +1012,16 @@ children (
                         [spec:mw:sem:ansi.to-html.sgr-accumulation]
                         [spec:mw:syn:ansi.annotated.labels]
                         [spec:mw:syn:ansi.term.ansi-encoding]
+                        [spec:mw:req:ansi.to-html.osc8+1]
                     )
                 }
+                deps (core)
             }
+
             {
                 id rendering.typst
                 title "Typst output adapter and compilation environment"
                 priority 2
-                deps (core)
                 implements {
                     main (
                         [spec:mw:def:typst.adapter.surface]
@@ -1023,9 +1034,11 @@ children (
                         [spec:mw:sem:typst.adapter.inline-mapping]
                     )
                 }
+                deps (core)
             }
         )
     }
+
     {
         id diagrams
         title "Diagram engines"
@@ -1050,11 +1063,11 @@ children (
                     )
                 }
             }
+
             {
                 id diagrams.graphviz
                 title "Graphviz DOT rendering and hardening"
                 priority 1
-                deps (diagrams.svg-safety)
                 implements {
                     main (
                         [spec:adv:req:input.attribute-cap]
@@ -1080,12 +1093,13 @@ children (
                         [spec:adv:sem:render.process-isolation]
                     )
                 }
+                deps (diagrams.svg-safety)
             }
+
             {
                 id diagrams.pikchr
                 title "Pikchr rendering and hardening"
                 priority 1
-                deps (diagrams.svg-safety)
                 implements {
                     main (
                         [spec:adv:req:pikchr.input.byte-cap]
@@ -1094,12 +1108,13 @@ children (
                         [spec:adv:req:pikchr.render.timeout]
                     )
                 }
+                deps (diagrams.svg-safety)
             }
+
             {
                 id diagrams.typst
                 title "Typst diagram rendering and hardening"
                 priority 1
-                deps (diagrams.svg-safety)
                 implements {
                     main (
                         [spec:adv:req:typst.input.byte-cap]
@@ -1108,9 +1123,11 @@ children (
                         [spec:adv:req:typst.render.timeout]
                     )
                 }
+                deps (diagrams.svg-safety)
             }
         )
     }
+
     {
         id safety
         title "Input and output safety"
@@ -1120,16 +1137,14 @@ children (
                 id safety.markdown
                 title "Markdown-level input caps and URL allow-listing"
                 priority 1
-                deps (parsing.inlines)
                 implements {
-                    main (
-                        [spec:adv:req:markdown.input.byte-cap]
-                        [spec:adv:req:markdown.url-allowlist]
-                    )
+                    main ([spec:adv:req:markdown.input.byte-cap] [spec:adv:req:markdown.url-allowlist])
                 }
+                deps (parsing.inlines)
             }
         )
     }
+
     {
         id defects
         title "Defects found during spec adoption"
@@ -1139,94 +1154,142 @@ children (
                 id defects.ansi-osc8-url-filtering
                 title "OSC 8 hyperlink URLs reach output HTML unfiltered"
                 priority 1
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T14:31:16.082921Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-07-29T14:36:48.631524Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
+
             {
                 id defects.ffi-handle-null-guard
                 title "JNI entry points dereference unvalidated handles"
                 priority 1
             }
+
             {
                 id defects.ffi-string-free-cross-heap
                 title "Per-module mw_string_free routing is unenforced across wasm heaps"
                 priority 1
             }
+
             {
                 id defects.ffi-utf8-stall
                 title "Invalid UTF-8 lead byte stalls push_bytes and is silently dropped"
                 priority 1
             }
+
             {
                 id defects.serializer-escaping
                 title "Serializer performs no escaping and never widens delimiters"
                 priority 1
             }
+
             {
                 id defects.serializer-nontermination
                 title "TableRow/TableCell/Custom serialise arms mutually delegate"
                 priority 1
             }
+
             {
                 id defects.dioxus-vdom-drift
                 title "Dioxus adapter has drifted from the vdom adapter"
                 priority 1
             }
+
             {
                 id defects.image-url-policy
                 title "is_safe_url vs is_safe_image_url divergence strands data-URI images"
                 priority 1
             }
+
             {
                 id defects.editor-span-drift
                 title "Editor spans drift against the un-normalised buffer; cursor never remapped"
                 priority 2
             }
+
             {
                 id defects.ansi-feature-gaps
                 title "ColorDepth inert, colon colour forms unsupported, dim/strike dropped"
                 priority 2
             }
+
             {
                 id defects.core-span-population
                 title "Unpopulated spans read as a real zero-width position"
                 priority 2
             }
+
             {
                 id defects.test-coverage-gaps
                 title "Rules with implementation but no honest verify site"
                 priority 2
             }
+
             {
                 id defects.spec-junk-rules
                 title "12 gfm rules have content-free bodies from the spec.txt conversion"
                 priority 2
             }
+
             {
                 id defects.highlighting-rules-misfiled
                 title "markdawn.highlighting.* sits in the gfm grammar spec, not mw"
                 priority 2
             }
+
             {
                 id defects.core-spec-padding
                 title "core def-layer rules restate declarations without adding constraint"
                 priority 2
             }
+
             {
                 id defects.uikit-media-unspecd
                 title "uikit image, math and diagram path carries no rules"
                 priority 2
             }
+
             {
                 id defects.verb-misassignment
                 title "Several gfm thm rules derive nothing; assorted mw verb mismatches"
                 priority 2
             }
+
             {
                 id defects.example-required-features
                 title "Repo lint and test checks were red: ansi_demo lacked required-features"
                 priority 2
             }
+
+            {
+                id defects.test-command-feature-coverage
+                title "Declared test check skips feature-gated code"
+                priority 1
+                log (
+                    {
+                        at 2026-07-29T14:34:53.975755Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "`cargo nextest run --workspace` runs 667 tests under default features (`highlight-all-languages`). The `ansi` feature is not enabled, so `src/ansi_to_html.rs` and `src/adapter/ansi.rs` tests never execute in the gate — including the OSC 8 scheme-allowlist test added for defects.ansi-osc8-url-filtering, which passes only under `--features ansi`. Same exposure applies to any other feature-gated module whose feature is not pulled in by workspace feature unification. Picking the right feature set is a judgement call: `--all-features` pulls in `iced-app` and the iOS/UIKit paths, which may not run headlessly."
+                    }
+                )
+            }
         )
     }
+
     {
         id core
         title "Document model, stream protocol and extension contract"
@@ -1283,11 +1346,11 @@ children (
             )
         }
     }
+
     {
         id editing
         title "Incremental editing and round-trip serialisation"
         priority 2
-        deps (core parsing.strategy)
         implements {
             main (
                 [spec:mw:def:editing.document.editable-document]
@@ -1304,12 +1367,13 @@ children (
                 [spec:mw:sem:editing.serialize.inline-forms]
             )
         }
+        deps (core parsing.strategy)
     }
+
     {
         id tracey-ext
         title "Tracey-flavoured markdown extension"
         priority 2
-        deps (core)
         implements {
             main (
                 [spec:mw:def:traceyext.extension.req-node]
@@ -1327,12 +1391,13 @@ children (
                 [spec:mw:syn:traceyext.marker.grammar]
             )
         }
+        deps (core)
     }
+
     {
         id bindings
         title "Swift, Android and WebAssembly bindings"
         priority 3
-        deps (core rendering.html)
         implements {
             main (
                 [spec:mw:def:ffi.host.jni]
@@ -1349,5 +1414,6 @@ children (
                 [spec:mw:sem:ffi.render-shim.lazy-module]
             )
         }
+        deps (core rendering.html)
     }
 )
