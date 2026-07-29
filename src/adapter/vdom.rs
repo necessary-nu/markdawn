@@ -1170,7 +1170,7 @@ fn terminal_block(_info: Option<&str>, literal: &str) -> VNode {
 }
 
 #[cfg(feature = "terminal")]
-fn parse_terminal_geometry(info: Option<&str>) -> (Option<u16>, Option<u16>) {
+pub(crate) fn parse_terminal_geometry(info: Option<&str>) -> (Option<u16>, Option<u16>) {
     let mut cols = None;
     let mut rows = None;
     if let Some(info) = info {

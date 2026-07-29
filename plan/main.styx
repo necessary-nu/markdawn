@@ -1176,42 +1176,101 @@ children (
                 id defects.ffi-handle-null-guard
                 title "JNI entry points dereference unvalidated handles"
                 priority 1
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T18:00:53.588372Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id defects.ffi-string-free-cross-heap
                 title "Per-module mw_string_free routing is unenforced across wasm heaps"
                 priority 1
+                log (
+                    {
+                        at 2026-07-29T18:00:18.55352Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Investigated; no runtime check is possible and none was invented. Inside a wasm module a pointer is just an offset into that module's linear memory, so an offset minted by another module is indistinguishable from a native one. Two candidate defences were considered and rejected as weaker than they look: an address registry (offsets collide across modules with high probability, turning a cross-heap free into a double-free of the checking module's own live allocation) and a magic-header canary (needs hand-rolled alloc/dealloc in four crates and breaks the documented CString::into_raw contract). What landed is documentation only — the rewritten rule plus per-module Safety docs stating that mw_string_free validates nothing beyond null, and a comment at the actual enforcement point in web/index.template.html. The pairing is correct today by encapsulation rather than enforcement: loadRenderer's closure allocates, reads and frees resultPtr against its own module and never hands the pointer out. Nothing stops a future caller, and since every module exports the symbol under the same name a crossed call would link and run rather than fail. Two genuine fixes exist, both changing the exported C ABI and so out of this node's scope: unique per-module free symbols (mw_render_graphviz_string_free etc.), making an accidental cross-call a missing-export error; or module-owned buffers, removing host ownership entirely. Either requires bumping ffi.render-shim.lazy-module, editing three build.rs export lists and the frontend, and rebuilding the emscripten artifacts. Node stays open pending that decision."
+                    }
+                )
             }
 
             {
                 id defects.ffi-utf8-stall
                 title "Invalid UTF-8 lead byte stalls push_bytes and is silently dropped"
                 priority 1
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T18:01:07.91475Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id defects.serializer-escaping
                 title "Serializer performs no escaping and never widens delimiters"
                 priority 1
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T17:58:47.961767Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Scope this node to structural corruption only, not to the serialiser's documented canonicalisation. In scope: content that re-parses as different structure — a backtick inside a CodeSpan (widen the fence), a closing-fence-shaped line inside a CodeBlock (widen the fence), `|` inside a table cell (escape), `\"` inside a link title (escape or requote), and inline text whose characters would re-parse as markup in that position. Prefer minimal positional escaping; over-escaping is its own defect. Explicitly out of scope, left as the canonicalisation `editing.serialize.round-trip` already enumerates honestly: `List::tight` dropped so lists emit loose, `FootnoteDefinition` label/number/backref_count dropped, `TaskItem` always emitting a bullet marker, and Subscript/Superscript emitting HTML. Those lose node metadata; they do not corrupt structure. Tests assert the span-erased AST survives a serialise/re-parse cycle, not exact bytes."
+                    }
+
+                    {
+                        at 2026-07-29T18:01:24.010531Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id defects.serializer-nontermination
                 title "TableRow/TableCell/Custom serialise arms mutually delegate"
                 priority 1
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T18:01:42.048151Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id defects.dioxus-vdom-drift
                 title "Dioxus adapter has drifted from the vdom adapter"
                 priority 1
+                sealed true
                 log (
                     {
                         at 2026-07-29T17:17:27.532045Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "A fix pass reached the `<dl>` wrapper for DefinitionList and started adding a `typst` option to DioxusOptions before being cut short. Reverted rather than landed: the typst option had no dispatch behind it (a public field that does nothing), and two rule versions were bumped at the annotation sites without the corresponding rule bodies being rewritten, which would leave the spec describing behaviour the code no longer had. The remaining divergences from the vdom adapter are unchanged and still listed on this node."
+                    }
+
+                    {
+                        at 2026-07-29T18:01:54.191352Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -1220,24 +1279,74 @@ children (
                 id defects.image-url-policy
                 title "is_safe_url vs is_safe_image_url divergence strands data-URI images"
                 priority 1
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T18:02:03.847869Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id defects.editor-span-drift
                 title "Editor spans drift against the un-normalised buffer; cursor never remapped"
                 priority 2
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T17:58:28.358197Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Resolve by normalising on ingest: `set_source` and `edit` store the text after `normalize_chunk` (CRLF/CR to LF, NUL to U+FFFD), so \"spans index the stored buffer\" holds by construction rather than via a translation layer every caller must remember. Rejected the alternative of keeping the raw buffer and mapping spans back to raw offsets: it preserves the caller's exact bytes but requires translating every span the parser emits, including deep inline spans, where a missed site is a silent wrong-offset bug rather than a compile error. Accepted cost: EditableDocument no longer echoes the caller's exact bytes — a CRLF document reads back LF-normalised — and callers supplying byte offsets must do so against the normalised text."
+                    }
+
+                    {
+                        at 2026-07-29T18:02:07.923281Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id defects.ansi-feature-gaps
                 title "ColorDepth inert, colon colour forms unsupported, dim/strike dropped"
                 priority 2
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T18:00:33.320761Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Three of the four items are fixed: ColorDepth now genuinely downgrades (quantisation added to ansi_style.rs reusing the existing palette, routed through a new AnsiAdapter::sgr_color), the colon-delimited T.416 colour forms parse alongside the semicolon forms, and `dim` now reaches the grid. Note `dim` was never a dependency limitation — the in-code comment claiming so was wrong; vt100 0.16.2 exposes Cell::dim() at cell.rs:155 and it had simply never been wired up. `strike` genuinely cannot be fixed at this version: there is no TEXT_MODE_STRIKE bit, no accessor, and Screen::sgr has no arm for SGR 9, so the attribute is discarded inside the emulator before a snapshot could observe it. 0.16.2 is the latest published release; only the vt100-ctt 0.17 fork is newer. Left as a documented limitation in ansi.term.style-mapping rather than faked. A related behaviour difference is now specified: vt100 treats intensity as one exclusive slot, so a snapshotted cell is never both bold and dim, unlike the byte-stream path where they are independent. Follow-up: the rule id `ansi.adapter.color-depth-inert` is now actively misleading since the field is no longer inert, and wants renaming."
+                    }
+
+                    {
+                        at 2026-07-29T18:02:17.754386Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id defects.core-span-population
                 title "Unpopulated spans read as a real zero-width position"
                 priority 2
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T18:02:13.97021Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
@@ -1268,6 +1377,15 @@ children (
                 id defects.uikit-media-unspecd
                 title "uikit image, math and diagram path carries no rules"
                 priority 2
+                sealed true
+                log (
+                    {
+                        at 2026-07-29T18:02:47.551678Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
@@ -1316,6 +1434,34 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id defects.uikit-image-allowlist-bypass
+                title "UIKit image path never applies the URL allow-list"
+                priority 1
+                log (
+                    {
+                        at 2026-07-29T17:57:55.093342Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "`try_load_image` (src/adapter/uikit/render.rs:799) never calls `is_safe_image_url`, while every other image-emitting adapter does — vdom.rs:852, dioxus.rs:760, iced/render.rs:1260. Consequences: every `data:` media type is decoded rather than only `data:image/*`, so the narrowing documented at url_safety.rs:71-91 does not apply here; the SVG branch selects on `parsed.mime.contains(\"svg\")`, a substring test over the whole header including parameters, so `data:text/html;charset=svg,<svg…>` routes attacker bytes into the private CoreSVG parser under a non-image media type; and there is no control-character rejection, which `is_safe_url` performs specifically to stop `jav\\tascript:` smuggling. Network fetch is gated by a literal http:// / https:// prefix test, so smuggling cannot reach NSURLSession today, but that is incidental rather than the allow-list. Current behaviour is documented as-is in `uikit.media.image-source`; wiring the allow-list in is a behaviour change, which is this node."
+                    }
+                )
+            }
+
+            {
+                id defects.uikit-svg-sanitiser-bypass
+                title "UIKit SVG rasterisation bypasses the sanitiser"
+                priority 1
+                log (
+                    {
+                        at 2026-07-29T17:57:58.599439Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Nothing under src/adapter/uikit/ references `svg_sanitize`. Three paths hand attacker-influenced bytes straight to `CGSVGDocumentCreateFromData`, a private Apple API resolved via dlsym: raw markdown HTML chunks that sniff as SVG (`try_render_svg_html`, block and inline), `data:` URIs whose header contains \"svg\", and remote fetch responses that sniff as SVG (`image_loader::handle_completion`). The last is sharpest — payload is whatever an arbitrary http(s) server returns, MAX_SVG_BYTES (5 MB) is not applied on that path, and the only bound is MAX_SVG_DIMENSION (4096 pt), checked after CoreSVG has already parsed. Caveat for weighing severity: CoreSVG rasterises to a UIImage rather than into a live DOM, so script execution — the sanitiser's primary target — is not obviously reachable. Residual exposure is unsanitised unbounded input into an undocumented private parser, plus whatever external-resource fetching CoreSVG performs for `<image href>` / `<use href>`, which the sanitiser's URL allow-list normally gates. Current behaviour documented as-is in `uikit.media.svg-raster`."
                     }
                 )
             }

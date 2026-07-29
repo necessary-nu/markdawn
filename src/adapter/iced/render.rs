@@ -1255,9 +1255,9 @@ fn code_block_style(code_style: IcedCodeStyle) -> container::Style {
     style
 }
 
-// [spec:mw:req:iced.renderer.image-policy]
+// [spec:mw:req:iced.renderer.image-policy+1]
 fn render_image(destination: &str, _title: Option<&str>, alt: &str) -> Element<'static, Url> {
-    if !crate::url_safety::is_safe_url(destination) {
+    if !crate::url_safety::is_safe_image_url(destination) {
         return text(alt.to_string()).into();
     }
     if let Some(bytes) = decode_data_uri(destination) {
@@ -1349,7 +1349,11 @@ fn render_diagram_error(
 /// attributes; we use those at face value (in pixels) and convert
 /// to em units via the demo's body font size of 16. If width/height
 /// aren't present, fall back to alt text.
+// [spec:mw:req:iced.renderer.image-policy+1]
 fn try_inline_image_atom(destination: &str, alt: &str) -> Option<InlineAtom<'static>> {
+    if !crate::url_safety::is_safe_image_url(destination) {
+        return None;
+    }
     let prefix_utf8 = "data:image/svg+xml;utf8,";
     let prefix_b64 = "data:image/svg+xml;base64,";
     let prefix_plain = "data:image/svg+xml,";
@@ -1918,7 +1922,7 @@ mod tests {
         let _ = render_default("![alt](some/local/path.png)");
     }
 
-    // [spec:mw:req:iced.renderer.image-policy/test]
+    // [spec:mw:req:iced.renderer.image-policy+1/test]
     #[test]
     fn image_remote_url_falls_back_to_alt() {
         let _ = render_default("![alt](https://example.com/x.png)");
@@ -1932,7 +1936,7 @@ mod tests {
         );
     }
 
-    // [spec:mw:req:iced.renderer.image-policy/test]
+    // [spec:mw:req:iced.renderer.image-policy+1/test]
     #[test]
     fn image_javascript_url_is_stripped() {
         // Should not panic and should degrade to alt text.

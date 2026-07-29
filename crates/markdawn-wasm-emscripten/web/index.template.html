@@ -140,6 +140,11 @@ async function loadRenderer(spec) {
     moduleCache[spec.js] = (async () => {
       const mod = await import(spec.js);
       const M = await mod.default();
+      // Every module exports `mw_string_free` under that one name over its own
+      // linear memory, and neither side can detect a pointer from the wrong
+      // heap. Nothing but this closure keeps them paired: `resultPtr` is
+      // allocated, read and freed against `M` here and never handed out, so
+      // callers only ever see the decoded string. Keep it that way.
       const render = (source) => {
         const bytes = new TextEncoder().encode(source);
         const ptr = M._malloc(bytes.length);

@@ -340,6 +340,7 @@ impl<R> BlockSink<R> {
         Ok(())
     }
 
+    // [spec:mw:req:uikit.diagram.view-factory]
     fn build_block_view<Ext>(
         &mut self,
         node: &Node<Ext>,
@@ -593,6 +594,8 @@ impl<R> BlockSink<R> {
         Ok(())
     }
 
+    // [spec:mw:sem:uikit.image.async-load]
+    // [spec:mw:req:uikit.image.cancellation]
     fn register_pending_images(&mut self, ctx: &RenderCtx, compartment_index: usize) {
         let pending = ctx
             .pending_images
@@ -637,6 +640,8 @@ impl<R> BlockSink<R> {
 
     // [spec:mw:req:uikit.compartments.range-bookkeeping]
     // [spec:mw:req:uikit.compartments.text-run-coalescing]
+    // [spec:mw:req:uikit.image.cancellation]
+    // [spec:mw:def:uikit.surface.element-map]
     fn remove_id(&mut self, id: CorrelationId) {
         let Some(loc) = self.element_map.swap_remove(&id) else {
             return;

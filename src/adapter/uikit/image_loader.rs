@@ -59,6 +59,7 @@ fn shared() -> &'static LoaderState {
 /// and will apply the image + invalidate layout when the fetch completes.
 ///
 /// Must be called from the main thread.
+// [spec:mw:sem:uikit.image.async-load]
 pub(crate) fn load(
     url: &str,
     attachment: &NSTextAttachment,
@@ -120,6 +121,7 @@ fn start_fetch(url: &str) {
 /// Cancel any in-flight image download for `url` and discard pending
 /// attachments. Safe to call from any thread; the actual `.cancel()` message
 /// to `NSURLSessionDataTask` is thread-safe per Apple docs.
+// [spec:mw:req:uikit.image.cancellation]
 pub fn cancel(url: &str) {
     let task = if let Ok(mut tasks) = shared().tasks.lock() {
         tasks.remove(url)
@@ -134,6 +136,8 @@ pub fn cancel(url: &str) {
     }
 }
 
+// [spec:mw:sem:uikit.image.async-load]
+// [spec:mw:req:uikit.image.cancellation]
 fn handle_completion(url: &str, data_ptr: *mut NSData, error_ptr: *mut NSError) {
     if !error_ptr.is_null() || data_ptr.is_null() {
         fail(url);
@@ -187,6 +191,7 @@ fn handle_completion(url: &str, data_ptr: *mut NSData, error_ptr: *mut NSError) 
     });
 }
 
+// [spec:mw:sem:uikit.image.async-load]
 fn fail(url: &str) {
     let entries: Vec<BoundEntry> = match shared().pending.lock() {
         Ok(mut pending) => pending.remove(url).unwrap_or_default(),
@@ -209,6 +214,7 @@ fn fail(url: &str) {
 
 /// Return a generic "loading" SF Symbol UIImage. Called from the main thread
 /// only. `None` if SF Symbols are unavailable.
+// [spec:mw:sem:uikit.image.async-load]
 pub(crate) fn placeholder_image() -> Option<Retained<UIImage>> {
     let name = NSString::from_str("photo");
     UIImage::systemImageNamed(&name)
@@ -219,6 +225,7 @@ fn error_image_for_mtm(_mtm: MainThreadMarker) -> Option<Retained<UIImage>> {
     UIImage::systemImageNamed(&name)
 }
 
+// [spec:mw:sem:uikit.image.async-load]
 fn apply_image(attachment: &NSTextAttachment, image: &UIImage) {
     let size = unsafe { image.size() };
     let max_width: f64 = 600.0;
@@ -239,6 +246,7 @@ fn apply_image(attachment: &NSTextAttachment, image: &UIImage) {
     ));
 }
 
+// [spec:mw:sem:uikit.image.async-load]
 fn invalidate_layout(content_storage: &NSTextContentStorage) {
     // Setting the image on an existing NSTextAttachment doesn't fire a text
     // storage change notification, so TextKit 2 never knows to re-render the

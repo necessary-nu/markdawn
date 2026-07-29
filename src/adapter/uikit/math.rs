@@ -38,6 +38,7 @@ fn hash_source(source: &str) -> u64 {
     h.finish()
 }
 
+// [spec:mw:sem:uikit.math.typeset]
 pub(crate) fn render_latex(source: &str, size: f64) -> Option<Retained<UIImage>> {
     let key = (hash_source(source), (size * 100.0).round() as u32);
 
@@ -66,6 +67,7 @@ pub(crate) fn render_latex(source: &str, size: f64) -> Option<Retained<UIImage>>
     Some(image)
 }
 
+// [spec:mw:sem:uikit.math.typeset]
 pub(crate) fn size_for(display: MathDisplay, body_font_size: f64, block_scale: f64) -> f64 {
     match display {
         MathDisplay::Inline => body_font_size,

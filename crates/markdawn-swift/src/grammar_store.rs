@@ -90,7 +90,7 @@ pub unsafe extern "C" fn mw_register_grammar(
 
 // A zero length is the empty string whatever the pointer holds; anything else
 // must be valid UTF-8 or the caller maps `None` onto its own return code.
-// [spec:mw:sem:ffi.encoding.utf8]
+// [spec:mw:sem:ffi.encoding.utf8+1]
 unsafe fn slice_to_str<'a>(ptr: *const c_char, len: usize) -> Option<&'a str> {
     if len == 0 {
         return Some("");

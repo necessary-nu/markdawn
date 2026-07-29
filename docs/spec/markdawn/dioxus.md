@@ -30,16 +30,20 @@ supposed to produce is not restated here — that lives in the `gfm` rules.
 > slot is consequently a `RefCell`, which — together with the boxed
 > `AlertIconFn` — makes `Renderer` neither `Send` nor `Sync`.
 
-> [spec:mw:def:dioxus.surface.options]
-> `DioxusOptions` carries *parse-time* configuration only: one `bool` per
-> parser feature (`gfm`, `math`, `alerts`, `highlights`, `definition_lists`)
-> plus the feature-gated diagram toggles `pikchr` and `graphviz`. Each flag
-> maps one-to-one onto the corresponding `Parser::builder()` call, and
-> `Renderer::render` rebuilds a `Parser` from them on every call.
-> `DioxusOptions::all()` turns on everything the current feature set ships.
-> Renderer-side configuration — HTML filter, highlighter, alert icons,
-> code-block rewriters, custom-extension renderer — is deliberately *not*
-> part of `DioxusOptions`; it is reachable only through `Renderer`.
+> [spec:mw:def:dioxus.surface.options+1]
+> `DioxusOptions` carries one `bool` per parser feature (`gfm`, `math`,
+> `alerts`, `highlights`, `definition_lists`), each mapping one-to-one onto
+> the corresponding `Parser::builder()` call — `Renderer::render` rebuilds a
+> `Parser` from them on every call — plus one render-time toggle per
+> compiled-in diagram engine (`pikchr`, `graphviz`, `typst`), each present
+> only under its cargo feature and each gating the code-block dispatch for
+> its own info word. Every field MUST be read by the renderer: a flag with
+> no dispatch behind it is a public knob that does nothing.
+> `DioxusOptions::all()` turns on everything the current feature set ships,
+> so a field added under a cargo feature MUST be added to `all()` in the
+> same breath. Renderer-side configuration — HTML filter, highlighter, alert
+> icons, code-block rewriters, custom-extension renderer — is deliberately
+> *not* part of `DioxusOptions`; it is reachable only through `Renderer`.
 
 ## Component contract
 
@@ -64,45 +68,54 @@ supposed to produce is not restated here — that lives in the `gfm` rules.
 
 ## Node → `rsx!` mapping
 
-> [spec:mw:req:dioxus.structure.vdom-agreement]
+> [spec:mw:req:dioxus.structure.vdom-agreement+1]
 > For every `Node` variant the tag, nesting and `class` / `id` / `data-*`
 > values emitted here MUST agree with the `VNode` tree `adapter::vdom` builds
 > for the same node, so that a document rendered through `dioxus_ssr` and the
 > same document rendered through `HtmlAdapter` are structurally
 > interchangeable. Because the two are separate matches over `Node`, a change
 > to one renderer's structure for a node kind requires the matching change
-> here. Whitespace is out of scope: `VNode` carries `nl_open` / `nl_close`
-> serialization hints with no `rsx!` counterpart, so the two outputs are
-> never byte-identical. The sanctioned divergences are:
+> here, and `vdom` is the reference: where the two disagree it is this
+> adapter that is wrong unless the divergence is listed below. Whitespace is
+> out of scope: `VNode` carries `nl_open` / `nl_close` serialization hints
+> with no `rsx!` counterpart, so the two outputs are never byte-identical.
+> In particular the structures that MUST match are `<dl>` around
+> `<dt>` / `<dd>`; `<thead>` unconditionally with `<tbody>` only when the
+> table has body rows; a cell's alignment resolved as its own `alignment`
+> falling back to the table-level `alignments` entry for its column index;
+> `<img src>` screened with `is_safe_image_url`, so `data:image/*` survives
+> on both sides; math that fails to typeset falling back to
+> `<pre><code class="language-math math-display math-error">` /
+> `<code class="language-math math-inline math-error">`; and the code-block
+> dispatch recognising the same info words, `ansi` and `terminal`
+> short-circuiting ahead of every other branch — including the highlighter —
+> whether or not their cargo features are on, and `typst` joining `pikchr`
+> and `graphviz` as a feature-and-option-gated diagram engine. The sanctioned
+> divergences are:
 >
-> - `Node::DefinitionList` renders its children directly, with no `<dl>`
->   wrapper; `<dt>` / `<dd>` still match.
-> - table cells carry `style: "text-align: …"` instead of `align="…"`, and
->   only the per-cell `alignment` is consulted — the table-level `alignments`
->   vector is ignored, so a cell that inherits its alignment from the
->   delimiter row is rendered unaligned. `style` is set unconditionally, to
->   the empty string when the cell has no alignment.
+> - table cells carry `style: "text-align: …"` instead of `align="…"`, set
+>   unconditionally, to the empty string when the cell resolves to no
+>   alignment. A `Node::TableCell` handed straight to `render_node` still
+>   renders its `<td>` / `<th>`, where vdom yields an empty fragment.
 > - attributes vdom omits when absent are set unconditionally here: `<a>` and
 >   `<img>` always get a `title`, and `<ol>` always gets a `start` defaulted
 >   to `1`.
 > - valueless flag attributes are written with an explicit value —
 >   `"data-footnotes": "true"`, `"data-footnote-ref": "true"`,
 >   `"data-footnote-backref": "true"` — where vdom emits a bare attribute.
-> - `<thead>` is emitted only when the header row list is non-empty and
->   `<tbody>` is always emitted; vdom is the reverse.
 > - the alert title paragraph wraps its label in
 >   `<span class="markdown-alert-label">`, preceded by
 >   `<span class="markdown-alert-icon">` when an `AlertIconFn` is installed;
 >   vdom emits the bare label text.
-> - math that fails to typeset falls back to
->   `<pre class="math math-display math-error">` /
->   `<code class="math math-inline math-error">`, where vdom keeps the
->   `<code>` inside the `<pre>` and uses `language-math …` classes.
-> - `<img src>` is screened with `is_safe_url` rather than
->   `is_safe_image_url`, so `data:image/*` URIs are dropped here but admitted
->   by the HTML adapter's default.
-> - `typst` and `terminal` info strings get no special dispatch; they fall
->   through to the highlighter or the plain `<pre><code>` branch.
+> - every pre-rendered-HTML payload gains the host element
+>   `[spec:mw:req:dioxus.html.host-element]` requires, where vdom splices it
+>   bare: diagram SVG lands inside `<div class="pikchr">` /
+>   `<div class="graphviz">` / `<div class="typst">` rather than being
+>   emitted verbatim under vdom's `aria-label`, and an inline `Node::Html`
+>   gains a block-level `<div>`.
+> - a `Node::MathBlock` reached in *inline* position keeps its block
+>   spelling here — `<div>`, or `<pre><code>` on typeset failure — where vdom
+>   switches to `<span>` / bare `<code>`; the classes agree either way.
 >
 > Attribute *spelling* follows `rsx!` rules, not HTML: Rust keywords are
 > raw-escaped (`r#type`, `r#for`), and any HTML attribute name that is not a
@@ -113,7 +126,7 @@ supposed to produce is not restated here — that lives in the `gfm` rules.
 > to `rsx!`, and a rejected URL becomes the empty string rather than an
 > omitted attribute.
 
-> [spec:mw:req:dioxus.html.host-element]
+> [spec:mw:req:dioxus.html.host-element+1]
 > `rsx!` has no raw-text node: the only way to place pre-rendered markup into
 > a Dioxus tree is the `dangerous_inner_html` attribute, which belongs to an
 > element and is mutually exclusive with that element's children. Every
@@ -121,8 +134,14 @@ supposed to produce is not restated here — that lives in the `gfm` rules.
 > than spliced: `Node::Html` into `<div>`, math into
 > `<div class="math math-display">` / `<span class="math math-inline">`,
 > pikchr into `<div class="pikchr">`, graphviz into
-> `<div class="graphviz">`, highlighted code into the `<code>` inside
-> `<pre>`, and each `ansi` pane into its own `<code>`. Two consequences are
+> `<div class="graphviz">`, typst into `<div class="typst">`, highlighted
+> code into the `<code>` inside `<pre>`, and each `ansi` or `terminal` pane
+> into its own `<code>` — the rendered pane under `language-ansi` /
+> `language-terminal`, the annotated-source pane under
+> `language-ansi-source` / `language-terminal-source`, both inside the
+> two-pane `<div class="ansi-block">` / `<div class="terminal-block">`
+> whose `<label for>` addresses its sibling checkbox `<input id>`. Two
+> consequences are
 > load-bearing. First, an *inline* `Node::Html` gets a block-level `<div>`
 > host, so raw HTML that the HTML adapter splices mid-paragraph appears here
 > as a nested `<div>` — the one place the inline/block distinction is lost.

@@ -7,11 +7,13 @@
 
 use base64::Engine;
 
+// [spec:mw:def:uikit.media.data-uri]
 pub struct DataUri<'a> {
     pub mime: &'a str,
     pub bytes: Vec<u8>,
 }
 
+// [spec:mw:def:uikit.media.data-uri]
 pub fn parse_data_uri(uri: &str) -> Option<DataUri<'_>> {
     let rest = uri.strip_prefix("data:")?;
     let comma = rest.find(',')?;
@@ -46,6 +48,7 @@ pub fn parse_data_uri(uri: &str) -> Option<DataUri<'_>> {
 mod tests {
     use super::*;
 
+    // [spec:mw:def:uikit.media.data-uri/test]
     #[test]
     fn parses_base64_svg() {
         let uri = "data:image/svg+xml;base64,PHN2Zy8+";
@@ -54,6 +57,7 @@ mod tests {
         assert_eq!(parsed.bytes, b"<svg/>");
     }
 
+    // [spec:mw:def:uikit.media.data-uri/test]
     #[test]
     fn parses_percent_encoded() {
         let uri = "data:image/svg+xml,%3Csvg%2F%3E";
@@ -62,6 +66,7 @@ mod tests {
         assert_eq!(parsed.bytes, b"<svg/>");
     }
 
+    // [spec:mw:def:uikit.media.data-uri/test]
     #[test]
     fn parses_with_no_mime() {
         let uri = "data:,Hello";
@@ -70,17 +75,20 @@ mod tests {
         assert_eq!(parsed.bytes, b"Hello");
     }
 
+    // [spec:mw:def:uikit.media.data-uri/test]
     #[test]
     fn rejects_non_data_uri() {
         assert!(parse_data_uri("https://example.com/foo.png").is_none());
         assert!(parse_data_uri("foo").is_none());
     }
 
+    // [spec:mw:def:uikit.media.data-uri/test]
     #[test]
     fn rejects_data_with_no_comma() {
         assert!(parse_data_uri("data:image/png;base64").is_none());
     }
 
+    // [spec:mw:def:uikit.media.data-uri/test]
     #[test]
     fn tolerates_whitespace_in_base64() {
         let uri = "data:image/svg+xml;base64,PHN2\nZy8\n+";

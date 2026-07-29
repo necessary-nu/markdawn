@@ -18,7 +18,7 @@
 //! snapshot. There is no streaming equivalent; the `AnsiSink` streaming
 //! surface is orthogonal and stays in the `ansi` pipeline.
 
-use crate::ansi_style::{CellStyle, Color};
+use crate::ansi_style::{CellStyle, Color, color_to_sgr};
 
 /// Default terminal width when the caller doesn't specify one. Matches
 /// the historical 80-column DEC VT100 default.
@@ -140,7 +140,12 @@ fn grid_from_screen(screen: &vt100::Screen) -> TermGrid {
     }
 }
 
-// [spec:mw:req:ansi.term.style-mapping]
+// Intensity is a single exclusive slot in the emulator, so a cell is
+// bold or dim but never both, and SGR 22 clears whichever is live.
+// Strike has no representation at all: vt100 0.16 carries no mode bit
+// for SGR 9 and offers no accessor, so the attribute is lost inside the
+// emulator before a snapshot can see it.
+// [spec:mw:req:ansi.term.style-mapping+1]
 fn cell_from_vt100(cell: &vt100::Cell) -> Cell {
     let ch = if cell.has_contents() {
         cell.contents().to_string()
@@ -151,10 +156,10 @@ fn cell_from_vt100(cell: &vt100::Cell) -> Cell {
         fg: vt100_color(cell.fgcolor()),
         bg: vt100_color(cell.bgcolor()),
         bold: cell.bold(),
-        dim: false, // vt100 0.16 doesn't expose `dim` on Cell; leave unset.
+        dim: cell.dim(),
         italic: cell.italic(),
         underline: cell.underline(),
-        strike: false, // also not exposed on Cell.
+        strike: false,
         inverse: cell.inverse(),
     };
     Cell { ch, style }
@@ -162,7 +167,7 @@ fn cell_from_vt100(cell: &vt100::Cell) -> Cell {
 
 // The `n < 16` split is what lets `color_to_sgr` recover the short
 // 30-37 / 90-97 forms when re-encoding.
-// [spec:mw:req:ansi.term.style-mapping]
+// [spec:mw:req:ansi.term.style-mapping+1]
 fn vt100_color(c: vt100::Color) -> Option<Color> {
     match c {
         vt100::Color::Default => None,
@@ -283,17 +288,6 @@ fn style_to_sgr(style: &CellStyle) -> String {
     }
 }
 
-// [spec:mw:syn:ansi.term.ansi-encoding]
-fn color_to_sgr(c: Color, bg: bool) -> String {
-    let base = if bg { 40 } else { 30 };
-    match c {
-        Color::Named(n) if n < 8 => format!("{}", base + n as u16),
-        Color::Named(n) => format!("{}", base + 60 + (n - 8) as u16),
-        Color::Palette(n) => format!("{};5;{n}", base + 8),
-        Color::Rgb(r, g, b) => format!("{};2;{r};{g};{b}", base + 8),
-    }
-}
-
 fn push_char(out: &mut String, s: &str) {
     if s.is_empty() {
         out.push(' ');
@@ -398,7 +392,27 @@ mod tests {
         );
     }
 
-    // [spec:mw:req:ansi.term.style-mapping/test]
+    // [spec:mw:req:ansi.term.style-mapping+1/test]
+    #[test]
+    fn dim_survives_the_emulator_and_strike_does_not() {
+        let dim = ansi_snapshot_grid("\x1b[2mfaint\x1b[0m", Some(20), Some(1));
+        assert!(dim.cells[0][0].style.dim, "expected dim to reach the grid");
+        assert!(
+            ansi_snapshot_to_html("\x1b[2mfaint\x1b[0m", Some(20), Some(1)).contains("opacity:0.6")
+        );
+
+        // Intensity is one exclusive slot in the emulator, so the later
+        // of bold / dim wins rather than both being live.
+        let both = ansi_snapshot_grid("\x1b[1;2mx\x1b[0m", Some(20), Some(1));
+        assert!(both.cells[0][0].style.dim);
+        assert!(!both.cells[0][0].style.bold);
+
+        // SGR 9 has no representation in the emulator at all.
+        let struck = ansi_snapshot_grid("\x1b[9mgone\x1b[0m", Some(20), Some(1));
+        assert!(!struck.cells[0][0].style.strike);
+    }
+
+    // [spec:mw:req:ansi.term.style-mapping+1/test]
     #[test]
     fn sgr_colors_roundtrip_in_snapshot() {
         let html = ansi_snapshot_to_html("\x1b[31mred\x1b[0m", Some(20), Some(2));

@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 use crate::node::CorrelationId;
 
+// [spec:mw:def:uikit.surface.element-map]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ElementLocation {
     /// The block lives inside a TextRun compartment. Use the compartment's
@@ -17,6 +18,7 @@ pub(crate) type ElementMap = IndexMap<CorrelationId, ElementLocation>;
 
 /// Adjust all compartment indices ≥ `from` by `delta`. Used after compartment
 /// removal to keep the element map consistent with the stack.
+// [spec:mw:def:uikit.surface.element-map]
 pub(crate) fn shift_compartment_indices(map: &mut ElementMap, from: usize, delta: isize) {
     for loc in map.values_mut() {
         match loc {

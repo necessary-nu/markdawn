@@ -13,8 +13,12 @@
 
 use core::fmt;
 
-use crate::node::{AlertKind, Emission, Node, StreamItem, TableAlignment};
+use crate::ansi_style::{Color, ansi256_to_named, color_to_sgr, rgb_to_ansi256, rgb_to_named};
+use crate::node::{Emission, Node, StreamItem};
 use crate::sink::Sink;
+
+#[path = "ansi_block.rs"]
+mod block;
 
 /// Errors surfaced by the ANSI adapter or its streaming sink.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,10 +41,11 @@ impl std::error::Error for AnsiError {}
 /// Target terminal's color depth. Callers pick based on environment
 /// detection; the adapter downgrades truecolor to the nearest 256 or
 /// 16 entry as needed so output stays readable on older terminals.
-// Configuration surface only: the render path emits fixed SGR literals
-// and never reads this field, so no truecolour value is downgraded and
-// `Basic16` does not change a single output byte.
-// [spec:mw:sem:ansi.adapter.color-depth-inert]
+// Every colour the render path emits goes through `downgrade` first, so
+// the adapter's own palette-index backgrounds collapse to named entries
+// under `Basic16` and a `terminal` transcript's truecolour cells are
+// quantised before they are re-encoded.
+// [spec:mw:req:ansi.adapter.color-depth-inert+1]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorDepth {
     Basic16,
@@ -150,10 +155,36 @@ impl AnsiAdapter<()> {
     }
 }
 
+/// Quantise `color` down to what `depth` can actually show.
+// Truecolour reaches 16 colours in one step rather than by way of the
+// 256 cube: routing through the intermediate would quantise twice and
+// land further from the requested hue.
+// [spec:mw:req:ansi.adapter.color-depth-inert+1]
+fn downgrade(color: Color, depth: ColorDepth) -> Color {
+    match depth {
+        ColorDepth::TrueColor => color,
+        ColorDepth::Ansi256 => match color {
+            Color::Rgb(r, g, b) => Color::Palette(rgb_to_ansi256(r, g, b)),
+            other => other,
+        },
+        ColorDepth::Basic16 => match color {
+            Color::Rgb(r, g, b) => Color::Named(rgb_to_named(r, g, b)),
+            Color::Palette(n) => Color::Named(ansi256_to_named(n)),
+            other => other,
+        },
+    }
+}
+
 impl<R> AnsiAdapter<R> {
     pub fn with_options(mut self, options: AnsiOptions) -> Self {
         self.options = options;
         self
+    }
+
+    /// SGR parameter text for `color` at the configured depth.
+    // [spec:mw:req:ansi.adapter.color-depth-inert+1]
+    fn sgr_color(&self, color: Color, bg: bool) -> String {
+        color_to_sgr(downgrade(color, self.options.color), bg)
     }
 
     pub fn render<Ext>(&self, item: StreamItem<Node<Ext>>) -> Result<StreamItem<String>, AnsiError>
@@ -188,322 +219,6 @@ impl<R> AnsiAdapter<R> {
             self.write_block(n, &mut out)?;
         }
         Ok(out)
-    }
-
-    fn write_block<Ext>(&self, node: &Node<Ext>, out: &mut String) -> Result<(), AnsiError>
-    where
-        R: RenderAnsiCustom<Ext>,
-    {
-        match node {
-            Node::Document { children, .. } => {
-                for child in children {
-                    self.write_block(child, out)?;
-                }
-            }
-            Node::Paragraph { children, .. } => {
-                let mut buf = String::new();
-                self.write_inlines(children, &mut buf)?;
-                if let Some(w) = self.options.width {
-                    write_wrapped(&buf, 0, w, out);
-                } else {
-                    out.push_str(&buf);
-                }
-                out.push_str("\n\n");
-            }
-            Node::Heading {
-                level, children, ..
-            } => {
-                let style = match level {
-                    1 => "\x1b[1;36m",
-                    2 => "\x1b[1;35m",
-                    _ => "\x1b[1m",
-                };
-                let mut text = String::new();
-                self.write_inlines(children, &mut text)?;
-                out.push_str(style);
-                out.push_str(&text);
-                out.push_str("\x1b[0m\n");
-                if *level == 1 {
-                    let width = self
-                        .options
-                        .width
-                        .unwrap_or_else(|| visible_len(&text).max(1));
-                    let bar_width = visible_len(&text).min(width);
-                    out.push_str("\x1b[1;36m");
-                    for _ in 0..bar_width {
-                        out.push('━');
-                    }
-                    out.push_str("\x1b[0m\n");
-                }
-                out.push('\n');
-            }
-            Node::BlockQuote { children, .. } => {
-                let mut buf = String::new();
-                for child in children {
-                    self.write_block(child, &mut buf)?;
-                }
-                for line in buf.split_inclusive('\n') {
-                    if line == "\n" {
-                        out.push_str("\x1b[2m│\x1b[0m\n");
-                    } else {
-                        out.push_str("\x1b[2m│\x1b[0m ");
-                        out.push_str(line);
-                    }
-                }
-            }
-            Node::List {
-                ordered,
-                start,
-                children,
-                ..
-            } => {
-                let start = start.unwrap_or(1);
-                let mut count = start;
-                for child in children {
-                    let prefix = if *ordered {
-                        let p = format!("  {count}. ");
-                        count += 1;
-                        p
-                    } else {
-                        "  • ".to_string()
-                    };
-                    let mut body = String::new();
-                    match child {
-                        Node::Item { children, .. } | Node::TaskItem { children, .. } => {
-                            for grand in children {
-                                self.write_block(grand, &mut body)?;
-                            }
-                        }
-                        other => self.write_block(other, &mut body)?,
-                    }
-                    let mut first = true;
-                    for line in body.split_inclusive('\n') {
-                        if first {
-                            out.push_str(&prefix);
-                            first = false;
-                        } else if line != "\n" {
-                            for _ in 0..visible_len(&prefix) {
-                                out.push(' ');
-                            }
-                        }
-                        out.push_str(line);
-                    }
-                }
-                out.push('\n');
-            }
-            Node::Item { children, .. } | Node::TaskItem { children, .. } => {
-                // Reachable if callers hand us a bare Item. List handler
-                // above normally consumes these.
-                for child in children {
-                    self.write_block(child, out)?;
-                }
-            }
-            Node::Table {
-                alignments,
-                header,
-                rows,
-                ..
-            } => {
-                self.write_table(alignments, header, rows, out)?;
-            }
-            Node::TableRow { .. } | Node::TableCell { .. } => {
-                // Handled via the parent Table node only.
-            }
-            // Three-way dispatch on the first word of the info string.
-            // All three forms guarantee a trailing newline plus a blank
-            // separator line.
-            // [spec:mw:req:ansi.adapter.code-block]
-            Node::CodeBlock { info, literal, .. } => {
-                let lang = info
-                    .as_deref()
-                    .and_then(|s| s.split_whitespace().next())
-                    .filter(|s| !s.is_empty());
-                if matches!(lang, Some("ansi")) {
-                    // Content is already styled — emit verbatim and
-                    // guarantee a reset follows.
-                    out.push_str(literal);
-                    if !literal.ends_with("\x1b[0m") {
-                        out.push_str("\x1b[0m");
-                    }
-                    if !literal.ends_with('\n') {
-                        out.push('\n');
-                    }
-                    out.push('\n');
-                } else if matches!(lang, Some("terminal")) {
-                    // Run through the VT100 emulator and re-emit the
-                    // final visible screen as styled ANSI. Drops the
-                    // literal cursor-traffic bytes entirely.
-                    #[cfg(feature = "terminal")]
-                    {
-                        let grid = crate::terminal::ansi_snapshot_grid(literal, None, None);
-                        out.push_str(&crate::terminal::render_grid_ansi(&grid));
-                        if !out.ends_with('\n') {
-                            out.push('\n');
-                        }
-                        out.push('\n');
-                    }
-                    #[cfg(not(feature = "terminal"))]
-                    {
-                        out.push_str(literal);
-                        if !literal.ends_with('\n') {
-                            out.push('\n');
-                        }
-                        out.push('\n');
-                    }
-                } else {
-                    if let Some(lang) = lang {
-                        out.push_str("\x1b[2m");
-                        out.push_str(lang);
-                        out.push_str("\x1b[0m\n");
-                    }
-                    for line in literal.split_inclusive('\n') {
-                        out.push_str("\x1b[48;5;236m  ");
-                        let needs_nl = line.ends_with('\n');
-                        let body = if needs_nl {
-                            &line[..line.len() - 1]
-                        } else {
-                            line
-                        };
-                        out.push_str(body);
-                        out.push_str("\x1b[0m");
-                        if needs_nl {
-                            out.push('\n');
-                        }
-                    }
-                    if !literal.ends_with('\n') {
-                        out.push('\n');
-                    }
-                    out.push('\n');
-                }
-            }
-            Node::MathBlock { math, .. } => {
-                out.push_str(math);
-                out.push_str("\n\n");
-            }
-            Node::ThematicBreak { .. } => {
-                let width = self.options.width.unwrap_or(60);
-                out.push_str("\x1b[2m");
-                for _ in 0..width {
-                    out.push('─');
-                }
-                out.push_str("\x1b[0m\n\n");
-            }
-            Node::Alert {
-                kind,
-                title,
-                children,
-                ..
-            } => {
-                let (color, default_title) = match kind {
-                    AlertKind::Note => ("34", "Note"),
-                    AlertKind::Tip => ("32", "Tip"),
-                    AlertKind::Important => ("33", "Important"),
-                    AlertKind::Warning => ("31", "Warning"),
-                    AlertKind::Caution => ("91", "Caution"),
-                };
-                let shown = title.as_deref().unwrap_or(default_title);
-                out.push_str("\x1b[1;");
-                out.push_str(color);
-                out.push('m');
-                out.push_str(shown);
-                out.push_str("\x1b[0m\n");
-                let mut body = String::new();
-                for child in children {
-                    self.write_block(child, &mut body)?;
-                }
-                for line in body.split_inclusive('\n') {
-                    if line == "\n" {
-                        out.push_str("\x1b[");
-                        out.push_str(color);
-                        out.push_str("m│\x1b[0m\n");
-                    } else {
-                        out.push_str("\x1b[");
-                        out.push_str(color);
-                        out.push_str("m│\x1b[0m ");
-                        out.push_str(line);
-                    }
-                }
-            }
-            Node::DefinitionList { children, .. } => {
-                for chunk in children.chunks(2) {
-                    if let [
-                        Node::DefinitionTerm { children: term, .. },
-                        Node::DefinitionDescription { children: desc, .. },
-                    ] = chunk
-                    {
-                        out.push_str("\x1b[1m");
-                        self.write_inlines(term, out)?;
-                        out.push_str("\x1b[0m\n");
-                        for d in desc {
-                            let mut body = String::new();
-                            self.write_block(d, &mut body)?;
-                            for line in body.split_inclusive('\n') {
-                                if line != "\n" {
-                                    out.push_str("  ");
-                                }
-                                out.push_str(line);
-                            }
-                        }
-                    }
-                }
-                out.push('\n');
-            }
-            Node::DefinitionTerm { .. } | Node::DefinitionDescription { .. } => {
-                // Handled by the DefinitionList parent only.
-            }
-            Node::Html { .. } => {
-                // Drop HTML — no reasonable rendering in a terminal.
-            }
-            Node::FootnoteSection { children, .. } => {
-                if !children.is_empty() {
-                    out.push_str("\x1b[2m---\x1b[0m\n");
-                    for child in children {
-                        self.write_block(child, out)?;
-                    }
-                }
-            }
-            Node::FootnoteDefinition {
-                label, children, ..
-            } => {
-                out.push_str("\x1b[2m[^");
-                out.push_str(label);
-                out.push_str("]\x1b[0m ");
-                for child in children {
-                    self.write_block(child, out)?;
-                }
-            }
-            Node::Custom {
-                payload, children, ..
-            } => {
-                let walk_block = |node: &Node<Ext>, o: &mut String| self.write_block(node, o);
-                let walk_inlines =
-                    |nodes: &[Node<Ext>], o: &mut String| self.write_inlines(nodes, o);
-                let walker = AnsiWalker {
-                    walk_block: &walk_block,
-                    walk_inlines: &walk_inlines,
-                };
-                self.custom.render_custom(payload, children, out, &walker)?;
-            }
-            // Leaves at block level pass through as inlines (e.g. a bare
-            // Text at document root).
-            Node::Text { .. }
-            | Node::CodeSpan { .. }
-            | Node::Emphasis { .. }
-            | Node::Strong { .. }
-            | Node::Strikethrough { .. }
-            | Node::Subscript { .. }
-            | Node::Superscript { .. }
-            | Node::Highlight { .. }
-            | Node::Link { .. }
-            | Node::Image { .. }
-            | Node::MathInline { .. }
-            | Node::SoftBreak { .. }
-            | Node::HardBreak { .. }
-            | Node::FootnoteRef { .. } => {
-                self.write_inline(node, out)?;
-            }
-        }
-        Ok(())
     }
 
     fn write_inlines<Ext>(&self, nodes: &[Node<Ext>], out: &mut String) -> Result<(), AnsiError>
@@ -557,7 +272,11 @@ impl<R> AnsiAdapter<R> {
                 out.push('}');
             }
             Node::Highlight { children, .. } => {
-                out.push_str("\x1b[43;30m");
+                out.push_str("\x1b[");
+                out.push_str(&self.sgr_color(Color::Named(3), true));
+                out.push(';');
+                out.push_str(&self.sgr_color(Color::Named(0), false));
+                out.push('m');
                 self.write_inlines(children, out)?;
                 out.push_str("\x1b[0m");
             }
@@ -589,7 +308,9 @@ impl<R> AnsiAdapter<R> {
                 out.push(']');
             }
             Node::CodeSpan { code, .. } => {
-                out.push_str("\x1b[48;5;237m");
+                out.push_str("\x1b[");
+                out.push_str(&self.sgr_color(Color::Palette(237), true));
+                out.push('m');
                 out.push_str(code);
                 out.push_str("\x1b[0m");
             }
@@ -610,16 +331,7 @@ impl<R> AnsiAdapter<R> {
             }
             Node::Custom {
                 payload, children, ..
-            } => {
-                let walk_block = |node: &Node<Ext>, o: &mut String| self.write_block(node, o);
-                let walk_inlines =
-                    |nodes: &[Node<Ext>], o: &mut String| self.write_inlines(nodes, o);
-                let walker = AnsiWalker {
-                    walk_block: &walk_block,
-                    walk_inlines: &walk_inlines,
-                };
-                self.custom.render_custom(payload, children, out, &walker)?;
-            }
+            } => self.write_custom(payload, children, out)?,
             Node::Paragraph { .. }
             | Node::Heading { .. }
             | Node::BlockQuote { .. }
@@ -640,99 +352,6 @@ impl<R> AnsiAdapter<R> {
             | Node::FootnoteSection { .. }
             | Node::Document { .. } => self.write_block(node, out)?,
         }
-        Ok(())
-    }
-
-    fn write_table<Ext>(
-        &self,
-        alignments: &[Option<TableAlignment>],
-        header: &[Node<Ext>],
-        rows: &[Node<Ext>],
-        out: &mut String,
-    ) -> Result<(), AnsiError>
-    where
-        R: RenderAnsiCustom<Ext>,
-    {
-        // Very small table renderer — one-pass rendering of cell text,
-        // column widths from visible length, ASCII box-drawing. No
-        // multi-line cells.
-        let mut cells: Vec<Vec<String>> = Vec::new();
-        for row in header.iter().chain(rows.iter()) {
-            if let Node::TableRow {
-                cells: row_cells, ..
-            } = row
-            {
-                let mut line = Vec::with_capacity(row_cells.len());
-                for cell in row_cells {
-                    if let Node::TableCell { children, .. } = cell {
-                        let mut text = String::new();
-                        self.write_inlines(children, &mut text)?;
-                        line.push(text);
-                    }
-                }
-                cells.push(line);
-            }
-        }
-        if cells.is_empty() {
-            return Ok(());
-        }
-        let columns = cells.iter().map(|c| c.len()).max().unwrap_or(1);
-        let mut widths = vec![0usize; columns];
-        for row in &cells {
-            for (i, text) in row.iter().enumerate() {
-                widths[i] = widths[i].max(visible_len(text));
-            }
-        }
-
-        let draw_border = |out: &mut String, left: char, mid: char, right: char, fill: char| {
-            out.push(left);
-            for (i, w) in widths.iter().enumerate() {
-                for _ in 0..w + 2 {
-                    out.push(fill);
-                }
-                if i + 1 < widths.len() {
-                    out.push(mid);
-                }
-            }
-            out.push(right);
-            out.push('\n');
-        };
-        let draw_row = |out: &mut String, line: &[String]| {
-            out.push('│');
-            for (i, w) in widths.iter().enumerate() {
-                out.push(' ');
-                let cell = line.get(i).map(|s| s.as_str()).unwrap_or("");
-                out.push_str(cell);
-                let pad = w.saturating_sub(visible_len(cell));
-                let align = alignments.get(i).copied().flatten();
-                match align {
-                    Some(TableAlignment::Right) => {}
-                    _ => {
-                        for _ in 0..pad {
-                            out.push(' ');
-                        }
-                    }
-                }
-                out.push(' ');
-                out.push('│');
-            }
-            out.push('\n');
-        };
-
-        draw_border(out, '┌', '┬', '┐', '─');
-        if !header.is_empty() {
-            draw_row(out, &cells[0]);
-            draw_border(out, '├', '┼', '┤', '─');
-            for line in &cells[1..] {
-                draw_row(out, line);
-            }
-        } else {
-            for line in &cells {
-                draw_row(out, line);
-            }
-        }
-        draw_border(out, '└', '┴', '┘', '─');
-        out.push('\n');
         Ok(())
     }
 }
@@ -879,13 +498,32 @@ fn write_wrapped(input: &str, initial_col: usize, width: usize, out: &mut String
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::{Node, SourceSpan};
+    use crate::node::{AlertKind, Node, SourceSpan};
 
     fn render<Ext>(node: Node<Ext>) -> String
     where
         (): RenderAnsiCustom<Ext>,
     {
         AnsiAdapter::new().render_node(&node).unwrap()
+    }
+
+    fn render_at(node: Node<()>, color: ColorDepth) -> String {
+        AnsiAdapter::new()
+            .with_options(AnsiOptions {
+                width: None,
+                hyperlinks: true,
+                color,
+            })
+            .render_node(&node)
+            .unwrap()
+    }
+
+    fn code_block(info: &str, literal: &str) -> Node<()> {
+        Node::CodeBlock {
+            info: Some(info.into()),
+            literal: literal.into(),
+            source: SourceSpan::default(),
+        }
     }
 
     fn txt(s: &str) -> Node<()> {
@@ -1036,5 +674,99 @@ mod tests {
         // Should not be a single long line.
         let first_line = out.lines().next().unwrap();
         assert!(first_line.chars().count() <= 14, "got `{first_line}`");
+    }
+
+    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    #[test]
+    fn downgrade_maps_each_depth() {
+        for (depth, expected) in [
+            (ColorDepth::TrueColor, Color::Rgb(255, 100, 50)),
+            (ColorDepth::Ansi256, Color::Palette(203)),
+            (ColorDepth::Basic16, Color::Named(9)),
+        ] {
+            assert_eq!(downgrade(Color::Rgb(255, 100, 50), depth), expected);
+        }
+        // A palette index survives 256 but not 16.
+        assert_eq!(
+            downgrade(Color::Palette(236), ColorDepth::Ansi256),
+            Color::Palette(236)
+        );
+        assert_eq!(
+            downgrade(Color::Palette(236), ColorDepth::Basic16),
+            Color::Named(0)
+        );
+        // Named entries are already 16-colour and never move.
+        for depth in [
+            ColorDepth::TrueColor,
+            ColorDepth::Ansi256,
+            ColorDepth::Basic16,
+        ] {
+            assert_eq!(downgrade(Color::Named(6), depth), Color::Named(6));
+            assert_eq!(downgrade(Color::Named(15), depth), Color::Named(15));
+        }
+    }
+
+    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    #[test]
+    fn basic16_reduces_the_code_block_band() {
+        let block = code_block("rust", "fn main() {}\n");
+        for depth in [ColorDepth::TrueColor, ColorDepth::Ansi256] {
+            assert!(render_at(block.clone(), depth).contains("\x1b[48;5;236m"));
+        }
+        let reduced = render_at(block, ColorDepth::Basic16);
+        assert!(
+            reduced.contains("\x1b[40m") && !reduced.contains("48;5;"),
+            "expected a named background at Basic16; got {reduced:?}"
+        );
+    }
+
+    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    #[test]
+    fn basic16_reduces_the_code_span_background() {
+        let span: Node<()> = Node::CodeSpan {
+            code: "x".into(),
+            source: SourceSpan::default(),
+        };
+        assert!(render_at(span.clone(), ColorDepth::Ansi256).contains("\x1b[48;5;237m"));
+        assert!(render_at(span, ColorDepth::Basic16).contains("\x1b[40m"));
+    }
+
+    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    #[test]
+    fn named_runs_are_identical_at_every_depth() {
+        let heading: Node<()> = Node::Heading {
+            level: 1,
+            children: vec![txt("Hello")],
+            source: SourceSpan::default(),
+        };
+        let alert: Node<()> = Node::Alert {
+            kind: AlertKind::Caution,
+            title: None,
+            children: vec![],
+            source: SourceSpan::default(),
+        };
+        for node in [heading, alert] {
+            let truecolor = render_at(node.clone(), ColorDepth::TrueColor);
+            for depth in [ColorDepth::Ansi256, ColorDepth::Basic16] {
+                assert_eq!(render_at(node.clone(), depth), truecolor);
+            }
+        }
+    }
+
+    // [spec:mw:req:ansi.adapter.color-depth-inert+1/test]
+    #[cfg(feature = "terminal")]
+    #[test]
+    fn terminal_transcript_colors_follow_the_depth() {
+        let block = code_block("terminal", "\x1b[38;2;255;100;50mhot\x1b[0m");
+        let truecolor = render_at(block.clone(), ColorDepth::TrueColor);
+        assert!(truecolor.contains("\x1b[38;2;255;100;50m"), "{truecolor:?}");
+
+        let palette = render_at(block.clone(), ColorDepth::Ansi256);
+        assert!(palette.contains("\x1b[38;5;203m"), "{palette:?}");
+        assert!(!palette.contains("38;2;"));
+
+        let basic = render_at(block, ColorDepth::Basic16);
+        assert!(basic.contains("\x1b[91m"), "{basic:?}");
+        assert!(!basic.contains("38;5;") && !basic.contains("38;2;"));
     }
 }

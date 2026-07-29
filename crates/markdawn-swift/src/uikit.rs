@@ -19,6 +19,7 @@ use markdawn::arborium::Highlighter;
 use markdawn::{BlockSink, Parser, UIKitError};
 
 use crate::grammar_store::global_store;
+use crate::html::incomplete_suffix_len;
 
 // [spec:mw:def:ffi.ownership.handle]
 pub struct UIKitState {
@@ -43,32 +44,29 @@ impl UIKitState {
         }
     }
 
+    // Only a truncated-but-still-valid tail waits for the next push; anything
+    // ahead of it decodes now, ill-formed sequences included.
+    // [spec:mw:sem:ffi.encoding.utf8+1]
     fn push_bytes(&mut self, bytes: &[u8]) -> Result<(), ()> {
         self.pending.extend_from_slice(bytes);
-        let valid_len = match std::str::from_utf8(&self.pending) {
-            Ok(_) => self.pending.len(),
-            Err(e) => e.valid_up_to(),
-        };
-        if valid_len == 0 {
+        let split = self.pending.len() - incomplete_suffix_len(&self.pending);
+        if split == 0 {
             return Ok(());
         }
-        let chunk = unsafe { std::str::from_utf8_unchecked(&self.pending[..valid_len]) }.to_owned();
-        self.pending.drain(..valid_len);
+        let chunk = String::from_utf8_lossy(&self.pending[..split]).into_owned();
+        self.pending.drain(..split);
         self.parser
             .push_str(&chunk, &mut self.sink)
             .map_err(|_: markdawn::StreamError<UIKitError>| ())
     }
 
+    // [spec:mw:sem:ffi.encoding.utf8+1]
     fn finish(&mut self) -> Result<(), ()> {
         if !self.pending.is_empty() {
-            if let Ok(s) = std::str::from_utf8(&self.pending) {
-                let owned = s.to_owned();
-                self.pending.clear();
-                if self.parser.push_str(&owned, &mut self.sink).is_err() {
-                    return Err(());
-                }
-            } else {
-                self.pending.clear();
+            let tail = String::from_utf8_lossy(&self.pending).into_owned();
+            self.pending.clear();
+            if self.parser.push_str(&tail, &mut self.sink).is_err() {
+                return Err(());
             }
         }
         self.parser.finish(&mut self.sink).map_err(|_| ())
@@ -78,7 +76,7 @@ impl UIKitState {
 /// Allocate a new UIKit-renderer state on the main thread.
 ///
 /// Returns NULL if called off the main thread.
-// [spec:mw:req:ffi.safety.null-guard]
+// [spec:mw:req:ffi.safety.null-guard+1]
 #[unsafe(no_mangle)]
 pub extern "C" fn mw_uikit_state_new() -> *mut UIKitState {
     let Some(mtm) = MainThreadMarker::new() else {

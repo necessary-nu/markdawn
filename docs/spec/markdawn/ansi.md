@@ -106,19 +106,35 @@ behind `terminal`.
 > an explicit reset, an attribute-clearing code or a colour-default code
 > retires part of it, so a run left open at end of input simply ends.
 
-> [spec:mw:req:ansi.to-html.extended-color]
-> `38` and `48` MUST consume their selector and operands from the same
-> parameter iterator the outer loop is walking. Selector `5` consumes
-> one further parameter as a 256-palette index; selector `2` consumes
-> three further parameters as R, G, B. Operands are narrowed to `u8` by
-> truncation, so values above 255 wrap rather than erroring. If the
-> parameter list ends before the operands are complete, the colour is
-> left unchanged and the sequence ends quietly. For an unrecognised
+> [spec:mw:req:ansi.to-html.extended-color+1]
+> `38` and `48` MUST accept both SGR colour shapes, distinguished by
+> whether the parameter carrying the selector also carries
+> sub-parameters.
+>
+> In the semicolon form (`ESC[38;5;9m`, `ESC[38;2;r;g;bm`) the parameter
+> holds only `38` or `48`, and the selector and operands MUST be consumed
+> from the same parameter iterator the outer loop is walking. Selector
+> `5` consumes one further parameter as a 256-palette index; selector `2`
+> consumes three further parameters as R, G, B. For an unrecognised
 > selector only the selector itself has been consumed, so the remaining
 > parameters fall back to the outer loop and are re-read as ordinary SGR
-> codes. Only the *first* sub-parameter of each parameter is read, so
-> the colon-delimited variants (`ESC[38:5:9m`, `ESC[38:2::r:g:bm`) are
-> not honoured — they are seen as a single `38` with nothing following.
+> codes.
+>
+> In the colon form of ITU-T T.416 (`ESC[38:5:9m`, `ESC[38:2:r:g:bm`,
+> `ESC[38:2::r:g:bm`) the selector and operands are sub-parameters of the
+> `38` / `48` parameter itself, and MUST be read from there without
+> touching the outer iterator — so a colon group is self-contained and
+> the parameters after it are unaffected. Selector `2` admits both
+> lengths: four operands are read as `2:r:g:b`, and five or more as
+> `2:<colour-space>:r:g:b`, the colour-space id being ignored (it is
+> conventionally written empty, which the parser reports as `0`).
+>
+> Both shapes narrow operands to `u8` by truncation, so values above 255
+> wrap rather than erroring. If the operands are incomplete — the
+> parameter list ends in the semicolon form, or the colon group is too
+> short — the colour is left unchanged and the sequence ends quietly.
+> The two shapes MUST agree: for any colour, the colon and semicolon
+> spellings produce the same `Color`.
 
 > [spec:mw:req:ansi.to-html.span-discipline]
 > At most one `<span>` may be open at any point, and spans MUST NOT
@@ -202,12 +218,17 @@ behind `terminal`.
 > the grid instead of being dropped — the snapshot is what a human would
 > see, not the literal byte stream. There is no streaming equivalent.
 
-> [spec:mw:req:ansi.term.style-mapping]
-> Snapshotting MUST carry `fg`, `bg`, `bold`, `italic`, `underline` and
-> `inverse` across from the emulator cell. `dim` and `strike` MUST be
-> left `false` unconditionally: `vt100::Cell` 0.16 exposes no accessor
-> for either, so a dim or struck source run is snapshotted as plain in
-> those two respects. Colour maps as `Default` → `None`, `Idx(n)` with
+> [spec:mw:req:ansi.term.style-mapping+1]
+> Snapshotting MUST carry `fg`, `bg`, `bold`, `dim`, `italic`,
+> `underline` and `inverse` across from the emulator cell. Bold and dim
+> are one exclusive intensity slot inside `vt100`, so unlike the
+> byte-stream path — where they are independent booleans — a snapshotted
+> cell is never both at once: the later of SGR 1 / SGR 2 wins and SGR 22
+> clears whichever is live. `strike` MUST be left `false`
+> unconditionally: `vt100` 0.16 carries no mode bit for SGR 9 and exposes
+> no accessor, so the attribute is discarded inside the emulator before a
+> snapshot can observe it, and a struck source run is snapshotted as
+> plain in that one respect. Colour maps as `Default` → `None`, `Idx(n)` with
 > `n < 16` → `Named(n)`, any other `Idx(n)` → `Palette(n)`, and
 > `Rgb(r, g, b)` → `Rgb(r, g, b)`; the `n < 16` split is what lets the
 > re-encoding direction recover short SGR forms. A cell with no contents
@@ -277,16 +298,44 @@ behind `terminal`.
 > `AnsiError::Sink` carries a stringified downstream error from
 > `AnsiSink`, the streaming wrapper symmetrical with `HtmlSink`.
 
-> [spec:mw:sem:ansi.adapter.color-depth-inert]
+> [spec:mw:req:ansi.adapter.color-depth-inert+1]
 > `ColorDepth` is `Basic16` / `Ansi256` / `TrueColor` and defaults to
-> `Ansi256`. It is carried on `AnsiOptions` and re-exported from the
-> crate root, but the adapter never reads it: every SGR sequence the
-> adapter emits is a fixed literal, so no
-> truecolour value is downgraded to a 256-palette or 16-colour
-> approximation and setting `Basic16` does not change a single output
-> byte. The field is configuration surface only. Content that carries
-> truecolour reaches the terminal unmodified, which is correct for the
-> `ansi` code-block passthrough path and a silent no-op everywhere else.
+> `Ansi256`. Every colour the adapter emits MUST pass through the
+> quantiser for the configured depth before it is encoded as SGR, so no
+> emitted sequence names a colour the target cannot show.
+>
+> The quantisation is: at `TrueColor` every colour passes through
+> untouched. At `Ansi256` an `Rgb` becomes the nearest `Palette` entry
+> and everything else passes through. At `Basic16` an `Rgb` becomes the
+> nearest `Named` entry and a `Palette` becomes the nearest `Named`
+> entry; `Named` is already 16-colour and never moves. Truecolour
+> reaching `Basic16` MUST be quantised against the named entries
+> directly rather than by way of the 256 cube, since quantising twice
+> lands further from the requested hue.
+>
+> Nearest is least squared Euclidean distance over the RGB channels,
+> against the same palette tables `ansi_style` resolves CSS with — there
+> is no second colour table. `rgb_to_ansi256` searches indices 16–255:
+> the 216-entry 6×6×6 cube and the 24-step grey ramp, but *not* the 16
+> base entries, whose rendered values a terminal is free to retheme.
+> `rgb_to_named` searches the 16 named entries, skipping any index the
+> table leaves to the ambient colour. `ansi256_to_named` passes indices
+> below 16 through unchanged and quantises the rest through their RGB
+> triple. Ties resolve to the lowest index.
+>
+> Two emissions are load-bearing. The adapter's own palette is already
+> 16-safe apart from the code-block band (`Palette(236)`) and the code
+> span background (`Palette(237)`), which collapse to `Named(0)` at
+> `Basic16`; every other adapter colour is a `Named` entry and so is
+> byte-identical at all three depths. The colours that genuinely span
+> the range are the *content's*: a `terminal` fenced block is
+> snapshotted, and its cells' `fg` and `bg` MUST be quantised before
+> `render_grid_ansi` re-encodes them, which is where a truecolour
+> transcript is actually reduced.
+>
+> An `ansi` fenced block is exempt: `[spec:mw:req:ansi.adapter.code-block]`
+> requires it verbatim, so its bytes reach the terminal at whatever depth
+> the author wrote them.
 
 > [spec:mw:req:ansi.adapter.reset-discipline]
 > Every styled run the adapter opens MUST be closed explicitly, and the

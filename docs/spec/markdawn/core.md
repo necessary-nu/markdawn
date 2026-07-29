@@ -177,13 +177,29 @@ its source spans, the `StreamItem` streaming protocol, the `Sink` and
 > Hit-testing a cursor position against a list of block spans therefore
 > returns nothing for inter-block whitespace.
 
-> [spec:mw:sem:core.span.unpopulated-is-empty]
-> Not every node has a computed span. Structural nodes built without one
-> — table rows and cells, the synthesized footnote section and its
-> definitions — carry the default empty span, which the descendant-offset
-> pass then shifts to `start..start` at the enclosing top-level block's
-> start offset. Consumers MUST read an empty span as "no source range
-> known" rather than as a real zero-width position in the document.
+> [spec:mw:sem:core.span.unpopulated-is-empty+1]
+> There is no "source range unknown" encoding, and a consumer MUST NOT
+> read an empty span as one. The structural nodes that carry no inline
+> content of their own are populated at construction like any other: a
+> table row spans its source line from its first to its last
+> non-whitespace byte, excluding the line terminator; a table cell spans
+> the text between its delimiting pipes with the surrounding whitespace
+> excluded, which is the cell's *source* and so differs from the cell's
+> content string wherever a `\|` escape was resolved; and a footnote
+> definition spans the lines it was written on, trailing newline
+> included, wherever in the document those lines sat before the
+> definition was lifted out. An empty span is therefore a construct that
+> genuinely occupies no source text at a real position: a cell that is
+> empty in the source, or one padded in to square up a short body row,
+> sits at the point in its row where it is or would have been, and the
+> synthesized `FootnoteSection` — assembled rather than parsed — sits at
+> the end of the parse input, the point at which it is appended.
+>
+> These are the one-shot parse's guarantees, in the coordinate space of
+> the source it was handed. The streaming parser computes no block spans
+> at all: every block `push_str` and `finish` emit carries `0..0`, since
+> only the one-shot path walks line offsets. The footnote layer is the
+> single exception, computing definition and section spans on both paths.
 
 ## The streaming protocol
 

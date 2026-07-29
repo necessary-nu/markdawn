@@ -41,7 +41,7 @@ use crate::parser::Parser;
 /// Parser + renderer configuration. Mirrors the parser feature flags.
 /// `Clone + PartialEq + Default` so it can be used as a `Markdown`
 /// component prop.
-// [spec:mw:def:dioxus.surface.options]
+// [spec:mw:def:dioxus.surface.options+1]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DioxusOptions {
     pub gfm: bool,
@@ -58,6 +58,10 @@ pub struct DioxusOptions {
     /// Requires the Graphviz C libraries at build time. No-op otherwise.
     #[cfg(feature = "graphviz")]
     pub graphviz: bool,
+    /// When the `typst` feature is enabled, fenced code blocks tagged
+    /// `typst` are compiled to inline SVG. No-op otherwise.
+    #[cfg(feature = "typst")]
+    pub typst: bool,
 }
 
 impl DioxusOptions {
@@ -73,6 +77,8 @@ impl DioxusOptions {
             pikchr: true,
             #[cfg(feature = "graphviz")]
             graphviz: true,
+            #[cfg(feature = "typst")]
+            typst: true,
         }
     }
 }
@@ -211,15 +217,16 @@ where
 
 impl<R> Renderer<R> {
     /// Render a single `Node` (block or inline) as a Dioxus `Element`.
-    // [spec:mw:req:dioxus.structure.vdom-agreement]
+    // [spec:mw:req:dioxus.structure.vdom-agreement+1]
     pub fn render_node<Ext>(&self, node: &Node<Ext>) -> Element
     where
         R: RenderDioxusCustom<Ext>,
     {
         match node {
-            Node::Document { children, .. } | Node::DefinitionList { children, .. } => {
-                self.render_children(children)
-            }
+            Node::Document { children, .. } => self.render_children(children),
+            Node::DefinitionList { children, .. } => rsx! {
+                dl { {self.render_children(children)} }
+            },
             Node::FootnoteSection { children, .. } => self.render_footnote_section(children),
             Node::Paragraph { children, .. } => rsx! { p { {self.render_children(children)} } },
             Node::Heading {
@@ -251,7 +258,7 @@ impl<R> Renderer<R> {
                 rows,
                 ..
             } => self.render_table(alignments, header, rows),
-            Node::TableRow { cells, .. } => rsx! { tr { {self.render_children(cells)} } },
+            Node::TableRow { .. } => self.render_table_row(node, &[]),
             Node::TableCell {
                 children,
                 header,
@@ -262,7 +269,7 @@ impl<R> Renderer<R> {
                 self.render_code_block(info.as_deref(), literal)
             }
             Node::ThematicBreak { .. } => rsx! { hr {} },
-            // [spec:mw:req:dioxus.html.host-element]
+            // [spec:mw:req:dioxus.html.host-element+1]
             Node::Html { html, .. } => {
                 let safe = self.html_filter.filter(html);
                 rsx! { div { dangerous_inner_html: safe } }
@@ -529,7 +536,7 @@ impl<R> Renderer<R> {
 
     fn render_table<Ext>(
         &self,
-        _alignments: &[Option<TableAlignment>],
+        alignments: &[Option<TableAlignment>],
         header: &[Node<Ext>],
         rows: &[Node<Ext>],
     ) -> Element
@@ -538,11 +545,50 @@ impl<R> Renderer<R> {
     {
         rsx! {
             table {
-                if !header.is_empty() {
-                    thead { {self.render_children(header)} }
+                thead {
+                    for row in header.iter() { {self.render_table_row(row, alignments)} }
                 }
-                tbody { {self.render_children(rows)} }
+                if !rows.is_empty() {
+                    tbody {
+                        for row in rows.iter() { {self.render_table_row(row, alignments)} }
+                    }
+                }
             }
+        }
+    }
+
+    fn render_table_row<Ext>(
+        &self,
+        node: &Node<Ext>,
+        alignments: &[Option<TableAlignment>],
+    ) -> Element
+    where
+        R: RenderDioxusCustom<Ext>,
+    {
+        let Node::TableRow { cells, .. } = node else {
+            return rsx! {};
+        };
+        rsx! {
+            tr {
+                for (index, cell) in cells.iter().enumerate() {
+                    {self.render_row_cell(cell, alignments.get(index).copied().flatten())}
+                }
+            }
+        }
+    }
+
+    fn render_row_cell<Ext>(&self, cell: &Node<Ext>, column: Option<TableAlignment>) -> Element
+    where
+        R: RenderDioxusCustom<Ext>,
+    {
+        match cell {
+            Node::TableCell {
+                children,
+                header,
+                alignment,
+                ..
+            } => self.render_table_cell(*header, alignment.or(column), children),
+            _ => rsx! {},
         }
     }
 
@@ -628,42 +674,14 @@ impl<R> Renderer<R> {
         // (attributes, filenames, etc.) consumed by rewriters.
         let info_lang = info.map(|s| s.split_whitespace().next().unwrap_or(""));
 
-        // 0.5. ```ansi — render escape sequences as styled HTML via the
-        //      crate-level `ansi_to_html` helper. Dispatches to the
-        //      CSS-only two-pane wrapper so readers can flip to the
-        //      annotated-source view.
-        #[cfg(feature = "ansi")]
+        // 0.5. ```ansi / ```terminal — render escape sequences as styled
+        //      HTML, wrapped in the CSS-only two-pane toggle so readers
+        //      can flip to the annotated-source view.
         if info_lang == Some("ansi") {
-            let rendered = crate::ansi_to_html::ansi_to_html(literal);
-            let source = crate::ansi_to_html::ansi_to_annotated_source(literal);
-            let id = {
-                use core::sync::atomic::{AtomicUsize, Ordering};
-                static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
-                NEXT_ID.fetch_add(1, Ordering::Relaxed)
-            };
-            let id_str = format!("ansi-src-{id}");
-            return rsx! {
-                div { class: "ansi-block",
-                    input {
-                        r#type: "checkbox",
-                        id: "{id_str}",
-                        class: "ansi-toggle-input",
-                        aria_hidden: "true",
-                    }
-                    label {
-                        r#for: "{id_str}",
-                        class: "ansi-toggle",
-                        span { class: "ansi-toggle-show", "show source" }
-                        span { class: "ansi-toggle-hide", "show rendered" }
-                    }
-                    pre { class: "ansi-rendered",
-                        code { class: "language-ansi", dangerous_inner_html: rendered }
-                    }
-                    pre { class: "ansi-source",
-                        code { class: "language-ansi-source", dangerous_inner_html: source }
-                    }
-                }
-            };
+            return render_ansi_block(literal);
+        }
+        if info_lang == Some("terminal") {
+            return render_terminal_block(info, literal);
         }
 
         // 1. pikchr (feature-gated)
@@ -692,6 +710,17 @@ impl<R> Renderer<R> {
                     };
                 }
             }
+        }
+
+        // 1c. typst (feature-gated)
+        #[cfg(feature = "typst")]
+        if self.options.typst
+            && info_lang == Some("typst")
+            && let Some(svg) = crate::render_typst_to_svg(literal)
+        {
+            return rsx! {
+                div { class: "typst", dangerous_inner_html: svg }
+            };
         }
 
         // 2. syntax highlighter (feature-gated)
@@ -757,7 +786,7 @@ where
 
 fn render_image(destination: &str, title: Option<&str>, alt: &str) -> Element {
     let title = title.unwrap_or_default();
-    let src = if crate::url_safety::is_safe_url(destination) {
+    let src = if crate::url_safety::is_safe_image_url(destination) {
         destination.to_string()
     } else {
         String::new()
@@ -781,11 +810,98 @@ fn render_math(math: &str, display: bool) -> Element {
             span { class: "math math-inline", dangerous_inner_html: svg }
         },
         Err(_) if display => rsx! {
-            pre { class: "math math-display math-error", "{math}" }
+            pre {
+                code { class: "language-math math-display math-error", "{math}" }
+            }
         },
         Err(_) => rsx! {
-            code { class: "math math-inline math-error", "{math}" }
+            code { class: "language-math math-inline math-error", "{math}" }
         },
+    }
+}
+
+/// Monotonic id for the CSS-only two-pane toggles, whose `<label for>`
+/// has to address its own `<input id>`.
+fn next_pane_id() -> usize {
+    use core::sync::atomic::{AtomicUsize, Ordering};
+    static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+    NEXT_ID.fetch_add(1, Ordering::Relaxed)
+}
+
+#[cfg(feature = "ansi")]
+fn render_ansi_block(literal: &str) -> Element {
+    let rendered = crate::ansi_to_html::ansi_to_html(literal);
+    let source = crate::ansi_to_html::ansi_to_annotated_source(literal);
+    let id_str = format!("ansi-src-{}", next_pane_id());
+    rsx! {
+        div { class: "ansi-block",
+            input {
+                r#type: "checkbox",
+                id: "{id_str}",
+                class: "ansi-toggle-input",
+                aria_hidden: "true",
+            }
+            label {
+                r#for: "{id_str}",
+                class: "ansi-toggle",
+                span { class: "ansi-toggle-show", "show source" }
+                span { class: "ansi-toggle-hide", "show rendered" }
+            }
+            pre { class: "ansi-rendered",
+                code { class: "language-ansi", dangerous_inner_html: rendered }
+            }
+            pre { class: "ansi-source",
+                code { class: "language-ansi-source", dangerous_inner_html: source }
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "ansi"))]
+fn render_ansi_block(literal: &str) -> Element {
+    rsx! {
+        pre {
+            code { class: "language-ansi", "{literal}" }
+        }
+    }
+}
+
+#[cfg(feature = "terminal")]
+fn render_terminal_block(info: Option<&str>, literal: &str) -> Element {
+    let (cols, rows) = crate::adapter::vdom::parse_terminal_geometry(info);
+    let rendered = crate::terminal::ansi_snapshot_to_html(literal, cols, rows);
+    let source = crate::ansi_to_html::ansi_to_annotated_source(literal);
+    let id_str = format!("terminal-src-{}", next_pane_id());
+    rsx! {
+        div { class: "terminal-block",
+            input {
+                r#type: "checkbox",
+                id: "{id_str}",
+                class: "terminal-toggle-input",
+                aria_hidden: "true",
+            }
+            label {
+                r#for: "{id_str}",
+                class: "terminal-toggle",
+                span { class: "terminal-toggle-show", "show source" }
+                span { class: "terminal-toggle-hide", "show rendered" }
+            }
+            pre { class: "terminal-rendered",
+                code { class: "language-terminal", dangerous_inner_html: rendered }
+            }
+            pre { class: "terminal-source",
+                code { class: "language-terminal-source", dangerous_inner_html: source }
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "terminal"))]
+fn render_terminal_block(_info: Option<&str>, literal: &str) -> Element {
+    rsx! {
+        pre {
+            code { class: "language-terminal", "{literal}" }
+        }
     }
 }
 
@@ -844,542 +960,9 @@ fn render_footnote_backrefs(label: &str, number: u32, count: u32) -> Element {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+#[path = "dioxus_tests.rs"]
+mod tests;
 
-    fn ssr(element: Element) -> String {
-        dioxus_ssr::render_element(element)
-    }
-
-    #[test]
-    fn paragraph_renders_p_tag() {
-        let html = ssr(render_markdown("hello world", DioxusOptions::default()));
-        assert_eq!(html, "<p>hello world</p>");
-    }
-
-    #[test]
-    fn heading_renders_correct_tag() {
-        let html = ssr(render_markdown("## Subheading", DioxusOptions::default()));
-        assert_eq!(html, "<h2>Subheading</h2>");
-    }
-
-    #[test]
-    fn nested_blockquote_with_heading() {
-        let html = ssr(render_markdown("> # title", DioxusOptions::default()));
-        assert!(html.contains("<blockquote>"));
-        assert!(html.contains("<h1>title</h1>"));
-        assert!(html.contains("</blockquote>"));
-    }
-
-    #[test]
-    fn link_has_href_attribute() {
-        let html = ssr(render_markdown(
-            "[click](https://example.com)",
-            DioxusOptions::default(),
-        ));
-        assert!(html.contains("href=\"https://example.com\""));
-        assert!(html.contains(">click</a>"));
-    }
-
-    // [spec:adv:req:markdown.url-allowlist/test]
-    #[test]
-    fn javascript_link_href_is_stripped() {
-        let html = ssr(render_markdown(
-            "[x](javascript:alert(1))",
-            DioxusOptions::default(),
-        ));
-        assert!(!html.contains("javascript:"), "got: {html}");
-        assert!(html.contains("href=\"\""), "got: {html}");
-    }
-
-    #[test]
-    fn javascript_image_src_is_stripped() {
-        let html = ssr(render_markdown(
-            "![x](javascript:alert(1))",
-            DioxusOptions::default(),
-        ));
-        assert!(!html.contains("javascript:"), "got: {html}");
-    }
-
-    #[test]
-    fn data_url_in_link_is_stripped() {
-        // Base64-encoded `<script>alert(1)</script>` without parens so
-        // markdown parses the URL cleanly; sanitiser should still reject
-        // the `data:` scheme.
-        let html = ssr(render_markdown(
-            "[x](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)",
-            DioxusOptions::default(),
-        ));
-        assert!(!html.contains("data:"), "got: {html}");
-    }
-
-    #[test]
-    fn vbscript_url_in_link_is_stripped() {
-        let html = ssr(render_markdown(
-            "[x](vbscript:msgbox)",
-            DioxusOptions::default(),
-        ));
-        assert!(!html.contains("vbscript:"), "got: {html}");
-    }
-
-    #[test]
-    fn code_block_uses_language_class() {
-        let html = ssr(render_markdown(
-            "```rust\nlet x = 1;\n```",
-            DioxusOptions::default(),
-        ));
-        assert!(html.contains("class=\"language-rust\""));
-        assert!(html.contains("let x = 1;"));
-    }
-
-    // [spec:mw:def:dioxus.surface.options/test]
-    #[test]
-    fn alert_renders_github_class_structure() {
-        let html = ssr(render_markdown(
-            "> [!WARNING]\n> careful",
-            DioxusOptions {
-                alerts: true,
-                ..Default::default()
-            },
-        ));
-        assert!(html.contains("markdown-alert"));
-        assert!(html.contains("markdown-alert-warning"));
-        assert!(html.contains(">Warning<"));
-        assert!(html.contains("careful"));
-    }
-
-    #[test]
-    fn alert_custom_title_overrides_default_label() {
-        let html = ssr(render_markdown(
-            "> [!NOTE] My custom title\n> body paragraph",
-            DioxusOptions {
-                alerts: true,
-                ..Default::default()
-            },
-        ));
-        assert!(
-            html.contains(">My custom title<"),
-            "expected custom title; got: {html}"
-        );
-        assert!(
-            !html.contains(">Note<"),
-            "default label should be replaced; got: {html}"
-        );
-        assert!(html.contains("body paragraph"));
-    }
-
-    // [spec:mw:req:core.node.alert-title-fallback/test]
-    #[test]
-    fn alert_without_title_keeps_default_label() {
-        let html = ssr(render_markdown(
-            "> [!NOTE]\n> body",
-            DioxusOptions {
-                alerts: true,
-                ..Default::default()
-            },
-        ));
-        assert!(
-            html.contains(">Note<"),
-            "expected default label; got: {html}"
-        );
-    }
-
-    // [spec:mw:req:dioxus.structure.vdom-agreement/test]
-    // [spec:mw:req:core.node.table-cell-alignment/test]
-    #[test]
-    fn table_alignment_emits_text_align_style() {
-        let src = "| a | b |\n|:--|---:|\n| 1 | 2 |";
-        let html = ssr(render_markdown(
-            src,
-            DioxusOptions {
-                gfm: true,
-                ..Default::default()
-            },
-        ));
-        assert!(html.contains("style=\"text-align: left\""));
-        assert!(html.contains("style=\"text-align: right\""));
-    }
-
-    // [spec:mw:def:core.node.footnote-triple/test]
-    #[test]
-    fn footnote_ref_renders_sup_link() {
-        let src = "see[^1]\n\n[^1]: a footnote";
-        let html = ssr(render_markdown(
-            src,
-            DioxusOptions {
-                gfm: true,
-                ..Default::default()
-            },
-        ));
-        assert!(html.contains("class=\"footnote-ref\""));
-        assert!(html.contains("href=\"#fn-1\""));
-    }
-
-    #[test]
-    fn math_block_renders_inline_svg() {
-        let html = ssr(render_markdown(
-            "$$x^2 + y^2 = z^2$$",
-            DioxusOptions {
-                math: true,
-                ..Default::default()
-            },
-        ));
-        assert!(html.contains("<svg"), "expected SVG, got: {html}");
-        assert!(html.contains("class=\"math math-display\""));
-    }
-
-    #[test]
-    fn math_inline_renders_inline_svg() {
-        let html = ssr(render_markdown(
-            "the formula $a + b$ is simple",
-            DioxusOptions {
-                math: true,
-                ..Default::default()
-            },
-        ));
-        assert!(html.contains("<svg"), "expected SVG, got: {html}");
-        assert!(html.contains("class=\"math math-inline\""));
-    }
-
-    #[test]
-    fn task_list_item_includes_checkbox() {
-        let html = ssr(render_markdown(
-            "- [x] done",
-            DioxusOptions {
-                gfm: true,
-                ..Default::default()
-            },
-        ));
-        assert!(html.contains("type=\"checkbox\""));
-        assert!(html.contains("disabled"));
-        assert!(html.contains("checked"));
-    }
-
-    #[test]
-    fn tight_list_strips_paragraph_wrapper() {
-        let html = ssr(render_markdown(
-            "- one\n- two\n- three",
-            DioxusOptions::default(),
-        ));
-        // Tight list: <li>one</li>, NOT <li><p>one</p></li>
-        assert!(
-            !html.contains("<p>one"),
-            "tight list shouldn't wrap in <p>: {html}"
-        );
-        assert!(html.contains("<li>one"), "got: {html}");
-    }
-
-    #[test]
-    fn loose_list_keeps_paragraph_wrapper() {
-        // Blank line between items → loose list
-        let html = ssr(render_markdown(
-            "- one\n\n- two\n",
-            DioxusOptions::default(),
-        ));
-        assert!(
-            html.contains("<p>one</p>"),
-            "loose list should wrap in <p>: {html}"
-        );
-    }
-
-    #[test]
-    fn footnote_section_wraps_in_section_and_ol() {
-        let src = "see[^1]\n\n[^1]: a footnote";
-        let html = ssr(render_markdown(
-            src,
-            DioxusOptions {
-                gfm: true,
-                ..Default::default()
-            },
-        ));
-        assert!(html.contains("<section class=\"footnotes\""), "got: {html}");
-        assert!(html.contains("data-footnotes"), "got: {html}");
-        assert!(html.contains("<ol>"), "got: {html}");
-        assert!(html.contains("id=\"fn-1\""), "got: {html}");
-    }
-
-    // [spec:mw:req:core.node.footnote-numbering/test]
-    #[test]
-    fn footnote_definition_appends_backref() {
-        let src = "see[^1]\n\n[^1]: a footnote";
-        let html = ssr(render_markdown(
-            src,
-            DioxusOptions {
-                gfm: true,
-                ..Default::default()
-            },
-        ));
-        assert!(html.contains("class=\"footnote-backref\""), "got: {html}");
-        assert!(html.contains("href=\"#fnref-1\""), "got: {html}");
-        assert!(html.contains("↩"), "expected backref arrow: {html}");
-    }
-
-    // [spec:mw:req:dioxus.html.host-element/test]
-    // [spec:mw:req:core.html-filter.default-safe/test]
-    #[test]
-    fn html_block_strips_dangerous_tags() {
-        let src = "<script>alert('xss')</script>\n\nsafe";
-        let html = ssr(render_markdown(
-            src,
-            DioxusOptions {
-                gfm: true,
-                ..Default::default()
-            },
-        ));
-        // The tagfilter replaces `<` with `&lt;` for disallowed tags
-        assert!(
-            !html.contains("<script>") || html.contains("&lt;script"),
-            "expected script tag filtered, got: {html}"
-        );
-    }
-
-    #[test]
-    fn unrestricted_filter_passes_script_through() {
-        let src = "<script>foo</script>";
-        let html = ssr(Renderer::default()
-            .with_html_filter(crate::HtmlFilter::unrestricted())
-            .render(src));
-        // Dioxus's dangerous_inner_html doesn't escape, but the SSR output
-        // still HTML-escapes the result of dangerous_inner_html attribute
-        // setting. Either way, the tag should NOT be neutered (no &lt;script).
-        assert!(!html.contains("&lt;script"), "got: {html}");
-    }
-
-    #[cfg(feature = "pikchr")]
-    #[test]
-    fn pikchr_block_renders_inline_svg() {
-        let src = "```pikchr\nbox \"Hello\"\n```";
-        let html = ssr(Renderer::default()
-            .with_options(DioxusOptions {
-                pikchr: true,
-                ..Default::default()
-            })
-            .render(src));
-        assert!(html.contains("class=\"pikchr\""), "got: {html}");
-        assert!(html.contains("<svg"), "got: {html}");
-    }
-
-    #[cfg(feature = "pikchr")]
-    #[test]
-    fn pikchr_block_falls_back_when_disabled() {
-        let src = "```pikchr\nbox \"Hello\"\n```";
-        let html = ssr(render_markdown(src, DioxusOptions::default()));
-        // pikchr feature off in options → just a code block
-        assert!(html.contains("<pre>"));
-        assert!(!html.contains("<svg"));
-    }
-
-    #[cfg(feature = "graphviz")]
-    #[test]
-    fn graphviz_block_renders_inline_svg() {
-        let src = "```dot\ndigraph { A -> B }\n```";
-        let html = ssr(Renderer::default()
-            .with_options(DioxusOptions {
-                graphviz: true,
-                ..Default::default()
-            })
-            .render(src));
-        assert!(html.contains("class=\"graphviz\""), "got: {html}");
-        assert!(html.contains("<svg"), "got: {html}");
-    }
-
-    #[cfg(feature = "graphviz")]
-    #[test]
-    fn graphviz_block_falls_back_when_disabled() {
-        let src = "```dot\ndigraph { A -> B }\n```";
-        let html = ssr(render_markdown(src, DioxusOptions::default()));
-        assert!(html.contains("<pre>"));
-        assert!(!html.contains("<svg"));
-    }
-
-    #[cfg(feature = "graphviz")]
-    #[test]
-    fn graphviz_info_string_alias_also_renders() {
-        let src = "```graphviz\ndigraph { A -> B }\n```";
-        let html = ssr(Renderer::default()
-            .with_options(DioxusOptions {
-                graphviz: true,
-                ..Default::default()
-            })
-            .render(src));
-        assert!(html.contains("class=\"graphviz\""), "got: {html}");
-        assert!(html.contains("<svg"), "got: {html}");
-    }
-
-    #[cfg(feature = "graphviz")]
-    #[test]
-    fn graphviz_javascript_href_sanitized_in_output_svg() {
-        let src = "```dot\ndigraph { A [href=\"javascript:alert(1)\"] }\n```";
-        let html = ssr(Renderer::default()
-            .with_options(DioxusOptions {
-                graphviz: true,
-                ..Default::default()
-            })
-            .render(src));
-        assert!(
-            html.contains("class=\"graphviz\""),
-            "no graphviz div: {html}"
-        );
-        assert!(!html.contains("javascript:"), "leaked javascript: {html}");
-    }
-
-    #[cfg(feature = "graphviz")]
-    #[test]
-    fn graphviz_url_alias_javascript_sanitized() {
-        // `URL=` is an alias for `href=`. Graphviz emits it as an
-        // xlink:href in SVG, where the post-render sanitiser catches
-        // the unsafe scheme.
-        let src = "```dot\ndigraph { A [URL=\"javascript:alert(1)\"]; B }\n```";
-        let html = ssr(Renderer::default()
-            .with_options(DioxusOptions {
-                graphviz: true,
-                ..Default::default()
-            })
-            .render(src));
-        assert!(!html.contains("javascript:"), "leaked: {html}");
-    }
-
-    #[cfg(feature = "graphviz")]
-    #[test]
-    fn graphviz_html_label_img_path_does_not_leak() {
-        let src = "```dot\ndigraph { A [label=<<IMG SRC=\"/etc/passwd\"/>>] }\n```";
-        let html = ssr(Renderer::default()
-            .with_options(DioxusOptions {
-                graphviz: true,
-                ..Default::default()
-            })
-            .render(src));
-        assert!(!html.contains("/etc/passwd"), "leaked: {html}");
-    }
-
-    #[cfg(feature = "graphviz")]
-    #[test]
-    fn graphviz_safe_href_preserved_in_output_svg() {
-        let src = "```dot\ndigraph { A [href=\"https://example.com\"] }\n```";
-        let html = ssr(Renderer::default()
-            .with_options(DioxusOptions {
-                graphviz: true,
-                ..Default::default()
-            })
-            .render(src));
-        assert!(
-            html.contains("https://example.com"),
-            "link stripped: {html}"
-        );
-    }
-
-    #[cfg(feature = "highlight")]
-    #[test]
-    fn highlighter_path_invoked_for_known_language() {
-        use std::cell::Cell;
-        use std::rc::Rc;
-
-        struct StubHl(Rc<Cell<bool>>);
-        impl crate::highlight::SyntaxHighlighter for StubHl {
-            fn highlight(
-                &mut self,
-                _lang: &str,
-                _src: &str,
-            ) -> Result<Vec<crate::SyntaxSpan>, crate::HighlightError> {
-                self.0.set(true);
-                Err(crate::HighlightError::new("no grammar"))
-            }
-        }
-
-        // [spec:gfm:req:markdawn.highlighting.boundary.error-fallback/test]
-        let invoked = Rc::new(Cell::new(false));
-        let html = ssr(Renderer::default()
-            .with_highlighter(StubHl(invoked.clone()))
-            .render("```rust\nfoo\n```"));
-        assert!(
-            invoked.get(),
-            "highlighter should be queried for `rust` block"
-        );
-        assert!(html.contains("class=\"language-rust\""), "got: {html}");
-        assert!(html.contains("foo"), "plain fallback lost source: {html}");
-    }
-
-    #[cfg(feature = "highlight")]
-    #[test]
-    fn highlighter_skipped_for_unknown_language_with_no_info() {
-        use std::cell::Cell;
-        use std::rc::Rc;
-
-        struct StubHl(Rc<Cell<u32>>);
-        impl crate::highlight::SyntaxHighlighter for StubHl {
-            fn highlight(
-                &mut self,
-                _lang: &str,
-                _src: &str,
-            ) -> Result<Vec<crate::SyntaxSpan>, crate::HighlightError> {
-                self.0.set(self.0.get() + 1);
-                Err(crate::HighlightError::new("unexpected call"))
-            }
-        }
-
-        let calls = Rc::new(Cell::new(0));
-        let _ = ssr(Renderer::default()
-            .with_highlighter(StubHl(calls.clone()))
-            .render("```\nno-lang\n```"));
-        assert_eq!(calls.get(), 0, "no info string → highlighter not called");
-    }
-
-    // [spec:mw:def:core.rewriter.types/test]
-    #[test]
-    fn code_block_rewriter_substitutes_info_and_literal() {
-        struct StubRewriter;
-        impl crate::ext::CodeBlockRewriter for StubRewriter {
-            fn rewrite(
-                &self,
-                info: Option<&str>,
-                _literal: &str,
-            ) -> Option<crate::ext::CodeBlockRewrite> {
-                if info == Some("foo") {
-                    Some(crate::ext::CodeBlockRewrite {
-                        info: Some("bar".into()),
-                        literal: "hello world".into(),
-                    })
-                } else {
-                    None
-                }
-            }
-        }
-
-        let html = ssr(Renderer::default()
-            .with_code_block_rewriter(StubRewriter)
-            .render("```foo\nignored content\n```"));
-        assert!(
-            html.contains("class=\"language-bar\""),
-            "info should be substituted; got: {html}"
-        );
-        assert!(
-            html.contains("hello world"),
-            "literal should be substituted; got: {html}"
-        );
-        assert!(
-            !html.contains("ignored content"),
-            "original literal should not appear; got: {html}"
-        );
-    }
-
-    // [spec:mw:req:core.rewriter.dispatch-order/test]
-    #[test]
-    fn code_block_rewriter_passes_through_non_matching() {
-        struct NeverMatches;
-        impl crate::ext::CodeBlockRewriter for NeverMatches {
-            fn rewrite(
-                &self,
-                _info: Option<&str>,
-                _literal: &str,
-            ) -> Option<crate::ext::CodeBlockRewrite> {
-                None
-            }
-        }
-
-        let html = ssr(Renderer::default()
-            .with_code_block_rewriter(NeverMatches)
-            .render("```text\nfoo\n```"));
-        assert!(html.contains("class=\"language-text\""), "got: {html}");
-        assert!(html.contains("foo"), "got: {html}");
-    }
-}
+#[cfg(test)]
+#[path = "dioxus_vdom_parity_tests.rs"]
+mod vdom_parity_tests;

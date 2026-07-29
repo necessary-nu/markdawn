@@ -458,14 +458,24 @@ line they belong to.
 > carries no href, so it is inert on click; the destination is not
 > rewritten or escaped, it is simply not wired up.
 
-> [spec:mw:req:iced.renderer.image-policy]
-> The adapter performs no network access, so a block-level image
-> resolves as: destination rejected by the URL allowlist — which
-> includes every `data:` URI — degrades to alt text; a destination
-> with no `://` separator is treated as a local filesystem path and
-> loaded from there; anything remaining, i.e. a remote URL, degrades
-> to alt text. Inline images take a separate path that promotes only
-> `data:image/svg+xml` payloads (percent-decoded or base64) whose
-> SVG declares explicit `width` and `height` within its first 512
-> bytes into a `Replaced` atom, and degrades every other inline
-> image to its alt text.
+> [spec:mw:req:iced.renderer.image-policy+1]
+> Every image destination, block-level or inline, MUST be screened
+> with `url_safety::is_safe_image_url` — the image-relaxed allowlist,
+> which admits `data:image/*` on top of the link schemes — and never
+> with the stricter link allowlist, so the adapter agrees with the
+> HTML and Dioxus adapters on which destinations survive. The
+> adapter performs no network access, so a block-level image
+> resolves as: destination rejected by the allowlist degrades to alt
+> text; a `data:` URI — necessarily image-typed, having passed the
+> allowlist — is decoded (base64 when the metadata segment says so,
+> otherwise the payload's own bytes) and handed to the image widget;
+> a destination with no `://` separator is treated as a local
+> filesystem path and loaded from there; anything remaining, i.e. a
+> remote URL, degrades to alt text. Inline images take a separate
+> path that promotes only `data:image/svg+xml` payloads
+> (percent-decoded or base64) whose SVG declares explicit `width`
+> and `height` within its first 512 bytes into a `Replaced` atom,
+> and degrades every other inline image to its alt text; the
+> allowlist screen MUST be applied there explicitly rather than
+> being left implicit in that prefix match, so widening the accepted
+> payloads cannot silently widen what reaches the rasteriser.

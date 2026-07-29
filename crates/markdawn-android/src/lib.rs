@@ -12,6 +12,7 @@
 //! grammars are dynamic plugin `.so`s (the `markdawn-swift-lang-*` cdylibs)
 //! loaded at runtime via [`Java_nu_necessary_markdawn_Native_loadLanguage`].
 
+mod core_tests;
 mod grammar_store;
 
 use std::ffi::{c_char, c_void};
@@ -247,7 +248,7 @@ fn register_language(name: &str) -> bool {
 
 // A null `JString` and an unconvertible one both degrade to "" — no failure
 // path here can raise, so callers keep their own error reporting.
-// [spec:mw:req:ffi.safety.null-guard]
+// [spec:mw:req:ffi.safety.null-guard+1]
 fn jstr(env: &mut JNIEnv, s: &JString) -> String {
     if s.is_null() {
         return String::new();
@@ -263,6 +264,22 @@ fn to_jstring(env: &mut JNIEnv, s: &str) -> jstring {
 
 fn throw(env: &mut JNIEnv, msg: &str) {
     let _ = env.throw_new("java/lang/RuntimeException", msg);
+}
+
+/// Reborrow a `jlong` handle. A zero handle is the one host mistake this
+/// surface can catch; it raises the same `RuntimeException` every other JNI
+/// failure raises, and the caller returns its own null/void failure value.
+/// A non-zero handle is trusted — a stale one is still undefined behaviour.
+///
+/// # Safety
+/// A non-zero `ptr` must be a live handle minted by the matching constructor.
+// [spec:mw:req:ffi.safety.null-guard+1]
+unsafe fn handle<'a, T>(env: &mut JNIEnv, ptr: jlong) -> Option<&'a mut T> {
+    if ptr == 0 {
+        throw(env, "null handle");
+        return None;
+    }
+    Some(unsafe { &mut *(ptr as *mut T) })
 }
 
 // [spec:mw:def:ffi.host.jni]
@@ -320,7 +337,9 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_parserPush<'local>(
     ptr: jlong,
     chunk: JString<'local>,
 ) {
-    let parser = unsafe { &mut *(ptr as *mut VdomParser) };
+    let Some(parser) = (unsafe { handle::<VdomParser>(&mut env, ptr) }) else {
+        return;
+    };
     let chunk = jstr(&mut env, &chunk);
     if let Err(e) = parser.push_str(&chunk) {
         throw(&mut env, &e);
@@ -333,7 +352,9 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_parserFinish<'local>(
     _class: JClass<'local>,
     ptr: jlong,
 ) {
-    let parser = unsafe { &mut *(ptr as *mut VdomParser) };
+    let Some(parser) = (unsafe { handle::<VdomParser>(&mut env, ptr) }) else {
+        return;
+    };
     if let Err(e) = parser.finish() {
         throw(&mut env, &e);
     }
@@ -345,7 +366,9 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_parserTakeEvents<'local
     _class: JClass<'local>,
     ptr: jlong,
 ) -> jstring {
-    let parser = unsafe { &mut *(ptr as *mut VdomParser) };
+    let Some(parser) = (unsafe { handle::<VdomParser>(&mut env, ptr) }) else {
+        return std::ptr::null_mut();
+    };
     match parser.take_events() {
         Ok(json) => to_jstring(&mut env, &json),
         Err(e) => {
@@ -386,7 +409,9 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_documentSetSource<'loca
     ptr: jlong,
     source: JString<'local>,
 ) {
-    let doc = unsafe { &mut *(ptr as *mut VdomDocument) };
+    let Some(doc) = (unsafe { handle::<VdomDocument>(&mut env, ptr) }) else {
+        return;
+    };
     let source = jstr(&mut env, &source);
     if let Err(e) = doc.set_source(&source) {
         throw(&mut env, &e);
@@ -402,7 +427,9 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_documentEdit<'local>(
     end: jlong,
     replacement: JString<'local>,
 ) {
-    let doc = unsafe { &mut *(ptr as *mut VdomDocument) };
+    let Some(doc) = (unsafe { handle::<VdomDocument>(&mut env, ptr) }) else {
+        return;
+    };
     let replacement = jstr(&mut env, &replacement);
     if let Err(e) = doc.edit(start as usize, end as usize, &replacement) {
         throw(&mut env, &e);
@@ -416,7 +443,9 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_documentSetCursor<'loca
     ptr: jlong,
     byte_offset: jlong,
 ) {
-    let doc = unsafe { &mut *(ptr as *mut VdomDocument) };
+    let Some(doc) = (unsafe { handle::<VdomDocument>(&mut env, ptr) }) else {
+        return;
+    };
     // A negative offset clears the cursor (Kotlin passes -1 for null).
     let offset = if byte_offset < 0 {
         None
@@ -434,7 +463,9 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_documentTakeEvents<'loc
     _class: JClass<'local>,
     ptr: jlong,
 ) -> jstring {
-    let doc = unsafe { &mut *(ptr as *mut VdomDocument) };
+    let Some(doc) = (unsafe { handle::<VdomDocument>(&mut env, ptr) }) else {
+        return std::ptr::null_mut();
+    };
     match doc.take_events() {
         Ok(json) => to_jstring(&mut env, &json),
         Err(e) => {

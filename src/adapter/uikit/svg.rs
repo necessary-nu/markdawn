@@ -37,6 +37,7 @@ const SYM_CREATE_FROM_DATA: &str = "Q0dTVkdEb2N1bWVudENyZWF0ZUZyb21EYXRh";
 const SYM_RELEASE: &str = "Q0dTVkdEb2N1bWVudFJlbGVhc2U=";
 const SEL_IMAGE_WITH_DOC: &str = "X2ltYWdlV2l0aENHU1ZHRG9jdW1lbnQ6";
 
+// [spec:mw:req:uikit.media.svg-raster]
 fn ensure_loaded() -> Option<&'static CoreSVGSymbols> {
     CORE_SVG
         .get_or_init(|| unsafe {
@@ -71,6 +72,7 @@ unsafe fn resolve_symbol(b64: &str) -> Option<*const std::ffi::c_void> {
 /// This is intentionally conservative: it rules out arbitrary XML/HTML that just
 /// happens to contain "svg" as a substring, and ignores trailing whitespace/junk
 /// after the closing tag.
+// [spec:mw:req:uikit.media.svg-raster]
 pub fn is_svg_data(data: &[u8]) -> bool {
     let close = b"</svg>";
     let open = b"<svg";
@@ -99,6 +101,7 @@ const MAX_SVG_DIMENSION: f64 = 4096.0;
 ///
 /// Returns `None` if CoreSVG symbols are unavailable, the data fails to parse,
 /// or the resulting image is too large (> [`MAX_SVG_DIMENSION`] in either axis).
+// [spec:mw:req:uikit.media.svg-raster]
 pub fn render_svg(data: &[u8]) -> Option<Retained<UIImage>> {
     let syms = ensure_loaded()?;
 
@@ -145,6 +148,7 @@ pub fn render_svg(data: &[u8]) -> Option<Retained<UIImage>> {
 /// The selector is known to take a single `CGSVGDocumentRef` argument and return
 /// an autoreleased `id`. If Apple ever changes the calling convention, return type,
 /// or autorelease semantics of this private method, this transmute is unsound.
+// [spec:mw:req:uikit.media.svg-raster]
 unsafe fn msg_send_image_with_doc(sel: Sel, doc: CGSVGDocumentRef) -> Option<Retained<UIImage>> {
     unsafe extern "C" {
         fn objc_msgSend();
@@ -174,6 +178,7 @@ fn base64_decode(s: &str) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
 
+    // [spec:mw:req:uikit.media.svg-raster/test]
     #[test]
     fn detects_svg_data() {
         assert!(is_svg_data(b"<svg width=\"10\"></svg>"));
@@ -190,6 +195,7 @@ mod tests {
         assert!(!is_svg_data(b"<svg starts but never ends"));
     }
 
+    // [spec:mw:req:uikit.media.svg-raster/test]
     #[test]
     fn base64_decodes_known_strings() {
         let decoded = base64_decode(SYM_CREATE_FROM_DATA).unwrap();

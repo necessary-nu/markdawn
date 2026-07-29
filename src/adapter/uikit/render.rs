@@ -28,6 +28,7 @@ use super::data_uri;
 use super::style::UIKitStyle;
 use super::svg;
 
+// [spec:mw:sem:uikit.media.image-source]
 pub(crate) struct PendingImage {
     pub url: String,
     pub attachment: Retained<NSTextAttachment>,
@@ -779,6 +780,7 @@ fn attributed_string(
 }
 
 /// Try to render an HTML chunk as an SVG `NSTextAttachment` (image-based, not view provider).
+// [spec:mw:req:uikit.media.svg-raster]
 fn try_render_svg_html(html: &str) -> Option<Retained<NSMutableAttributedString>> {
     if !svg::is_svg_data(html.as_bytes()) {
         return None;
@@ -794,6 +796,7 @@ fn try_render_svg_html(html: &str) -> Option<Retained<NSMutableAttributedString>
 ///   `PendingImage` into `ctx.pending_images`. The BlockSink drains these
 ///   after insertion and registers them with the async image_loader.
 /// - If an image was previously loaded and cached, uses it immediately.
+// [spec:mw:sem:uikit.media.image-source]
 fn try_load_image(uri: &str, ctx: &RenderCtx) -> Option<Retained<NSMutableAttributedString>> {
     // 1. data: URI — synchronous
     if let Some(parsed) = data_uri::parse_data_uri(uri) {

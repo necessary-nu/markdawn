@@ -44,6 +44,23 @@ font, colour, and spacing decision is resolved.
 > id appends; `StreamItem::Delete` removes it. The stack view is
 > the sole embedding point exposed to the host application.
 
+> [spec:mw:def:uikit.surface.element-map]
+> An `ElementMap` is an insertion-ordered map from `CorrelationId`
+> to an `ElementLocation`, which is either `TextRun {
+> compartment_index }` or `BlockView { compartment_index }`. It
+> records only *which* compartment renders a block, never where
+> inside it: a text-like block's `NSRange` lives in that
+> compartment's own `blocks` vector, so an update resolves the
+> compartment through the map and the range through the
+> compartment. The indirection exists because a `CorrelationId` is
+> stable for the life of a block while its compartment index is not
+> — emptying a `TextRun` deletes the whole compartment and
+> renumbers every compartment after it — so one pass of
+> `shift_compartment_indices` over the map repairs every affected
+> location, rather than indices being chased through the stack
+> view. Deletion is a swap-remove, so map order after a delete no
+> longer matches emission order.
+
 ## Block-to-compartment mapping
 
 > [spec:mw:req:uikit.compartments.text-run-coalescing]
@@ -204,3 +221,141 @@ font, colour, and spacing decision is resolved.
 > `tertiaryLabelColor`, and pushes the code label down so the two
 > do not overlap. The container's accessibility label names the
 > block and its language.
+
+## Images and async loading
+
+> [spec:mw:sem:uikit.media.image-source]
+> An image destination is resolved by three ordered attempts: a
+> `data:` URI is decoded and rasterised inline; otherwise a
+> destination already in the loader's image cache produces its
+> attachment immediately; otherwise a destination beginning with
+> the literal `http://` or `https://` produces a placeholder
+> attachment and queues a `PendingImage` on the `RenderCtx`.
+> Anything else — and any of the three attempts that fails to
+> produce an image — falls back to the alt text rendered as
+> `[alt]` in the surrounding font, so a destination that cannot be
+> displayed still occupies its place in the run. The destination is
+> not checked against the crate's URL allow-list: `is_safe_image_url`
+> gates the adapters that emit markup, but has no call site on this
+> path, so the accepted set is exactly what those three attempts
+> accept. Every `data:` media type is decoded, not only
+> `data:image/*`, and the effective restriction on network access is
+> the literal `http`/`https` prefix test rather than the
+> allow-list's scheme grammar and control-character rejection.
+
+> [spec:mw:sem:uikit.image.async-load]
+> A queued `PendingImage` is fetched once per URL. The loader holds
+> a list of `(attachment, content storage)` pairs keyed by URL and
+> starts an `NSURLSession` data task only when that list was empty,
+> so several attachments sharing a URL cost one request and are all
+> updated from its single completion. Response bytes that sniff as
+> SVG are rasterised through CoreSVG; everything else goes to
+> `UIImage::imageWithData`. A decoded image enters a process-wide
+> cache bounded at 100 entries, evicting an arbitrary existing key
+> when full — that cache is what lets a re-render during streaming
+> resolve the same URL synchronously. Application always happens on
+> the main thread: pending entries are held in `MainThreadBound` so
+> they can cross the completion block's thread, and each is applied
+> by setting the attachment's image, clamping its bounds to 600
+> points wide with the aspect ratio preserved, then invalidating
+> layout. Setting an image on an existing `NSTextAttachment` fires
+> no text-storage notification, so invalidation additionally
+> rewrites one character's attributes to drive the `processEditing`
+> chain that makes TextKit 2 redraw the glyph. A transport error, a
+> null body, or a payload neither CoreSVG nor `UIImage` can decode
+> substitutes an `exclamationmark.triangle` symbol; the placeholder
+> is the `photo` symbol; either is simply absent, not replaced by a
+> fallback drawing, when SF Symbols yields nothing.
+
+> [spec:mw:req:uikit.image.cancellation]
+> Every URL registered from a block MUST be recorded against that
+> block, and removing the block — or removing the compartment that
+> held it — MUST cancel each URL so recorded. Cancellation MUST
+> cancel the in-flight task, drop the loader's pending entries for
+> that URL, and be safe to call from any thread. The pending
+> entries are the only path from a completion back to an
+> attachment, so a response that arrives after cancellation finds
+> nothing to apply and returns without touching a view whose text
+> storage may already be gone; the guarantee is that no completion
+> outlives its attachment, not that the transfer stops in time.
+> Cancellation MUST NOT evict the cached image, so a URL that
+> loaded, was cancelled and is re-emitted still resolves from
+> cache. A `BlockView` compartment records its pending URLs for
+> cancellation but starts no load, because it owns no
+> `NSTextContentStorage` whose layout could be invalidated.
+
+## Data URIs and SVG rasterisation
+
+> [spec:mw:def:uikit.media.data-uri]
+> A `data:` URI parses as `data:[<mediatype>][;base64],<data>`: the
+> prefix is required, the first comma terminates the header, and a
+> `;base64` suffix on the header selects base64 decoding over
+> percent-decoding for the payload. An absent media type yields
+> `text/plain;charset=US-ASCII`; any other header is returned
+> verbatim, parameters included, and is never validated as a media
+> type. ASCII whitespace anywhere inside a base64 payload is
+> stripped before decoding, because generators wrap long payloads
+> across lines. Parsing yields nothing — never a partial or empty
+> result — when the prefix is absent, when there is no comma, or
+> when base64 decoding fails; percent-decoding has no failure mode
+> and passes an invalid escape through as its literal bytes.
+
+> [spec:mw:req:uikit.media.svg-raster]
+> SVG reaches UIKit as a `UIImage`, never as a view. Bytes are
+> recognised as SVG only when an opening `<svg` appears within the
+> first kilobyte and a closing `</svg>` within the last,
+> case-insensitively, each tolerating prolog or trailing junk
+> around it; requiring both ends keeps unrelated XML that merely
+> contains the substring from being handed to the rasteriser.
+> CoreSVG is private API, so `CGSVGDocumentCreateFromData`,
+> `CGSVGDocumentRelease` and `_imageWithCGSVGDocument:` MUST be
+> resolved at run time — by `dlsym` and selector registration over
+> base64-obscured names, once, behind a `OnceLock` — and a failed
+> resolution MUST degrade to no image rather than abort, because
+> these symbols are not contractual. The document MUST be released
+> once the image is built, and the autoreleased result retained. A
+> rendered image MUST be rejected when its canvas is non-finite,
+> non-positive, or exceeds 4096 points on either axis, since the
+> attachment bounds taken from it drive TextKit layout. That is the
+> whole of the checking on this path: bytes are not passed through
+> `svg_sanitize`, so neither its element and URL allow-list nor its
+> `MAX_SVG_BYTES` cap applies here, unlike on the adapters that
+> emit SVG into markup. Failure at any step yields no image and
+> each caller degrades on its own terms — an HTML chunk that sniffs
+> as SVG but does not rasterise falls back to showing its source in
+> the monospaced face.
+
+## Math and diagram views
+
+> [spec:mw:sem:uikit.math.typeset]
+> Math is typeset by rendering the LaTeX source to SVG through
+> `mathml-core` and rasterising that SVG by the same CoreSVG path
+> as any other image, producing an attachment inside the text run;
+> there is no native math view. The renderer, and the math font it
+> bundles, is built once and shared across calls. Results are
+> cached under the source's hash paired with the font size
+> quantised to hundredths of a point, bounded at 200 entries with
+> arbitrary eviction, so a streaming re-emission of an unchanged
+> formula re-runs neither layout nor rasterisation. Size follows
+> display: inline math takes the surrounding font's point size,
+> block math the body size scaled by `math_block_scale`. When
+> typesetting or rasterisation fails the source is emitted as
+> literal text in the monospaced face, so an unparseable formula
+> shows its own LaTeX rather than vanishing.
+
+> [spec:mw:req:uikit.diagram.view-factory]
+> Fenced code blocks tagged `pikchr`, `dot`/`graphviz` or `typst`
+> are rendered as diagrams when the matching opt-in is set on the
+> sink. Each dispatches to a factory that runs its engine to SVG,
+> rasterises it, and returns a `UIImageView` in aspect-fit mode
+> carrying a height-to-width constraint equal to the image's
+> intrinsic ratio — the image is vector, so that constraint is what
+> gives the view a height at any width — and an accessibility label
+> naming the diagram kind. A factory MUST yield nothing, rather
+> than an error or an empty view, when its engine fails or the SVG
+> does not rasterise, and the sink MUST then fall through to the
+> ordinary code-block view, so a malformed diagram displays as its
+> own highlighted source. Dispatch MUST be skipped while the code
+> block is provisional: a mid-stream fence has not yet received its
+> closing delimiter, and feeding partial source to an engine only
+> yields a fresh syntax error per token.

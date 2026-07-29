@@ -4,6 +4,18 @@ use crate::node::{CorrelationId, Emission, Node, SourceSpan, StreamItem, TableAl
 use crate::sink::Sink;
 use std::collections::{HashMap, HashSet};
 
+#[path = "parser_footnote.rs"]
+mod footnote;
+
+#[path = "parser_table.rs"]
+mod table;
+
+use footnote::{
+    assign_footnote_ref_numbers, collect_footnote_def_lines, collect_footnote_refs,
+    collect_raw_footnote_definitions, find_footnote_label_end,
+};
+use table::{parse_table_delimiter, split_table_row_spans, trimmed_line_range};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ParsedBlock<Ext> {
     pub(crate) node: Node<Ext>,
@@ -92,6 +104,9 @@ type FootnoteLabels = HashSet<String>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RawFootnoteDef {
     lines: Vec<String>,
+    /// Line range the definition was written on, in the line list it was
+    /// collected from.
+    line_range: core::ops::Range<usize>,
 }
 
 type RawFootnoteDefs = HashMap<String, RawFootnoteDef>;
@@ -305,6 +320,10 @@ impl<Ext> Parser<Ext> {
 
         let split = split_lines(&self.buffer);
         let line_offsets = compute_line_offsets(&self.buffer);
+        let spans = LineSpans {
+            offsets: &line_offsets,
+            base: base_offset,
+        };
 
         let refs = self.collect_reference_definitions(&split.lines)?;
         let raw_footnotes = if self.gfm {
@@ -330,22 +349,20 @@ impl<Ext> Parser<Ext> {
         // inline input) into the same source coordinate space. `base_offset`
         // shifts everything so spans are valid in the outer source.
         for (block, range) in blocks.iter_mut().zip(ranges.iter()) {
-            let start = line_offsets
-                .get(range.start)
-                .copied()
-                .unwrap_or(self.buffer.len())
-                + base_offset;
-            let end = line_offsets
-                .get(range.end)
-                .copied()
-                .unwrap_or(self.buffer.len())
-                + base_offset;
-            *block.node.source_mut() = SourceSpan::new(start, end);
+            let start = spans.start_of(range.start);
+            *block.node.source_mut() = SourceSpan::new(start, spans.start_of(range.end));
             offset_descendant_spans(&mut block.node, start);
         }
 
         if self.gfm {
-            self.finalize_footnotes(&mut blocks, &raw_footnotes, &refs, &footnote_labels, true)?;
+            self.finalize_footnotes(
+                &mut blocks,
+                &raw_footnotes,
+                &refs,
+                &footnote_labels,
+                true,
+                spans,
+            )?;
         }
 
         Ok(blocks)
@@ -395,12 +412,17 @@ impl<Ext> Parser<Ext> {
             &footnote_labels,
         )?;
         if self.gfm {
+            let line_offsets = compute_line_offsets(&self.buffer);
             self.finalize_footnotes(
                 &mut blocks,
                 &raw_footnotes,
                 &refs,
                 &footnote_labels,
                 finalizing,
+                LineSpans {
+                    offsets: &line_offsets,
+                    base: 0,
+                },
             )?;
         }
         Ok(blocks)
@@ -424,6 +446,7 @@ impl<Ext> Parser<Ext> {
     }
 
     // [spec:mw:req:core.node.footnote-numbering]
+    // [spec:mw:sem:core.span.unpopulated-is-empty+1]
     fn finalize_footnotes(
         &self,
         blocks: &mut Vec<ParsedBlock<Ext>>,
@@ -431,6 +454,7 @@ impl<Ext> Parser<Ext> {
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
         finalizing: bool,
+        spans: LineSpans<'_>,
     ) -> Result<(), Error>
     where
         Ext: Clone + PartialEq,
@@ -469,20 +493,26 @@ impl<Ext> Parser<Ext> {
             let children_blocks =
                 self.parse_block_lines(&raw.lines, finalizing, true, refs, footnote_labels)?;
             let children: Vec<Node<Ext>> = children_blocks.into_iter().map(|b| b.node).collect();
-            section_children.push(Node::FootnoteDefinition {
+            // A definition spans the lines it was written on, wherever in the
+            // document that was; the section it is lifted into does not.
+            let start = spans.start_of(raw.line_range.start);
+            let mut definition = Node::FootnoteDefinition {
                 label: label.clone(),
                 number,
                 backref_count,
                 children,
-                source: SourceSpan::default(),
-            });
+                source: SourceSpan::new(start, spans.start_of(raw.line_range.end)),
+            };
+            offset_descendant_spans(&mut definition, start);
+            section_children.push(definition);
         }
 
         let provisional = blocks.iter().any(|b| b.provisional);
+        let eof = spans.eof();
         blocks.push(ParsedBlock {
             node: Node::FootnoteSection {
                 children: section_children,
-                source: SourceSpan::default(),
+                source: SourceSpan::new(eof, eof),
             },
             provisional,
         });
@@ -1569,7 +1599,7 @@ impl<Ext> Parser<Ext> {
         let Some(alignments) = parse_table_delimiter(&lines[start + 1]) else {
             return Ok(None);
         };
-        let header_cells = split_table_row(&lines[start]);
+        let header_cells = split_table_row_spans(&lines[start]);
         // A header row that disagrees with the delimiter row's column
         // count is not a table: reject the whole construct rather than
         // reshape the header.
@@ -1577,6 +1607,12 @@ impl<Ext> Parser<Ext> {
         if header_cells.is_empty() || header_cells.len() != alignments.len() {
             return Ok(None);
         }
+
+        // Row and cell spans are byte offsets relative to the table's first
+        // line, which is where the enclosing block's span starts; the
+        // descendant-offset pass lifts them into source coordinates.
+        // [spec:mw:sem:core.span.unpopulated-is-empty+1]
+        let mut row_offset = lines[start].len() + 1 + lines[start + 1].len() + 1;
 
         let mut rows = Vec::new();
         let mut index = start + 2;
@@ -1593,18 +1629,33 @@ impl<Ext> Parser<Ext> {
             {
                 break;
             }
-            let mut cells = split_table_row(&lines[index]);
+            let line_range = trimmed_line_range(&lines[index]);
+            let mut cells = split_table_row_spans(&lines[index]);
             // Body rows are normalised, not rejected: pad short rows with
-            // empty cells and truncate long ones to the column count.
+            // empty cells and truncate long ones to the column count. A
+            // padded cell has no source text, so it takes the empty span at
+            // the row's end.
             // [spec:mw:req:core.node.table-cell-alignment]
-            cells.resize(alignments.len(), String::new());
+            cells.resize(
+                alignments.len(),
+                (String::new(), line_range.end..line_range.end),
+            );
             rows.push(Node::TableRow {
-                cells: self.parse_table_cells(&cells, false, &alignments, refs, footnote_labels)?,
-                source: SourceSpan::default(),
+                cells: self.parse_table_cells(
+                    &cells,
+                    false,
+                    &alignments,
+                    row_offset,
+                    refs,
+                    footnote_labels,
+                )?,
+                source: SourceSpan::new(row_offset + line_range.start, row_offset + line_range.end),
             });
+            row_offset += lines[index].len() + 1;
             index += 1;
         }
 
+        let header_range = trimmed_line_range(&lines[start]);
         Ok(Some((
             index,
             ParsedBlock {
@@ -1615,10 +1666,11 @@ impl<Ext> Parser<Ext> {
                             &header_cells,
                             true,
                             &alignments,
+                            0,
                             refs,
                             footnote_labels,
                         )?,
-                        source: SourceSpan::default(),
+                        source: SourceSpan::new(header_range.start, header_range.end),
                     }],
                     rows,
                     source: SourceSpan::default(),
@@ -1630,11 +1682,13 @@ impl<Ext> Parser<Ext> {
 
     // [spec:gfm:sem:leaf-blocks.tables-extension.spaces-around-cell-content-are-trimmed]
     // [spec:mw:req:core.node.table-cell-alignment]
+    // [spec:mw:sem:core.span.unpopulated-is-empty+1]
     fn parse_table_cells(
         &self,
-        cells: &[String],
+        cells: &[(String, core::ops::Range<usize>)],
         header: bool,
         alignments: &[Option<TableAlignment>],
+        row_offset: usize,
         refs: &ReferenceDefinitions,
         footnote_labels: &FootnoteLabels,
     ) -> Result<Vec<Node<Ext>>, Error>
@@ -1642,13 +1696,16 @@ impl<Ext> Parser<Ext> {
         Ext: Clone + PartialEq,
     {
         let mut out = Vec::with_capacity(cells.len());
-        for (index, cell) in cells.iter().enumerate() {
-            out.push(Node::TableCell {
+        for (index, (cell, range)) in cells.iter().enumerate() {
+            let start = row_offset + range.start;
+            let mut node = Node::TableCell {
                 children: self.parse_inline_nodes(cell.trim(), false, refs, footnote_labels)?,
                 header,
                 alignment: alignments.get(index).copied().flatten(),
-                source: SourceSpan::default(),
-            });
+                source: SourceSpan::new(start, row_offset + range.end),
+            };
+            offset_descendant_spans(&mut node, start);
+            out.push(node);
         }
         Ok(out)
     }
@@ -2201,7 +2258,7 @@ const HTML_BLOCK_TYPE_6_TAGS: &[&str] = &[
 // [spec:gfm:def:preliminaries.characters-and-lines.character-definition]
 // [spec:gfm:req:preliminaries.characters-and-lines.encoding-is-unspecified]
 // [spec:gfm:syn:preliminaries.characters-and-lines.valid-commonmark-document]
-fn normalize_chunk(chunk: &str) -> String {
+pub(crate) fn normalize_chunk(chunk: &str) -> String {
     let mut out = String::with_capacity(chunk.len());
     let mut chars = chunk.chars().peekable();
 
@@ -2232,13 +2289,35 @@ struct SplitLines {
 /// node itself — its span is already absolute). Used to translate
 /// inline-relative spans produced by `InlineParser` into source-absolute
 /// coordinates.
-// [spec:mw:sem:core.span.unpopulated-is-empty]
 fn offset_descendant_spans<Ext>(node: &mut Node<Ext>, offset: usize) {
     node.for_each_child_mut(|child| {
         let span = child.source();
         *child.source_mut() = SourceSpan::new(span.start + offset, span.end + offset);
         offset_descendant_spans(child, offset);
     });
+}
+
+/// Where a parse input's lines start, and where the input itself starts
+/// within the document it was taken from. Turns a line index into a byte
+/// offset in document coordinates.
+#[derive(Clone, Copy)]
+struct LineSpans<'a> {
+    offsets: &'a [usize],
+    base: usize,
+}
+
+impl LineSpans<'_> {
+    /// Byte offset one past the last line of the input.
+    fn eof(self) -> usize {
+        self.offsets.last().copied().unwrap_or(0) + self.base
+    }
+
+    /// Byte offset the given line starts at; `eof` for a line past the end.
+    fn start_of(self, line: usize) -> usize {
+        self.offsets
+            .get(line)
+            .map_or_else(|| self.eof(), |offset| offset + self.base)
+    }
 }
 
 /// Compute byte offsets where each line starts in `text`. Result has
@@ -2663,85 +2742,6 @@ fn collect_list_item_lines(lines: &[String], start: usize) -> Option<(usize, Vec
     Some((index, items))
 }
 
-// Detects the start of a footnote definition: `[^label]:` (with up to 3 leading spaces).
-// Returns (label, byte_offset_of_content_after_colon_on_first_line).
-fn parse_footnote_def_opener(line: &str) -> Option<(String, usize)> {
-    let trimmed = trim_up_to_three_spaces(line);
-    let indent_bytes = line.len() - trimmed.len();
-    let after_bracket = trimmed.strip_prefix("[^")?;
-    let label_end = find_footnote_label_end(after_bracket)?;
-    let label = &after_bracket[..label_end];
-    if label.is_empty() || label.chars().any(|c| c.is_whitespace()) {
-        return None;
-    }
-    let after_label = &after_bracket[label_end + 1..];
-    if !after_label.starts_with(':') {
-        return None;
-    }
-    let content_offset = indent_bytes + 2 + label_end + 1 + 1;
-    Some((label.to_string(), content_offset))
-}
-
-fn find_footnote_label_end(s: &str) -> Option<usize> {
-    let mut escaped = false;
-    for (i, ch) in s.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        if ch == '\\' {
-            escaped = true;
-            continue;
-        }
-        if ch == ']' {
-            return Some(i);
-        }
-        if ch == '[' || ch == '\n' {
-            return None;
-        }
-    }
-    None
-}
-
-// Collect all raw lines belonging to a footnote definition starting at `start`.
-// Strips the opener prefix and 4 columns of indentation from continuation lines.
-// Returns (next_index_after_def, label, body_lines).
-fn collect_footnote_def_lines(
-    lines: &[String],
-    start: usize,
-) -> Option<(usize, String, Vec<String>)> {
-    let (label, content_offset) = parse_footnote_def_opener(&lines[start])?;
-    let first_content = lines[start][content_offset..].trim_start().to_string();
-    let mut body: Vec<String> = vec![first_content];
-
-    let mut index = start + 1;
-    let mut pending_blanks: usize = 0;
-    while index < lines.len() {
-        let line = &lines[index];
-        if line.trim().is_empty() {
-            pending_blanks += 1;
-            index += 1;
-            continue;
-        }
-        let indent = leading_indent(line);
-        if indent.columns >= 4 {
-            for _ in 0..pending_blanks {
-                body.push(String::new());
-            }
-            pending_blanks = 0;
-            let stripped = strip_indent_columns(line, 4).unwrap_or_else(|| line.clone());
-            body.push(stripped);
-            index += 1;
-            continue;
-        }
-        break;
-    }
-
-    // Rewind past trailing blanks inside the footnote — those belong to the surrounding document.
-    let rewind_to = index - pending_blanks;
-    Some((rewind_to, label, body))
-}
-
 enum MathFence {
     Dollar,
     Bracket,
@@ -2823,35 +2823,6 @@ where
             },
         ))
     }
-}
-
-fn collect_raw_footnote_definitions(lines: &[String]) -> RawFootnoteDefs {
-    let mut defs: RawFootnoteDefs = HashMap::new();
-    let mut index = 0;
-    let mut in_paragraph = false;
-    while index < lines.len() {
-        if lines[index].trim().is_empty() {
-            in_paragraph = false;
-            index += 1;
-            continue;
-        }
-        if !in_paragraph && let Some((next, label, body)) = collect_footnote_def_lines(lines, index)
-        {
-            defs.entry(label).or_insert(RawFootnoteDef { lines: body });
-            index = next;
-            continue;
-        }
-        // Conservatively treat other lines as potentially paragraph text so that
-        // a `[^label]:` appearing mid-paragraph doesn't steal content.
-        in_paragraph = !is_thematic_break(&lines[index])
-            && classify_html_block_start(&lines[index]).is_none()
-            && parse_fence_opener(&lines[index]).is_none()
-            && !lines[index].trim_start().starts_with('#')
-            && strip_block_quote_marker(&lines[index]).is_none()
-            && parse_list_marker(&lines[index]).is_none();
-        index += 1;
-    }
-    defs
 }
 
 fn trim_up_to_three_spaces(line: &str) -> &str {
@@ -5554,183 +5525,6 @@ fn is_lazy_block_quote_continuation(line: &str, lines: &[String], index: usize, 
             && line.contains('|')
             && index + 1 < lines.len()
             && parse_table_delimiter(&lines[index + 1]).is_some())
-}
-
-// [spec:gfm:def:leaf-blocks.tables-extension.delimiter-row-structure]
-fn parse_table_delimiter(line: &str) -> Option<Vec<Option<TableAlignment>>> {
-    let cells = split_table_row(line);
-    if cells.is_empty() {
-        return None;
-    }
-    let mut out = Vec::with_capacity(cells.len());
-    for cell in cells {
-        let trimmed = cell.trim();
-        // A delimiter cell needs at least one `-` and may have leading/trailing `:`.
-        if trimmed.is_empty()
-            || !trimmed.chars().all(|ch| matches!(ch, '-' | ':'))
-            || !trimmed.contains('-')
-        {
-            return None;
-        }
-        let alignment = if trimmed.starts_with(':') && trimmed.ends_with(':') {
-            Some(TableAlignment::Center)
-        } else if trimmed.starts_with(':') {
-            Some(TableAlignment::Left)
-        } else if trimmed.ends_with(':') {
-            Some(TableAlignment::Right)
-        } else {
-            None
-        };
-        if trimmed.trim_matches(':').chars().all(|ch| ch == '-') {
-            out.push(alignment);
-        } else {
-            return None;
-        }
-    }
-    Some(out)
-}
-
-// [spec:gfm:syn:leaf-blocks.tables-extension.escaped-pipes-are-literal-cell-content]
-fn split_table_row(line: &str) -> Vec<String> {
-    let trimmed = line.trim();
-    let core = trimmed.strip_prefix('|').unwrap_or(trimmed);
-    let core = core.strip_suffix('|').unwrap_or(core);
-    let mut cells = Vec::new();
-    let mut current = String::new();
-    let mut chars = core.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if ch == '\\' && chars.peek() == Some(&'|') {
-            chars.next();
-            current.push('|');
-            continue;
-        }
-        if ch == '|' {
-            cells.push(current.trim().to_owned());
-            current = String::new();
-        } else {
-            current.push(ch);
-        }
-    }
-    cells.push(current.trim().to_owned());
-    cells
-}
-
-fn collect_footnote_refs<Ext>(
-    node: &Node<Ext>,
-    ordered_labels: &mut Vec<String>,
-    occurrences: &mut HashMap<String, u32>,
-) {
-    match node {
-        Node::FootnoteRef { label, .. } => {
-            let count = occurrences.entry(label.clone()).or_insert(0);
-            *count += 1;
-            if *count == 1 {
-                ordered_labels.push(label.clone());
-            }
-        }
-        Node::Document { children, .. }
-        | Node::Paragraph { children, .. }
-        | Node::Heading { children, .. }
-        | Node::BlockQuote { children, .. }
-        | Node::List { children, .. }
-        | Node::Item { children, .. }
-        | Node::TaskItem { children, .. }
-        | Node::Emphasis { children, .. }
-        | Node::Strong { children, .. }
-        | Node::Strikethrough { children, .. }
-        | Node::Link { children, .. }
-        | Node::Custom { children, .. } => {
-            for child in children {
-                collect_footnote_refs(child, ordered_labels, occurrences);
-            }
-        }
-        Node::Table { header, rows, .. } => {
-            for n in header {
-                collect_footnote_refs(n, ordered_labels, occurrences);
-            }
-            for n in rows {
-                collect_footnote_refs(n, ordered_labels, occurrences);
-            }
-        }
-        Node::TableRow { cells, .. } => {
-            for n in cells {
-                collect_footnote_refs(n, ordered_labels, occurrences);
-            }
-        }
-        Node::TableCell { children, .. } => {
-            for child in children {
-                collect_footnote_refs(child, ordered_labels, occurrences);
-            }
-        }
-        // FootnoteDefinition / FootnoteSection only appear at top level after
-        // post-processing; if encountered here we still recurse so nested refs
-        // inside a definition's content get counted.
-        Node::FootnoteDefinition { children, .. } | Node::FootnoteSection { children, .. } => {
-            for child in children {
-                collect_footnote_refs(child, ordered_labels, occurrences);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn assign_footnote_ref_numbers<Ext>(
-    node: &mut Node<Ext>,
-    label_numbers: &HashMap<String, u32>,
-    counters: &mut HashMap<String, u32>,
-) {
-    match node {
-        Node::FootnoteRef {
-            label,
-            number,
-            ref_num,
-            ..
-        } => {
-            if let Some(n) = label_numbers.get(label) {
-                *number = *n;
-            }
-            let counter = counters.entry(label.clone()).or_insert(0);
-            *counter += 1;
-            *ref_num = *counter;
-        }
-        Node::Document { children, .. }
-        | Node::Paragraph { children, .. }
-        | Node::Heading { children, .. }
-        | Node::BlockQuote { children, .. }
-        | Node::List { children, .. }
-        | Node::Item { children, .. }
-        | Node::TaskItem { children, .. }
-        | Node::Emphasis { children, .. }
-        | Node::Strong { children, .. }
-        | Node::Strikethrough { children, .. }
-        | Node::Link { children, .. }
-        | Node::Custom { children, .. }
-        | Node::FootnoteDefinition { children, .. }
-        | Node::FootnoteSection { children, .. } => {
-            for child in children {
-                assign_footnote_ref_numbers(child, label_numbers, counters);
-            }
-        }
-        Node::Table { header, rows, .. } => {
-            for n in header {
-                assign_footnote_ref_numbers(n, label_numbers, counters);
-            }
-            for n in rows {
-                assign_footnote_ref_numbers(n, label_numbers, counters);
-            }
-        }
-        Node::TableRow { cells, .. } => {
-            for n in cells {
-                assign_footnote_ref_numbers(n, label_numbers, counters);
-            }
-        }
-        Node::TableCell { children, .. } => {
-            for child in children {
-                assign_footnote_ref_numbers(child, label_numbers, counters);
-            }
-        }
-        _ => {}
-    }
 }
 
 fn plain_text<Ext>(nodes: &[Node<Ext>]) -> String {

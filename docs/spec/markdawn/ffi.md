@@ -39,7 +39,7 @@ per entry point.
 > pointer value is either a live handle or undefined behaviour. A handle MUST
 > NOT be used after its destructor returns.
 
-> [spec:mw:req:ffi.ownership.string-free]
+> [spec:mw:req:ffi.ownership.string-free+1]
 > Every `*mut c_char` returned across the C ABI is a `CString::into_raw`
 > allocation whose ownership transfers to the caller, and the caller MUST
 > return it to `mw_string_free` — never to `free`, to `Module._free`, or to any
@@ -51,7 +51,17 @@ per entry point.
 > pointer MUST be released by the `mw_string_free` exported by the same module
 > that produced it; the copies exported by the core module and by each
 > `markdawn-render-*` module are not interchangeable, and crossing them frees
-> an address in the wrong heap.
+> an address in the wrong heap. That pairing is a caller obligation the callee
+> cannot check. Inside a wasm module a pointer is an offset into that module's
+> own linear memory, so an offset minted elsewhere is indistinguishable from a
+> native one; `mw_string_free` validates nothing beyond null, and no provenance
+> test it could perform would be sound. The invariant is held one level up, in
+> the frontend: the raw pointer never leaves the per-module closure in
+> `crates/markdawn-wasm-emscripten/web/index.template.html` that allocates,
+> reads and releases it, so no caller-side code is ever in a position to pair a
+> pointer with the wrong module. That is encapsulation, not enforcement —
+> every module exports the function under the *same* name, so a future caller
+> that did cross them would link and run rather than fail.
 
 > [spec:mw:req:ffi.ownership.borrowed-input]
 > Pointers passed *into* the ABI are borrowed for the duration of the call and
@@ -78,9 +88,9 @@ per entry point.
 
 ## Boundary safety
 
-> [spec:mw:req:ffi.safety.null-guard]
-> Every C-ABI entry point MUST check its handle argument for null before
-> dereferencing and report the failure in-band instead of trapping: functions
+> [spec:mw:req:ffi.safety.null-guard+1]
+> Every entry point that takes a handle MUST check it before dereferencing and
+> report the failure in-band instead of trapping. On the C ABI: functions
 > returning `u32` return `0` on success and non-zero on failure (`1` for a
 > rejected argument on the state ABI; `mw_register_grammar` uses a wider code
 > range), functions returning a pointer return null, and destructors return
@@ -89,10 +99,13 @@ per entry point.
 > called off the main thread. `mw_state_push_chunk` and
 > `mw_uikit_state_push_chunk` reject a null data pointer only when `len > 0`; a
 > null pointer with `len == 0` is accepted as an empty chunk. The JNI surface
-> does NOT extend this guarantee to handles: only `parserFree` and
-> `documentFree` test their `jlong` for zero, so passing a zero or already-freed
-> handle to any other `Native` method dereferences it. Nothing on either
-> surface can detect a stale-but-non-null handle.
+> extends the same guarantee to its `jlong` handles, reported the way every
+> other JNI failure is: a zero handle raises a `java.lang.RuntimeException` and
+> returns, yielding null from the methods whose return type is `jstring` and
+> nothing from the `void` ones. The two destructors stay silent no-ops on zero,
+> so a host may call them unconditionally on a nullable field. Nothing on
+> either surface can detect a stale-but-non-null handle: every non-zero value
+> is either live or undefined behaviour.
 
 > [spec:mw:req:ffi.safety.no-unwind]
 > A Rust panic MUST NOT unwind into a host frame. The release profile is built
@@ -106,22 +119,28 @@ per entry point.
 > the same discipline — a JNI string that will not convert yields the empty
 > string rather than an error path that could panic.
 
-> [spec:mw:sem:ffi.encoding.utf8]
+> [spec:mw:sem:ffi.encoding.utf8+1]
 > Text crossing the boundary is UTF-8. The byte-oriented entry points
 > (`mw_state_push_byte`, `mw_state_push_chunk`, `mw_uikit_state_push_chunk`)
 > tolerate a chunk that splits a multi-byte code point: incoming bytes are
-> appended to a pending buffer, the longest valid UTF-8 prefix is forwarded to
-> the parser and drained from the buffer, and any trailing incomplete sequence
-> stays buffered for the next call. A byte that cannot begin a valid sequence
-> therefore stalls the stream rather than erroring — the valid prefix stays
-> length zero and later pushes accumulate behind it unparsed — until
-> `mw_state_finish`, which discards the unparseable remainder and flushes what
-> the parser already has. Ill-formed input is dropped, never reported. Strings
+> appended to a pending buffer, everything ahead of the final *truncated but
+> still valid* sequence is decoded and forwarded to the parser, and only that
+> trailing sequence stays buffered for the next call. Since a truncated
+> sequence is at most three bytes, the buffer cannot grow without bound.
+> Ill-formed input inside the decoded part is substituted, not held: each
+> maximal ill-formed subsequence becomes one U+FFFD — the substitution
+> `String::from_utf8_lossy` performs, and the character the parser already
+> substitutes for NUL. A byte that can never begin a valid sequence therefore
+> cannot stall the stream. `mw_state_finish` decodes whatever remains the same
+> lossy way, so input ending mid-sequence contributes a final U+FFFD rather
+> than being discarded. Substitution is the only report: no status code
+> distinguishes a chunk that decoded cleanly from one that did not. Strings
 > handed back to the host are NUL-terminated UTF-8, so a render whose output
 > contains an interior NUL yields null instead of a silently truncated string.
-> `mw_register_grammar` validates each of its `(ptr, len)` arguments as UTF-8
-> and reports which one failed through its return code, treating a zero length
-> as the empty string regardless of the pointer.
+> `mw_register_grammar` does not substitute — it validates each of its
+> `(ptr, len)` arguments as UTF-8 and reports which one failed through its
+> return code, treating a zero length as the empty string regardless of the
+> pointer.
 
 ## Host surfaces
 

@@ -152,9 +152,10 @@ impl Perform for HtmlWriter {
             self.flush_pending_style();
             return;
         }
-        // Only the first sub-parameter of each param is read, so the
-        // colon-delimited colour forms are not honoured. Unrecognised
-        // codes are skipped without aborting the rest of the sequence.
+        // The leading sub-parameter selects the code; `38` / `48` look at
+        // the rest of the group to tell the colon form from the semicolon
+        // one. Unrecognised codes are skipped without aborting the rest
+        // of the sequence.
         // [spec:mw:req:ansi.to-html.sgr-params]
         while let Some(param) = iter.next() {
             let code = param.first().copied().unwrap_or(0);
@@ -176,14 +177,14 @@ impl Perform for HtmlWriter {
                 29 => self.current.strike = false,
                 30..=37 => self.current.fg = Some(Color::Named(code as u8 - 30)),
                 38 => {
-                    if let Some(color) = parse_extended_color(&mut iter) {
+                    if let Some(color) = parse_extended_color(param, &mut iter) {
                         self.current.fg = Some(color);
                     }
                 }
                 39 => self.current.fg = None,
                 40..=47 => self.current.bg = Some(Color::Named(code as u8 - 40)),
                 48 => {
-                    if let Some(color) = parse_extended_color(&mut iter) {
+                    if let Some(color) = parse_extended_color(param, &mut iter) {
                         self.current.bg = Some(color);
                     }
                 }
@@ -234,14 +235,19 @@ impl Perform for HtmlWriter {
     }
 }
 
-// Operands come off the caller's iterator, so an unrecognised selector
-// swallows only itself and the remaining params fall back to the outer
-// SGR loop. A truncated list leaves the colour unchanged.
-// [spec:mw:req:ansi.to-html.extended-color]
-fn parse_extended_color<'a, I>(iter: &mut I) -> Option<Color>
+// A group carrying sub-parameters is the colon form and is entirely
+// self-contained. Otherwise operands come off the caller's iterator, so
+// an unrecognised selector swallows only itself and the remaining params
+// fall back to the outer SGR loop. A truncated list leaves the colour
+// unchanged either way.
+// [spec:mw:req:ansi.to-html.extended-color+1]
+fn parse_extended_color<'a, I>(param: &[u16], iter: &mut I) -> Option<Color>
 where
     I: Iterator<Item = &'a [u16]>,
 {
+    if param.len() > 1 {
+        return parse_colon_color(&param[1..]);
+    }
     let kind = iter.next()?.first().copied()?;
     match kind {
         5 => {
@@ -253,6 +259,27 @@ where
             let g = iter.next()?.first().copied()? as u8;
             let b = iter.next()?.first().copied()? as u8;
             Some(Color::Rgb(r, g, b))
+        }
+        _ => None,
+    }
+}
+
+// Both `38:2:r:g:b` and the T.416 `38:2:<colour-space>:r:g:b` are in the
+// wild; the longer form carries a colour-space id ahead of the channels
+// which is almost always written empty and has no bearing on the result,
+// so operand count is what picks the channel offset.
+// [spec:mw:req:ansi.to-html.extended-color+1]
+fn parse_colon_color(operands: &[u16]) -> Option<Color> {
+    let channel = |i: usize| operands.get(i).map(|&v| v as u8);
+    match operands.first().copied()? {
+        5 => channel(1).map(Color::Palette),
+        2 => {
+            let offset = if operands.len() >= 5 { 2 } else { 1 };
+            Some(Color::Rgb(
+                channel(offset)?,
+                channel(offset + 1)?,
+                channel(offset + 2)?,
+            ))
         }
         _ => None,
     }
@@ -379,11 +406,50 @@ mod tests {
     }
 
     // [spec:mw:def:ansi.style.color/test]
-    // [spec:mw:req:ansi.to-html.extended-color/test]
+    // [spec:mw:req:ansi.to-html.extended-color+1/test]
     #[test]
     fn truecolor_fg() {
         let out = ansi_to_html("\x1b[38;2;255;100;50mhot\x1b[0m");
         assert!(out.contains("color:#ff6432"));
+    }
+
+    // [spec:mw:req:ansi.to-html.extended-color+1/test]
+    #[test]
+    fn colon_form_matches_semicolon_form() {
+        // Truecolour, both selectors, and a group that follows or
+        // precedes another parameter in the same escape.
+        for (colon, semi) in [
+            ("\x1b[38:2:255:100:50mhot", "\x1b[38;2;255;100;50mhot"),
+            ("\x1b[48:5:9mx", "\x1b[48;5;9mx"),
+            ("\x1b[1;38:5:201mx", "\x1b[1;38;5;201mx"),
+            ("\x1b[38:5:9;1mx", "\x1b[38;5;9;1mx"),
+        ] {
+            assert_eq!(
+                ansi_to_html(colon),
+                ansi_to_html(semi),
+                "colon form {colon:?} diverged from its semicolon twin"
+            );
+        }
+        // T.416 writes a colour-space id ahead of the channels, usually
+        // empty; the channels still land.
+        assert!(ansi_to_html("\x1b[38:2::255:100:50mhot").contains("color:#ff6432"));
+    }
+
+    // [spec:mw:req:ansi.to-html.extended-color+1/test]
+    #[test]
+    fn truncated_colon_group_leaves_color_unchanged() {
+        for source in [
+            "\x1b[38:5mx",
+            "\x1b[38:2:255mx",
+            "\x1b[38:9:1mx",
+            "\x1b[38:mx",
+        ] {
+            assert_eq!(
+                ansi_to_html(source),
+                "x",
+                "unexpected style from {source:?}"
+            );
+        }
     }
 
     // [spec:mw:sem:ansi.style.palette-resolution/test]

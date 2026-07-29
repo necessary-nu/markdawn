@@ -24,9 +24,13 @@ pub unsafe extern "C" fn mw_render_pikchr(ptr: *const u8, len: usize) -> *mut c_
 }
 
 /// # Safety
-/// `ptr` must be a pointer returned by `mw_render_pikchr` and not yet freed.
-// This module's allocator, not the core module's — the two heaps are distinct.
-// [spec:mw:req:ffi.ownership.string-free]
+/// `ptr` must be a pointer returned by *this* module's `mw_render_pikchr` and
+/// not yet freed. This is this module's allocator over this module's linear
+/// memory; a pointer minted by the core module or by another
+/// `markdawn-render-*` module is an offset into a different heap, and nothing
+/// here can tell the two apart — null is the only argument this function can
+/// reject. Keeping the pairing straight is the caller's job.
+// [spec:mw:req:ffi.ownership.string-free+1]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_string_free(ptr: *mut c_char) {
     if ptr.is_null() {

@@ -14,6 +14,7 @@ use crate::adapter::uikit::svg;
 /// Try to render `source` as a pikchr diagram. Returns `None` on parse error
 /// or SVG rasterisation failure so the caller can fall back to a plain code
 /// block view.
+// [spec:mw:req:uikit.diagram.view-factory]
 pub(crate) fn try_build_pikchr_view(
     source: &str,
     mtm: MainThreadMarker,
