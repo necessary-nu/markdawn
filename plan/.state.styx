@@ -1027,6 +1027,8 @@ assertions (
     {id defects.iced-bidi-doc-misattached, kind @complete, author "brendan@necessary.nu", at 2026-07-29T23:56:04.467845Z}
     {id defects.wasm-demo-build-undocumented, kind @complete, author "brendan@necessary.nu", at 2026-07-29T23:56:07.94455Z}
     {id defects.uikit-syntax-logic-apple-bound, kind @complete, author "brendan@necessary.nu", at 2026-07-29T23:57:50.982215Z}
+    {id ntreesitter.plugin-split-upstream, kind @complete, author "brendan@necessary.nu", at 2026-07-30T17:20:45.172193Z}
+    {id ntreesitter.spec, kind @complete, author "brendan@necessary.nu", at 2026-07-30T17:27:00.400868Z}
 )
 
 impl_evidence (

@@ -187,29 +187,33 @@ per entry point.
 
 ## Dynamically loaded modules
 
-> [spec:mw:def:ffi.plugin.grammar-registration]
+> [spec:mw:def:ffi.plugin.grammar-registration+1]
 > Tree-sitter grammars are not linked into the Swift framework or the Android
-> `.so`. Both ship the highlighting machinery over an initially empty
-> process-global `GrammarStore` and acquire grammars at runtime from plugin
-> libraries. A plugin exports exactly one symbol,
-> `mw_lang_<sanitized>_init(register: RegisterFn) -> u32`, where `<sanitized>`
-> is the language name with `-` replaced by `_` (`c-sharp` becomes
-> `mw_lang_c_sharp_init`) and `RegisterFn` is the signature of
-> `mw_register_grammar`. The host loader resolves that symbol — Swift `dlopen`s
-> `MarkdawnLang<Pascal>.framework` and `dlsym`s it, Android `dlsym`s
-> `RTLD_DEFAULT` after Kotlin's `System.loadLibrary` has pulled the plugin in —
-> and calls it with the address of `mw_register_grammar`. That handoff is the
-> only way a plugin obtains the registration function; it does not link against
-> the core library. The plugin calls back with the language's *unsanitized*
-> name (`c-sharp`, matching markdown info strings), its `LanguageFn` erased to
-> `*const c_void`, and its three query sources. `mw_register_grammar` compiles
-> them and inserts the result into the global store, returning `0` on success,
-> `1` for a null pointer or non-UTF-8 name, `2`, `3` or `4` for a non-UTF-8
-> highlights, injections or locals query respectively, and `5` when compilation
-> fails. Registration is additive and takes effect for subsequently rendered
-> blocks: a code block whose info string names a registered language is
-> highlighted, one that does not falls through to plain monospace. The plugin
-> crates are mechanically generated, one per arborium language, by
+> `.so`. Both ship the highlighting machinery over an initially empty language
+> registry and acquire grammars at runtime from plugin libraries. A plugin
+> exports exactly one symbol, `nts_init_<sanitized>() -> *const NtsProvider`,
+> where `<sanitized>` is the language's canonical id with `-` replaced by `_`
+> (`c-sharp` becomes `nts_init_c_sharp`). Naming the symbol per language, rather
+> than sharing one across every plugin, is what keeps process-global lookup
+> viable: the host resolves it — Swift `dlopen`s `MarkdawnLang<Pascal>.framework`
+> and `dlsym`s it, Android `dlsym`s `RTLD_DEFAULT` after Kotlin's
+> `System.loadLibrary` has pulled the plugin in — validates the returned
+> descriptor, and registers it. The direction is host-pulls-descriptor: a plugin
+> is handed no function pointer and calls nothing, so it links neither the core
+> library nor the Tree-sitter runtime, only the provider export crate.
+>
+> The descriptor carries the language's canonical id (`c-sharp`, matching
+> markdown info strings), its aliases, file extensions and exact filenames, its
+> `LanguageFn`, its query sources, its declared injection targets, its parser
+> ABI and its upstream provenance — so identity travels with the grammar
+> instead of being inferred from a crate or library name. Registration fails
+> when the symbol is absent or the descriptor does not validate, and the
+> registry rejects a descriptor whose aliases collide with one already
+> registered rather than silently shadowing it. Registration is otherwise
+> additive and takes effect for subsequently rendered blocks: a code block whose
+> info string names a registered language is highlighted, one that does not
+> falls through to plain monospace. The plugin crates are mechanically
+> generated, one per catalogued language, by
 > `crates/markdawn-swift/generate-plugins.sh` and are not tracked in the
 > repository.
 

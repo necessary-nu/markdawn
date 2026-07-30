@@ -11,12 +11,7 @@ children (
         title "Establish the renderer-neutral syntax-highlighting boundary"
         priority 0
         implements {
-            main (
-                [spec:mw:req:highlighting.api]
-                [spec:mw:req:highlighting.span-semantics]
-                [spec:mw:req:highlighting.error-fallback]
-                [spec:mw:req:highlighting.arborium-transition]
-            )
+            main ([spec:mw:req:highlighting.api] [spec:mw:req:highlighting.span-semantics] [spec:mw:req:highlighting.error-fallback])
         }
         log (
             {
@@ -45,6 +40,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator has parked the arborium-to-ntreesitter migration: ntreesitter is still being built out and is not relevant to markdawn right now. This supersedes the scope widening recorded earlier — the backend swap is NOT active work on this node. What remains in scope here is the original renderer-neutral SyntaxHighlighter / SyntaxSpan / HighlightError seam, which is exactly the right thing to finish regardless: it is what lets the backend be swapped later without touching every renderer again. Keep arborium behind the seam. The survey findings recorded above stay valid as preparation and should be re-read rather than re-derived when the migration is picked up; the gating fact is that ntreesitter's catalog covers 11 languages against arborium's 104, with a tooled but per-file-curated import (xtask import / catalog / normalization / metadata, 230 provenance-tracked entries for those 11). Do not re-open the migration until the operator raises it."
+            }
+
+            {
+                at 2026-07-30T00:05:42.437719Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Second ntreesitter analysis, after the catalog grew from 11 to 104 languages. Verdict changed from blocked to ready-with-caveats, and the blocker moved.\n\nRESOLVED SINCE THE FIRST SURVEY. Grammar parity is real, not scaffolded: 104 dirs in languages/, all 104 in the catalog's features, DESCRIPTORS and EXPECTED_IDS, set-equal to markdawn's 104 markdawn-swift-lang-* names with zero diff either way and no renames. They build — 104 libnts_lang_*.rlib, 327 parser archives, and a catalog test asserting all 104 form one Registry. pattern_index parity is genuine and was fixed below the API: tree-sitter-highlight/src/highlight.rs computes match_.pattern_index minus the layer's highlights_pattern_index, i.e. the zero-based index within the highlights query, which is exactly arborium's number, threaded out through a new HighlightEvent::HighlightStart field. The plugin ABI objection is disproven: load_provider_v1_from_handle takes a caller-supplied resolver so the caller dlopens and dlsyms, and there is a test (identical_entry_names_are_resolved_per_library_handle) showing N libraries exporting the same symbol resolve per handle.\n\nTHE NEW BLOCKER IS A CARGO links COLLISION, verified empirically with throwaway crates rather than reasoned about. ntreesitter-runtime is package name tree-sitter with links = \"tree-sitter\"; arborium-tree-sitter declares the same links value. Three results: both as plain deps fails; both as MUTUALLY EXCLUSIVE optional deps still fails, because links uniqueness is checked over the declared graph before feature resolution; and ntreesitter alone without a [patch.crates-io] table also fails, because ntreesitter-highlight declares tree-sitter-highlight = \"=0.26.8\" from crates.io which drags in crates.io tree-sitter. Consequence: arborium and ntreesitter cannot coexist in one Cargo graph at any feature setting, so there is no bisectable intermediate and the migration is a single all-or-nothing commit across ~7 workstreams. This also makes [spec:mw:req:highlighting.arborium-transition] unimplementable as written — its premise is that markdawn retains a legacy arborium feature alongside the new one.\n\nUPSTREAM REQUESTS, in priority order. (A) Rename the runtime's links value to something namespaced and drop the workspace [patch.crates-io] requirement — markdawn cannot work around this because [patch] is only honoured in the workspace-root manifest, so markdawn would have to copy ntreesitter's private-git patch table into its own root, applying to all 113 of its crates, and keep it in sync forever, and it still would not allow arborium for even one commit. (B) Re-export ntreesitter_plugin from ntreesitter behind a feature, since otherwise consumers need two git deps to the same private repo with hand-matched revs, multiplied by 104 generated plugin crates. (C) Ship the per-language cdylib plugin crates or a cargo xtask generate-plugins, because the alternative is 104 individual git deps plus markdawn re-deriving ntreesitter's canonical IDs from directory layout, which means every language ntreesitter adds silently breaks markdawn's generator. (D) impl GrammarStore for Arc<Registry> — GrammarStore::language returns a borrow tied to &self, which is why DynamicRegistry structurally cannot be a store; markdawn's workaround (snapshot per highlight call, an RwLock read plus an Arc clone) is cheap, so this is lower priority. (E) HighlightOutput::into_spans for consumers whose boundary cannot carry non-fatal diagnostics.\n\nMARKDAWN-SIDE WORK, in dependency order: own a span-to-HTML serializer (~30 lines; ntreesitter deliberately has no emitter and should not gain one, since markdawn's output is <a-s> custom elements feeding its own sanitiser, not generic span class); replace the blanket HighlightSpans adapter with a concrete highlighter holding Arc<DynamicRegistry>; drop pub use arborium from lib.rs and tracey/render.rs, which is what actually leaks the backend; rewrite both grammar_store.rs files, dropping the 9-argument mw_register_grammar shim since plugins now carry their own descriptors; rewrite generate-plugins.sh around export_provider_v1!; update the root manifest. Steps must land together.\n\nSPEC IMPACT: highlighting.arborium-transition delete or replace; uikit.syntax.span-priority drop the equal-range tie-break clause (ntreesitter emits only the winning capture and its own spec forbids consumers re-running precedence, so markdawn's tie-breaks are both dead code and a contradiction); highlighting.span-semantics amend the priority wording; highlighting.api relax &mut self to &self and note it is renderer-neutral but not store-neutral; highlighting.error-fallback add that non-fatal diagnostics are dropped; and a new rule is needed for the span-to-HTML serialization markdawn is about to own.\n\nHONEST GAPS: query CONTENT was not diffed against arborium, so coverage parity is established but output equivalence is not — each language carries provenance/arborium.yaml suggesting mechanical import, but that is inference. Wasm was not built, so the 104-language footprint against markdawn's ~100 MB warning is unmeasured. Whether request A has a hidden cost in the Swift/Android link step is unknown. And ntreesitter's own delivery state is unclear — commit 0b59c76 is an errata reopening incomplete delivery and a ntreesitter-legacy-retirement node exists, so whether the operator considers it done is worth asking rather than inferring."
             }
         )
     }
@@ -1909,5 +1911,182 @@ children (
             )
         }
         deps (core rendering.html)
+    }
+
+    {
+        id ntreesitter
+        title "Migrate the highlighting backend from arborium to ntreesitter"
+        children (
+            {
+                id ntreesitter.spec
+                title "Retire the arborium transition rule and spec the ntreesitter provider binding"
+                priority 0
+                sealed true
+                log (
+                    {
+                        at 2026-07-30T15:02:04.882805Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Rule work in docs/spec/markdawn/. Downstream nodes claim these rules; this node authors them and carries no implements of its own.\n\nRETIRE. [spec:mw:req:highlighting.arborium-transition] goes. It is premised on markdawn \"retaining its legacy Arborium feature\", which the links collision makes impossible — there is no configuration in which both backends are present. Removing it orphans the ref on markdawn-highlighter-boundary.implements and the three /test annotations in src/highlight.rs, all of which must go in the same change. Replace with a provider-neutral successor covering the same ground: the backend adapts to SyntaxHighlighter without exposing its span or error types to renderers, preserving every span field and the provider diagnostic.\n\nREVISE. [spec:mw:req:highlighting.span-semantics] — the July 29 survey claimed priority was an emission counter and that overlapping-but-not-nested spans were impossible. Both are now wrong: ntreesitter's priority is the zero-based highlights-query index, the same quantity as arborium's pattern_index. Re-read the rule against the current engine before changing a word of it; it may need no change at all. [spec:mw:req:highlighting.api] may need a clause for HighlightOutput.diagnostics, which carries non-fatal partial-injection failures the current boundary cannot express.\n\nADD. Registry composition (static catalog vs empty-plus-dynamic), dynamic registration semantics (snapshot-per-render, and the consequence that a pipeline pinning a snapshot at construction will not see later registrations), and delegation of span-to-HTML to the provider formatter with no renderer-side precedence resolution.\n\nCASCADE — NOT BOOKKEEPING. [spec:mw:def:ffi.plugin.grammar-registration] specifies markdawn's nine-argument mw_register_grammar handoff, where the plugin calls into the host. That inverts: the host resolves nts_init_<canonical_id> and pulls a descriptor. The rule body changes, so it versions to +1, and the bindings node (P3, currently Done) goes Stale and needs re-annotation at its new sites. Expect that transition rather than being surprised by it at sync.\n\nUNAFFECTED. uikit.syntax.capture-fallback, uikit.syntax.span-bounds and uikit.sem:span-priority are span algebra over markdawn's own SyntaxSpan and do not move."
+                    }
+
+                    {
+                        at 2026-07-30T17:21:38.615041Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-07-30T17:26:38.185147Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Spec landed. Four decisions worth the record.\n\nSPAN-SEMANTICS NEEDED NO CHANGE. The July 29 survey called it inaccurate on two counts and both are wrong. Its \"query-pattern priority\" clause is accurate because ntreesitter's Span.priority is the zero-based index within the highlights query — arborium's pattern_index, not the emission counter the survey described. Its \"overlapping and nested spans\" clause is a preservation requirement on the boundary (the seam must not merge or drop them), not a claim that any backend emits partial overlaps; tree-sitter-highlight is a stack machine and emits strictly nested events either way, which does not make the requirement false. Left at v0. uikit.syntax.span-priority likewise names pattern_index, which is markdawn's own SyntaxSpan field and unaffected.\n\nDIAGNOSTICS AS A NEW RULE, NOT A BUMP TO highlighting.api. ntreesitter's HighlightOutput carries a diagnostics vec for non-fatal failures — an injected language that would not resolve, an exhausted injection budget — which the boundary's Result<Vec<SyntaxSpan>, HighlightError> cannot express. Dropping it would contradict a rule already in the spec: highlighting.error-fallback exists so the boundary keeps the diagnostic \"instead of turning failure into absence\", and an Ok-with-degradation is exactly that case. Rather than widen highlighting.api's return type — a breaking change to every SyntaxHighlighter impl — the new highlighting.diagnostics requires only that the information stay reachable, satisfiable by an additive defaulted trait method. highlighting.api stays at v0 and its cascade never fires.\n\nLATE-REGISTRATION IS SPEC'D BECAUSE IT IS A SILENT FAILURE. DynamicRegistry hands out immutable generation-tracked snapshots and does not itself impl GrammarStore, so a pipeline that pins a snapshot at construction compiles, runs, and quietly never highlights a language registered afterwards. That reads in the field as \"highlighting randomly doesn't work\". The rule states the observable requirement and leaves snapshot-per-render as one conforming implementation.\n\nDELIBERATE UNCOVERED AND STALE STATE. Five new highlighting.* rules are uncovered and stay that way until ntreesitter.core-binding; ffi.plugin.grammar-registration is bumped to +1 and its six impl and three test refs in the Swift and Android loaders are stale until those nodes land. Both are the intended signal, not debt. The arborium blanket impl in src/highlight.rs is now deliberately unannotated rather than re-pointed at highlighting.provider-binding: that rule also forbids re-exporting the backend crate, which src/lib.rs still does, so claiming it there would be a false claim."
+                    }
+
+                    {
+                        at 2026-07-30T17:27:00.400868Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id ntreesitter.output-parity
+                title "Diff highlight output across all 104 languages while arborium still builds"
+                priority 0
+                log (
+                    {
+                        at 2026-07-30T15:01:45.842417Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator chose full 104-language coverage over a bounded representative sample. Rationale: a bounded sample cannot catch a regression in a long-tail grammar, and markdawn has no test for most of the catalog, so the sample would have been chosen by convenience rather than risk.\n\nWHY IT MUST RUN FIRST. links = \"tree-sitter\" makes a single-process A/B comparison impossible, so this is two dumps diffed offline: one binary per repo emitting (start, end, capture, pattern_index) per fixture, compared by canonical id. Once ntreesitter.core-binding lands, arborium no longer builds in this workspace and the baseline is unobtainable. This node is the last moment the comparison exists.\n\nWHAT COUNTS AS SIGNAL. Coverage parity is already established — 104 languages, set-equal names, zero diff, all building — and each language carries provenance/arborium.yaml suggesting a mechanical import. Query CONTENT has never been diffed, so output equivalence is unestablished. Expect one known, intentional class of difference: ntreesitter's HTML path deliberately omits arborium's pattern-index dedup step, because the engine resolves query precedence before spans are emitted and highlight.html-output forbids renderers re-running it. Differences of that shape are expected and should be characterised, not treated as regressions; anything else is a real finding.\n\nFREE SIDE-EFFECT. This node builds every language on both sides, so it also yields the plugin dylib size comparison that ntreesitter.plugin-split-upstream wants a number for."
+                    }
+                )
+            }
+
+            {
+                id ntreesitter.plugin-split-upstream
+                title "Split ntreesitter-plugin so provider exports do not link the runtime"
+                priority 0
+                sealed true
+                log (
+                    {
+                        at 2026-07-30T15:01:14.707466Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "External dependency on the ntreesitter repository, modelled here because markdawn's plugin-crates node cannot start until it lands.\n\nREQUEST. ntreesitter-plugin depended on ntreesitter for decode.rs alone — the host half that registers a validated descriptor. export.rs, which is all a provider library uses, needs only ntreesitter-provider. Left coupled, all 104 markdawn-swift-lang-* cdylibs would link ntreesitter -> ntreesitter-highlight -> ntreesitter-runtime through an edge they never call, inheriting the links = \"tree-sitter\" identity. Two costs: every iOS plugin dylib carries the Tree-sitter runtime (whether the linker drops it is unmeasured, not known), and the plugin crates fall inside the core swap's non-bisectable commit instead of landing ahead of it.\n\nSTATUS AT PLANNING TIME. Taken up and in flight, uncommitted in the ntreesitter working tree at c9e6ed4: a new crates/ntreesitter-abi carries abi.rs + export.rs and the export_provider! macro, depending on ntreesitter-provider alone; ntreesitter-plugin retains decode.rs + loader.rs and keeps the ntreesitter dep. That is exactly the shape this node asked for. Close it once the split is committed and a provider cdylib built against ntreesitter-abi is confirmed free of the runtime in its dependency graph."
+                    }
+
+                    {
+                        at 2026-07-30T17:20:38.629683Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Satisfied upstream at ntreesitter a23a56a, tree clean. Verified empirically rather than from the commit message: `cargo tree -p ntreesitter-abi` is ntreesitter-abi -> ntreesitter-provider -> tree-sitter-language and nothing else, and `cargo tree -p nts-lang-rust` reaches the same three plus a build-only ntreesitter-build. Neither touches ntreesitter-runtime, so neither inherits links = \"tree-sitter\".\n\nDelivered stronger than requested. The ABI types, the export encoder and export_provider! moved to ntreesitter-abi; decode and loader stayed in ntreesitter-plugin, which now re-exports the ABI so a host still writes one import. Beyond that they pinned the invariant as [spec:nts:req:plugin.export-independence] with project-check enforcing the export crate's dependency set — so a future edge back to the runtime fails their gate rather than silently re-coupling markdawn's 104 cdylibs.\n\nConsequence for this plan: ntreesitter.plugin-crates is now genuinely free of the core swap and lands as its own earlier commit. markdawn's generated crates take ntreesitter-abi, not ntreesitter-plugin — the loaders take ntreesitter-plugin.\n\nUNCHANGED. ntreesitter-runtime is still package.name = \"tree-sitter\" with links = \"tree-sitter\", so the ntreesitter.core-binding / swift-loader / android-loader commit remains atomic."
+                    }
+
+                    {
+                        at 2026-07-30T17:20:45.172193Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id ntreesitter.plugin-crates
+                title "Regenerate the 104 plugin cdylibs against nts-lang providers"
+                priority 0
+                deps (ntreesitter.spec ntreesitter.plugin-split-upstream)
+                log (
+                    {
+                        at 2026-07-30T15:02:21.836159Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Lands as its own commit AHEAD of the core swap: with the ntreesitter-abi split these crates depend on ntreesitter-abi + ntreesitter-provider only, reach no links crate, and so coexist with arborium.\n\nGENERATOR. crates/markdawn-swift/generate-plugins.sh currently discovers languages by scanning ../arborium/langs/<group>/<name>/crate — directory layout as a source of truth, which is why adding a language upstream could silently break generation. Drive it off the `all` feature list in ntreesitter-catalog's Cargo.toml instead: that list is declared, canonical, and exactly the 104 ids.\n\nPER-CRATE SHAPE. Each generated crate becomes a dep on nts-lang-<name> plus ntreesitter-abi, and a single export_provider!(nts_init_<sanitized>, nts_lang_<sanitized>::DESCRIPTOR). This deletes markdawn's hand-written nine-argument unsafe registration ABI and the LazyLock-vs-&str query-borrowing workaround the arborium template needed.\n\nSYMBOL NAMING IS UNCHANGED IN KIND. nts_init_<canonical_id> with dashes normalised to underscores — the same sanitisation the current mw_lang_<name>_init template already does, so c-sharp still yields nts_init_c_sharp. Because the symbol is per-language rather than shared, process-global dlsym keeps working and neither loader's contract changes; use ntreesitter_abi::init_symbol to derive the name rather than formatting it by hand in two places.\n\nDESCRIPTOR SURFACE IS WIDER THAN THE ARBORIUM TEMPLATE EMITTED. Aliases, file extensions, exact filenames, injection targets, parser ABI and provenance hashes now travel with the grammar instead of being inferred from the crate name. That is the point — it is what lets the registry reject ambiguous aliases at build time — but registry construction is fallible, and with 104 merged alias sets a collision is plausible and will not be visible until the descriptors are all present. Build the full registry once, early, rather than discovering it in the loaders."
+                    }
+                )
+            }
+
+            {
+                id ntreesitter.core-binding
+                title "Bind ntreesitter behind the highlighter seam and drop the arborium re-export"
+                priority 0
+                implements {
+                    main (
+                        [spec:mw:req:highlighting.provider-binding]
+                        [spec:mw:req:highlighting.diagnostics]
+                        [spec:mw:req:highlighting.registry-composition]
+                        [spec:mw:req:highlighting.late-registration]
+                        [spec:mw:req:highlighting.html-delegation]
+                    )
+                }
+                deps (ntreesitter.spec ntreesitter.output-parity ntreesitter.plugin-crates)
+                log (
+                    {
+                        at 2026-07-30T15:01:31.257785Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "ATOMICITY. This node, ntreesitter.swift-loader and ntreesitter.android-loader land as ONE commit. They are siblings rather than a dep chain because none precedes the others — they are simultaneous. The cause is links = \"tree-sitter\", declared by both arborium-tree-sitter and ntreesitter-runtime: the moment markdawn's arborium dep is replaced, no crate in the workspace may reach arborium, and both binding crates reference markdawn::arborium::GrammarStore, so all three break together or land together. Commit with nplan_commit ids: [ntreesitter.core-binding, ntreesitter.swift-loader, ntreesitter.android-loader].\n\nThe 104 plugin crates are NOT in this commit — with the ntreesitter-abi split they depend only on ntreesitter-provider, reach no links crate, and land ahead of it.\n\nSCOPE. Cargo.toml: drop the arborium path dep, add ntreesitter + ntreesitter-catalog (default-features = false, since catalog defaults to all) + ntreesitter-highlight; highlight = catalog with no languages, highlight-all-languages = catalog/all. src/highlight.rs: replace the HighlightSpans blanket impl and the two arborium From impls with the ntreesitter adapter (Span.priority maps to SyntaxSpan.pattern_index, same zero-based highlights-query index); spans_to_html delegates to ntreesitter_highlight::spans_to_html. src/lib.rs: delete `pub use arborium;` and expose a markdawn-owned Highlighter instead — do not re-export the backend, that re-export is what made this migration touch every consumer. Then src/tracey/render.rs:218 and examples cli.rs:34, iced_demo.rs:84, html_snapshot.rs:50.\n\nTWO API SHAPES NEEDED. Static: ntreesitter_catalog::register_all(RegistryBuilder) -> Registry, which impls GrammarStore. Dynamic (Swift/Android, zero grammars baked in): DynamicRegistry does NOT impl GrammarStore — only Registry and RegistrySnapshot do — so the dynamic path holds a DynamicRegistry globally and takes .snapshot() per render. That is a deliberate design (explicit reader generations), not an omission, but it is a different shape from arborium's shared Arc<GrammarStore> and both loaders change accordingly."
+                    }
+                )
+            }
+
+            {
+                id ntreesitter.swift-loader
+                title "Move the Swift grammar store and loader onto the ntreesitter registry"
+                priority 0
+                deps (ntreesitter.spec ntreesitter.plugin-crates)
+                log (
+                    {
+                        at 2026-07-30T15:02:47.311859Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Lands in the same commit as ntreesitter.core-binding and ntreesitter.android-loader — see the decision note there.\n\ncrates/markdawn-swift/src/grammar_store.rs takes the same treatment as the Android store: DynamicRegistry in place of Arc<GrammarStore>, descriptor validation via ntreesitter_plugin::load_provider in place of the nine-argument mw_register_grammar. The two files are near-verbatim ports of each other today and should stay that way; if the shared logic is worth extracting, that is a separate node, not a smuggled one.\n\nuikit.rs:18 imports markdawn::arborium::Highlighter and constructs it at line 34 from the global store — that becomes the markdawn-owned Highlighter over a snapshot.\n\ncrates/markdawn-swift/include/markdawn.h declares mw_register_grammar for the Swift side to take the address of. That declaration goes; ntreesitter ships include/ntreesitter/provider.h for the descriptor struct. The three Markdawn.xcframework/*/Headers/markdawn.h copies are build outputs and must be regenerated, not hand-edited.\n\nSwift's loader hands over a function pointer today because the plugin calls back into the host. That inverts — the host resolves nts_init_<id> and pulls a descriptor — so the Swift-side handoff simplifies rather than merely renaming."
+                    }
+                )
+            }
+
+            {
+                id ntreesitter.android-loader
+                title "Move the Android grammar store and JNI loader onto the ntreesitter registry"
+                priority 0
+                deps (ntreesitter.spec ntreesitter.plugin-crates)
+                log (
+                    {
+                        at 2026-07-30T15:02:35.602779Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Lands in the same commit as ntreesitter.core-binding and ntreesitter.swift-loader — see the decision note there.\n\ncrates/markdawn-android/src/grammar_store.rs: replace the OnceLock<Arc<GrammarStore>> with a DynamicRegistry, and mw_register_grammar's nine-argument body with descriptor validation through ntreesitter_plugin::load_provider. The five return codes collapse: the non-UTF-8 arms disappear with the unpacked string arguments, leaving symbol-missing and invalid-descriptor.\n\nlib.rs:215 register_language keeps dlsym(RTLD_DEFAULT, ...) — per-language nts_init_<id> symbols mean no dlopen handle and no JNI signature change. Only the symbol name and the call shape change: resolve, then hand the entry point to load_provider with the canonical id.\n\nlib.rs:85 constructs its Highlighter from the store; that becomes a per-render .snapshot(). Note the pinning hazard — VdomPipeline holding a snapshot taken at construction will not observe languages registered afterwards, which is a behaviour change from the shared Arc and is exactly the kind of thing that looks like \"highlighting randomly doesn't work\" in the field.\n\nlib.rs:674-680 builds a CompiledGrammar from arborium_rust in test code, and crates/markdawn-android/Cargo.toml carries the arborium-rust dep that feeds it. Both go; nts-lang-rust replaces them."
+                    }
+                )
+            }
+
+            {
+                id ntreesitter.retire-arborium
+                title "Assert arborium is gone from the dependency graph and refresh the docs"
+                priority 0
+                deps (ntreesitter.core-binding ntreesitter.swift-loader ntreesitter.android-loader)
+                log (
+                    {
+                        at 2026-07-30T15:03:03.951924Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Closes the migration. The gate is mechanical: `cargo tree` over the workspace with every headless-safe feature must show no arborium crate and no crates.io tree-sitter, which is the only proof that the links collision is actually resolved rather than merely dormant behind a feature that happens to be off.\n\nThen the full declared check suite from .config/nplan/config.styx — fmt, clippy -D warnings, nextest across the workspace — at the feature set those commands already carry. Run `nplan check` in a terminal first so the commit gate consumes the witnesses instead of re-running the suite inside the 60s budget.\n\nDocs: README's workspace layout is already stale (see defects.readme-workspace-layout-stale, which lists one crate of about 110) and the 104 plugin crates change name-for-name in this migration, so the two should be reconciled together rather than leaving a second wrong list behind. The arborium checkout at ../arborium stays on disk as reference; nothing in this repo may reach it."
+                    }
+                )
+            }
+        )
+        log (
+            {
+                at 2026-07-30T15:00:38.875333Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator green-lit the arborium-to-ntreesitter migration on 2026-07-30, superseding the park recorded on markdawn-highlighter-boundary. Upstream state at planning time (ntreesitter @ 78b9601):\n\nRESOLVED SINCE THE JULY 29 SURVEY. (1) Grammar parity: 104 languages, set-equal to markdawn's 104 markdawn-swift-lang-* names, zero diff, all building. (2) pattern_index parity: fixed below the API as match_.pattern_index.saturating_sub(layer.config.highlights_pattern_index), i.e. the zero-based index within the highlights query — arborium's number. Span.priority is that value, not the emission counter the first survey described. (3) The [patch.crates-io] requirement is gone: tree-sitter-highlight is a vendored path dep at crates/tree-sitter-highlight. (4) commit 49fa940 ships ntreesitter_highlight::spans_to_html with ThemeSlot tag and class names byte-identical to arborium's, so markdawn does NOT need to own an HTML formatter and existing theme CSS keeps working. (5) commit 899848c replaces the single ntreesitter_provider_v1 symbol with per-language nts_init_<canonical_id> (dashes to underscores) and drops V1 branding throughout; process-global dlsym still works, so neither the Swift loader contract nor the JNI loadLanguage signature has to change.\n\nSTILL OPEN. ntreesitter-runtime is still package.name = \"tree-sitter\" with links = \"tree-sitter\", the same value arborium-tree-sitter declares, so arborium and ntreesitter cannot coexist in one Cargo graph at any feature setting — links uniqueness is checked over the declared graph before feature resolution. That forces one non-bisectable commit; see the note on ntreesitter.core-binding for its exact extent.\n\nDEPENDENCY FORM. ntreesitter crates are all publish = false, so markdawn takes path deps on ../ntreesitter exactly as it does on ../arborium today. This does not newly block publishing markdawn — it already could not be published with a path dep on arborium."
+            }
+        )
     }
 )

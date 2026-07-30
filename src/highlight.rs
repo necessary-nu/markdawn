@@ -72,8 +72,11 @@ pub trait SyntaxHighlighter {
 /// Temporary compatibility adapter for the legacy Arborium feature.
 ///
 /// The blanket implementation intentionally terminates at Markdawn-owned
-/// types. Renderers never receive Arborium spans or errors.
-// [spec:mw:req:highlighting.arborium-transition]
+/// types. Renderers never receive Arborium spans or errors. Deliberately
+/// unannotated: `highlighting.provider-binding` also forbids re-exporting the
+/// backend crate, which `src/lib.rs` still does, so claiming that rule here
+/// would be a false claim. `ntreesitter.core-binding` replaces this adapter
+/// and closes the rule.
 #[cfg(feature = "highlight")]
 impl<H> SyntaxHighlighter for H
 where
@@ -301,7 +304,6 @@ mod tests {
 
     // [spec:mw:req:highlighting.api/test]
     // [spec:mw:req:highlighting.span-semantics/test]
-    // [spec:mw:req:highlighting.arborium-transition/test]
     #[test]
     fn arborium_adapter_preserves_neutral_span_contract() {
         let expected = vec![
@@ -328,7 +330,6 @@ mod tests {
     }
 
     // [spec:mw:req:highlighting.error-fallback/test]
-    // [spec:mw:req:highlighting.arborium-transition/test]
     #[test]
     fn arborium_adapter_preserves_provider_diagnostic() {
         let mut highlighter = StubArborium {
