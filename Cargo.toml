@@ -110,6 +110,12 @@ serde_json = "1"
 name = "ansi_demo"
 required-features = ["ansi"]
 
+# Half of the arborium-to-ntreesitter output parity check. Deleted with the
+# arborium dependency itself; see the `ntreesitter` plan subtree.
+[[example]]
+name = "arborium_span_dump"
+required-features = ["highlight-all-languages"]
+
 [[example]]
 name = "ssg_blog"
 required-features = ["dioxus"]

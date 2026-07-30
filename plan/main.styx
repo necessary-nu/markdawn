@@ -1957,12 +1957,34 @@ children (
                 id ntreesitter.output-parity
                 title "Diff highlight output across all 104 languages while arborium still builds"
                 priority 0
+                sealed true
                 log (
                     {
                         at 2026-07-30T15:01:45.842417Z
                         author "brendan@necessary.nu"
                         kind @decision
                         text "Operator chose full 104-language coverage over a bounded representative sample. Rationale: a bounded sample cannot catch a regression in a long-tail grammar, and markdawn has no test for most of the catalog, so the sample would have been chosen by convenience rather than risk.\n\nWHY IT MUST RUN FIRST. links = \"tree-sitter\" makes a single-process A/B comparison impossible, so this is two dumps diffed offline: one binary per repo emitting (start, end, capture, pattern_index) per fixture, compared by canonical id. Once ntreesitter.core-binding lands, arborium no longer builds in this workspace and the baseline is unobtainable. This node is the last moment the comparison exists.\n\nWHAT COUNTS AS SIGNAL. Coverage parity is already established — 104 languages, set-equal names, zero diff, all building — and each language carries provenance/arborium.yaml suggesting a mechanical import. Query CONTENT has never been diffed, so output equivalence is unestablished. Expect one known, intentional class of difference: ntreesitter's HTML path deliberately omits arborium's pattern-index dedup step, because the engine resolves query precedence before spans are emitted and highlight.html-output forbids renderers re-running it. Differences of that shape are expected and should be characterised, not treated as regressions; anything else is a real finding.\n\nFREE SIDE-EFFECT. This node builds every language on both sides, so it also yields the plugin dylib size comparison that ntreesitter.plugin-split-upstream wants a number for."
+                    }
+
+                    {
+                        at 2026-07-30T17:28:11.447939Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-07-30T17:59:10.297029Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "RESULT. 104 languages, 166 fixtures, both backends. ntreesitter highlighted 166 of 166; arborium 156 of 166. Comparison is three-layer because a raw span diff badly over-reports.\n\nLAYER 1 — RAW SPANS. 32 fixtures identical, 3 same-spans-different-order, 121 different. Reading that as a regression would have been wrong.\n\nLAYER 2 — GEOMETRY, duplicates collapsed. arborium emits one span per matching query pattern; ntreesitter emits one per (range, capture), keeping the highest pattern index. Collapsing that, 43 fixtures are geometrically identical. Pattern-index VALUES differ on 6 of those — the inherited-query languages renumber, e.g. hlsl emits 53/83/102 where ntreesitter emits 5/24 for the same ranges and captures — but relative order within a range is preserved on every single one, so markdawn's tie-break is unaffected. Zero fixtures reorder ties.\n\nLAYER 3 — WHAT MARKDAWN ACTUALLY PAINTS. Simulating order_spans (widest-first, then start, then ascending pattern_index, last-wins-per-byte): 122 of 156 fixtures paint IDENTICALLY. The 6,000-span \"loss\" is almost entirely losing captures markdawn was always going to paint over. 34 fixtures paint differently; 10 of those by more than 5% of styled bytes — objc/RCTLog.mm 39%, scss/_buttons.scss 42%, markdown/rust-readme.md 39%, r/detect.R 17%, vue/App.vue 16%, cobol 11%, silo 10%, scala 7%, both gleam fixtures 7%. Caveat on this layer: order_spans is the UIKit model. The HTML path resolves through spans_to_html and iced has its own (divergent) logic — see defects.iced-duplicates-span-logic-divergently — so identical-paint is strong evidence, not proof, for those two renderers.\n\nMIGRATION FIXES THREE LANGUAGES. fsharp, haskell and perl fail on arborium with \"unsupported language\" across all 10 of its failures; ntreesitter highlights all of them (fsharp 45-1772 spans, haskell up to 1298, perl up to 145). The arborium message is a misattribution: crates/arborium/src/store.rs try_lang! ends in CompiledGrammar::new(config).ok(), so a query-compilation failure becomes None and is reported as an unsupported language. These three are in arborium's all-languages feature list and in markdawn's 104 generated plugin crates, so markdawn ships them today as silently unhighlightable.\n\nFIVE INJECTION GRAMMARS ARE ABSENT FROM THE CATALOG. 33 diagnostics: jsdoc (javascript, typescript, tsx, vue, html), regex (javascript, typescript, vim, query), comment (vim, haskell, groovy, fsharp), phpdoc (php), pod (perl). Not in either catalog, but ntreesitter surfaces the failure where arborium was silent — which is highlighting.diagnostics earning its place on the first run.\n\nWHERE PAINT DIFFERS, THREE CLASSES. (1) Injected HTML is coarser: in markdown/rust-readme.md arborium splits media=\"(prefers-color-scheme: dark)\" into attribute + string, ntreesitter emits one attribute span over the whole thing, so the value loses its string colour. (2) scss comments resolve to @spell rather than @comment; markdawn's capture_accent maps spell to no accent, so // comments render unstyled. (3) Assorted generic/specific swaps, some improvements (variable to variable.parameter, 768 bytes; function.call to method).\n\nVERDICT. Does not block the swap. Rendering is unchanged on 78% of the corpus and the changes are query-content differences per language, which is what an unaudited import predicts. The scss comment-to-spell case is the one I would call a plain regression and is worth a fixture-level bug upstream. Recorded rather than fixed here: this node's contract was to obtain the baseline before it becomes unobtainable, and it has.\n\nMETHOD. examples/arborium_span_dump.rs in this repo (deleted by ntreesitter.retire-arborium); the ntreesitter half and the three analysis scripts are deliberately outside both repositories, in the session scratchpad, since the comparison is a one-time gate and not tooling either project should carry. Both walk fixtures recursively — a flat walk silently skips silo, whose corpus nests under fixtures/corpus/, while still reporting success."
+                    }
+
+                    {
+                        at 2026-07-30T17:59:39.786541Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
