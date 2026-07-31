@@ -95,7 +95,7 @@ pub struct IcedOptions {
     pub highlights: bool,
     pub definition_lists: bool,
     /// When the `pikchr` feature is enabled, fenced code blocks tagged
-    /// `pikchr` are rendered as inline SVG via `pikru`. No-op otherwise.
+    /// `pikchr` are rendered as inline SVG via `npikchr`. No-op otherwise.
     #[cfg(feature = "pikchr")]
     pub pikchr: bool,
     /// When the `graphviz` feature is enabled, fenced code blocks tagged
@@ -1571,7 +1571,7 @@ fn svg_cache_key(kind: &str, source: &str) -> u64 {
 /// Strip ANSI CSI escape sequences (`ESC [ ... letter`) from a
 /// string so embedded color/style codes don't render as visible
 /// `[31m` garbage in the diagnostic banner. Keep this dependency-
-/// free — only handles CSI which is what `pikru` emits.
+/// free — only handles CSI which is what `npikchr` emits.
 #[cfg(any(feature = "pikchr", feature = "graphviz"))]
 fn strip_ansi_escapes_simple(s: &str) -> String {
     let mut out = String::with_capacity(s.len());

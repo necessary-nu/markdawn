@@ -138,7 +138,7 @@ impl<R> BlockSink<R> {
     }
 
     /// Render fenced code blocks tagged with the `pikchr` info string as
-    /// vector image diagrams via `pikru`. Parse failures fall back to the
+    /// vector image diagrams via `npikchr`. Parse failures fall back to the
     /// regular code-block view.
     #[cfg(feature = "pikchr")]
     pub fn with_pikchr(mut self) -> Self {

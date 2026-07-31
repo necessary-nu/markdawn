@@ -1,4 +1,4 @@
-//! Hardened wrapper around `pikru::pikchr_with_options`.
+//! Hardened wrapper around `npikchr::pikchr_with_options`.
 //!
 //! Mirrors the defensive layer around libgraphviz in
 //! [`markdawn_graphviz`]: input byte cap, wall-clock render timeout,
@@ -30,7 +30,7 @@ pub enum PikchrError {
     /// byte count.
     InputTooLarge(usize),
     /// libpikchr rejected the source. Payload is the human-readable
-    /// error report from `pikru` (parse error message, line/column,
+    /// error report from `npikchr` (parse error message, line/column,
     /// and source snippet).
     Failed(String),
     /// The render worker thread panicked. Payload is the recovered
@@ -117,10 +117,16 @@ pub fn render_with_timeout(source: &str, timeout: Duration) -> Result<String, Pi
 
 fn render_inner(source: &str) -> Result<String, PikchrError> {
     let _guard = RENDER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let opts = pikru::RenderOptions {
+    let opts = npikchr::RenderOptions {
         css_variables: true,
+        // Named rather than defaulted so the choice is visible: emitting
+        // explicit width/height would stop an inline diagram scaling to its
+        // container, which is a rendering change every adapter would feel.
+        // markdawn shipped without this option existing, so `false` is the
+        // behaviour its output is specified and tested against.
+        explicit_size: false,
     };
-    pikru::pikchr_with_options(source, &opts).map_err(PikchrError::Failed)
+    npikchr::pikchr_with_options(source, &opts).map_err(PikchrError::Failed)
 }
 
 fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> String {

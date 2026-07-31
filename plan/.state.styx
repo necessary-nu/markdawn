@@ -1038,6 +1038,7 @@ assertions (
     {id defects.wasm-bindgen-demo-undocumented, kind @complete, author "brendan@necessary.nu", at 2026-07-31T12:06:44.831239Z}
     {id defects.iced-duplicates-span-logic-divergently, kind @doing, author "brendan@necessary.nu", at 2026-07-31T12:09:39.879992Z}
     {id defects.cmark-gfm-submodule-unregistered, kind @complete, author "brendan@necessary.nu", at 2026-07-31T13:31:46.790402Z}
+    {id defects.escaping-path-deps-block-git-consumers, kind @complete, author "brendan@necessary.nu", at 2026-07-31T17:57:24.556776Z}
 )
 
 impl_evidence (

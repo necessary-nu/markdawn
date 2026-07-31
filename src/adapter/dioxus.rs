@@ -50,7 +50,7 @@ pub struct DioxusOptions {
     pub highlights: bool,
     pub definition_lists: bool,
     /// When the `pikchr` feature is enabled, fenced code blocks tagged
-    /// `pikchr` are rendered as inline SVG via `pikru`. No-op otherwise.
+    /// `pikchr` are rendered as inline SVG via `npikchr`. No-op otherwise.
     #[cfg(feature = "pikchr")]
     pub pikchr: bool,
     /// When the `graphviz` feature is enabled, fenced code blocks tagged

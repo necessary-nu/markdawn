@@ -1855,6 +1855,28 @@ children (
                     }
                 )
             }
+
+            {
+                id defects.escaping-path-deps-block-git-consumers
+                title "Relative path deps escape the checkout, so markdawn cannot be a git dependency"
+                priority 1
+                sealed true
+                log (
+                    {
+                        at 2026-07-31T17:57:15.252405Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found while unblocking silo-lang's silo-markdown, which could not take markdawn as a git dependency. The submodule fix in defects.cmark-gfm-submodule-unregistered only got it past the fetch; resolution then failed on three dependencies declared as relative paths out of the checkout — mathml-core, sanitizer and pikru. A consumer has the checkout and nothing beside it, so those cannot resolve. markdawn had never been consumable this way; nothing had tried.\n\nRESOLUTION. mathml-rs and sanitizer-rs were published under necessary-nu and markdawn now takes them by git. pikru was replaced outright by necessary-nu/npikchr.\n\nWHY REPLACED RATHER THAN PINNED. pikru is bearcove's, and pinning could not reproduce what markdawn was building against: local ../pikru sat at 87f3754 with *uncommitted* modifications, including Cargo.toml line 39 changed from `facet-svg = { version = \"0.44\" }` to `facet-svg = { path = \"../facet-xml/facet-svg\" }`. So markdawn's green builds depended on an unpublished redirection into a fourth unpublished sibling. Pinning the rev got the crates.io facet chain instead — facet-svg 0.44 to facet-xml 0.44 to facet-dom 0.44 — which does not compile against the facet 0.46 markdawn's own facet-dessert/reflect/path pulled in. 101 errors, and no revision could fix it because the working state was never committed anywhere. npikchr is a facet-less fork: glam, ariadne, pest, thiserror, enum_dispatch, and the whole facet subtree disappears.\n\nTHREE DEPENDENCIES DELETED, NOT MIGRATED. facet-dessert, facet-reflect and facet-path were declared in the pikchr feature and have zero references in any .rs file. They existed to satisfy pikru's transitive needs and became dead the moment pikru left.\n\nONE BEHAVIOURAL DECISION. npikchr's RenderOptions carries an `explicit_size` field that did not exist in the pinned pikru. Set explicitly to false rather than defaulted, because true emits width/height on the SVG and stops an inline diagram scaling to its container — a rendering change every adapter would feel, and not something a dependency swap should smuggle in. Worth revisiting on its own merits.\n\nA GATE GAP WORTH KNOWING. The check witness is content-hashed over the platform `files` globs, which are src/**/*.rs and friends. Cargo.toml is not among them, so swapping every dependency source left all three checks reported as `wtns` — witnessed, skipped — without ever building against the new graph. I only caught it because I ran the suite directly. A manifest-only change can currently pass the commit gate unbuilt.\n\nSTILL TRUE. markdawn vendors cmark-gfm as a submodule that nothing compiles, so consumers clone it regardless; see defects.cmark-gfm-submodule-unregistered."
+                    }
+
+                    {
+                        at 2026-07-31T17:57:24.556776Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
         )
     }
 
