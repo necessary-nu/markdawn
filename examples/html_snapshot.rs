@@ -47,7 +47,8 @@ fn featured_adapter() -> HtmlAdapter {
     let mut adapter = HtmlAdapter::new();
     #[cfg(feature = "highlight")]
     {
-        adapter = adapter.with_highlighter(markdawn::arborium::Highlighter::new());
+        adapter = adapter
+            .with_highlighter(markdawn::Highlighter::new().expect("compose the language catalog"));
     }
     #[cfg(feature = "pikchr")]
     {

@@ -1,37 +1,90 @@
 #!/usr/bin/env bash
-# Generate one plugin cdylib crate per arborium language under
-# crates/markdawn-swift-lang-{name}/. Idempotent — re-running rewrites
-# every generated file. Run again after arborium adds a language.
+# Generate one plugin cdylib crate per ntreesitter language under
+# crates/markdawn-swift-lang-{name}/. Idempotent — re-running rewrites every
+# generated file. Run again after ntreesitter adds a language.
 #
-# Each generated crate:
-#   - Cargo.toml: cdylib, depends on arborium-{name} (path) + tree-sitter-language
-#   - src/lib.rs: exports mw_lang_{sanitized}_init(register_fn) that calls
-#     the register callback with arborium-{name}::language() + queries.
+# Each generated crate is a two-line shim: it depends on nts-lang-{name} for
+# the grammar descriptor and on ntreesitter-abi for the export macro, and
+# invokes that macro once. Everything the host needs — canonical id, aliases,
+# extensions, queries, injection targets, parser ABI, provenance — travels
+# inside the descriptor rather than being reassembled here from the crate
+# name, which is what the old arborium template had to do.
 #
-# Names with `-` get sanitized to `_` for the symbol (c-sharp -> mw_lang_c_sharp_init).
-# The grammar registers under the original hyphenated name (matches markdown
-# info strings + arborium's alias normalization).
+# ntreesitter-abi depends on the descriptor crate alone, deliberately: a
+# provider library exports through it without linking the Tree-sitter runtime.
+# Depending on ntreesitter-plugin here instead would drag the runtime into all
+# 104 of these dylibs for the sake of a decode path none of them call. The
+# host takes ntreesitter-plugin; a provider takes ntreesitter-abi.
+#
+# The exported symbol is nts_init_{sanitized}, `-` replaced by `_`
+# (c-sharp -> nts_init_c_sharp). Per-language rather than one shared symbol,
+# so the Swift and JNI loaders keep resolving it through process-global
+# dlsym. The direction is inverted from the old ABI: the host resolves the
+# symbol and pulls a descriptor, rather than handing the plugin a callback.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$here/../.." && pwd)"
-arborium_root="$(cd "$repo_root/../arborium" && pwd)"
+nts_root="$(cd "$repo_root/../ntreesitter" && pwd)"
+nts_url="https://github.com/necessary-nu/ntreesitter"
 crates_dir="$repo_root/crates"
+catalog_toml="$nts_root/crates/ntreesitter-catalog/Cargo.toml"
 
-if [[ ! -d "$arborium_root/langs" ]]; then
-  echo "error: arborium not found at $arborium_root" >&2
+# Generation reads the catalog from a sibling checkout; the crates it emits
+# depend on the published repository, so *building* markdawn needs no checkout.
+# Only regenerating after an upstream language change does.
+if [[ ! -f "$catalog_toml" ]]; then
+  echo "error: ntreesitter checkout not found at $nts_root" >&2
+  echo "       (needed to regenerate only — building uses the git dependency)" >&2
   exit 1
 fi
 
-# Discover all per-language arborium crates. Each one lives at
-# arborium/langs/<group>/<name>/crate/ with a src/lib.rs that exports
-# language() + HIGHLIGHTS_QUERY + INJECTIONS_QUERY + LOCALS_QUERY.
+# The catalog's `all` feature is the declared, canonical language set. The
+# previous generator discovered languages by scanning a directory layout,
+# which meant an upstream reorganisation silently changed what markdawn
+# shipped. Read the declaration instead, then cross-check it against the
+# directories so a language present in one and not the other is loud.
+languages=()
+while IFS= read -r language; do
+  languages+=("$language")
+done < <(
+  grep -m1 '^all = \[' "$catalog_toml" |
+    grep -oE '"[a-z0-9_-]+"' |
+    tr -d '"' |
+    sort -u
+)
+
+if [[ ${#languages[@]} -eq 0 ]]; then
+  echo "error: could not parse the 'all' feature from $catalog_toml" >&2
+  exit 1
+fi
+
+on_disk=()
+while IFS= read -r language; do
+  on_disk+=("$language")
+done < <(find "$nts_root/languages" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort -u)
+if ! diff -q <(printf '%s\n' "${languages[@]}") <(printf '%s\n' "${on_disk[@]}") >/dev/null; then
+  echo "error: catalog 'all' feature and languages/ directory disagree:" >&2
+  diff <(printf '%s\n' "${languages[@]}") <(printf '%s\n' "${on_disk[@]}") >&2 || true
+  exit 1
+fi
+
+# Drop crates for languages that no longer exist upstream, so a removal
+# upstream does not leave an unbuildable member behind in the workspace.
+removed=0
+for stale in "$crates_dir"/markdawn-swift-lang-*/; do
+  [[ -d "$stale" ]] || continue
+  name="$(basename "$stale")"
+  name="${name#markdawn-swift-lang-}"
+  if ! printf '%s\n' "${languages[@]}" | grep -qx "$name"; then
+    rm -rf "$stale"
+    removed=$((removed + 1))
+  fi
+done
+
 generated=0
-while IFS= read -r d; do
-  # d looks like /.../arborium/langs/group-birch/rust/crate
-  name="$(basename "$(dirname "$d")")"               # rust
-  group="$(basename "$(dirname "$(dirname "$d")")")"  # group-birch
-  sanitized="${name//-/_}"                            # c-sharp -> c_sharp
+for name in "${languages[@]}"; do
+  sanitized="${name//-/_}"
   crate_dir="$crates_dir/markdawn-swift-lang-$name"
 
   mkdir -p "$crate_dir/src"
@@ -47,59 +100,24 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-arborium-$name = { path = "../../../arborium/langs/$group/$name/crate" }
-tree-sitter-language = "0.1"
+ntreesitter-abi = { git = "$nts_url" }
+nts-lang-$name = { git = "$nts_url" }
 EOF
 
   cat > "$crate_dir/src/lib.rs" <<EOF
 // GENERATED by crates/markdawn-swift/generate-plugins.sh — do not edit by hand.
 //
-// Single C ABI: mw_lang_${sanitized}_init takes a register callback (a function
-// pointer to mw_register_grammar in the main framework, handed over by the
-// Swift loader) and calls it with this plugin's grammar.
-
-use std::ffi::{c_char, c_void};
-
-type RegisterFn = unsafe extern "C" fn(
-    *const c_char, usize,
-    *const c_void,
-    *const c_char, usize,
-    *const c_char, usize,
-    *const c_char, usize,
-) -> u32;
-
-const NAME: &str = "$name";
-
-/// # Safety
-/// \`register\` must be the address of \`mw_register_grammar\` exported by the
-/// main markdawn-swift static library / framework. Passing any other function
-/// is undefined behaviour.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mw_lang_${sanitized}_init(register: RegisterFn) -> u32 {
-    let lang_fn = arborium_${sanitized}::language();
-    let raw_fn = lang_fn.into_raw();
-    let lang_fn_ptr = raw_fn as *const c_void;
-
-    // Some Arborium grammars inherit queries and expose a LazyLock<String>;
-    // others expose a plain &'static str. Borrowing works for both and keeps
-    // the generated adapter from attempting to move a process-global query.
-    let highlights = &arborium_${sanitized}::HIGHLIGHTS_QUERY;
-    let injections = arborium_${sanitized}::INJECTIONS_QUERY;
-    let locals = arborium_${sanitized}::LOCALS_QUERY;
-
-    unsafe {
-        register(
-            NAME.as_ptr() as *const c_char, NAME.len(),
-            lang_fn_ptr,
-            highlights.as_ptr() as *const c_char, highlights.len(),
-            injections.as_ptr() as *const c_char, injections.len(),
-            locals.as_ptr() as *const c_char, locals.len(),
-        )
-    }
-}
+// Exports nts_init_${sanitized}, which returns this language's provider
+// descriptor for the host to validate and register. The descriptor is the
+// same value static registration uses and lives for the process.
+// [spec:mw:def:ffi.plugin.grammar-registration+1]
+ntreesitter_abi::export_provider!(nts_init_${sanitized}, nts_lang_${sanitized}::DESCRIPTOR);
 EOF
 
   generated=$((generated + 1))
-done < <(find "$arborium_root/langs" -maxdepth 3 -type d -name crate | sort)
+done
 
 echo "==> generated $generated plugin crates under $crates_dir/markdawn-swift-lang-*"
+if [[ $removed -gt 0 ]]; then
+  echo "==> removed $removed crate(s) for languages no longer in the catalog"
+fi

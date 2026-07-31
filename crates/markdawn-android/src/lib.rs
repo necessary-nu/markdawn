@@ -16,9 +16,7 @@ mod core_tests;
 mod grammar_store;
 mod jni_surface_tests;
 
-use std::ffi::{c_char, c_void};
-
-use grammar_store::{global_store, mw_register_grammar};
+use grammar_store::{global_registry, register_language};
 use indexmap::IndexMap;
 use markdawn::{self as md, Sink};
 use serde::Serialize;
@@ -82,9 +80,7 @@ impl VdomPipeline {
             adapter: md::VdomAdapter::new()
                 .with_html_filter(html_filter)
                 .with_pikchr()
-                .with_highlighter(md::arborium::Highlighter::with_store(
-                    global_store().clone(),
-                )),
+                .with_highlighter(md::DynamicHighlighter::new(global_registry().clone())),
             events: Vec::new(),
         }
     }
@@ -212,35 +208,17 @@ impl VdomDocument {
     }
 }
 
-/// `dlsym` a plugin's `mw_lang_<name>_init` (the plugin `.so` has already been
-/// pulled into the process by Kotlin's `System.loadLibrary`) and call it,
-/// handing over `mw_register_grammar` so it registers its grammar into the
-/// global store. The JNI analogue of Swift's `Markdawn.loadLanguage` — but the
-/// `dlsym`+call runs here in Rust, since Kotlin can't take the address of the
-/// `mw_register_grammar` C symbol to pass across.
-// [spec:mw:def:ffi.plugin.grammar-registration]
-fn register_language(name: &str) -> bool {
-    type RegisterFn = unsafe extern "C" fn(
-        *const c_char,
-        usize,
-        *const c_void,
-        *const c_char,
-        usize,
-        *const c_char,
-        usize,
-        *const c_char,
-        usize,
-    ) -> u32;
-    type InitFn = unsafe extern "C" fn(RegisterFn) -> u32;
-
-    let sanitized = name.replace('-', "_");
-    let symbol = format!("mw_lang_{sanitized}_init\0");
-    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, symbol.as_ptr() as *const c_char) };
-    if sym.is_null() {
-        return false;
-    }
-    let init_fn: InitFn = unsafe { std::mem::transmute(sym) };
-    unsafe { init_fn(mw_register_grammar) == 0 }
+/// Register a plugin's grammar. The plugin `.so` has already been pulled into
+/// the process by Kotlin's `System.loadLibrary`; `grammar_store` resolves its
+/// per-language provider symbol and validates the descriptor behind it.
+///
+/// The JNI analogue of Swift's `Markdawn.loadLanguage`. It stays in Rust
+/// because the symbol lookup and the ABI decode both do, not — as before —
+/// because Kotlin could not take the address of a C symbol to pass across.
+/// That handoff no longer exists.
+// [spec:mw:def:ffi.plugin.grammar-registration+1]
+fn register_plugin_language(name: &str) -> bool {
+    register_language(name) == 0
 }
 
 // ===================================================================
@@ -309,7 +287,7 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_loadLanguage<'local>(
     name: JString<'local>,
 ) -> jboolean {
     let name = jstr(&mut env, &name);
-    if register_language(&name) {
+    if register_plugin_language(&name) {
         JNI_TRUE
     } else {
         JNI_FALSE
@@ -667,20 +645,13 @@ mod tests {
         );
     }
 
-    /// Register the bundled rust grammar into the process-global store the
-    /// same way `mw_register_grammar` does — but in-process, so the highlight
-    /// path is exercised without a plugin `.so`.
+    /// Register the bundled rust grammar into the process-global registry
+    /// with the same descriptor a plugin would hand over — but linked in, so
+    /// the highlight path is exercised without a plugin `.so`.
     fn register_rust_grammar() {
-        use markdawn::arborium::advanced::{CompiledGrammar, GrammarConfig};
-        use std::sync::Arc;
-        let config = GrammarConfig {
-            language: arborium_rust::language().into(),
-            highlights_query: arborium_rust::HIGHLIGHTS_QUERY,
-            injections_query: arborium_rust::INJECTIONS_QUERY,
-            locals_query: arborium_rust::LOCALS_QUERY,
-        };
-        let grammar = CompiledGrammar::new(config).expect("rust grammar compiles");
-        global_store().insert("rust".to_owned(), Arc::new(grammar));
+        // Idempotent for the suite's sake: registration rejects a duplicate
+        // canonical id, and more than one test needs a grammar present.
+        let _ = global_registry().register(nts_lang_rust::DESCRIPTOR);
     }
 
     #[test]

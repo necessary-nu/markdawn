@@ -9,7 +9,9 @@ crate-type = ["staticlib"]
 [dependencies]
 markdawn = { path = "../..", default-features = false, features = ["highlight", "pikchr"] }
 indexmap = "2"
-tree-sitter-language = "0.1"
+ntreesitter = { git = "https://github.com/necessary-nu/ntreesitter" }
+ntreesitter-plugin = { git = "https://github.com/necessary-nu/ntreesitter" }
+libc = "0.2"
 
 [target.'cfg(target_os = "ios")'.dependencies]
 objc2 = "0.6"

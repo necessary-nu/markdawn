@@ -1,106 +1,75 @@
-//! Process-global tree-sitter grammar store, populated at runtime by
-//! `markdawn-swift-lang-*` plugin cdylibs.
+//! Process-global language registry, populated at runtime by
+//! `markdawn-swift-lang-*` plugin `.so`s.
 //!
 //! Ported verbatim from `crates/markdawn-swift/src/grammar_store.rs` — the
 //! mechanism is platform-neutral. The core `.so` ships with zero grammars
 //! baked in (it depends on `markdawn` with just the `highlight` feature, not
-//! `highlight-all-languages`). Plugins call `mw_register_grammar` via a
-//! function pointer handed to them by the loader. Here the loader is the JNI
-//! `loadLanguage` entry point in `lib.rs`, which `dlsym`s the plugin's
-//! `mw_lang_<name>_init` and calls it with `&mw_register_grammar`. The
-//! `VdomPipeline` builds its `Highlighter` from the global store, so any
-//! subsequently rendered code block whose language has been registered will be
-//! highlighted; unregistered languages fall through to plain monospace.
+//! `highlight-all-languages`). Kotlin's `System.loadLibrary` pulls a plugin
+//! into the process and the JNI `loadLanguage` entry point registers it,
+//! resolving the plugin's provider symbol and validating its descriptor. The
+//! `VdomPipeline` builds its highlighter from the global registry, so any
+//! subsequently rendered code block whose language has been registered will
+//! be highlighted; unregistered languages fall through to plain monospace.
 
-use std::ffi::{c_char, c_void};
+use std::ffi::c_char;
 use std::sync::{Arc, OnceLock};
 
-use markdawn::arborium::GrammarStore;
-use markdawn::arborium::advanced::{CompiledGrammar, GrammarConfig};
-use tree_sitter_language::LanguageFn;
+use ntreesitter::{DynamicRegistry, RegistryBuilder};
+use ntreesitter_plugin::{NtsProviderEntry, PluginLoadError, load_provider};
 
-static STORE: OnceLock<Arc<GrammarStore>> = OnceLock::new();
+static REGISTRY: OnceLock<Arc<DynamicRegistry>> = OnceLock::new();
 
-pub fn global_store() -> &'static Arc<GrammarStore> {
-    STORE.get_or_init(|| Arc::new(GrammarStore::new()))
+pub fn global_registry() -> &'static Arc<DynamicRegistry> {
+    REGISTRY.get_or_init(|| {
+        let empty = RegistryBuilder::new()
+            .build()
+            .expect("an empty registry has no aliases to collide");
+        Arc::new(DynamicRegistry::new(empty))
+    })
 }
 
-/// Register a tree-sitter grammar under `name`. Called by plugin cdylibs via
-/// the function-pointer handoff orchestrated by the JNI `loadLanguage` loader.
+/// Resolve a plugin's provider entry point and register its grammar.
 ///
 /// Return codes:
 ///   0 — success
-///   1 — null pointer or non-UTF-8 name
-///   2 — non-UTF-8 highlights query
-///   3 — non-UTF-8 injections query
-///   4 — non-UTF-8 locals query
-///   5 — grammar compilation failed (bad query or language mismatch)
+///   2 — the plugin's entry symbol is not loaded
+///   3 — the descriptor failed validation or conflicts with a registered one
 ///
-/// # Safety
-/// All pointers must point to valid, readable byte slices of the indicated
-/// lengths. `lang_fn` must be the raw function pointer obtained from
-/// `LanguageFn::into_raw` (i.e. `unsafe extern "C" fn() -> *const ()`),
-/// erased to `*const c_void`.
-// The name is copied and the three query sources are consumed by grammar
-// compilation before returning, so only `lang_fn` outlives the call — the
-// plugin image backing it must stay resident.
+/// The plugin exports `nts_init_<name>` with `-` replaced by `_`. Because the
+/// symbol is per-language rather than one shared across every plugin, a
+/// process-global lookup resolves the right one; a single shared symbol would
+/// resolve to whichever library loaded first regardless of the language
+/// asked for. The direction is inverted from the previous ABI: nothing is
+/// handed to the plugin, its descriptor is pulled and validated here.
+///
+/// Nothing borrowed from the descriptor is copied out — the registry holds
+/// `&'static` data owned by the plugin image, which must stay resident.
+/// Android never unloads a library pulled in by `System.loadLibrary`.
+// [spec:mw:def:ffi.plugin.grammar-registration+1]
 // [spec:mw:req:ffi.ownership.borrowed-input]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mw_register_grammar(
-    name: *const c_char,
-    name_len: usize,
-    lang_fn: *const c_void,
-    highlights: *const c_char,
-    highlights_len: usize,
-    injections: *const c_char,
-    injections_len: usize,
-    locals: *const c_char,
-    locals_len: usize,
-) -> u32 {
-    if name.is_null() || lang_fn.is_null() {
-        return 1;
+pub(crate) fn register_language(name: &str) -> u32 {
+    // SAFETY: the resolver returns a symbol from the loaded process image,
+    // and `load_provider` validates the descriptor behind it before anything
+    // is registered.
+    match unsafe { load_provider(name, resolve_global) } {
+        Ok(provider) => match provider.register(global_registry()) {
+            Ok(_) => 0,
+            Err(_) => 3,
+        },
+        Err(PluginLoadError::MissingEntrySymbol { .. }) => 2,
+        Err(_) => 3,
     }
-    let name = match unsafe { slice_to_str(name, name_len) } {
-        Some(s) => s.to_owned(),
-        None => return 1,
-    };
-    let highlights = match unsafe { slice_to_str(highlights, highlights_len) } {
-        Some(s) => s,
-        None => return 2,
-    };
-    let injections = match unsafe { slice_to_str(injections, injections_len) } {
-        Some(s) => s,
-        None => return 3,
-    };
-    let locals = match unsafe { slice_to_str(locals, locals_len) } {
-        Some(s) => s,
-        None => return 4,
-    };
-
-    let raw_fn: unsafe extern "C" fn() -> *const () = unsafe { std::mem::transmute(lang_fn) };
-    let lang_fn = unsafe { LanguageFn::from_raw(raw_fn) };
-
-    let config = GrammarConfig {
-        language: lang_fn.into(),
-        highlights_query: highlights,
-        injections_query: injections,
-        locals_query: locals,
-    };
-    let grammar = match CompiledGrammar::new(config) {
-        Ok(g) => g,
-        Err(_) => return 5,
-    };
-    global_store().insert(name, Arc::new(grammar));
-    0
 }
 
-unsafe fn slice_to_str<'a>(ptr: *const c_char, len: usize) -> Option<&'a str> {
-    if len == 0 {
-        return Some("");
-    }
-    if ptr.is_null() {
+/// Look up a NUL-terminated symbol in the loaded process image.
+fn resolve_global(symbol: &[u8]) -> Option<NtsProviderEntry> {
+    // SAFETY: `symbol` is NUL-terminated by `load_provider`, which builds it
+    // from the ABI's own prefix.
+    let address = unsafe { libc::dlsym(libc::RTLD_DEFAULT, symbol.as_ptr() as *const c_char) };
+    if address.is_null() {
         return None;
     }
-    let bytes = unsafe { core::slice::from_raw_parts(ptr as *const u8, len) };
-    std::str::from_utf8(bytes).ok()
+    // SAFETY: the provider ABI fixes this entry point's signature, and the
+    // symbol name was derived from that same ABI.
+    Some(unsafe { std::mem::transmute::<*mut libc::c_void, NtsProviderEntry>(address) })
 }

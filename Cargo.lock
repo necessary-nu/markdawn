@@ -68,7 +68,7 @@ dependencies = [
  "ndk-context",
  "ndk-sys",
  "num_enum",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -185,1111 +185,6 @@ dependencies = [
  "windows-sys 0.60.2",
  "wl-clipboard-rs",
  "x11rb",
-]
-
-[[package]]
-name = "arborium"
-version = "2.16.0"
-dependencies = [
- "arborium-ada",
- "arborium-agda",
- "arborium-asciidoc",
- "arborium-asm",
- "arborium-awk",
- "arborium-bash",
- "arborium-batch",
- "arborium-c",
- "arborium-c-sharp",
- "arborium-caddy",
- "arborium-capnp",
- "arborium-cedar",
- "arborium-cedarschema",
- "arborium-clojure",
- "arborium-cmake",
- "arborium-cobol",
- "arborium-commonlisp",
- "arborium-cpp",
- "arborium-css",
- "arborium-d",
- "arborium-dart",
- "arborium-devicetree",
- "arborium-diff",
- "arborium-dockerfile",
- "arborium-dot",
- "arborium-elisp",
- "arborium-elixir",
- "arborium-elm",
- "arborium-erlang",
- "arborium-fish",
- "arborium-fsharp",
- "arborium-gleam",
- "arborium-glsl",
- "arborium-go",
- "arborium-graphql",
- "arborium-groovy",
- "arborium-haskell",
- "arborium-hcl",
- "arborium-highlight",
- "arborium-hlsl",
- "arborium-html",
- "arborium-idris",
- "arborium-ini",
- "arborium-java",
- "arborium-javascript",
- "arborium-jinja2",
- "arborium-jq",
- "arborium-json",
- "arborium-julia",
- "arborium-kotlin",
- "arborium-lean",
- "arborium-lua",
- "arborium-markdown",
- "arborium-matlab",
- "arborium-meson",
- "arborium-nginx",
- "arborium-ninja",
- "arborium-nix",
- "arborium-objc",
- "arborium-ocaml",
- "arborium-perl",
- "arborium-php",
- "arborium-postscript",
- "arborium-powershell",
- "arborium-prolog",
- "arborium-python",
- "arborium-query",
- "arborium-r",
- "arborium-rego",
- "arborium-rescript",
- "arborium-ron",
- "arborium-ruby",
- "arborium-rust",
- "arborium-scala",
- "arborium-scheme",
- "arborium-scss",
- "arborium-silo",
- "arborium-solidity",
- "arborium-sparql",
- "arborium-sql",
- "arborium-ssh-config",
- "arborium-starlark",
- "arborium-styx",
- "arborium-svelte",
- "arborium-swift",
- "arborium-textproto",
- "arborium-theme",
- "arborium-thrift",
- "arborium-tlaplus",
- "arborium-toml",
- "arborium-tree-sitter",
- "arborium-tsx",
- "arborium-typescript",
- "arborium-typst",
- "arborium-uiua",
- "arborium-vb",
- "arborium-verilog",
- "arborium-vhdl",
- "arborium-vim",
- "arborium-vue",
- "arborium-wit",
- "arborium-x86asm",
- "arborium-xml",
- "arborium-yaml",
- "arborium-yuri",
- "arborium-zig",
- "arborium-zsh",
- "dlmalloc",
-]
-
-[[package]]
-name = "arborium-ada"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-agda"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-asciidoc"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-asm"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-awk"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-bash"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-batch"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-c"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-c-sharp"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-caddy"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-capnp"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-cedar"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-cedarschema"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-clojure"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-cmake"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-cobol"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-commonlisp"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-cpp"
-version = "2.16.0"
-dependencies = [
- "arborium-c",
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-css"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-d"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-dart"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-devicetree"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-diff"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-dockerfile"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-dot"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-elisp"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-elixir"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-elm"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-erlang"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-fish"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-fsharp"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-gleam"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-glsl"
-version = "2.16.0"
-dependencies = [
- "arborium-c",
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-go"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-graphql"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-groovy"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-haskell"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-hcl"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-highlight"
-version = "2.16.0"
-dependencies = [
- "arborium-theme",
- "arborium-tree-sitter",
- "streaming-iterator",
-]
-
-[[package]]
-name = "arborium-hlsl"
-version = "2.16.0"
-dependencies = [
- "arborium-cpp",
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-html"
-version = "2.16.0"
-dependencies = [
- "arborium-css",
- "arborium-javascript",
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-idris"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-ini"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-java"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-javascript"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-jinja2"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-jq"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-json"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-julia"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-kotlin"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-lean"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-lua"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-markdown"
-version = "2.16.0"
-dependencies = [
- "arborium-html",
- "arborium-sysroot",
- "arborium-toml",
- "arborium-yaml",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-matlab"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-meson"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-nginx"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-ninja"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-nix"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-objc"
-version = "2.16.0"
-dependencies = [
- "arborium-c",
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-ocaml"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-perl"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-php"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-postscript"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-powershell"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-prolog"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-python"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-query"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-r"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-rego"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-rescript"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-ron"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-ruby"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-rust"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-scala"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-scheme"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-scss"
-version = "2.16.0"
-dependencies = [
- "arborium-css",
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-silo"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-solidity"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-sparql"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-sql"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-ssh-config"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-starlark"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-styx"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-svelte"
-version = "2.16.0"
-dependencies = [
- "arborium-css",
- "arborium-html",
- "arborium-javascript",
- "arborium-scss",
- "arborium-sysroot",
- "arborium-typescript",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-swift"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-sysroot"
-version = "2.16.0"
-dependencies = [
- "cc",
- "dlmalloc",
-]
-
-[[package]]
-name = "arborium-textproto"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-theme"
-version = "2.16.0"
-
-[[package]]
-name = "arborium-thrift"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-tlaplus"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-toml"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-tree-sitter"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "regex",
- "regex-syntax",
- "streaming-iterator",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-tsx"
-version = "2.16.0"
-dependencies = [
- "arborium-javascript",
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-typescript"
-version = "2.16.0"
-dependencies = [
- "arborium-javascript",
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-typst"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-uiua"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-vb"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-verilog"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-vhdl"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-vim"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-vue"
-version = "2.16.0"
-dependencies = [
- "arborium-css",
- "arborium-html",
- "arborium-javascript",
- "arborium-scss",
- "arborium-sysroot",
- "arborium-typescript",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-wit"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-x86asm"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-xml"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-yaml"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-yuri"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-zig"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-zsh"
-version = "2.16.0"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
 ]
 
 [[package]]
@@ -1428,7 +323,7 @@ checksum = "3b43422f69d8ff38f95f1b2bb76517c91589a924d1559a0e935d7c8ce0274c11"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -1463,7 +358,7 @@ checksum = "9035ad2d096bed7955a320ee7e2230574d28fd3c3a0f186cbea1ff3c7eed5dbb"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -1559,6 +454,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake3"
+version = "1.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0aa83c34e62843d924f905e0f5c866eb1dd6545fc4d719e803d9ba6030371fce"
+dependencies = [
+ "arrayref",
+ "arrayvec",
+ "cc",
+ "cfg-if",
+ "constant_time_eq",
+ "cpufeatures 0.3.0",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1627,7 +536,7 @@ checksum = "f9abbd1bc6865053c427f7198e6af43bfdedc55ab791faed4fbd361d789575ff"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -1670,9 +579,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.65"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e228eec9be7c17ccb640b59b36a5cd805ea2a564a4c5e162c2f659fea30d3b96"
+checksum = "5add81bb678e6cb321aff7fa0dc7689ad82b112dbc032cea19f91d6b8e3582b9"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -1784,7 +693,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -1808,7 +717,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
 dependencies = [
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -1883,7 +792,7 @@ checksum = "a3c400139ba1389ef9e20ad2d87cda68b437a66483aa0da616bdf2cea7413853"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -1929,7 +838,7 @@ checksum = "4f160aad86b4343e8d4e261fee9965c3005b2fd6bc117d172ab65948779e4acf"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -1940,7 +849,7 @@ checksum = "42571ed01eb46d2e1adcf99c8ca576f081e46f2623d13500eba70d1d99a4c439"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -1963,6 +872,12 @@ dependencies = [
  "quote",
  "unicode-xid",
 ]
+
+[[package]]
+name = "constant_time_eq"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
 name = "convert_case"
@@ -2056,6 +971,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpufeatures"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2137,7 +1061,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10a2a99df6e410a8ff4245aa2006499ea662245f967cc7c0a38c83ef8eb44dbf"
 dependencies = [
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2196,7 +1120,7 @@ dependencies = [
  "ident_case",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2207,7 +1131,7 @@ checksum = "d38308df82d1080de0afee5d069fa14b0326a88c14f15c5ccda35b4a6c414c81"
 dependencies = [
  "darling_core",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2246,7 +1170,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustc_version",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2292,7 +1216,7 @@ dependencies = [
  "ndk",
  "ndk-context",
  "ndk-sys",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -2342,7 +1266,7 @@ dependencies = [
  "dioxus-rsx",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2364,7 +1288,7 @@ dependencies = [
  "serde",
  "serde_json",
  "subsecond",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tracing",
  "tungstenite",
 ]
@@ -2458,7 +1382,7 @@ dependencies = [
  "convert_case",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2487,7 +1411,7 @@ dependencies = [
  "proc-macro2-diagnostics",
  "quote",
  "rustversion",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2539,7 +1463,7 @@ dependencies = [
  "convert_case",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2600,7 +1524,7 @@ checksum = "1ac70aa55017e108007fbaf5aa0f54b021c98f92ff8af59d42eda9da96e3dd4f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2714,7 +1638,7 @@ checksum = "42e528e2d34ba8a67a1a650b86beae8ef69fc5fdb638016f386b973226590432"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2726,7 +1650,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2747,7 +1671,7 @@ checksum = "67c78a4d8fdf9953a5c9d458f9efe940fd97a0cab0941c075a813ac594733827"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -2768,7 +1692,7 @@ dependencies = [
  "darling",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -3106,7 +2030,7 @@ checksum = "1a5c6c585bc94aaf2c7b51dd4c2ba22680844aba4c687be581871a6f518c5742"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -3193,7 +2117,7 @@ checksum = "e835b70203e41293343137df5c0664546da5745f82ec9b84d40be8336958447b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -3375,7 +2299,7 @@ dependencies = [
  "hashbrown 0.16.1",
  "log",
  "presser",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "windows",
 ]
 
@@ -3490,7 +2414,7 @@ dependencies = [
  "roman-numerals-rs",
  "serde",
  "serde_yaml",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "unic-langid",
  "unicode-segmentation",
  "unscanny",
@@ -3679,7 +2603,7 @@ dependencies = [
  "iced_runtime",
  "iced_widget",
  "iced_winit",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -3696,7 +2620,7 @@ dependencies = [
  "raw-window-handle",
  "rustc-hash 2.1.2",
  "smol_str 0.2.2",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "web-time",
 ]
 
@@ -3740,7 +2664,7 @@ dependencies = [
  "log",
  "raw-window-handle",
  "rustc-hash 2.1.2",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "unicode-segmentation",
 ]
 
@@ -3762,7 +2686,7 @@ dependencies = [
  "iced_tiny_skia",
  "iced_wgpu",
  "log",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -3773,7 +2697,7 @@ dependencies = [
  "bytes",
  "iced_core",
  "iced_futures",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -3809,7 +2733,7 @@ dependencies = [
  "log",
  "resvg 0.45.1",
  "rustc-hash 2.1.2",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "wgpu",
 ]
 
@@ -3823,7 +2747,7 @@ dependencies = [
  "log",
  "num-traits",
  "rustc-hash 2.1.2",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "unicode-segmentation",
 ]
 
@@ -3840,7 +2764,7 @@ dependencies = [
  "mundy",
  "objc2 0.5.2",
  "rustc-hash 2.1.2",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tracing",
  "wasm-bindgen-futures",
  "web-sys",
@@ -4139,6 +3063,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "indoc"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79cf5c93f93228cf8efb3ba362535fb11199ac548a09ce117c9b1adc3030d706"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "infer"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4184,7 +3117,7 @@ dependencies = [
  "jni-sys 0.4.1",
  "log",
  "simd_cesu8",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "walkdir",
  "windows-link",
 ]
@@ -4199,7 +3132,7 @@ dependencies = [
  "quote",
  "rustc_version",
  "simd_cesu8",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -4227,7 +3160,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38c0b942f458fe50cdac086d2f946512305e5631e720728f2a61aabcd47a6264"
 dependencies = [
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -4513,7 +3446,7 @@ checksum = "1b27834086c65ec3f9387b096d66e99f221cf081c2b738042aa252bcd41204e3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -4529,7 +3462,7 @@ dependencies = [
  "manganis-macro",
  "ndk-context",
  "objc2 0.6.4",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -4557,14 +3490,13 @@ dependencies = [
  "manganis-core",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
 name = "markdawn"
 version = "0.1.0"
 dependencies = [
- "arborium",
  "base64",
  "block2 0.6.2",
  "comemo",
@@ -4587,6 +3519,9 @@ dependencies = [
  "libc",
  "markdawn-graphviz",
  "mathml-core",
+ "ntreesitter",
+ "ntreesitter-catalog",
+ "ntreesitter-highlight",
  "objc2 0.6.4",
  "objc2-core-foundation",
  "objc2-foundation 0.3.2",
@@ -4615,14 +3550,15 @@ dependencies = [
 name = "markdawn-android"
 version = "0.1.0"
 dependencies = [
- "arborium-rust",
  "indexmap",
  "jni 0.21.1",
  "libc",
  "markdawn",
+ "ntreesitter",
+ "ntreesitter-plugin",
+ "nts-lang-rust",
  "serde",
  "serde_json",
- "tree-sitter-language",
 ]
 
 [[package]]
@@ -4660,843 +3596,845 @@ name = "markdawn-swift"
 version = "0.1.0"
 dependencies = [
  "indexmap",
+ "libc",
  "markdawn",
+ "ntreesitter",
+ "ntreesitter-plugin",
  "objc2 0.6.4",
  "objc2-foundation 0.3.2",
  "objc2-ui-kit 0.3.2",
- "tree-sitter-language",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-ada"
 version = "0.1.0"
 dependencies = [
- "arborium-ada",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-ada",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-agda"
 version = "0.1.0"
 dependencies = [
- "arborium-agda",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-agda",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-asciidoc"
 version = "0.1.0"
 dependencies = [
- "arborium-asciidoc",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-asciidoc",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-asm"
 version = "0.1.0"
 dependencies = [
- "arborium-asm",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-asm",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-awk"
 version = "0.1.0"
 dependencies = [
- "arborium-awk",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-awk",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-bash"
 version = "0.1.0"
 dependencies = [
- "arborium-bash",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-bash",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-batch"
 version = "0.1.0"
 dependencies = [
- "arborium-batch",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-batch",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-c"
 version = "0.1.0"
 dependencies = [
- "arborium-c",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-c",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-c-sharp"
 version = "0.1.0"
 dependencies = [
- "arborium-c-sharp",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-c-sharp",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-caddy"
 version = "0.1.0"
 dependencies = [
- "arborium-caddy",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-caddy",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-capnp"
 version = "0.1.0"
 dependencies = [
- "arborium-capnp",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-capnp",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-cedar"
 version = "0.1.0"
 dependencies = [
- "arborium-cedar",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-cedar",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-cedarschema"
 version = "0.1.0"
 dependencies = [
- "arborium-cedarschema",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-cedarschema",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-clojure"
 version = "0.1.0"
 dependencies = [
- "arborium-clojure",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-clojure",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-cmake"
 version = "0.1.0"
 dependencies = [
- "arborium-cmake",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-cmake",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-cobol"
 version = "0.1.0"
 dependencies = [
- "arborium-cobol",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-cobol",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-commonlisp"
 version = "0.1.0"
 dependencies = [
- "arborium-commonlisp",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-commonlisp",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-cpp"
 version = "0.1.0"
 dependencies = [
- "arborium-cpp",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-cpp",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-css"
 version = "0.1.0"
 dependencies = [
- "arborium-css",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-css",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-d"
 version = "0.1.0"
 dependencies = [
- "arborium-d",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-d",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-dart"
 version = "0.1.0"
 dependencies = [
- "arborium-dart",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-dart",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-devicetree"
 version = "0.1.0"
 dependencies = [
- "arborium-devicetree",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-devicetree",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-diff"
 version = "0.1.0"
 dependencies = [
- "arborium-diff",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-diff",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-dockerfile"
 version = "0.1.0"
 dependencies = [
- "arborium-dockerfile",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-dockerfile",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-dot"
 version = "0.1.0"
 dependencies = [
- "arborium-dot",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-dot",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-elisp"
 version = "0.1.0"
 dependencies = [
- "arborium-elisp",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-elisp",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-elixir"
 version = "0.1.0"
 dependencies = [
- "arborium-elixir",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-elixir",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-elm"
 version = "0.1.0"
 dependencies = [
- "arborium-elm",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-elm",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-erlang"
 version = "0.1.0"
 dependencies = [
- "arborium-erlang",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-erlang",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-fish"
 version = "0.1.0"
 dependencies = [
- "arborium-fish",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-fish",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-fsharp"
 version = "0.1.0"
 dependencies = [
- "arborium-fsharp",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-fsharp",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-gleam"
 version = "0.1.0"
 dependencies = [
- "arborium-gleam",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-gleam",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-glsl"
 version = "0.1.0"
 dependencies = [
- "arborium-glsl",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-glsl",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-go"
 version = "0.1.0"
 dependencies = [
- "arborium-go",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-go",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-graphql"
 version = "0.1.0"
 dependencies = [
- "arborium-graphql",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-graphql",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-groovy"
 version = "0.1.0"
 dependencies = [
- "arborium-groovy",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-groovy",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-haskell"
 version = "0.1.0"
 dependencies = [
- "arborium-haskell",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-haskell",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-hcl"
 version = "0.1.0"
 dependencies = [
- "arborium-hcl",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-hcl",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-hlsl"
 version = "0.1.0"
 dependencies = [
- "arborium-hlsl",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-hlsl",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-html"
 version = "0.1.0"
 dependencies = [
- "arborium-html",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-html",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-idris"
 version = "0.1.0"
 dependencies = [
- "arborium-idris",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-idris",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-ini"
 version = "0.1.0"
 dependencies = [
- "arborium-ini",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-ini",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-java"
 version = "0.1.0"
 dependencies = [
- "arborium-java",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-java",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-javascript"
 version = "0.1.0"
 dependencies = [
- "arborium-javascript",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-javascript",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-jinja2"
 version = "0.1.0"
 dependencies = [
- "arborium-jinja2",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-jinja2",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-jq"
 version = "0.1.0"
 dependencies = [
- "arborium-jq",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-jq",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-json"
 version = "0.1.0"
 dependencies = [
- "arborium-json",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-json",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-julia"
 version = "0.1.0"
 dependencies = [
- "arborium-julia",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-julia",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-kotlin"
 version = "0.1.0"
 dependencies = [
- "arborium-kotlin",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-kotlin",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-lean"
 version = "0.1.0"
 dependencies = [
- "arborium-lean",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-lean",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-lua"
 version = "0.1.0"
 dependencies = [
- "arborium-lua",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-lua",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-markdown"
 version = "0.1.0"
 dependencies = [
- "arborium-markdown",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-markdown",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-matlab"
 version = "0.1.0"
 dependencies = [
- "arborium-matlab",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-matlab",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-meson"
 version = "0.1.0"
 dependencies = [
- "arborium-meson",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-meson",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-nginx"
 version = "0.1.0"
 dependencies = [
- "arborium-nginx",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-nginx",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-ninja"
 version = "0.1.0"
 dependencies = [
- "arborium-ninja",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-ninja",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-nix"
 version = "0.1.0"
 dependencies = [
- "arborium-nix",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-nix",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-objc"
 version = "0.1.0"
 dependencies = [
- "arborium-objc",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-objc",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-ocaml"
 version = "0.1.0"
 dependencies = [
- "arborium-ocaml",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-ocaml",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-perl"
 version = "0.1.0"
 dependencies = [
- "arborium-perl",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-perl",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-php"
 version = "0.1.0"
 dependencies = [
- "arborium-php",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-php",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-postscript"
 version = "0.1.0"
 dependencies = [
- "arborium-postscript",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-postscript",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-powershell"
 version = "0.1.0"
 dependencies = [
- "arborium-powershell",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-powershell",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-prolog"
 version = "0.1.0"
 dependencies = [
- "arborium-prolog",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-prolog",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-python"
 version = "0.1.0"
 dependencies = [
- "arborium-python",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-python",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-query"
 version = "0.1.0"
 dependencies = [
- "arborium-query",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-query",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-r"
 version = "0.1.0"
 dependencies = [
- "arborium-r",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-r",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-rego"
 version = "0.1.0"
 dependencies = [
- "arborium-rego",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-rego",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-rescript"
 version = "0.1.0"
 dependencies = [
- "arborium-rescript",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-rescript",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-ron"
 version = "0.1.0"
 dependencies = [
- "arborium-ron",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-ron",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-ruby"
 version = "0.1.0"
 dependencies = [
- "arborium-ruby",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-ruby",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-rust"
 version = "0.1.0"
 dependencies = [
- "arborium-rust",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-rust",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-scala"
 version = "0.1.0"
 dependencies = [
- "arborium-scala",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-scala",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-scheme"
 version = "0.1.0"
 dependencies = [
- "arborium-scheme",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-scheme",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-scss"
 version = "0.1.0"
 dependencies = [
- "arborium-scss",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-scss",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-silo"
 version = "0.1.0"
 dependencies = [
- "arborium-silo",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-silo",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-solidity"
 version = "0.1.0"
 dependencies = [
- "arborium-solidity",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-solidity",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-sparql"
 version = "0.1.0"
 dependencies = [
- "arborium-sparql",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-sparql",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-sql"
 version = "0.1.0"
 dependencies = [
- "arborium-sql",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-sql",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-ssh-config"
 version = "0.1.0"
 dependencies = [
- "arborium-ssh-config",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-ssh-config",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-starlark"
 version = "0.1.0"
 dependencies = [
- "arborium-starlark",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-starlark",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-styx"
 version = "0.1.0"
 dependencies = [
- "arborium-styx",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-styx",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-svelte"
 version = "0.1.0"
 dependencies = [
- "arborium-svelte",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-svelte",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-swift"
 version = "0.1.0"
 dependencies = [
- "arborium-swift",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-swift",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-textproto"
 version = "0.1.0"
 dependencies = [
- "arborium-textproto",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-textproto",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-thrift"
 version = "0.1.0"
 dependencies = [
- "arborium-thrift",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-thrift",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-tlaplus"
 version = "0.1.0"
 dependencies = [
- "arborium-tlaplus",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-tlaplus",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-toml"
 version = "0.1.0"
 dependencies = [
- "arborium-toml",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-toml",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-tsx"
 version = "0.1.0"
 dependencies = [
- "arborium-tsx",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-tsx",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-typescript"
 version = "0.1.0"
 dependencies = [
- "arborium-typescript",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-typescript",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-typst"
 version = "0.1.0"
 dependencies = [
- "arborium-typst",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-typst",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-uiua"
 version = "0.1.0"
 dependencies = [
- "arborium-uiua",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-uiua",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-vb"
 version = "0.1.0"
 dependencies = [
- "arborium-vb",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-vb",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-verilog"
 version = "0.1.0"
 dependencies = [
- "arborium-verilog",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-verilog",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-vhdl"
 version = "0.1.0"
 dependencies = [
- "arborium-vhdl",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-vhdl",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-vim"
 version = "0.1.0"
 dependencies = [
- "arborium-vim",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-vim",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-vue"
 version = "0.1.0"
 dependencies = [
- "arborium-vue",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-vue",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-wit"
 version = "0.1.0"
 dependencies = [
- "arborium-wit",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-wit",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-x86asm"
 version = "0.1.0"
 dependencies = [
- "arborium-x86asm",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-x86asm",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-xml"
 version = "0.1.0"
 dependencies = [
- "arborium-xml",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-xml",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-yaml"
 version = "0.1.0"
 dependencies = [
- "arborium-yaml",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-yaml",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-yuri"
 version = "0.1.0"
 dependencies = [
- "arborium-yuri",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-yuri",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-zig"
 version = "0.1.0"
 dependencies = [
- "arborium-zig",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-zig",
 ]
 
 [[package]]
 name = "markdawn-swift-lang-zsh"
 version = "0.1.0"
 dependencies = [
- "arborium-zsh",
- "tree-sitter-language",
+ "ntreesitter-abi",
+ "nts-lang-zsh",
 ]
 
 [[package]]
@@ -5665,7 +4603,7 @@ dependencies = [
  "once_cell",
  "rustc-hash 1.1.0",
  "spirv",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "unicode-ident",
 ]
 
@@ -5712,6 +4650,1215 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "ntreesitter"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-highlight",
+ "ntreesitter-provider",
+ "tree-sitter",
+]
+
+[[package]]
+name = "ntreesitter-abi"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-provider",
+]
+
+[[package]]
+name = "ntreesitter-build"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "blake3",
+ "cc",
+ "serde_json",
+ "tree-sitter-generate",
+]
+
+[[package]]
+name = "ntreesitter-catalog"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter",
+ "nts-lang-ada",
+ "nts-lang-agda",
+ "nts-lang-asciidoc",
+ "nts-lang-asm",
+ "nts-lang-awk",
+ "nts-lang-bash",
+ "nts-lang-batch",
+ "nts-lang-c",
+ "nts-lang-c-sharp",
+ "nts-lang-caddy",
+ "nts-lang-capnp",
+ "nts-lang-cedar",
+ "nts-lang-cedarschema",
+ "nts-lang-clojure",
+ "nts-lang-cmake",
+ "nts-lang-cobol",
+ "nts-lang-commonlisp",
+ "nts-lang-cpp",
+ "nts-lang-css",
+ "nts-lang-d",
+ "nts-lang-dart",
+ "nts-lang-devicetree",
+ "nts-lang-diff",
+ "nts-lang-dockerfile",
+ "nts-lang-dot",
+ "nts-lang-elisp",
+ "nts-lang-elixir",
+ "nts-lang-elm",
+ "nts-lang-erlang",
+ "nts-lang-fish",
+ "nts-lang-fsharp",
+ "nts-lang-gleam",
+ "nts-lang-glsl",
+ "nts-lang-go",
+ "nts-lang-graphql",
+ "nts-lang-groovy",
+ "nts-lang-haskell",
+ "nts-lang-hcl",
+ "nts-lang-hlsl",
+ "nts-lang-html",
+ "nts-lang-idris",
+ "nts-lang-ini",
+ "nts-lang-java",
+ "nts-lang-javascript",
+ "nts-lang-jinja2",
+ "nts-lang-jq",
+ "nts-lang-json",
+ "nts-lang-julia",
+ "nts-lang-kotlin",
+ "nts-lang-lean",
+ "nts-lang-lua",
+ "nts-lang-markdown",
+ "nts-lang-matlab",
+ "nts-lang-meson",
+ "nts-lang-nginx",
+ "nts-lang-ninja",
+ "nts-lang-nix",
+ "nts-lang-objc",
+ "nts-lang-ocaml",
+ "nts-lang-perl",
+ "nts-lang-php",
+ "nts-lang-postscript",
+ "nts-lang-powershell",
+ "nts-lang-prolog",
+ "nts-lang-python",
+ "nts-lang-query",
+ "nts-lang-r",
+ "nts-lang-rego",
+ "nts-lang-rescript",
+ "nts-lang-ron",
+ "nts-lang-ruby",
+ "nts-lang-rust",
+ "nts-lang-scala",
+ "nts-lang-scheme",
+ "nts-lang-scss",
+ "nts-lang-silo",
+ "nts-lang-solidity",
+ "nts-lang-sparql",
+ "nts-lang-sql",
+ "nts-lang-ssh-config",
+ "nts-lang-starlark",
+ "nts-lang-styx",
+ "nts-lang-svelte",
+ "nts-lang-swift",
+ "nts-lang-textproto",
+ "nts-lang-thrift",
+ "nts-lang-tlaplus",
+ "nts-lang-toml",
+ "nts-lang-tsx",
+ "nts-lang-typescript",
+ "nts-lang-typst",
+ "nts-lang-uiua",
+ "nts-lang-vb",
+ "nts-lang-verilog",
+ "nts-lang-vhdl",
+ "nts-lang-vim",
+ "nts-lang-vue",
+ "nts-lang-wit",
+ "nts-lang-x86asm",
+ "nts-lang-xml",
+ "nts-lang-yaml",
+ "nts-lang-yuri",
+ "nts-lang-zig",
+ "nts-lang-zsh",
+]
+
+[[package]]
+name = "ntreesitter-highlight"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-provider",
+ "tree-sitter",
+ "tree-sitter-highlight",
+]
+
+[[package]]
+name = "ntreesitter-plugin"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter",
+ "ntreesitter-abi",
+ "ntreesitter-provider",
+]
+
+[[package]]
+name = "ntreesitter-provider"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-ada"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-agda"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-asciidoc"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-asm"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-awk"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-bash"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-batch"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-c"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-c-sharp"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-caddy"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-capnp"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-cedar"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-cedarschema"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-clojure"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-cmake"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-cobol"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-commonlisp"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-cpp"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-css"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-d"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-dart"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-devicetree"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-diff"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-dockerfile"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-dot"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-elisp"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-elixir"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-elm"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-erlang"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-fish"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-fsharp"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-gleam"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-glsl"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-go"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-graphql"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-groovy"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-haskell"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-hcl"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-hlsl"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-html"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-idris"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-ini"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-java"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-javascript"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-jinja2"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-jq"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-json"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-julia"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-kotlin"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-lean"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-lua"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-markdown"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-matlab"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-meson"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-nginx"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-ninja"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-nix"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-objc"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-ocaml"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-perl"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-php"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-postscript"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-powershell"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-prolog"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-python"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-query"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-r"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-rego"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-rescript"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-ron"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-ruby"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-rust"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-scala"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-scheme"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-scss"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-silo"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-solidity"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-sparql"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-sql"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-ssh-config"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-starlark"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-styx"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-svelte"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-swift"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-textproto"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-thrift"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-tlaplus"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-toml"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-tsx"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-typescript"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-typst"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-uiua"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-vb"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-verilog"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-vhdl"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-vim"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-vue"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-wit"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-x86asm"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-xml"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-yaml"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-yuri"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-zig"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "nts-lang-zsh"
+version = "0.0.0"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "ntreesitter-build",
+ "ntreesitter-provider",
+ "tree-sitter-language",
 ]
 
 [[package]]
@@ -5768,7 +5915,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -6273,7 +6420,7 @@ dependencies = [
  "by_address",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -6372,7 +6519,7 @@ dependencies = [
  "pest_meta",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -6437,7 +6584,7 @@ dependencies = [
  "phf_shared",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -6475,7 +6622,7 @@ dependencies = [
  "glam 0.33.2",
  "pest",
  "pest_derive",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -6495,7 +6642,7 @@ checksum = "c96395f0a926bc13b1c17622aaddda1ecb55d49c8f1bf9777e4d877800a43f8b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -6690,7 +6837,7 @@ checksum = "af066a9c399a26e020ada66a034357a868728e72cd426f3adcd35f80d88d88c8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
  "version_check",
 ]
 
@@ -6734,7 +6881,7 @@ checksum = "6affe2792e23edafc810686ea4f0615307c135648338a772b50cf5e00723688b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -6746,7 +6893,7 @@ dependencies = [
  "proc-macro2",
  "qname-impl",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -6940,9 +7087,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.12.4"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1292b7759ae1cb9ec195452d1390a074f0cd8541ab7a5a8c31cd6db45d4a6ba"
+checksum = "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -6952,9 +7099,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.14"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e1dd4122fc1595e8162618945476892eefca7b88c52820e74af6262213cae8f"
+checksum = "8fcfdb36bda0c880c5931cdc7a2bcdc8ba4556847b9d912bca70bc94708711ad"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -7200,6 +7347,10 @@ name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
+dependencies = [
+ "serde",
+ "serde_core",
+]
 
 [[package]]
 name = "send_wrapper"
@@ -7248,15 +7399,16 @@ checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
 name = "serde_json"
-version = "1.0.150"
+version = "1.0.151"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
+checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
 dependencies = [
+ "indexmap",
  "itoa",
  "memchr",
  "serde",
@@ -7283,7 +7435,7 @@ checksum = "175ee3e80ae9982737ca543e96133087cbd9a485eecc3bc4de9c1a37b47ea59c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -7324,7 +7476,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3bf829a2d51ab4a5ddf1352d8470c140cadc8301b2ae1789db023f01cedd6ba"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.2.17",
  "digest",
 ]
 
@@ -7335,7 +7487,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.2.17",
  "digest",
 ]
 
@@ -7435,7 +7587,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb251b407f50028476a600541542b605bb864d35d9ee1de4f6cab45d88475e6d"
 dependencies = [
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -7456,6 +7608,12 @@ dependencies = [
  "serde",
  "version_check",
 ]
+
+[[package]]
+name = "smallbitvec"
+version = "2.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b0e903ee191d8f7a8fbf0d712c3a1699d19e04ceba5ad1eb673053c7d938a09"
 
 [[package]]
 name = "smallvec"
@@ -7652,7 +7810,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -7668,7 +7826,7 @@ dependencies = [
  "memmap2",
  "serde",
  "subsecond-types",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -7759,6 +7917,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "syn"
+version = "3.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53e9bae58849f64dfa4f5d5ae372c8341f7305f82a3868709269343628b659a3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
 name = "synstructure"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7766,7 +7935,7 @@ checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -7785,7 +7954,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "walkdir",
  "yaml-rust",
 ]
@@ -7848,11 +8017,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.18"
+version = "2.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
+checksum = "09a43598840e33d5b0331f38c5e30d13bb11c11210a4b58f0d9b18a5a5eefcd9"
 dependencies = [
- "thiserror-impl 2.0.18",
+ "thiserror-impl 2.0.19",
 ]
 
 [[package]]
@@ -7863,18 +8032,18 @@ checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.18"
+version = "2.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
+checksum = "43cbfe0cf76104d42a574802844187e84a305e531ed54455f11fbde0f10541cd"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -8079,6 +8248,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
 
 [[package]]
+name = "topological-sort"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea68304e134ecd095ac6c3574494fc62b909f416c4fca77e440530221e549d3d"
+
+[[package]]
 name = "tracing"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8097,7 +8272,7 @@ checksum = "7490cfa5ec963746568740651ac6781f701c9c5ea257c58e057f3ba8cf69e8da"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -8107,6 +8282,52 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "tree-sitter"
+version = "0.26.8"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "cc",
+ "dlmalloc",
+ "regex",
+ "regex-syntax",
+ "streaming-iterator",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "tree-sitter-generate"
+version = "0.26.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3fb2e1bdb1d5f9d23cd5fa68cf98b3bedbd223c92a2edd60bbcf30bcf7180a5"
+dependencies = [
+ "bitflags 2.13.0",
+ "dunce",
+ "indexmap",
+ "indoc",
+ "log",
+ "regex",
+ "regex-syntax",
+ "rustc-hash 2.1.2",
+ "semver",
+ "serde",
+ "serde_json",
+ "smallbitvec",
+ "thiserror 2.0.19",
+ "topological-sort",
+]
+
+[[package]]
+name = "tree-sitter-highlight"
+version = "0.26.8"
+source = "git+https://github.com/necessary-nu/ntreesitter#75da486ad3a310afff293eb44845f315242d1e7e"
+dependencies = [
+ "regex",
+ "streaming-iterator",
+ "thiserror 2.0.19",
+ "tree-sitter",
 ]
 
 [[package]]
@@ -8148,7 +8369,7 @@ dependencies = [
  "log",
  "rand 0.9.4",
  "sha1",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "utf-8",
 ]
 
@@ -8360,7 +8581,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -8564,7 +8785,7 @@ checksum = "a1249a628de3ad34b821ecb1001355bca3940bcb2f88558f1a8bd82e977f75b5"
 dependencies = [
  "proc-macro-hack",
  "quote",
- "syn",
+ "syn 2.0.118",
  "unic-langid-impl",
 ]
 
@@ -8951,7 +9172,7 @@ dependencies = [
  "peniko",
  "png 0.18.1",
  "smallvec 1.15.2",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -8968,7 +9189,7 @@ dependencies = [
  "peniko",
  "png 0.18.1",
  "smallvec 1.15.2",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -9050,7 +9271,7 @@ checksum = "59195a1db0e95b920366d949ba5e0d3fc0e70b67c09be15ce5abb790106b0571"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -9108,7 +9329,7 @@ dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
  "wasm-bindgen-shared",
 ]
 
@@ -9394,7 +9615,7 @@ dependencies = [
  "raw-window-handle",
  "rustc-hash 1.1.0",
  "smallvec 1.15.2",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "wgpu-core-deps-apple",
  "wgpu-core-deps-emscripten",
  "wgpu-core-deps-windows-linux-android",
@@ -9473,7 +9694,7 @@ dependencies = [
  "raw-window-metal",
  "renderdoc-sys",
  "smallvec 1.15.2",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "wasm-bindgen",
  "wayland-sys",
  "web-sys",
@@ -9570,7 +9791,7 @@ checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -9581,7 +9802,7 @@ checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -9943,7 +10164,7 @@ dependencies = [
  "log",
  "os_pipe",
  "rustix 1.1.4",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tree_magic_mini",
  "wayland-backend",
  "wayland-client",
@@ -10115,7 +10336,7 @@ checksum = "de844c262c8848816172cef550288e7dc6c7b7814b4ee56b3e1553f275f1858e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
  "synstructure",
 ]
 
@@ -10163,7 +10384,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
  "zbus_names",
  "zvariant",
  "zvariant_utils",
@@ -10203,7 +10424,7 @@ checksum = "1ae7f38b72ec2a254e2b87ef277cf2cd4fb97cbebf944faa6f33354da0867930"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -10223,7 +10444,7 @@ checksum = "11532158c46691caf0f2593ea8358fed6bbf68a0315e80aae9bd41fbade684a1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
  "synstructure",
 ]
 
@@ -10261,7 +10482,7 @@ checksum = "625dc425cab0dca6dc3c3319506e6593dcb08a9f387ea3b284dbd52a92c40555"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -10329,7 +10550,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.118",
  "zvariant_utils",
 ]
 
@@ -10342,6 +10563,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "syn",
+ "syn 2.0.118",
  "winnow 1.0.3",
 ]

@@ -22,16 +22,13 @@ void     mw_state_free(MwState* state);
 
 /* ---------- Grammar registration ABI (all platforms) ---------- */
 
-/* Register a tree-sitter grammar with the process-global store. Called by
- * mw_lang_*_init in plugin frameworks. Swift hands a pointer to this function
- * to each plugin via dlsym. Return codes: 0 success, 1-4 input validation,
- * 5 grammar compile failure. */
-uint32_t mw_register_grammar(
-    const char* name, size_t name_len,
-    const void* lang_fn,
-    const char* highlights, size_t highlights_len,
-    const char* injections, size_t injections_len,
-    const char* locals, size_t locals_len);
+/* Register a language whose plugin framework is already loaded. Swift
+ * dlopen()s MarkdawnLang<Pascal>.framework and then calls this with the
+ * language name; the provider symbol lookup and descriptor validation happen
+ * inside. No function pointer is handed to the plugin — the descriptor is
+ * pulled from it. Return codes: 0 success, 1 invalid name, 2 the plugin's
+ * entry symbol is not loaded, 3 the descriptor is invalid or conflicts. */
+uint32_t mw_register_language(const char* name, size_t name_len);
 
 /* ---------- UIKit ABI (iOS / Catalyst / Sim only) ---------- */
 

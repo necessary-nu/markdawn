@@ -214,8 +214,14 @@ fn build_html_adapter() -> HtmlAdapter<()> {
     // `Node::Html`. Sanitizing either path strips attributes/classes the
     // dashboard relies on, so the outer adapter passes HTML through.
     let adapter = HtmlAdapter::new().with_html_filter(crate::HtmlFilter::unrestricted());
+    // Composition fails only when two linked languages claim the same alias,
+    // which is a property of the build rather than of the document. Rendering
+    // without highlighting beats refusing to render the dashboard.
     #[cfg(feature = "highlight")]
-    let adapter = adapter.with_highlighter(crate::arborium::Highlighter::new());
+    let adapter = match crate::Highlighter::new() {
+        Ok(highlighter) => adapter.with_highlighter(highlighter),
+        Err(_) => adapter,
+    };
     #[cfg(feature = "pikchr")]
     let adapter = adapter.with_pikchr();
     adapter

@@ -1,91 +1,87 @@
-//! Process-global tree-sitter grammar store, populated at runtime by
-//! `markdawn-swift-lang-*` plugin cdylibs.
+//! Process-global language registry, populated at runtime by
+//! `markdawn-swift-lang-*` plugin dylibs.
 //!
 //! The main framework ships with zero grammars baked in (it depends on
 //! `markdawn` with just the `highlight` feature, not `highlight-all-languages`).
-//! Plugins call `mw_register_grammar` via a function pointer the Swift loader
-//! hands them. The UIKit `BlockSink` constructs its `Highlighter` from the
-//! global store, so any subsequently rendered code block whose language has
-//! been registered will be highlighted; unregistered languages fall through
-//! to plain monospace.
+//! Swift `dlopen`s a plugin framework and then calls `mw_register_language`
+//! with the language name; the symbol lookup and descriptor validation happen
+//! here in Rust. The UIKit `BlockSink` builds its highlighter from the global
+//! registry, so any subsequently rendered code block whose language has been
+//! registered will be highlighted; unregistered languages fall through to
+//! plain monospace.
 
-use std::ffi::{c_char, c_void};
+use std::ffi::c_char;
 use std::sync::{Arc, OnceLock};
 
-use markdawn::arborium::GrammarStore;
-use markdawn::arborium::advanced::{CompiledGrammar, GrammarConfig};
-use tree_sitter_language::LanguageFn;
+use ntreesitter::{DynamicRegistry, RegistryBuilder};
+use ntreesitter_plugin::{NtsProviderEntry, load_provider};
 
-static STORE: OnceLock<Arc<GrammarStore>> = OnceLock::new();
+static REGISTRY: OnceLock<Arc<DynamicRegistry>> = OnceLock::new();
 
-pub fn global_store() -> &'static Arc<GrammarStore> {
-    STORE.get_or_init(|| Arc::new(GrammarStore::new()))
+pub fn global_registry() -> &'static Arc<DynamicRegistry> {
+    REGISTRY.get_or_init(|| {
+        let empty = RegistryBuilder::new()
+            .build()
+            .expect("an empty registry has no aliases to collide");
+        Arc::new(DynamicRegistry::new(empty))
+    })
 }
 
-/// Register a tree-sitter grammar under `name`. Called by plugin cdylibs via
-/// the function-pointer handoff orchestrated by the Swift loader.
+/// Resolve a plugin's provider entry point and register its grammar.
 ///
 /// Return codes:
 ///   0 — success
 ///   1 — null pointer or non-UTF-8 name
-///   2 — non-UTF-8 highlights query
-///   3 — non-UTF-8 injections query
-///   4 — non-UTF-8 locals query
-///   5 — grammar compilation failed (bad query or language mismatch)
+///   2 — the plugin's entry symbol is not loaded
+///   3 — the descriptor failed validation or conflicts with a registered one
+///
+/// The plugin exports `nts_init_<name>` with `-` replaced by `_`; because the
+/// symbol is per-language rather than shared across every plugin, a
+/// process-global lookup resolves the right one. The direction is inverted
+/// from the old ABI: nothing is handed to the plugin, its descriptor is
+/// pulled and validated here.
 ///
 /// # Safety
-/// All pointers must point to valid, readable byte slices of the indicated
-/// lengths. `lang_fn` must be the raw function pointer obtained from
-/// `LanguageFn::into_raw` (i.e. `unsafe extern "C" fn() -> *const ()`),
-/// erased to `*const c_void`.
-// [spec:mw:def:ffi.plugin.grammar-registration]
+/// `name` must point to `name_len` readable bytes. The plugin library
+/// exporting the resolved symbol must stay loaded for as long as the registry
+/// can be observed, which holds because plugin frameworks are never unloaded.
+// [spec:mw:def:ffi.plugin.grammar-registration+1]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mw_register_grammar(
-    name: *const c_char,
-    name_len: usize,
-    lang_fn: *const c_void,
-    highlights: *const c_char,
-    highlights_len: usize,
-    injections: *const c_char,
-    injections_len: usize,
-    locals: *const c_char,
-    locals_len: usize,
-) -> u32 {
-    if name.is_null() || lang_fn.is_null() {
+pub unsafe extern "C" fn mw_register_language(name: *const c_char, name_len: usize) -> u32 {
+    let Some(name) = (unsafe { slice_to_str(name, name_len) }) else {
+        return 1;
+    };
+    if name.is_empty() {
         return 1;
     }
-    let name = match unsafe { slice_to_str(name, name_len) } {
-        Some(s) => s.to_owned(),
-        None => return 1,
-    };
-    let highlights = match unsafe { slice_to_str(highlights, highlights_len) } {
-        Some(s) => s,
-        None => return 2,
-    };
-    let injections = match unsafe { slice_to_str(injections, injections_len) } {
-        Some(s) => s,
-        None => return 3,
-    };
-    let locals = match unsafe { slice_to_str(locals, locals_len) } {
-        Some(s) => s,
-        None => return 4,
-    };
 
-    let raw_fn: unsafe extern "C" fn() -> *const () = unsafe { std::mem::transmute(lang_fn) };
-    let lang_fn = unsafe { LanguageFn::from_raw(raw_fn) };
+    // SAFETY: the resolver hands back a symbol from the process image, which
+    // the caller contract keeps loaded; `load_provider` validates the
+    // descriptor behind it before anything is registered.
+    let provider = unsafe { load_provider(name, |symbol| resolve_global(symbol)) };
+    match provider {
+        Ok(provider) => match provider.register(global_registry()) {
+            Ok(_) => 0,
+            Err(_) => 3,
+        },
+        Err(ntreesitter_plugin::PluginLoadError::MissingEntrySymbol { .. }) => 2,
+        Err(_) => 3,
+    }
+}
 
-    let config = GrammarConfig {
-        language: lang_fn.into(),
-        highlights_query: highlights,
-        injections_query: injections,
-        locals_query: locals,
-    };
-    let grammar = match CompiledGrammar::new(config) {
-        Ok(g) => g,
-        Err(_) => return 5,
-    };
-    global_store().insert(name, Arc::new(grammar));
-    0
+/// Look up a NUL-terminated symbol in the loaded process image.
+///
+/// `RTLD_DEFAULT` is sound here only because every provider exports a
+/// distinct `nts_init_<name>`; a single shared entry symbol would resolve to
+/// whichever library loaded first, no matter which language was asked for.
+fn resolve_global(symbol: &[u8]) -> Option<NtsProviderEntry> {
+    let address = unsafe { libc::dlsym(libc::RTLD_DEFAULT, symbol.as_ptr() as *const c_char) };
+    if address.is_null() {
+        return None;
+    }
+    // SAFETY: the provider ABI fixes this entry point's signature, and the
+    // symbol name is derived from that same ABI's prefix.
+    Some(unsafe { std::mem::transmute::<*mut libc::c_void, NtsProviderEntry>(address) })
 }
 
 // A zero length is the empty string whatever the pointer holds; anything else

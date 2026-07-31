@@ -81,7 +81,7 @@ fn build_renderer() -> IcedRenderer {
         ..Default::default()
     });
     #[cfg(feature = "highlight")]
-    let r = r.with_highlighter(arborium::Highlighter::new());
+    let r = r.with_highlighter(markdawn::Highlighter::new().expect("compose the language catalog"));
     r
 }
 

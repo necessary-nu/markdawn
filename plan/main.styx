@@ -1986,6 +1986,14 @@ children (
                         kind @status
                         text "Doing → Done (nplan complete)"
                     }
+
+                    {
+                        at 2026-07-30T22:25:10.431711Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "RE-RUN against ntreesitter 77bd99b (decorative-capture filter in the shipped registry). Baseline arborium dump unchanged and reused.\n\nMY HEADLINE METRIC WAS WRONG AND HID THE RESULT. \"Identical painted output\" went 122 to 114 fixtures, i.e. it reported the fix as a regression. It cannot distinguish improvement from degradation, because a capture markdawn maps to no accent renders exactly like unstyled text: arborium painting @spell and ntreesitter painting @comment is a fix that a raw capture comparison scores as a difference. Re-measured through markdawn's own capture_accent — the dotted-prefix walk in src/highlight.rs — classifying each differing byte as gained, lost or changed colour.\n\n  before errata: gained 179, lost 4020, changed 510\n  after errata:  gained 12153, lost 4020, changed 510\n\nThe errata coloured 11,974 additional bytes and lost nothing. Clean win. Dominant gains: spell to comment 9646 bytes, spell to string 1895, nospell to keyword.directive 408.\n\nA PRE-EXISTING MARKDAWN DEFECT, NOT A MIGRATION RISK. Those 12 KB are unstyled in markdawn TODAY. arborium emits @comment and @spell as separate spans with the same pattern index, and order_spans breaks that tie by emission order, so @spell paints last and wins; capture_accent(\"spell\") is None, so scss, ini, asciidoc, zig, prolog, sql, query, wit, asm and capnp comments render as plain text on the UIKit path right now. The migration fixes it. Worth its own defect node if the swap slips.\n\nREMAINING 4,020 LOST BYTES SPLIT TWO WAYS, and only one is ntreesitter's.\n  (a) markdawn's accent table does not know ntreesitter's capture vocabulary: function.definition to definition.function (170 bytes), type.definition to definition.type (75), comment to constructor (78), plus a tail of _function, _scope and parameter. exact_capture_accent has no arm for definition.*, constructor or parameter, so they resolve to no accent. That is markdawn-side work and belongs in ntreesitter.core-binding — extend the table when the adapter lands, or these render plain.\n  (b) ntreesitter emits nothing where arborium emitted something: type 1224, comment 692, string 594, keyword 323, tag 152, property 113 — 3,098 bytes. Consistent with the five injection grammars absent from the catalog plus per-language query granularity. Not resolved here.\n\nCHANGED (510 bytes) is dominated by string to attribute, 473 — the injected-HTML granularity case, reported upstream with byte offsets from markdown/rust-readme.md.\n\nLEFTOVER. crates/ntreesitter-highlight/src/lib.rs:551 still calls is_decorative inside TestStore::new under #[cfg(test)] at line 526. Harmless — the production path at registry/mod.rs:195 is now correct and is what these numbers measure — but it is a second copy of the rule, which is what the errata set out to remove."
+                        after_done true
+                    }
                 )
             }
 
@@ -2023,12 +2031,27 @@ children (
                 title "Regenerate the 104 plugin cdylibs against nts-lang providers"
                 priority 0
                 deps (ntreesitter.spec ntreesitter.plugin-split-upstream)
+                sealed true
                 log (
                     {
                         at 2026-07-30T15:02:21.836159Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Lands as its own commit AHEAD of the core swap: with the ntreesitter-abi split these crates depend on ntreesitter-abi + ntreesitter-provider only, reach no links crate, and so coexist with arborium.\n\nGENERATOR. crates/markdawn-swift/generate-plugins.sh currently discovers languages by scanning ../arborium/langs/<group>/<name>/crate — directory layout as a source of truth, which is why adding a language upstream could silently break generation. Drive it off the `all` feature list in ntreesitter-catalog's Cargo.toml instead: that list is declared, canonical, and exactly the 104 ids.\n\nPER-CRATE SHAPE. Each generated crate becomes a dep on nts-lang-<name> plus ntreesitter-abi, and a single export_provider!(nts_init_<sanitized>, nts_lang_<sanitized>::DESCRIPTOR). This deletes markdawn's hand-written nine-argument unsafe registration ABI and the LazyLock-vs-&str query-borrowing workaround the arborium template needed.\n\nSYMBOL NAMING IS UNCHANGED IN KIND. nts_init_<canonical_id> with dashes normalised to underscores — the same sanitisation the current mw_lang_<name>_init template already does, so c-sharp still yields nts_init_c_sharp. Because the symbol is per-language rather than shared, process-global dlsym keeps working and neither loader's contract changes; use ntreesitter_abi::init_symbol to derive the name rather than formatting it by hand in two places.\n\nDESCRIPTOR SURFACE IS WIDER THAN THE ARBORIUM TEMPLATE EMITTED. Aliases, file extensions, exact filenames, injection targets, parser ABI and provenance hashes now travel with the grammar instead of being inferred from the crate name. That is the point — it is what lets the registry reject ambiguous aliases at build time — but registry construction is fallible, and with 104 merged alias sets a collision is plausible and will not be visible until the descriptors are all present. Build the full registry once, early, rather than discovering it in the loaders."
+                    }
+
+                    {
+                        at 2026-07-30T23:36:18.986157Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-07-31T01:51:23.46939Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -2046,7 +2069,7 @@ children (
                         [spec:mw:req:highlighting.html-delegation]
                     )
                 }
-                deps (ntreesitter.spec ntreesitter.output-parity ntreesitter.plugin-crates)
+                deps (ntreesitter.spec ntreesitter.output-parity ntreesitter.plugin-split-upstream)
                 log (
                     {
                         at 2026-07-30T15:01:31.257785Z
@@ -2061,7 +2084,7 @@ children (
                 id ntreesitter.swift-loader
                 title "Move the Swift grammar store and loader onto the ntreesitter registry"
                 priority 0
-                deps (ntreesitter.spec ntreesitter.plugin-crates)
+                deps (ntreesitter.spec ntreesitter.plugin-split-upstream)
                 log (
                     {
                         at 2026-07-30T15:02:47.311859Z
@@ -2076,7 +2099,7 @@ children (
                 id ntreesitter.android-loader
                 title "Move the Android grammar store and JNI loader onto the ntreesitter registry"
                 priority 0
-                deps (ntreesitter.spec ntreesitter.plugin-crates)
+                deps (ntreesitter.spec ntreesitter.plugin-split-upstream)
                 log (
                     {
                         at 2026-07-30T15:02:35.602779Z
@@ -2091,7 +2114,12 @@ children (
                 id ntreesitter.retire-arborium
                 title "Assert arborium is gone from the dependency graph and refresh the docs"
                 priority 0
-                deps (ntreesitter.core-binding ntreesitter.swift-loader ntreesitter.android-loader)
+                deps (
+                    ntreesitter.plugin-crates
+                    ntreesitter.core-binding
+                    ntreesitter.swift-loader
+                    ntreesitter.android-loader
+                )
                 log (
                     {
                         at 2026-07-30T15:03:03.951924Z
@@ -2108,6 +2136,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator green-lit the arborium-to-ntreesitter migration on 2026-07-30, superseding the park recorded on markdawn-highlighter-boundary. Upstream state at planning time (ntreesitter @ 78b9601):\n\nRESOLVED SINCE THE JULY 29 SURVEY. (1) Grammar parity: 104 languages, set-equal to markdawn's 104 markdawn-swift-lang-* names, zero diff, all building. (2) pattern_index parity: fixed below the API as match_.pattern_index.saturating_sub(layer.config.highlights_pattern_index), i.e. the zero-based index within the highlights query — arborium's number. Span.priority is that value, not the emission counter the first survey described. (3) The [patch.crates-io] requirement is gone: tree-sitter-highlight is a vendored path dep at crates/tree-sitter-highlight. (4) commit 49fa940 ships ntreesitter_highlight::spans_to_html with ThemeSlot tag and class names byte-identical to arborium's, so markdawn does NOT need to own an HTML formatter and existing theme CSS keeps working. (5) commit 899848c replaces the single ntreesitter_provider_v1 symbol with per-language nts_init_<canonical_id> (dashes to underscores) and drops V1 branding throughout; process-global dlsym still works, so neither the Swift loader contract nor the JNI loadLanguage signature has to change.\n\nSTILL OPEN. ntreesitter-runtime is still package.name = \"tree-sitter\" with links = \"tree-sitter\", the same value arborium-tree-sitter declares, so arborium and ntreesitter cannot coexist in one Cargo graph at any feature setting — links uniqueness is checked over the declared graph before feature resolution. That forces one non-bisectable commit; see the note on ntreesitter.core-binding for its exact extent.\n\nDEPENDENCY FORM. ntreesitter crates are all publish = false, so markdawn takes path deps on ../ntreesitter exactly as it does on ../arborium today. This does not newly block publishing markdawn — it already could not be published with a path dep on arborium."
+            }
+
+            {
+                at 2026-07-30T23:39:38.794345Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "SCOPE CORRECTION from the operator, 2026-07-31: coexistence is not the plan; arborium is replaced.\n\nI had let a property of the tooling become a planning goal. Once the ntreesitter-abi split landed, the 104 plugin crates no longer reached a links crate, so they *could* have landed in their own commit ahead of the core swap — and I structured plugin-crates around that. But being able to hold both backends in one graph for one commit is worth nothing when the intent is to delete one of them. It buys a bisection point on a boundary nobody will bisect across, at the cost of a transient state that has to be reasoned about and reviewed.\n\nCONSEQUENCE. plugin-crates, core-binding, swift-loader and android-loader are now siblings on [spec, output-parity, plugin-split-upstream] rather than a chain, and land as ONE commit that removes arborium. retire-arborium depends on all four and stays separate, because verifying the dependency graph is clean and refreshing the docs is genuinely after-the-fact work.\n\nWHAT DOES NOT CHANGE. The generated plugin crates still take ntreesitter-abi rather than ntreesitter-plugin. That choice was only ever half about the links identity; the other half is that a provider library has no reason to link the Tree-sitter runtime for a decode path it never calls, across 104 iOS dylibs. The host takes ntreesitter-plugin, a provider takes ntreesitter-abi, and that split is correct on its own terms.\n\nALSO IN THE REPLACEMENT COMMIT. examples/arborium_span_dump.rs, which was scheduled for retire-arborium — it depends on arborium and cannot outlive it. Its baseline is already captured and analysed on ntreesitter.output-parity."
             }
         )
     }

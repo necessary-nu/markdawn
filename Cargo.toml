@@ -16,13 +16,16 @@ license = "Apache-2.0 OR MIT"
 [features]
 default = ["highlight-all-languages"]
 dioxus = ["dep:dioxus", "dep:dioxus-core"]
-highlight = ["dep:arborium"]
-# Convenience superset of `highlight` that pulls every tree-sitter
-# parser arborium ships. On `default`, so native consumers get a
-# fully-stocked highlighter without thinking about it. Wasm builds
-# should set `default-features = false` and curate via a direct
-# `arborium` dep — `all-languages` adds ~100 MB of static data.
-highlight-all-languages = ["highlight", "arborium/all-languages"]
+# The highlighting machinery with an empty language set. Hosts that
+# acquire grammars at runtime from plugin libraries — Swift, Android —
+# want exactly this and must not pay for parsers they never link.
+highlight = ["dep:ntreesitter", "dep:ntreesitter-highlight", "dep:ntreesitter-catalog"]
+# Convenience superset that pulls every parser the ntreesitter catalog
+# ships. On `default`, so native consumers get a fully-stocked
+# highlighter without thinking about it. Wasm builds should set
+# `default-features = false` and curate by enabling individual
+# `ntreesitter-catalog` language features.
+highlight-all-languages = ["highlight", "ntreesitter-catalog/all"]
 pikchr = ["dep:pikru", "dep:facet-dessert", "dep:facet-reflect", "dep:facet-path"]
 graphviz = ["dep:markdawn-graphviz"]
 typst = [
@@ -50,7 +53,15 @@ iced = ["dep:iced_core", "dep:iced_widget", "dep:iced_runtime", "dep:iced_graphi
 iced-app = ["iced", "dep:iced"]
 
 [dependencies]
-arborium = { path = "../arborium/crates/arborium", optional = true, default-features = false }
+ntreesitter = { git = "https://github.com/necessary-nu/ntreesitter", optional = true }
+# The span-to-HTML formatter lives here and is not re-exported by the
+# facade; markdawn delegates to it rather than owning a second capture
+# vocabulary. See [spec:mw:req:highlighting.html-delegation].
+ntreesitter-highlight = { git = "https://github.com/necessary-nu/ntreesitter", optional = true }
+# Language composition. `default-features = false` matters: the catalog
+# defaults to `all`, which would make the empty-registry `highlight`
+# feature silently link every parser.
+ntreesitter-catalog = { git = "https://github.com/necessary-nu/ntreesitter", optional = true, default-features = false }
 base64 = "0.22"
 dioxus = { version = "0.7", optional = true, default-features = false, features = ["lib"] }
 dioxus-core = { version = "0.7", optional = true }
@@ -109,12 +120,6 @@ serde_json = "1"
 [[example]]
 name = "ansi_demo"
 required-features = ["ansi"]
-
-# Half of the arborium-to-ntreesitter output parity check. Deleted with the
-# arborium dependency itself; see the `ntreesitter` plan subtree.
-[[example]]
-name = "arborium_span_dump"
-required-features = ["highlight-all-languages"]
 
 [[example]]
 name = "ssg_blog"

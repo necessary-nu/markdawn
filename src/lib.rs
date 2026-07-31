@@ -71,8 +71,12 @@ pub use crate::terminal::{
 };
 
 pub use crate::highlight::{HighlightError, SyntaxHighlighter, SyntaxSpan};
+// Markdawn-owned highlighters, deliberately *instead* of re-exporting the
+// backend crate. The previous re-export is what made a provider swap a
+// change to every consumer rather than to one module.
+// [spec:mw:req:highlighting.provider-binding]
 #[cfg(feature = "highlight")]
-pub use arborium;
+pub use crate::highlight::{DynamicHighlighter, Highlighter};
 
 #[cfg(feature = "dioxus")]
 pub use crate::adapter::dioxus::{

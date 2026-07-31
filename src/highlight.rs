@@ -1,13 +1,11 @@
 //! Renderer-neutral syntax-highlighting boundary.
 //!
 //! Markdawn owns the public span and error types consumed by its renderers.
-//! The Arborium implementation below is a transition adapter: it keeps the
-//! current feature working without making Arborium types part of renderer APIs.
+//! The provider below is bound behind them: no backend type appears in any
+//! renderer-facing signature, and the backend crate is not re-exported, so
+//! swapping providers is a change to this file rather than to every consumer.
 
 use std::fmt;
-
-#[cfg(feature = "highlight")]
-use arborium::advanced::HighlightSpans;
 
 /// A semantic syntax span over UTF-8 source bytes.
 ///
@@ -67,56 +65,249 @@ pub trait SyntaxHighlighter {
         language_hint: &str,
         source: &str,
     ) -> Result<Vec<SyntaxSpan>, HighlightError>;
-}
 
-/// Temporary compatibility adapter for the legacy Arborium feature.
-///
-/// The blanket implementation intentionally terminates at Markdawn-owned
-/// types. Renderers never receive Arborium spans or errors. Deliberately
-/// unannotated: `highlighting.provider-binding` also forbids re-exporting the
-/// backend crate, which `src/lib.rs` still does, so claiming that rule here
-/// would be a false claim. `ntreesitter.core-binding` replaces this adapter
-/// and closes the rule.
-#[cfg(feature = "highlight")]
-impl<H> SyntaxHighlighter for H
-where
-    H: HighlightSpans,
-    H::Error: fmt::Display,
-{
-    fn highlight(
-        &mut self,
-        language_hint: &str,
-        source: &str,
-    ) -> Result<Vec<SyntaxSpan>, HighlightError> {
-        self.highlight_spans(language_hint, source)
-            .map(|spans| spans.into_iter().map(SyntaxSpan::from).collect())
-            .map_err(|error| HighlightError::new(error.to_string()))
+    /// Take the non-fatal diagnostics produced by the most recent
+    /// [`highlight`](Self::highlight) call, leaving none behind.
+    ///
+    /// A provider can succeed overall while something inside the highlight
+    /// did not: an injected language that would not resolve, an exhausted
+    /// injection budget. Returning `Ok` while dropping that on the floor is
+    /// the "failure becomes absence" this boundary exists to prevent, so it
+    /// stays reachable here. Defaulted to empty, because a highlighter with
+    /// nothing partial to report is not obliged to invent the concept.
+    // [spec:mw:req:highlighting.diagnostics]
+    fn take_diagnostics(&mut self) -> Vec<HighlightError> {
+        Vec::new()
     }
 }
 
+/// The provider binding. Every name from the highlighting backend is
+/// confined to this module, which is the whole point of the seam: a
+/// renderer cannot accidentally depend on the backend because it cannot see
+/// it, and markdawn does not re-export the crate.
+// [spec:mw:req:highlighting.provider-binding]
 #[cfg(feature = "highlight")]
-impl From<arborium::advanced::Span> for SyntaxSpan {
-    fn from(span: arborium::advanced::Span) -> Self {
-        Self {
+mod provider {
+    use std::sync::Arc;
+
+    use ntreesitter::{
+        DynamicRegistry, HighlightEngine, HighlightOutput, Registry, RegistryBuilder,
+    };
+
+    use super::{HighlightError, SyntaxHighlighter, SyntaxSpan};
+
+    /// `priority` is the zero-based index of the winning pattern within the
+    /// highlights query — the same quantity markdawn calls `pattern_index`
+    /// and uses to break ties among equal-range captures.
+    // [spec:mw:req:highlighting.span-semantics]
+    fn span(span: ntreesitter::Span) -> SyntaxSpan {
+        SyntaxSpan {
             start: span.start,
             end: span.end,
             capture: span.capture,
-            pattern_index: span.pattern_index,
+            pattern_index: span.priority,
+        }
+    }
+
+    fn split(output: HighlightOutput) -> (Vec<SyntaxSpan>, Vec<HighlightError>) {
+        (
+            output.spans.into_iter().map(span).collect(),
+            output
+                .diagnostics
+                .into_iter()
+                .map(|error| HighlightError::new(error.to_string()))
+                .collect(),
+        )
+    }
+
+    /// Highlighter over the language set composed at build time.
+    ///
+    /// Which languages that is depends on the enabled `ntreesitter-catalog`
+    /// features: everything under `highlight-all-languages`, nothing under
+    /// bare `highlight`.
+    // [spec:mw:req:highlighting.registry-composition]
+    pub struct Highlighter {
+        engine: HighlightEngine<Registry>,
+        diagnostics: Vec<HighlightError>,
+    }
+
+    /// Composing the catalog compiles every linked grammar's queries, which
+    /// is far too expensive to repeat per highlighter — a caller that builds
+    /// an adapter per document would pay it every time. Built once and
+    /// cloned; `Registry` is `Arc`-backed, so clones share the compiled
+    /// grammars rather than recompiling them.
+    ///
+    /// The error is stored as a `String` because the registry error type is
+    /// not `Clone` and this cell outlives any one caller.
+    static SHARED: std::sync::OnceLock<Result<Registry, String>> = std::sync::OnceLock::new();
+
+    fn shared_registry() -> Result<Registry, HighlightError> {
+        SHARED
+            .get_or_init(|| {
+                ntreesitter_catalog::register_all(RegistryBuilder::new())
+                    .and_then(RegistryBuilder::build)
+                    .map_err(|error| error.to_string())
+            })
+            .clone()
+            .map_err(HighlightError::new)
+    }
+
+    impl Highlighter {
+        /// Compose every catalogued language into one registry.
+        ///
+        /// Fallible because registry construction rejects ambiguous aliases
+        /// rather than letting one language silently shadow another.
+        pub fn new() -> Result<Self, HighlightError> {
+            Ok(Self {
+                engine: HighlightEngine::new(shared_registry()?),
+                diagnostics: Vec::new(),
+            })
+        }
+    }
+
+    impl SyntaxHighlighter for Highlighter {
+        fn highlight(
+            &mut self,
+            language_hint: &str,
+            source: &str,
+        ) -> Result<Vec<SyntaxSpan>, HighlightError> {
+            let output = self
+                .engine
+                .highlight(language_hint, source)
+                .map_err(|error| HighlightError::new(error.to_string()))?;
+            let (spans, diagnostics) = split(output);
+            self.diagnostics = diagnostics;
+            Ok(spans)
+        }
+
+        // [spec:mw:req:highlighting.diagnostics]
+        fn take_diagnostics(&mut self) -> Vec<HighlightError> {
+            std::mem::take(&mut self.diagnostics)
+        }
+    }
+
+    /// Highlighter over a registry populated at runtime by plugin libraries.
+    ///
+    /// Takes a fresh snapshot per highlight rather than holding one. A
+    /// snapshot is immutable and generation-tracked, so pinning one at
+    /// construction would compile, run, and silently never see a language
+    /// registered afterwards — which presents as highlighting that works for
+    /// some blocks and not others, with nothing in the logs.
+    // [spec:mw:req:highlighting.late-registration]
+    pub struct DynamicHighlighter {
+        registry: Arc<DynamicRegistry>,
+        diagnostics: Vec<HighlightError>,
+    }
+
+    impl DynamicHighlighter {
+        pub fn new(registry: Arc<DynamicRegistry>) -> Self {
+            Self {
+                registry,
+                diagnostics: Vec::new(),
+            }
+        }
+    }
+
+    impl SyntaxHighlighter for DynamicHighlighter {
+        fn highlight(
+            &mut self,
+            language_hint: &str,
+            source: &str,
+        ) -> Result<Vec<SyntaxSpan>, HighlightError> {
+            let engine = HighlightEngine::new(self.registry.snapshot());
+            let output = engine
+                .highlight(language_hint, source)
+                .map_err(|error| HighlightError::new(error.to_string()))?;
+            let (spans, diagnostics) = split(output);
+            self.diagnostics = diagnostics;
+            Ok(spans)
+        }
+
+        // [spec:mw:req:highlighting.diagnostics]
+        fn take_diagnostics(&mut self) -> Vec<HighlightError> {
+            std::mem::take(&mut self.diagnostics)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        // An empty registry is a supported configuration, not a broken one:
+        // it is what the mobile hosts ship before any plugin loads.
+        // [spec:mw:req:highlighting.registry-composition/test]
+        // [spec:mw:req:highlighting.error-fallback/test]
+        #[test]
+        fn an_unregistered_language_is_an_error_not_empty_spans() {
+            let registry = Arc::new(DynamicRegistry::new(
+                RegistryBuilder::new().build().expect("empty registry"),
+            ));
+
+            let error = DynamicHighlighter::new(registry)
+                .highlight("rust", "fn main() {}")
+                .expect_err("no grammar is registered");
+
+            assert!(
+                error.message().contains("rust"),
+                "the diagnostic should name the language it could not resolve, got {:?}",
+                error.message()
+            );
+        }
+
+        // The hazard highlighting.late-registration exists to forbid: a
+        // registry snapshot is immutable, so a highlighter that took one at
+        // construction would answer this second call from the stale view and
+        // report the language as unsupported forever.
+        // [spec:mw:req:highlighting.late-registration/test]
+        #[cfg(feature = "highlight-all-languages")]
+        #[test]
+        fn a_highlighter_observes_a_language_registered_after_it_was_built() {
+            let registry = Arc::new(DynamicRegistry::new(
+                RegistryBuilder::new().build().expect("empty registry"),
+            ));
+            let mut highlighter = DynamicHighlighter::new(Arc::clone(&registry));
+            assert!(highlighter.highlight("json", "{}").is_err());
+
+            let json = ntreesitter_catalog::DESCRIPTORS
+                .iter()
+                .find(|descriptor| descriptor.canonical_id == "json")
+                .copied()
+                .expect("the catalog ships json under highlight-all-languages");
+            registry.register(json).expect("register json");
+
+            let spans = highlighter
+                .highlight("json", "{\"a\": 1}")
+                .expect("the same highlighter now resolves json");
+            assert!(!spans.is_empty());
+        }
+
+        // [spec:mw:req:highlighting.span-semantics/test]
+        // [spec:mw:req:highlighting.registry-composition/test]
+        #[cfg(feature = "highlight-all-languages")]
+        #[test]
+        fn spans_are_utf8_byte_offsets_into_the_original_source() {
+            let source = "// é\nfn main() {}\n";
+            let spans = Highlighter::new()
+                .expect("compose the catalog")
+                .highlight("rust", source)
+                .expect("rust is catalogued");
+
+            assert!(!spans.is_empty());
+            for span in &spans {
+                assert!(span.start < span.end, "half-open and non-inverted");
+                assert!(span.end as usize <= source.len(), "within the source");
+                assert!(
+                    source.is_char_boundary(span.start as usize)
+                        && source.is_char_boundary(span.end as usize),
+                    "{span:?} splits a codepoint, so the offsets are not UTF-8 byte offsets"
+                );
+            }
         }
     }
 }
 
 #[cfg(feature = "highlight")]
-impl From<SyntaxSpan> for arborium::advanced::Span {
-    fn from(span: SyntaxSpan) -> Self {
-        Self {
-            start: span.start,
-            end: span.end,
-            capture: span.capture,
-            pattern_index: span.pattern_index,
-        }
-    }
-}
+pub use provider::{DynamicHighlighter, Highlighter};
 
 // The span algebra below is platform-neutral arithmetic over `SyntaxSpan`,
 // but its only caller today is the UIKit adapter, which compiles solely
@@ -177,8 +368,21 @@ pub(crate) fn capture_accent(capture: &str) -> Option<SyntaxAccent> {
 fn exact_capture_accent(capture: &str) -> Option<SyntaxAccent> {
     let accent = match capture {
         "keyword" | "include" | "storageclass" | "conditional" | "repeat" => SyntaxAccent::Keyword,
-        "function" | "function.builtin" | "function.macro" | "method" => SyntaxAccent::Function,
-        "type" | "type.builtin" | "namespace" | "module" | "class" => SyntaxAccent::Type,
+        // `definition.function` and `constructor` are the provider's
+        // vocabulary for what the older one called `function.definition` and
+        // (in places) `function`. Without these arms the prefix walk falls
+        // through to `definition` / no match and the run renders as plain
+        // text — a silent loss measured at several hundred bytes across the
+        // parity corpus, all of it code the previous backend coloured.
+        "function"
+        | "function.builtin"
+        | "function.macro"
+        | "method"
+        | "definition.function"
+        | "constructor" => SyntaxAccent::Function,
+        "type" | "type.builtin" | "namespace" | "module" | "class" | "definition.type" => {
+            SyntaxAccent::Type
+        }
         "string" | "string.special" | "character" => SyntaxAccent::StringLiteral,
         "comment" => SyntaxAccent::Comment,
         "constant" | "constant.builtin" | "boolean" | "number" | "float" => SyntaxAccent::Constant,
@@ -188,7 +392,10 @@ fn exact_capture_accent(capture: &str) -> Option<SyntaxAccent> {
         "operator" | "punctuation" | "punctuation.bracket" | "punctuation.delimiter" => {
             return None;
         }
-        "variable" | "variable.parameter" | "variable.builtin" => return None,
+        // `parameter` is the provider's spelling of `variable.parameter`;
+        // both are deliberately unaccented, and naming it keeps that a
+        // decision rather than an unmapped-name accident.
+        "variable" | "variable.parameter" | "variable.builtin" | "parameter" => return None,
         "attribute" | "tag" | "tag.attribute" | "property" => SyntaxAccent::Attribute,
         "escape" | "string.escape" => SyntaxAccent::Escape,
         "label" => SyntaxAccent::Label,
@@ -263,13 +470,30 @@ pub(crate) fn utf16_range(source: &str, span: &SyntaxSpan) -> Option<(usize, usi
     Some((utf16_start, utf16_end - utf16_start))
 }
 
-/// Render neutral spans with the legacy HTML formatter during the transition.
+/// Render neutral spans as HTML through the provider's formatter.
+///
+/// Delegated rather than reimplemented so one capture vocabulary and one
+/// theme vocabulary govern every host. `HtmlFormat::CustomElements` is the
+/// `<a-k>`/`<a-s>` output existing theme CSS is written against.
+///
+/// The spans arrive already resolved — the engine picked a winner per range
+/// before emitting — so this deliberately does not re-run precedence.
+// [spec:mw:req:highlighting.html-delegation]
 #[cfg(feature = "highlight")]
 pub(crate) fn spans_to_html(source: &str, spans: Vec<SyntaxSpan>) -> String {
-    arborium::advanced::spans_to_html(
+    let spans: Vec<ntreesitter_highlight::Span> = spans
+        .into_iter()
+        .map(|span| ntreesitter_highlight::Span {
+            start: span.start,
+            end: span.end,
+            capture: span.capture,
+            priority: span.pattern_index,
+        })
+        .collect();
+    ntreesitter_highlight::spans_to_html(
         source,
-        spans.into_iter().map(Into::into).collect(),
-        &arborium::advanced::HtmlFormat::default(),
+        &spans,
+        &ntreesitter_highlight::HtmlFormat::CustomElements,
     )
 }
 
@@ -277,89 +501,53 @@ pub(crate) fn spans_to_html(source: &str, spans: Vec<SyntaxSpan>) -> String {
 mod tests {
     use super::*;
 
-    #[derive(Debug)]
-    struct StubError(&'static str);
+    struct Stub;
 
-    impl fmt::Display for StubError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.write_str(self.0)
-        }
-    }
-
-    struct StubArborium {
-        result: Result<Vec<arborium::advanced::Span>, StubError>,
-    }
-
-    impl HighlightSpans for StubArborium {
-        type Error = StubError;
-
-        fn highlight_spans(
+    impl SyntaxHighlighter for Stub {
+        fn highlight(
             &mut self,
-            _language: &str,
+            _language_hint: &str,
             _source: &str,
-        ) -> Result<Vec<arborium::advanced::Span>, Self::Error> {
-            std::mem::replace(&mut self.result, Ok(Vec::new()))
+        ) -> Result<Vec<SyntaxSpan>, HighlightError> {
+            Ok(Vec::new())
         }
     }
 
-    // [spec:mw:req:highlighting.api/test]
-    // [spec:mw:req:highlighting.span-semantics/test]
+    // An implementation with nothing partial to report is not obliged to
+    // invent the concept, which is why the method is defaulted rather than
+    // required.
+    // [spec:mw:req:highlighting.diagnostics/test]
     #[test]
-    fn arborium_adapter_preserves_neutral_span_contract() {
-        let expected = vec![
-            SyntaxSpan {
-                start: 0,
-                end: 6,
-                capture: "function.call".into(),
-                pattern_index: 2,
-            },
-            SyntaxSpan {
-                start: 2,
-                end: 6,
-                capture: "variable.parameter".into(),
-                pattern_index: 9,
-            },
-        ];
-        let mut highlighter = StubArborium {
-            result: Ok(expected.clone().into_iter().map(Into::into).collect()),
-        };
-
-        let actual = highlighter.highlight("rust", "éname").unwrap();
-
-        assert_eq!(actual, expected);
+    fn diagnostics_default_to_none_for_a_highlighter_that_has_none() {
+        assert!(Stub.take_diagnostics().is_empty());
     }
 
-    // [spec:mw:req:highlighting.error-fallback/test]
+    // Byte offsets are UTF-8, so the multibyte prefix must not shift the
+    // span, and the tag vocabulary is the legacy custom-element one existing
+    // theme CSS targets.
+    // [spec:mw:req:highlighting.html-delegation/test]
     #[test]
-    fn arborium_adapter_preserves_provider_diagnostic() {
-        let mut highlighter = StubArborium {
-            result: Err(StubError("query compilation failed")),
-        };
-
-        let error = highlighter.highlight("rust", "fn main() {}").unwrap_err();
-
-        assert_eq!(error.message(), "query compilation failed");
-    }
-
-    // [spec:mw:req:highlighting.span-semantics/test]
-    #[test]
-    fn html_transition_respects_byte_ranges_and_pattern_priority() {
-        let spans = vec![
-            SyntaxSpan {
-                start: 2,
-                end: 6,
-                capture: "keyword".into(),
-                pattern_index: 1,
-            },
-            SyntaxSpan {
-                start: 2,
-                end: 6,
-                capture: "string".into(),
-                pattern_index: 7,
-            },
-        ];
+    fn html_delegation_emits_legacy_custom_elements_over_byte_ranges() {
+        let spans = vec![SyntaxSpan {
+            start: 2,
+            end: 6,
+            capture: "string".into(),
+            pattern_index: 7,
+        }];
 
         assert_eq!(spans_to_html("éname", spans), "é<a-s>name</a-s>");
+    }
+
+    // The previous revision of this test fed two spans over one range and
+    // asserted the higher pattern index won. That input is no longer
+    // reachable: the engine resolves precedence before emitting, and
+    // highlighting.html-delegation forbids the renderer re-running it, so a
+    // formatter handed competing equal-range spans is being asked a question
+    // the pipeline cannot pose.
+    // [spec:mw:req:highlighting.html-delegation/test]
+    #[test]
+    fn html_delegation_escapes_unstyled_source() {
+        assert_eq!(spans_to_html("a<b & c", Vec::new()), "a&lt;b &amp; c");
     }
 }
 

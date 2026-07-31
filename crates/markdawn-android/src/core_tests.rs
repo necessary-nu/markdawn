@@ -5,7 +5,7 @@
 #[cfg(test)]
 mod tests {
     use crate::{
-        VdomDocument, VdomParser, filter_from_options, parse_to_vdom_json, register_language,
+        VdomDocument, VdomParser, filter_from_options, parse_to_vdom_json, register_plugin_language,
     };
     use serde_json::Value;
 
@@ -46,14 +46,14 @@ mod tests {
 
     /// `loadLanguage` for a grammar whose plugin `.so` was never loaded
     /// resolves no symbol and reports failure instead of aborting.
-    // [spec:mw:def:ffi.plugin.grammar-registration/test]
+    // [spec:mw:def:ffi.plugin.grammar-registration+1/test]
     #[test]
     fn unknown_grammar_plugin_reports_failure() {
-        assert!(!register_language("no-such-language-plugin"));
-        assert!(!register_language(""));
+        assert!(!register_plugin_language("no-such-language-plugin"));
+        assert!(!register_plugin_language(""));
         // Hyphens are sanitized into the symbol name, so this must miss the
         // same way rather than build a malformed symbol.
-        assert!(!register_language("c-sharp"));
+        assert!(!register_plugin_language("c-sharp"));
     }
 
     /// Nothing parsed means an empty block list, not `null` or an error.

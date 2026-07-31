@@ -31,7 +31,8 @@ fn main() {
     let adapter = HtmlAdapter::new();
     #[cfg(feature = "highlight")]
     let adapter = if highlight {
-        adapter.with_highlighter(markdawn::arborium::Highlighter::new())
+        adapter
+            .with_highlighter(markdawn::Highlighter::new().expect("compose the language catalog"))
     } else {
         adapter
     };

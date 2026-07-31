@@ -21,10 +21,11 @@ jni = "0.21"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 indexmap = "2"
-tree-sitter-language = "0.1"
+ntreesitter = { git = "https://github.com/necessary-nu/ntreesitter" }
+ntreesitter-plugin = { git = "https://github.com/necessary-nu/ntreesitter" }
 libc = "0.2"
 
 [dev-dependencies]
 # A real grammar, for the in-process highlight test only (production grammars
 # are dynamic plugin .so's loaded via loadLanguage, never linked into core).
-arborium-rust = { path = "../../../arborium/langs/group-birch/rust/crate" }
+nts-lang-rust = { git = "https://github.com/necessary-nu/ntreesitter" }

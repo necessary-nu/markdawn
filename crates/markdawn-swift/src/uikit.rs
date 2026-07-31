@@ -15,10 +15,9 @@ use objc2::Message;
 use objc2::rc::Retained;
 use objc2_ui_kit::UIStackView;
 
-use markdawn::arborium::Highlighter;
-use markdawn::{BlockSink, Parser, UIKitError};
+use markdawn::{BlockSink, DynamicHighlighter, Parser, UIKitError};
 
-use crate::grammar_store::global_store;
+use crate::grammar_store::global_registry;
 use crate::html::incomplete_suffix_len;
 
 // [spec:mw:def:ffi.ownership.handle]
@@ -30,12 +29,13 @@ pub struct UIKitState {
 
 impl UIKitState {
     fn new(mtm: MainThreadMarker) -> Self {
-        // Highlighter consults the process-global store, which is populated at
-        // runtime by `mw_lang_*_init` plugins (see crate::grammar_store).
-        // Languages not registered fall through to plain monospace rendering.
-        // `with_pikchr` renders fenced `pikchr` blocks as inline diagrams.
+        // The highlighter re-reads the process-global registry per block, so a
+        // language registered by a plugin loaded after this state was built is
+        // still picked up (see crate::grammar_store). Languages not registered
+        // fall through to plain monospace rendering. `with_pikchr` renders
+        // fenced `pikchr` blocks as inline diagrams.
         let sink = BlockSink::new(mtm)
-            .with_highlighter(Highlighter::with_store(global_store().clone()))
+            .with_highlighter(DynamicHighlighter::new(global_registry().clone()))
             .with_pikchr();
         Self {
             parser: Parser::builder().with_all().build(),
