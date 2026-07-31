@@ -2085,12 +2085,20 @@ children (
                 title "Move the Swift grammar store and loader onto the ntreesitter registry"
                 priority 0
                 deps (ntreesitter.spec ntreesitter.plugin-split-upstream)
+                sealed true
                 log (
                     {
                         at 2026-07-30T15:02:47.311859Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Lands in the same commit as ntreesitter.core-binding and ntreesitter.android-loader — see the decision note there.\n\ncrates/markdawn-swift/src/grammar_store.rs takes the same treatment as the Android store: DynamicRegistry in place of Arc<GrammarStore>, descriptor validation via ntreesitter_plugin::load_provider in place of the nine-argument mw_register_grammar. The two files are near-verbatim ports of each other today and should stay that way; if the shared logic is worth extracting, that is a separate node, not a smuggled one.\n\nuikit.rs:18 imports markdawn::arborium::Highlighter and constructs it at line 34 from the global store — that becomes the markdawn-owned Highlighter over a snapshot.\n\ncrates/markdawn-swift/include/markdawn.h declares mw_register_grammar for the Swift side to take the address of. That declaration goes; ntreesitter ships include/ntreesitter/provider.h for the descriptor struct. The three Markdawn.xcframework/*/Headers/markdawn.h copies are build outputs and must be regenerated, not hand-edited.\n\nSwift's loader hands over a function pointer today because the plugin calls back into the host. That inverts — the host resolves nts_init_<id> and pulls a descriptor — so the Swift-side handoff simplifies rather than merely renaming."
+                    }
+
+                    {
+                        at 2026-07-31T11:57:14.661514Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -2100,12 +2108,20 @@ children (
                 title "Move the Android grammar store and JNI loader onto the ntreesitter registry"
                 priority 0
                 deps (ntreesitter.spec ntreesitter.plugin-split-upstream)
+                sealed true
                 log (
                     {
                         at 2026-07-30T15:02:35.602779Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Lands in the same commit as ntreesitter.core-binding and ntreesitter.swift-loader — see the decision note there.\n\ncrates/markdawn-android/src/grammar_store.rs: replace the OnceLock<Arc<GrammarStore>> with a DynamicRegistry, and mw_register_grammar's nine-argument body with descriptor validation through ntreesitter_plugin::load_provider. The five return codes collapse: the non-UTF-8 arms disappear with the unpacked string arguments, leaving symbol-missing and invalid-descriptor.\n\nlib.rs:215 register_language keeps dlsym(RTLD_DEFAULT, ...) — per-language nts_init_<id> symbols mean no dlopen handle and no JNI signature change. Only the symbol name and the call shape change: resolve, then hand the entry point to load_provider with the canonical id.\n\nlib.rs:85 constructs its Highlighter from the store; that becomes a per-render .snapshot(). Note the pinning hazard — VdomPipeline holding a snapshot taken at construction will not observe languages registered afterwards, which is a behaviour change from the shared Arc and is exactly the kind of thing that looks like \"highlighting randomly doesn't work\" in the field.\n\nlib.rs:674-680 builds a CompiledGrammar from arborium_rust in test code, and crates/markdawn-android/Cargo.toml carries the arborium-rust dep that feeds it. Both go; nts-lang-rust replaces them."
+                    }
+
+                    {
+                        at 2026-07-31T11:57:17.398914Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -2120,12 +2136,34 @@ children (
                     ntreesitter.swift-loader
                     ntreesitter.android-loader
                 )
+                sealed true
                 log (
                     {
                         at 2026-07-30T15:03:03.951924Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Closes the migration. The gate is mechanical: `cargo tree` over the workspace with every headless-safe feature must show no arborium crate and no crates.io tree-sitter, which is the only proof that the links collision is actually resolved rather than merely dormant behind a feature that happens to be off.\n\nThen the full declared check suite from .config/nplan/config.styx — fmt, clippy -D warnings, nextest across the workspace — at the feature set those commands already carry. Run `nplan check` in a terminal first so the commit gate consumes the witnesses instead of re-running the suite inside the 60s budget.\n\nDocs: README's workspace layout is already stale (see defects.readme-workspace-layout-stale, which lists one crate of about 110) and the 104 plugin crates change name-for-name in this migration, so the two should be reconciled together rather than leaving a second wrong list behind. The arborium checkout at ../arborium stays on disk as reference; nothing in this repo may reach it."
+                    }
+
+                    {
+                        at 2026-07-31T11:57:25.346363Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-07-31T11:58:43.079426Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Dependency graph verified clean: `cargo tree --workspace` with every headless-safe feature reports zero arborium nodes, and no arborium name survives in src/, crates/, examples/ or Cargo.toml. That is the proof the links = \"tree-sitter\" collision is actually resolved rather than dormant behind a feature that happens to be off.\n\nDOCS. README's feature table, the wasm32 toolchain note and the workspace layout all named arborium. The layout was separately stale — it listed one crate of about 110, which is defects.readme-workspace-layout-stale — so both were fixed together rather than leaving a second wrong list behind. It now names the nine hand-written crates and describes the 104 generated ones as a group, with the note that regenerating needs an ntreesitter checkout while building does not. The feature table gained the `highlight` versus `highlight-all-languages` distinction, which is the thing a consumer actually has to choose.\n\nOUT OF SCOPE, DELIBERATELY. crates/markdawn-wasm-bindgen/web/*.html still load `@arborium/arborium` from jsDelivr for client-side highlighting of the demo preview. That is an npm package doing browser-side work, unrelated to the Rust dependency this node retires, and removing the script tag without a replacement would leave the demo pages with no highlighting at all. It belongs to defects.demo-highlighting-needs-cdn, which already owns the problem that demo highlighting comes from a CDN and looks broken offline. Left there rather than half-done here."
+                    }
+
+                    {
+                        at 2026-07-31T11:58:49.09821Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

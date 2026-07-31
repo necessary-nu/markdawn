@@ -1031,6 +1031,9 @@ assertions (
     {id ntreesitter.spec, kind @complete, author "brendan@necessary.nu", at 2026-07-30T17:27:00.400868Z}
     {id ntreesitter.output-parity, kind @complete, author "brendan@necessary.nu", at 2026-07-30T17:59:39.786541Z}
     {id ntreesitter.plugin-crates, kind @complete, author "brendan@necessary.nu", at 2026-07-31T01:51:23.46939Z}
+    {id ntreesitter.swift-loader, kind @complete, author "brendan@necessary.nu", at 2026-07-31T11:57:14.661514Z}
+    {id ntreesitter.android-loader, kind @complete, author "brendan@necessary.nu", at 2026-07-31T11:57:17.398914Z}
+    {id ntreesitter.retire-arborium, kind @complete, author "brendan@necessary.nu", at 2026-07-31T11:58:49.09821Z}
 )
 
 impl_evidence (
