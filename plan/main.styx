@@ -1833,6 +1833,28 @@ children (
                     }
                 )
             }
+
+            {
+                id defects.cmark-gfm-submodule-unregistered
+                title "cmark-gfm gitlink has no .gitmodules entry, breaking every git consumer"
+                priority 1
+                sealed true
+                log (
+                    {
+                        at 2026-07-31T13:31:30.335155Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Reported by the operator from a downstream consumer, silo-lang's silo-markdown, which could not resolve markdawn as a git dependency:\n\n  failed to update https://github.com/necessary-nu/markdawn\n  failed to update submodule `cmark-gfm`\n  no URL configured for submodule 'cmark-gfm'; class=Submodule (17)\n\nCAUSE. `git ls-files -s` showed two gitlinks — cmark-gfm at 587a12bb and crates/markdawn-graphviz/vendor/graphviz at 281ac389 — but `.gitmodules` declared only graphviz. A gitlink with no matching `.gitmodules` entry is a submodule with no URL: git itself tolerates it in a working checkout that already has the directory, which is why nothing here ever complained, but any fresh clone that recurses submodules fails, and cargo always recurses. So this was invisible locally and fatal for every consumer.\n\nIt almost certainly arose from the directory being cloned in place rather than added with `git submodule add`, which is the one path that writes the gitlink without writing `.gitmodules`.\n\nFIX. Added the entry with the URL the operator supplied. Verified rather than assumed: inside the checkout `git describe --tags` reports 0.29.0.gfm.13 and `git rev-parse 0.29.0.gfm.13` is 587a12bb54d95ac37241377e6ddc93ea0e45439b, byte-identical to the pinned gitlink, so the registered URL and the recorded commit agree.\n\nNOT REMOVED, DELIBERATELY. Nothing in the build references cmark-gfm — the only mentions in tree are prose in docs/spec/adversarial.md and src/parser.rs comparing markdawn's behaviour to it. It is a reference copy of the GFM implementation the gfm spec was adopted against, so consumers do now pay a clone for something markdawn never compiles. Dropping the gitlink instead would also have fixed the error and would spare them that; the operator supplied a URL rather than asking for removal, so it stays. Worth revisiting if consumer clone time becomes a complaint."
+                    }
+
+                    {
+                        at 2026-07-31T13:31:46.790402Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
         )
     }
 
