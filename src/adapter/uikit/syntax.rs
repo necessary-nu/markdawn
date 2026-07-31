@@ -17,8 +17,9 @@ use crate::highlight::{SyntaxAccent, capture_accent, order_spans, utf16_range};
 
 /// Build an attributed string for the given `source`, applying foreground
 /// colors per `SyntaxSpan`. Returns `None` if the source has no characters.
-// [spec:mw:sem:uikit.syntax.span-priority]
-// [spec:mw:req:uikit.syntax.span-bounds]
+// [spec:mw:sem:highlighting.span-priority]
+// [spec:mw:req:highlighting.span-bounds]
+// [spec:mw:req:uikit.syntax.span-bounds+1]
 pub(crate) fn build_highlighted(
     source: &str,
     spans: &[SyntaxSpan],
@@ -73,7 +74,7 @@ pub(crate) fn build_highlighted(
 /// name to an accent is platform-neutral and lives in
 /// [`crate::highlight`]; only the colour lookup is UIKit's. An accent
 /// the walk cannot resolve leaves the run's colour untouched.
-// [spec:mw:req:uikit.syntax.capture-fallback]
+// [spec:mw:req:highlighting.capture-accent]
 fn syntax_color(style: &UIKitStyle, capture: &str) -> Option<Retained<UIColor>> {
     let _ = style; // reserved for future per-style overrides
     let color = match capture_accent(capture)? {

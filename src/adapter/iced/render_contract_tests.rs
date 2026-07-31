@@ -240,3 +240,112 @@ fn task_toggle_ids_are_one_based_and_assigned_in_document_order() {
     let _ = renderer.render_node(&none[0], &task_id);
     assert_eq!(task_id.get(), 0);
 }
+
+/// iced resolved capture names by first dotted component, so
+/// `string.escape` was indistinguishable from `string` here while
+/// resolving to its own accent on the UIKit path. Both now walk the
+/// shared prefix table.
+// [spec:mw:req:highlighting.capture-accent/test]
+#[cfg(feature = "highlight")]
+#[test]
+fn capture_names_resolve_by_prefix_walk_not_first_component() {
+    assert_ne!(
+        accent_color("string.escape"),
+        accent_color("string"),
+        "an escape has its own accent and must not collapse into its prefix"
+    );
+    assert_eq!(
+        accent_color("keyword.control.conditional"),
+        accent_color("keyword"),
+        "an unmapped name falls back through successively shorter prefixes"
+    );
+    assert_eq!(accent_color("nonsense.deeply.nested"), None);
+    assert_eq!(
+        accent_color("variable"),
+        None,
+        "deliberately unaccented captures stay unaccented"
+    );
+}
+
+/// A highlighter runs against a copy of the source, so an edit that
+/// shortens it leaves spans describing the longer text. iced clamped
+/// those with `.min(len)` and painted them; UIKit discarded them. The
+/// clamped run is a real capture over the wrong bytes.
+// [spec:mw:req:highlighting.span-bounds/test]
+#[cfg(feature = "highlight")]
+#[test]
+fn stale_spans_past_the_source_are_discarded_not_clamped() {
+    let edited = "let v";
+    let stale = vec![
+        crate::SyntaxSpan {
+            start: 0,
+            end: 3,
+            capture: "keyword".into(),
+            pattern_index: 0,
+        },
+        crate::SyntaxSpan {
+            start: 4,
+            end: 9,
+            capture: "string".into(),
+            pattern_index: 1,
+        },
+    ];
+
+    let rendered = highlight_to_spans(edited, &stale);
+    let text: String = rendered.iter().map(|s| &*s.text).collect();
+    assert_eq!(text, edited, "every byte is emitted exactly once");
+
+    let coloured: Vec<&str> = rendered
+        .iter()
+        .filter(|s| s.color.is_some())
+        .map(|s| &*s.text)
+        .collect();
+    assert_eq!(
+        coloured,
+        vec!["let"],
+        "only the span still inside the edited source paints"
+    );
+}
+
+/// Equal-width spans covering the same byte: the later start wins. The
+/// old selection loop had no start tie-break and fell through to
+/// pattern_index, so it could disagree with the sequential painter.
+// [spec:mw:sem:highlighting.span-priority/test]
+#[cfg(feature = "highlight")]
+#[test]
+fn equal_width_overlaps_resolve_the_same_way_the_painter_does() {
+    let src = "abcdef";
+    let spans = vec![
+        crate::SyntaxSpan {
+            start: 0,
+            end: 4,
+            capture: "keyword".into(),
+            pattern_index: 9,
+        },
+        crate::SyntaxSpan {
+            start: 2,
+            end: 6,
+            capture: "comment".into(),
+            pattern_index: 0,
+        },
+    ];
+
+    // Byte 2..4 is covered by both, equal widths, later start wins —
+    // regardless of the lower pattern_index on the winner.
+    let ordered = crate::highlight::order_spans(&spans);
+    let painter_winner = ordered
+        .iter()
+        .rfind(|s| s.start as usize <= 2 && 4 <= s.end as usize)
+        .unwrap();
+    assert_eq!(painter_winner.capture, "comment");
+
+    let rendered = highlight_to_spans(src, &spans);
+    let segment = rendered
+        .iter()
+        .find(|s| s.text == "cd")
+        .expect("a segment split at the overlap boundary");
+    assert_eq!(
+        segment.color,
+        accent_color("comment").map(|(r, g, b)| Color::from_rgb(r, g, b))
+    );
+}

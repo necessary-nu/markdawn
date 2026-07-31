@@ -1631,24 +1631,28 @@ fn highlight_to_spans(
     src: &str,
     spans: &[crate::SyntaxSpan],
 ) -> Vec<crate::iced_shim::widget::text::Span<'static, String>> {
-    // Providers may emit OVERLAPPING / nested spans (an
-    // identifier inside a function-call inside a statement, etc.).
-    // The naive sequential walker emitted overlapping bytes multiple
-    // times — that's why every token appeared duplicated.
+    // Providers emit overlapping and nested spans, so a byte can be covered
+    // several times over; painting them in sequence would emit those bytes
+    // more than once. Split the source at every span boundary instead, and
+    // resolve each segment to the one span that should style it.
     //
-    // Split the source at every span boundary into half-open
-    // segments. For each segment, pick the innermost (smallest) span
-    // covering it as the color source. Segments not covered by any
-    // span render with no color.
+    // Resolution, bounds and capture vocabulary all come from
+    // `crate::highlight` rather than being decided here. This renderer used
+    // to decide all three for itself and got two of them wrong: it clamped
+    // out-of-range spans instead of discarding them, and it resolved capture
+    // names by first dotted component instead of by prefix walk.
     let len = src.len();
     let mut breaks: Vec<usize> = Vec::with_capacity(2 + spans.len() * 2);
     breaks.push(0);
     breaks.push(len);
+    // A span that does not apply contributes no boundary either; leaving its
+    // clamped edges in would split a run for a span that never paints.
+    // [spec:mw:req:highlighting.span-bounds]
     for s in spans {
-        let lo = (s.start as usize).min(len);
-        let hi = (s.end as usize).min(len);
-        breaks.push(lo);
-        breaks.push(hi);
+        if let Some((lo, hi)) = crate::highlight::byte_range(src, s) {
+            breaks.push(lo);
+            breaks.push(hi);
+        }
     }
     breaks.sort_unstable();
     breaks.dedup();
@@ -1656,32 +1660,24 @@ fn highlight_to_spans(
     let mut out = Vec::with_capacity(breaks.len().saturating_sub(1));
     for window in breaks.windows(2) {
         let (lo, hi) = (window[0], window[1]);
-        if lo >= hi || hi > len || !src.is_char_boundary(lo) || !src.is_char_boundary(hi) {
+        if lo >= hi || !src.is_char_boundary(lo) || !src.is_char_boundary(hi) {
             continue;
         }
-        // Pick innermost (smallest-range) span covering [lo, hi).
-        let mut best: Option<&crate::SyntaxSpan> = None;
-        for s in spans {
-            let s_lo = (s.start as usize).min(len);
-            let s_hi = (s.end as usize).min(len);
-            if s_lo <= lo && hi <= s_hi {
-                match best {
-                    None => best = Some(s),
-                    Some(b) => {
-                        let span_width = s.end.saturating_sub(s.start);
-                        let best_width = b.end.saturating_sub(b.start);
-                        if span_width < best_width
-                            || (span_width == best_width && s.pattern_index > b.pattern_index)
-                        {
-                            best = Some(s);
-                        }
-                    }
-                }
-            }
-        }
+        // The winner is the span `paint_order` ranks last among those
+        // covering this segment — the same choice the sequential painter
+        // arrives at by letting the last write stand.
+        // [spec:mw:sem:highlighting.span-priority]
+        let best = spans
+            .iter()
+            .filter(|s| {
+                crate::highlight::byte_range(src, s)
+                    .is_some_and(|(s_lo, s_hi)| s_lo <= lo && hi <= s_hi)
+            })
+            .max_by(|a, b| crate::highlight::paint_order(a, b));
+
         let mut sp = span(src[lo..hi].to_string()).font(MONOSPACE);
         if let Some(s) = best
-            && let Some((r, g, b)) = scope_color(&s.capture)
+            && let Some((r, g, b)) = accent_color(&s.capture)
         {
             sp = sp.color(Color::from_rgb(r, g, b));
         }
@@ -1690,21 +1686,27 @@ fn highlight_to_spans(
     out
 }
 
+/// Minimal default palette over the shared accent vocabulary. Hosts wanting
+/// finer theming can post-process the output or supply their own
+/// highlighter.
+///
+/// Only the palette is iced's; which accent a capture resolves to is
+/// `capture_accent`'s, so this renderer and UIKit cannot disagree about what
+/// a capture *means* — only about what colour to paint it.
+// [spec:mw:req:highlighting.capture-accent]
 #[cfg(feature = "highlight")]
-fn scope_color(scope: &str) -> Option<(f32, f32, f32)> {
-    // Minimal default palette. Hosts wanting fine-grained theming can
-    // post-process the output or provide a custom highlighter that emits
-    // a finer scope tree.
-    let head = scope.split('.').next().unwrap_or(scope);
-    Some(match head {
-        "keyword" => (0.55, 0.20, 0.65),
-        "string" => (0.20, 0.55, 0.30),
-        "comment" => (0.45, 0.45, 0.50),
-        "constant" | "number" => (0.75, 0.45, 0.10),
-        "function" | "entity" => (0.10, 0.40, 0.75),
-        "type" | "support" => (0.10, 0.55, 0.55),
-        "variable" => (0.35, 0.30, 0.30),
-        _ => return None,
+fn accent_color(capture: &str) -> Option<(f32, f32, f32)> {
+    use crate::highlight::SyntaxAccent;
+    Some(match crate::highlight::capture_accent(capture)? {
+        SyntaxAccent::Keyword => (0.55, 0.20, 0.65),
+        SyntaxAccent::StringLiteral => (0.20, 0.55, 0.30),
+        SyntaxAccent::Comment => (0.45, 0.45, 0.50),
+        SyntaxAccent::Constant => (0.75, 0.45, 0.10),
+        SyntaxAccent::Function => (0.10, 0.40, 0.75),
+        SyntaxAccent::Type => (0.10, 0.55, 0.55),
+        SyntaxAccent::Attribute => (0.60, 0.40, 0.15),
+        SyntaxAccent::Escape => (0.70, 0.35, 0.45),
+        SyntaxAccent::Label => (0.40, 0.35, 0.60),
     })
 }
 

@@ -62,6 +62,49 @@ receives is the renderer's own concern and lives in that adapter's file.
 > is refreshed per highlight; a code block rendered after its language
 > registers MUST be highlighted.
 
+## Resolving spans for painting
+
+These three govern every renderer that paints spans itself rather than
+delegating to the provider's HTML formatter — today `uikit` and `iced`.
+They lived under `uikit` while it was the only such renderer, which let the
+two drift: iced resolved capture names by first dotted component rather
+than by prefix walk, and clamped out-of-range spans where UIKit discarded
+them. Two renderers of one document disagreeing about which bytes are
+styled is a conformance difference, not a detail.
+
+> [spec:mw:req:highlighting.capture-accent]
+> A capture name that has no accent of its own MUST be retried against
+> successively shorter dotted prefixes — `keyword.function` falls back to
+> `keyword` — and a name still unmapped after the walk MUST leave the run
+> unaccented so it keeps the base text colour. Taking only the first dotted
+> component is not a conforming implementation: it makes `string.escape`
+> indistinguishable from `string`. Capture vocabularies differ per grammar
+> and grow over time, so an unrecognised capture is a missing accent, not an
+> error, and MUST NOT be rendered in a default or placeholder colour.
+> Captures that are deliberately unaccented — operators, punctuation, plain
+> variables — resolve to no accent by the same mechanism. Renderers MUST
+> resolve to the shared accent vocabulary rather than to their own palette
+> keys, so that two renderers cannot disagree about what a capture means.
+
+> [spec:mw:sem:highlighting.span-priority]
+> Spans may overlap and nest, so a byte covered by several MUST resolve to
+> exactly one: the narrowest span covering it, ties broken by the later
+> start and then the higher `pattern_index`. An enclosing capture is
+> therefore overpainted by the captures nested inside it, and for equal
+> ranges the higher-priority query pattern wins. A renderer MAY paint in
+> sequence and let the last write stand, or select a winner per run, but
+> both MUST derive that choice from one ordering — the two formulations
+> disagree on ties whenever they are written separately.
+
+> [spec:mw:req:highlighting.span-bounds]
+> A span MUST be discarded — never clamped into a shorter range — when it
+> is empty or inverted (`start >= end`) or when its end exceeds the source
+> length. A highlighter runs against a copy of the source, so after an edit
+> shortens it the returned offsets still describe the longer text; clamping
+> such a span paints a real capture over the wrong bytes, which reads as a
+> rendering bug, whereas discarding it merely leaves the run unstyled.
+> Out-of-range spans MUST NOT raise.
+
 ## Rendering spans to HTML
 
 > [spec:mw:req:highlighting.html-delegation]

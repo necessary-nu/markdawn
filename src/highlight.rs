@@ -310,10 +310,17 @@ mod provider {
 pub use provider::{DynamicHighlighter, Highlighter};
 
 // The span algebra below is platform-neutral arithmetic over `SyntaxSpan`,
-// but its only caller today is the UIKit adapter, which compiles solely
-// for `target_os = "ios"` — hence the `dead_code` waivers on the entry
-// points. Living here rather than inside that adapter is what makes the
-// logic testable on a non-Apple host.
+// shared by every renderer that paints spans itself rather than delegating
+// to the provider's HTML formatter. Both such renderers are gated — UIKit on
+// `target_os = "ios"`, iced behind its feature — so under a build with
+// neither these are unreferenced, hence the `dead_code` waivers on the entry
+// points. Living here rather than inside an adapter is what makes the logic
+// testable on a non-Apple host, and what stops the two renderers deciding
+// capture resolution, paint precedence and bounds separately, which is
+// exactly how they drifted apart.
+//
+// `utf16_offset` and `utf16_range` are the exception: UTF-16 is an
+// `NSAttributedString` concern and UIKit is still their only caller.
 
 /// The palette slot a capture name resolves to, independent of any
 /// toolkit's colour type.
@@ -349,8 +356,7 @@ pub(crate) enum SyntaxAccent {
 /// retrying against successively shorter dotted prefixes. `None` when
 /// the name is unmapped at every level, or when it names a capture that
 /// is deliberately unaccented.
-// [spec:mw:req:uikit.syntax.capture-fallback]
-#[allow(dead_code)]
+// [spec:mw:req:highlighting.capture-accent]
 pub(crate) fn capture_accent(capture: &str) -> Option<SyntaxAccent> {
     let mut name = capture;
     loop {
@@ -364,7 +370,7 @@ pub(crate) fn capture_accent(capture: &str) -> Option<SyntaxAccent> {
 
 /// The accent table, keyed on a whole capture name. Consulted by
 /// [`capture_accent`] once per dotted prefix.
-// [spec:mw:req:uikit.syntax.capture-fallback]
+// [spec:mw:req:highlighting.capture-accent]
 fn exact_capture_accent(capture: &str) -> Option<SyntaxAccent> {
     let accent = match capture {
         "keyword" | "include" | "storageclass" | "conditional" | "repeat" => SyntaxAccent::Keyword,
@@ -404,25 +410,53 @@ fn exact_capture_accent(capture: &str) -> Option<SyntaxAccent> {
     Some(accent)
 }
 
-/// Order `spans` for painting: widest first, ties broken by ascending
-/// start offset and then ascending `pattern_index`.
+/// Paint precedence between two spans, as an ordering in which the winner
+/// for any byte both cover sorts *last*.
 ///
-/// Painting in this order means an enclosing capture is painted before
-/// the captures nested inside it, and — for equal ranges — the
-/// higher-priority query pattern is painted last and wins.
-// [spec:mw:sem:uikit.syntax.span-priority]
+/// The narrower span wins, so an enclosing capture is overpainted by the
+/// captures nested inside it. Equal widths break to the later start, then
+/// to the higher `pattern_index` — the higher-priority query pattern.
+///
+/// Two renderers need this: one paints in sequence and lets the last write
+/// win, the other selects a winner per segment. Expressing it once as an
+/// ordering is what keeps them from disagreeing on ties, which is exactly
+/// how they drifted apart before.
+// [spec:mw:sem:highlighting.span-priority]
+pub(crate) fn paint_order(a: &SyntaxSpan, b: &SyntaxSpan) -> std::cmp::Ordering {
+    let a_width = a.end.saturating_sub(a.start);
+    let b_width = b.end.saturating_sub(b.start);
+    b_width
+        .cmp(&a_width)
+        .then_with(|| a.start.cmp(&b.start))
+        .then_with(|| a.pattern_index.cmp(&b.pattern_index))
+}
+
+/// Order `spans` for painting, so that painting them in sequence leaves
+/// each byte styled by the span [`paint_order`] ranks last.
+// [spec:mw:sem:highlighting.span-priority]
 #[allow(dead_code)]
 pub(crate) fn order_spans(spans: &[SyntaxSpan]) -> Vec<&SyntaxSpan> {
     let mut ordered: Vec<&SyntaxSpan> = spans.iter().collect();
-    ordered.sort_by(|a, b| {
-        let a_width = a.end.saturating_sub(a.start);
-        let b_width = b.end.saturating_sub(b.start);
-        b_width
-            .cmp(&a_width)
-            .then_with(|| a.start.cmp(&b.start))
-            .then_with(|| a.pattern_index.cmp(&b.pattern_index))
-    });
+    ordered.sort_by(|a, b| paint_order(a, b));
     ordered
+}
+
+/// Resolve `span` to a byte range within `source`, or `None` when it does
+/// not apply: empty, inverted, or ending past the source.
+///
+/// A highlighter runs against a copy of the source, so after an edit
+/// shortens it the spans still describe the longer text. Such a span is
+/// discarded rather than clamped — clamping would paint a shorter run in
+/// the right colour at the wrong place, which reads as a rendering bug
+/// rather than as missing highlighting.
+// [spec:mw:req:highlighting.span-bounds]
+pub(crate) fn byte_range(source: &str, span: &SyntaxSpan) -> Option<(usize, usize)> {
+    let start = span.start as usize;
+    let end = span.end as usize;
+    if start >= end || end > source.len() {
+        return None;
+    }
+    Some((start, end))
 }
 
 /// Convert a UTF-8 byte offset into `source` to a UTF-16 code-unit
@@ -432,7 +466,7 @@ pub(crate) fn order_spans(spans: &[SyntaxSpan]) -> Vec<&SyntaxSpan> {
 /// yields the source's full code-unit length, and one that lands inside
 /// a codepoint rounds forward to that codepoint's boundary — a UTF-16
 /// range cannot split a surrogate pair.
-// [spec:mw:req:uikit.syntax.span-bounds]
+// [spec:mw:req:uikit.syntax.span-bounds+1]
 #[allow(dead_code)]
 pub(crate) fn utf16_offset(source: &str, byte_offset: usize) -> usize {
     let limit = byte_offset.min(source.len());
@@ -454,14 +488,10 @@ pub(crate) fn utf16_offset(source: &str, byte_offset: usize) -> usize {
 /// against a copy of the source, so its offsets may no longer describe
 /// the string being styled; such a span is dropped, not clamped into a
 /// shorter range that would paint the wrong run.
-// [spec:mw:req:uikit.syntax.span-bounds]
+// [spec:mw:req:highlighting.span-bounds]
 #[allow(dead_code)]
 pub(crate) fn utf16_range(source: &str, span: &SyntaxSpan) -> Option<(usize, usize)> {
-    let start = span.start as usize;
-    let end = span.end as usize;
-    if start >= end || end > source.len() {
-        return None;
-    }
+    let (start, end) = byte_range(source, span)?;
     let utf16_start = utf16_offset(source, start);
     let utf16_end = utf16_offset(source, end);
     if utf16_end <= utf16_start {
@@ -572,7 +602,7 @@ mod span_tests {
     /// surrogate pair.
     const MIXED: &str = "aé𝄞b";
 
-    // [spec:mw:req:uikit.syntax.capture-fallback/test]
+    // [spec:mw:req:highlighting.capture-accent/test]
     #[test]
     fn capture_accent_walks_dotted_prefixes() {
         assert_eq!(capture_accent("keyword"), Some(SyntaxAccent::Keyword));
@@ -599,7 +629,7 @@ mod span_tests {
         );
     }
 
-    // [spec:mw:req:uikit.syntax.capture-fallback/test]
+    // [spec:mw:req:highlighting.capture-accent/test]
     #[test]
     fn unmapped_capture_names_resolve_to_no_accent() {
         assert_eq!(
@@ -627,7 +657,7 @@ mod span_tests {
         assert_eq!(capture_accent("variable.parameter"), None);
     }
 
-    // [spec:mw:req:uikit.syntax.span-bounds/test]
+    // [spec:mw:req:highlighting.span-bounds/test]
     #[test]
     fn utf16_offset_counts_code_units_across_multibyte_codepoints() {
         assert_eq!(MIXED.len(), 8, "byte length");
@@ -644,7 +674,7 @@ mod span_tests {
         assert_eq!(utf16_offset(MIXED, 8), 5, "whole string");
     }
 
-    // [spec:mw:req:uikit.syntax.span-bounds/test]
+    // [spec:mw:req:highlighting.span-bounds/test]
     #[test]
     fn utf16_offset_clamps_past_the_end_instead_of_slicing() {
         assert_eq!(utf16_offset(MIXED, 9), 5);
@@ -659,7 +689,7 @@ mod span_tests {
         assert_eq!(utf16_offset(MIXED, 2), 2, "likewise inside 'é'");
     }
 
-    // [spec:mw:req:uikit.syntax.span-bounds/test]
+    // [spec:mw:req:highlighting.span-bounds/test]
     #[test]
     fn utf16_range_converts_in_range_spans() {
         assert_eq!(
@@ -675,7 +705,7 @@ mod span_tests {
         assert_eq!(utf16_range(MIXED, &span(1, 3, "keyword", 0)), Some((1, 1)));
     }
 
-    // [spec:mw:req:uikit.syntax.span-bounds/test]
+    // [spec:mw:req:highlighting.span-bounds/test]
     #[test]
     fn utf16_range_discards_out_of_range_and_degenerate_spans() {
         assert_eq!(
@@ -707,7 +737,7 @@ mod span_tests {
 
     // A highlighter runs against a copy of the source: after an edit
     // shortens it, the spans it returns still describe the longer text.
-    // [spec:mw:req:uikit.syntax.span-bounds/test]
+    // [spec:mw:req:highlighting.span-bounds/test]
     #[test]
     fn stale_spans_from_a_longer_source_are_dropped() {
         let edited = "let v";
@@ -729,7 +759,7 @@ mod span_tests {
         );
     }
 
-    // [spec:mw:sem:uikit.syntax.span-priority/test]
+    // [spec:mw:sem:highlighting.span-priority/test]
     #[test]
     fn order_spans_paints_widest_first() {
         let spans = vec![

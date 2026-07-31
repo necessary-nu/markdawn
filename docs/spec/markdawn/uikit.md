@@ -144,40 +144,21 @@ font, colour, and spacing decision is resolved.
 
 ## Syntax highlighting
 
-> [spec:mw:req:uikit.syntax.capture-fallback]
-> A capture name that has no colour of its own MUST be retried
-> against successively shorter dotted prefixes — `keyword.function`
-> falls back to `keyword` — and a name that is still unmapped after
-> the walk MUST leave the run's colour untouched so it keeps the
-> base text colour. Capture vocabularies differ per grammar and
-> grow over time; an unrecognised capture is a missing accent, not
-> an error, and MUST NOT be rendered in a default or placeholder
-> colour. Captures that are deliberately unaccented (operators,
-> punctuation, plain variables) resolve to no colour by the same
-> mechanism.
+Capture resolution, paint precedence and span bounds are renderer-neutral
+and live in `highlighting` — this adapter is one of two consumers, and the
+two disagreeing is the defect those rules exist to prevent. What remains
+here is the part that is genuinely Apple-specific.
 
-> [spec:mw:sem:uikit.syntax.span-priority]
-> Spans may overlap and nest, and the attributed string keeps
-> whichever colour was applied last for a given character. Spans
-> are therefore applied widest-first, ties broken by ascending
-> start offset and then by ascending `pattern_index`, so an
-> enclosing capture is painted before the captures nested inside it
-> and, for equal ranges, the higher-priority query pattern is
-> applied last and wins.
-
-> [spec:mw:req:uikit.syntax.span-bounds]
-> Span offsets are UTF-8 byte offsets into the source; attributed
-> string ranges are UTF-16 code-unit offsets, so every offset MUST
-> be converted before use and the conversion MUST clamp its input
-> to the source length rather than slicing out of bounds. The
-> source is trimmed of trailing newlines before highlighting, and a
-> span MUST be discarded — not clamped into a shorter range — when
-> it is empty or inverted (`start >= end`), when its end exceeds
-> the trimmed byte length, or when the converted UTF-16 range is
-> degenerate. A highlighter runs against a copy of the source and
-> can return offsets that no longer describe the string being
-> attributed; out-of-range spans MUST leave the run unstyled rather
-> than raise.
+> [spec:mw:req:uikit.syntax.span-bounds+1]
+> Span offsets are UTF-8 byte offsets into the source; attributed string
+> ranges are UTF-16 code-unit offsets, so every offset MUST be converted
+> before use and the conversion MUST clamp its input to the source length
+> rather than slicing out of bounds — an offset landing inside a codepoint
+> MUST round forward to that codepoint's boundary, since a UTF-16 range
+> cannot split a surrogate pair. The source is trimmed of trailing newlines
+> before highlighting. A span whose converted UTF-16 range is degenerate
+> MUST be discarded; which spans are in range at all is
+> `[spec:mw:req:highlighting.span-bounds]`.
 
 ## Block layout
 

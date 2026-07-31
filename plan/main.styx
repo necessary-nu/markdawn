@@ -11,7 +11,14 @@ children (
         title "Establish the renderer-neutral syntax-highlighting boundary"
         priority 0
         implements {
-            main ([spec:mw:req:highlighting.api] [spec:mw:req:highlighting.span-semantics] [spec:mw:req:highlighting.error-fallback])
+            main (
+                [spec:mw:req:highlighting.api]
+                [spec:mw:req:highlighting.span-semantics]
+                [spec:mw:req:highlighting.error-fallback]
+                [spec:mw:req:highlighting.capture-accent]
+                [spec:mw:sem:highlighting.span-priority]
+                [spec:mw:req:highlighting.span-bounds]
+            )
         }
         log (
             {
@@ -978,10 +985,8 @@ children (
                         [spec:mw:req:uikit.layout.blockquote]
                         [spec:mw:req:uikit.layout.list-item]
                         [spec:mw:req:uikit.style.system-colors]
-                        [spec:mw:req:uikit.syntax.capture-fallback]
                         [spec:mw:req:uikit.syntax.span-bounds]
                         [spec:mw:sem:uikit.attributes.inherited-traits]
-                        [spec:mw:sem:uikit.syntax.span-priority]
                     )
                 }
                 deps (core markdawn-highlighter-boundary)
@@ -1811,6 +1816,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found while extracting the platform-neutral span logic for defects.uikit-syntax-logic-apple-bound. src/adapter/iced/render.rs reimplements all three transformations that now live in src/highlight.rs, and two of the three disagree with the spec the UIKit path is held to.\n\n1. scope_color (render.rs:1693-1709) does scope.split('.').next() — it takes only the FIRST dotted component rather than walking successively shorter prefixes. So `string.escape` collapses to `string` in iced while resolving to its own Escape accent on UIKit. It also carries a second hardcoded palette, so the two adapters can drift in colour as well as in resolution.\n\n2. highlight_to_spans (render.rs:1663-1681) resolves priority as an innermost-wins plus higher-pattern_index-wins selection loop — the inverse formulation of order_spans' widest-first sort. Same intent, opposite construction, so they can disagree on ties.\n\n3. The same function clamps out-of-range offsets with .min(len) at render.rs:1648-1649 and :1665-1666, where uikit.syntax.span-bounds requires DISCARDING an out-of-range span. So a stale span after an edit renders clamped-and-styled in iced and unstyled in UIKit — the divergence is user-visible, not cosmetic.\n\nFiled P1 rather than P2 because (3) is a spec conformance difference between two shipping renderers, not a tidiness issue. The fix is for the iced path to consume SyntaxAccent + capture_accent + order_spans + utf16_range so there is one capture vocabulary, one priority policy and one bounds policy. Note that would also let the three uikit.syntax.* rules be restated as renderer-neutral rules rather than UIKit-specific ones, since the logic is no longer Apple-bound — worth deciding at the same time."
+                    }
+
+                    {
+                        at 2026-07-31T12:09:39.879992Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-07-31T13:26:21.150354Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Fixed by making the three policies shared rather than duplicated, and by moving the rules that govern them out of `uikit`.\n\nMECHANISM. `paint_order` expresses precedence once — narrower wins, ties to the later start, then the higher pattern_index. `order_spans` is now `sort_by(paint_order)` (behaviour unchanged, one definition) and iced selects with `max_by(paint_order)`, so the sequential painter and the per-segment selector are provably the same order rather than two spellings that happened to agree. `byte_range` extracts the discard policy that was buried inside `utf16_range`, so iced can use it without dragging in UTF-16; `utf16_range` is now `byte_range` plus the conversion. iced's `scope_color` became `accent_color` over the shared `SyntaxAccent`, so only the palette is iced's.\n\nBOTH REAL DIVERGENCES PRODUCED WRONG OUTPUT, not merely duplication. iced clamped an out-of-range span with `.min(len)` and painted it, so a stale span after an edit rendered a real capture over the wrong bytes where UIKit discarded it. And iced's selection had no start tie-break, so two equal-width spans covering one byte fell through to pattern_index where the painter takes the later start. Both cases are now pinned by tests that fail against the old code.\n\nRULES MOVED, NOT RENAMED. `uikit.syntax.capture-fallback` and `uikit.syntax.span-priority` became `highlighting.capture-accent` and `highlighting.span-priority`, and a new `highlighting.span-bounds` carries the discard policy. They were filed under uikit only because uikit was once the sole renderer painting spans itself; leaving them there while iced obeyed them would be the same misfiling defects.highlighting-rules-misfiled already fixed once here. `uikit.syntax.span-bounds` survives at +1, narrowed to the genuinely Apple-specific part: UTF-16 conversion and its clamping, with in-range-ness delegated to the shared rule.\n\nI nearly added a `uikit.style.syntax-palette` rule for the accent-to-UIColor mapping, then removed it — `uikit.style.system-colors` already requires semantic system colours throughout, including view factories, and a second rule restating it is the core-spec-padding defect this repo also already fixed.\n\nDEAD-CODE WAIVERS. Dropped from `capture_accent`, `paint_order` and `byte_range`, which iced now references; kept on `order_spans`, `utf16_offset` and `utf16_range`, which stay UIKit-only. My first pass dropped all six on the reasoning that iced used them now. It uses three; clippy caught the other half."
                     }
                 )
             }
