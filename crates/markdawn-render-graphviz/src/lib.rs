@@ -42,7 +42,7 @@ pub unsafe extern "C" fn mw_render_dot(ptr: *const u8, len: usize) -> *mut c_cha
 /// — null is the only argument this function can reject. The engine-qualified
 /// name is the guard: no other module exports it, so naming it against the
 /// wrong module fails to resolve rather than freeing into the wrong heap.
-// [spec:mw:req:ffi.ownership.string-free+2]
+// [spec:mw:req:ffi.ownership.string-free+3]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_render_graphviz_string_free(ptr: *mut c_char) {
     if ptr.is_null() {
@@ -61,7 +61,7 @@ mod tests {
     // and null passes through untouched. The cross-module half is not testable
     // from here — it needs two loaded wasm modules, and is not checkable at
     // runtime at all; the link-time guard is the engine-qualified name itself.
-    // [spec:mw:req:ffi.ownership.string-free+2/test]
+    // [spec:mw:req:ffi.ownership.string-free+3/test]
     #[test]
     fn rendered_string_round_trips_through_this_modules_free() {
         let src = "digraph { a -> b }";

@@ -149,7 +149,7 @@ pub unsafe extern "C" fn mw_state_push_byte(state: *mut State, byte: u8) -> u32 
 /// point to `len` readable bytes.
 // The bytes live in the JS heap and are copied out before returning, so the
 // caller can `_free` them as soon as the call completes.
-// [spec:mw:req:ffi.ownership.borrowed-input]
+// [spec:mw:req:ffi.ownership.borrowed-input+1]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_push_chunk(state: *mut State, ptr: *const u8, len: usize) -> u32 {
     if state.is_null() || (ptr.is_null() && len > 0) {
@@ -183,7 +183,7 @@ pub unsafe extern "C" fn mw_state_finish(state: *mut State) -> u32 {
 ///
 /// # Safety
 /// `state` must be a pointer returned by `mw_state_new` and not yet freed.
-// [spec:mw:req:ffi.ownership.string-free+2]
+// [spec:mw:req:ffi.ownership.string-free+3]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_render(state: *const State) -> *mut c_char {
     if state.is_null() {
@@ -202,7 +202,7 @@ pub unsafe extern "C" fn mw_state_render(state: *const State) -> *mut c_char {
 // the unqualified name; each lazily-loaded render module exports its free under
 // an engine-qualified name instead, and a pointer minted by one of them must go
 // back to that name rather than here.
-// [spec:mw:req:ffi.ownership.string-free+2]
+// [spec:mw:req:ffi.ownership.string-free+3]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_string_free(ptr: *mut c_char) {
     if ptr.is_null() {
@@ -348,7 +348,7 @@ mod tests {
     // The half of the ownership contract this module can enforce: a pointer it
     // minted goes back to its own `mw_string_free`. Which module a pointer came
     // from is not something the callee can check — see the rule.
-    // [spec:mw:req:ffi.ownership.string-free+2/test]
+    // [spec:mw:req:ffi.ownership.string-free+3/test]
     #[test]
     fn rendered_string_round_trips_through_this_modules_free() {
         let state = mw_state_new();

@@ -15,7 +15,7 @@ fn finish_and_render(state: *mut State) -> String {
     html
 }
 
-// [spec:mw:req:ffi.ownership.borrowed-input/test]
+// [spec:mw:req:ffi.ownership.borrowed-input+1/test]
 #[test]
 fn a_pushed_chunk_is_copied_before_the_call_returns() {
     let state = mw_state_new();
@@ -36,7 +36,7 @@ fn a_pushed_chunk_is_copied_before_the_call_returns() {
     assert!(!html.contains('\u{FFFD}'), "scrubbed bytes leaked: {html}");
 }
 
-// [spec:mw:req:ffi.ownership.borrowed-input/test]
+// [spec:mw:req:ffi.ownership.borrowed-input+1/test]
 #[test]
 fn a_borrowed_chunk_is_not_retained_across_pushes() {
     let state = mw_state_new();

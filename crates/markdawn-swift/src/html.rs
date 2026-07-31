@@ -150,7 +150,7 @@ pub unsafe extern "C" fn mw_state_push_byte(state: *mut State, byte: u8) -> u32 
 /// point to `len` readable bytes.
 // The chunk is copied into the pending buffer before returning; the caller
 // may free or reuse it immediately.
-// [spec:mw:req:ffi.ownership.borrowed-input]
+// [spec:mw:req:ffi.ownership.borrowed-input+1]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_push_chunk(state: *mut State, ptr: *const u8, len: usize) -> u32 {
     if state.is_null() || (ptr.is_null() && len > 0) {
@@ -183,7 +183,7 @@ pub unsafe extern "C" fn mw_state_finish(state: *mut State) -> u32 {
 ///
 /// # Safety
 /// `state` must be a pointer returned by `mw_state_new` and not yet freed.
-// [spec:mw:req:ffi.ownership.string-free+2]
+// [spec:mw:req:ffi.ownership.string-free+3]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_state_render(state: *const State) -> *mut c_char {
     if state.is_null() {
@@ -202,7 +202,7 @@ pub unsafe extern "C" fn mw_state_render(state: *const State) -> *mut c_char {
 // plugins it loads never mint a `*mut c_char`, so there is no second heap here
 // to confuse this with — it keeps the unqualified name the published header
 // declares.
-// [spec:mw:req:ffi.ownership.string-free+2]
+// [spec:mw:req:ffi.ownership.string-free+3]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_string_free(ptr: *mut c_char) {
     if ptr.is_null() {
@@ -330,7 +330,7 @@ mod tests {
         unsafe { mw_state_free(state) };
     }
 
-    // [spec:mw:req:ffi.ownership.string-free+2/test]
+    // [spec:mw:req:ffi.ownership.string-free+3/test]
     #[test]
     fn rendered_string_round_trips_through_this_modules_free() {
         let state = mw_state_new();

@@ -90,7 +90,7 @@ pub extern "C" fn mw_uikit_state_new() -> *mut UIKitState {
 /// point to `len` readable bytes.
 // The chunk is copied into the pending buffer before returning; the caller
 // may free or reuse it immediately.
-// [spec:mw:req:ffi.ownership.borrowed-input]
+// [spec:mw:req:ffi.ownership.borrowed-input+1]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mw_uikit_state_push_chunk(
     state: *mut UIKitState,

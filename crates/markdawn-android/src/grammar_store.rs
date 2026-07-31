@@ -46,7 +46,7 @@ pub fn global_registry() -> &'static Arc<DynamicRegistry> {
 /// `&'static` data owned by the plugin image, which must stay resident.
 /// Android never unloads a library pulled in by `System.loadLibrary`.
 // [spec:mw:def:ffi.plugin.grammar-registration+1]
-// [spec:mw:req:ffi.ownership.borrowed-input]
+// [spec:mw:req:ffi.ownership.borrowed-input+1]
 pub(crate) fn register_language(name: &str) -> u32 {
     // SAFETY: the resolver returns a symbol from the loaded process image,
     // and `load_provider` validates the descriptor behind it before anything

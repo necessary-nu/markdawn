@@ -67,23 +67,23 @@ per entry point.
 > staticlib and its published header, and the absence of an engine prefix is
 > what identifies the core heap. One crossing consequently stays expressible —
 > handing a render module's pointer to the core module's `mw_string_free` — and
-> that one is still held by encapsulation: in
-> `crates/markdawn-wasm-emscripten/web/index.template.html` a render module's
-> raw pointer never leaves the per-module closure that allocates, reads and
-> releases it, so no caller-side code is ever in a position to pair one with the
-> core module.
+> nothing in this repository prevents it, because nothing here embeds the
+> modules. An embedding host MUST therefore confine a render module's raw
+> pointer to the scope that allocates, reads and releases it, so that no
+> caller-side code is ever in a position to pair one with the core module.
 
-> [spec:mw:req:ffi.ownership.borrowed-input]
+> [spec:mw:req:ffi.ownership.borrowed-input+1]
 > Pointers passed *into* the ABI are borrowed for the duration of the call and
 > no longer. `mw_state_push_chunk`, `mw_uikit_state_push_chunk`,
-> `mw_render_dot`, `mw_render_typst`, `mw_render_pikchr` and every
-> `(ptr, len)` pair of `mw_register_grammar` MUST reference memory readable for
+> `mw_render_dot`, `mw_render_typst`, `mw_render_pikchr` and
+> `mw_register_language`'s `(ptr, len)` name MUST reference memory readable for
 > the length given, and the callee MUST copy anything it needs to retain before
 > returning. The host keeps ownership and MAY free or reuse the buffer as soon
-> as the call returns. The one argument that outlives its call is
-> `mw_register_grammar`'s `lang_fn`: the compiled grammar holds static data
-> reachable through that function pointer, so the plugin image it came from
-> MUST stay loaded for the remaining life of the process.
+> as the call returns. What outlives the call is not an argument but the
+> provider descriptor `mw_register_language` resolves: the registry holds
+> `&'static` data owned by the plugin image — its language function, queries and
+> metadata — so that image MUST stay loaded for the remaining life of the
+> process.
 
 > [spec:mw:req:ffi.ownership.retained-objc]
 > `mw_uikit_state_stack_view` and `mw_uikit_state_attributed_text` return

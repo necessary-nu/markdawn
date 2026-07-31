@@ -1034,6 +1034,8 @@ assertions (
     {id ntreesitter.swift-loader, kind @complete, author "brendan@necessary.nu", at 2026-07-31T11:57:14.661514Z}
     {id ntreesitter.android-loader, kind @complete, author "brendan@necessary.nu", at 2026-07-31T11:57:17.398914Z}
     {id ntreesitter.retire-arborium, kind @complete, author "brendan@necessary.nu", at 2026-07-31T11:58:49.09821Z}
+    {id defects.demo-highlighting-needs-cdn, kind @complete, author "brendan@necessary.nu", at 2026-07-31T12:06:42.673622Z}
+    {id defects.wasm-bindgen-demo-undocumented, kind @complete, author "brendan@necessary.nu", at 2026-07-31T12:06:44.831239Z}
 )
 
 impl_evidence (
