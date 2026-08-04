@@ -897,20 +897,25 @@ enum Clipped {
 /// `(x_start, x_end)` pair per visually-contiguous run of glyphs whose
 /// byte range overlaps `[lo, hi)`.
 ///
-/// PRECONDITION: the glyphs must be in ascending-`x_left` order. Runs
-/// are extended by comparing the next glyph's `x_left` against the
-/// open run's right edge, which only measures the true inter-box gap
-/// when the boxes march rightwards. Byte ranges may be permuted
-/// freely — that is what an embedded reversed bidi run looks like —
-/// but the boxes may not go backwards.
+/// Glyphs are ordered by left edge here rather than being required to
+/// arrive that way. Runs are extended by comparing the next glyph's
+/// `x_left` against the open run's right edge, which measures the true
+/// inter-box gap only when the boxes march rightwards, and
+/// `paragraph.buffer().layout_runs()` yields them along the line's own
+/// reading direction — so `x` descends on a base-RTL line. Fed that
+/// order the comparison reads two abutting boxes as separated by the
+/// sum of their advances, nothing ever coalesces, and grouping
+/// degenerates to one rectangle per glyph.
 ///
-/// `paragraph.buffer().layout_runs()` satisfies this for a base-LTR
-/// line and violates it for a base-RTL one, where `x` descends; see
-/// `paint_bidi_selection`.
+/// Byte ranges may still be permuted freely: an embedded reversed bidi
+/// run is the normal case, and the in-selection test is per glyph, so
+/// reordering by geometry cannot change which glyphs are selected —
+/// only which of them are recognised as neighbours.
 ///
 /// This is the algorithmic core of `paint_bidi_selection`, extracted
 /// so it can be unit-tested without an iced runtime.
-// [spec:mw:sem:iced.paint.glyph-run-grouping+1]
+// [spec:mw:sem:iced.paint.glyph-run-grouping+2]
+// [spec:mw:req:iced.paint.bidi-runs+1]
 fn group_in_selection_glyphs(
     glyphs: &[(usize, usize, f32, f32)],
     lo: usize,
@@ -920,9 +925,12 @@ fn group_in_selection_glyphs(
     /// them as visually contiguous (subpixel layout, kerning, etc.).
     const ADJACENCY_EPSILON_PX: f32 = 0.5;
 
+    let mut ordered: Vec<(usize, usize, f32, f32)> = glyphs.to_vec();
+    ordered.sort_by(|a, b| a.2.total_cmp(&b.2));
+
     let mut out = Vec::new();
     let mut current: Option<(f32, f32)> = None;
-    for &(g_lo, g_hi, x0, x1) in glyphs {
+    for (g_lo, g_hi, x0, x1) in ordered {
         let in_sel = g_lo < hi && g_hi > lo;
         if in_sel {
             match current {
@@ -1731,7 +1739,7 @@ mod tests {
 
     // ─── group_in_selection_glyphs (UAX #9 painting core) ───────
 
-    // [spec:mw:sem:iced.paint.glyph-run-grouping+1/test]
+    // [spec:mw:sem:iced.paint.glyph-run-grouping+2/test]
     #[test]
     fn grouping_pure_ltr_contiguous() {
         // Bytes monotonic with x; a single contiguous run.
@@ -1799,7 +1807,7 @@ mod tests {
         );
     }
 
-    // [spec:mw:sem:iced.paint.glyph-run-grouping+1/test]
+    // [spec:mw:sem:iced.paint.glyph-run-grouping+2/test]
     #[test]
     fn grouping_empty_selection_yields_no_rects() {
         let glyphs = [(0, 1, 0.0, 10.0), (1, 2, 10.0, 20.0)];
@@ -1810,7 +1818,7 @@ mod tests {
         );
     }
 
-    // [spec:mw:sem:iced.paint.glyph-run-grouping+1/test]
+    // [spec:mw:sem:iced.paint.glyph-run-grouping+2/test]
     #[test]
     fn grouping_subpixel_gap_coalesces() {
         // Two glyphs whose x extents are 0.3 px apart should merge.

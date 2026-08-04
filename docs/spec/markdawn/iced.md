@@ -333,25 +333,33 @@ line they belong to.
 > direction that is; see `[spec:mw:sem:iced.paint.glyph-run-grouping]`
 > for the coalescing predicate.
 
-> [spec:mw:sem:iced.paint.glyph-run-grouping+1]
+> [spec:mw:sem:iced.paint.glyph-run-grouping+2]
 > A glyph counts as selected when its byte range half-open overlaps
 > the selection (`glyph_start < hi && glyph_end > lo`), so an empty
-> range selects no glyph and paints nothing. Selected glyphs are
-> walked in the order supplied and coalesced into one run while the
-> next glyph's left edge stays within `ADJACENCY_EPSILON_PX` (0.5) of
-> the open run's right edge, so sub-pixel layout and kerning do not
-> shatter a run into hairline rectangles; a larger separation closes
-> the current run and opens a new one. An unselected glyph always
-> closes the open run.
+> range selects no glyph and paints nothing.
 >
-> That comparison equals the true gap between adjacent glyph boxes
-> only while the boxes ascend in `x`, so ascending-`x` order is a
-> PRECONDITION on the caller. Fed boxes that descend — what
-> `layout_runs()` yields for a base-RTL line — it reads two abutting
-> boxes as separated by the sum of their advances and coalesces
-> nothing, emitting one rectangle per glyph. Byte ranges, by contrast,
-> may be permuted freely: an embedded reversed run is the normal case
-> and grouping depends on geometry alone.
+> Grouping MUST order the glyph boxes by left edge itself rather than
+> requiring a caller to supply them that way. The coalescing comparison
+> equals the true gap between adjacent boxes only while they ascend in
+> `x`, and `layout_runs()` yields them along the line's own reading
+> direction, so they descend on a base-RTL line; fed that order the
+> comparison reads two abutting boxes as separated by the sum of their
+> advances, nothing coalesces, and the result degenerates to one
+> rectangle per glyph. Making the ordering an obligation on the caller
+> is what allowed that to happen unnoticed.
+>
+> Ordered boxes are then coalesced into one run while the next glyph's
+> left edge stays within `ADJACENCY_EPSILON_PX` (0.5) of the open run's
+> right edge, so sub-pixel layout and kerning do not shatter a run into
+> hairline rectangles; a larger separation closes the current run and
+> opens a new one. A glyph that is not selected always closes the open
+> run, which is what leaves a hole where a selection covers only part of
+> an embedded reversed run.
+>
+> Byte ranges may be permuted freely — an embedded reversed run is the
+> normal case. Reordering by geometry cannot change which glyphs are
+> selected, since that test is per glyph; it changes only which of them
+> are recognised as neighbours.
 
 ## Inline replaced atoms
 

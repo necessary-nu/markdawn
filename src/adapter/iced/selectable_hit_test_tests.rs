@@ -272,20 +272,25 @@ fn glyph_order_follows_the_lines_base_direction() {
     assert!(descending(&g), "base-RTL boxes descend in x: {g:?}");
     assert!(!bytes_ascending(&g), "the embedded LTR run reverses bytes");
 
-    // The consequence for painting: the ascending-x precondition of
-    // `group_in_selection_glyphs` does not hold for a base-RTL line, so
-    // a logically contiguous selection of one is not coalesced. The
-    // rectangles still tile the selected glyphs exactly, so the painted
-    // region is right even though the decomposition is per-glyph.
+    // The consequence for painting: grouping orders boxes by left edge
+    // itself, so a base-RTL line — whose boxes arrive descending —
+    // coalesces exactly like an LTR one. Selecting all of a
+    // single-direction line is one rectangle whichever direction it is.
     let (_, g) = line_of(RTL);
+    assert!(g.len() > 1, "the fixture needs several glyphs to be a test");
     let rects = group_in_selection_glyphs(&g, 0, RTL.len());
-    assert_eq!(rects.len(), g.len(), "one rectangle per glyph, not one run");
+    assert_eq!(
+        rects.len(),
+        1,
+        "a logically contiguous base-RTL selection is one run, not {} glyph rects",
+        g.len()
+    );
     let leftmost = g.iter().map(|x| x.2).fold(f32::MAX, f32::min);
     let rightmost = g.iter().map(|x| x.3).fold(f32::MIN, f32::max);
     assert_eq!(
-        rects.iter().map(|r| r.1 - r.0).sum::<f32>(),
-        rightmost - leftmost,
-        "the rectangles tile the glyph extent without gap or overlap"
+        rects[0],
+        (leftmost, rightmost),
+        "and it spans exactly the glyph extent"
     );
 }
 
@@ -548,5 +553,38 @@ fn a_failed_paragraph_downcast_degrades_to_iceds_own_hit_test() {
     assert_eq!(
         hit_test_global_byte(&real, &real_offsets, Point::new(0.5, y_of(&real, 1))),
         Some(4)
+    );
+}
+
+// Boxes arriving in descending x — what `layout_runs()` yields for a
+// base-RTL line — must coalesce exactly as ascending ones do. Before
+// grouping ordered them itself, each pair read as separated by the
+// sum of their advances and every glyph got its own rectangle.
+// [spec:mw:sem:iced.paint.glyph-run-grouping+2/test]
+// [spec:mw:req:iced.paint.bidi-runs+1/test]
+#[test]
+fn grouping_coalesces_boxes_supplied_in_descending_x() {
+    // "אבג": logical order along the line, so byte 0..2 sits rightmost.
+    let descending = [(0, 2, 20.0, 30.0), (2, 4, 10.0, 20.0), (4, 6, 0.0, 10.0)];
+    assert_eq!(
+        group_in_selection_glyphs(&descending, 0, 6),
+        vec![(0.0, 30.0)],
+        "a contiguous base-RTL selection is one run"
+    );
+
+    // The same boxes ascending must give the same answer — grouping
+    // depends on geometry, and supply order is not geometry.
+    let ascending = [(4, 6, 0.0, 10.0), (2, 4, 10.0, 20.0), (0, 2, 20.0, 30.0)];
+    assert_eq!(
+        group_in_selection_glyphs(&ascending, 0, 6),
+        group_in_selection_glyphs(&descending, 0, 6)
+    );
+
+    // A hole still opens where an unselected glyph intervenes
+    // visually, rather than where one intervenes in supply order.
+    assert_eq!(
+        group_in_selection_glyphs(&descending, 0, 2),
+        vec![(20.0, 30.0)],
+        "selecting only the logically-first glyph paints only its box"
     );
 }

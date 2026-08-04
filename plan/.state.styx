@@ -1036,9 +1036,12 @@ assertions (
     {id ntreesitter.retire-arborium, kind @complete, author "brendan@necessary.nu", at 2026-07-31T11:58:49.09821Z}
     {id defects.demo-highlighting-needs-cdn, kind @complete, author "brendan@necessary.nu", at 2026-07-31T12:06:42.673622Z}
     {id defects.wasm-bindgen-demo-undocumented, kind @complete, author "brendan@necessary.nu", at 2026-07-31T12:06:44.831239Z}
-    {id defects.iced-duplicates-span-logic-divergently, kind @doing, author "brendan@necessary.nu", at 2026-07-31T12:09:39.879992Z}
+    {id defects.iced-duplicates-span-logic-divergently, kind @complete, author "brendan@necessary.nu", at 2026-08-03T22:32:54.872103Z}
     {id defects.cmark-gfm-submodule-unregistered, kind @complete, author "brendan@necessary.nu", at 2026-07-31T13:31:46.790402Z}
     {id defects.escaping-path-deps-block-git-consumers, kind @complete, author "brendan@necessary.nu", at 2026-07-31T17:57:24.556776Z}
+    {id defects.readme-workspace-layout-stale, kind @complete, author "brendan@necessary.nu", at 2026-08-03T22:32:52.425958Z}
+    {id defects.iced-rtl-selection-rect-per-glyph, kind @complete, author "brendan@necessary.nu", at 2026-08-03T23:52:21.132652Z}
+    {id defects.build-override-unset-runs-codegen-unoptimized, kind @complete, author "brendan@necessary.nu", at 2026-08-03T23:52:17.297466Z}
 )
 
 impl_evidence (
