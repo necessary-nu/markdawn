@@ -18,6 +18,8 @@
 //! snapshot. There is no streaming equivalent; the `AnsiSink` streaming
 //! surface is orthogonal and stays in the `ansi` pipeline.
 
+use std::num::NonZeroU16;
+
 use crate::ansi_style::{CellStyle, Color, color_to_sgr};
 
 /// Default terminal width when the caller doesn't specify one. Matches
@@ -80,8 +82,11 @@ pub struct TermEmulator {
 impl TermEmulator {
     /// Construct an emulator of the given grid size. `scrollback` rows
     /// are retained above the visible region (most callers pass 0 for
-    /// "snapshot only the visible screen").
+    /// "snapshot only the visible screen"). A zero `rows` or `cols` is
+    /// raised to 1, the smallest grid the emulator accepts.
     pub fn with_size(rows: u16, cols: u16, scrollback: usize) -> Self {
+        let rows = NonZeroU16::new(rows).unwrap_or(NonZeroU16::MIN);
+        let cols = NonZeroU16::new(cols).unwrap_or(NonZeroU16::MIN);
         Self {
             parser: vt100::Parser::new(rows, cols, scrollback),
         }
@@ -116,6 +121,7 @@ impl Default for TermEmulator {
 
 fn grid_from_screen(screen: &vt100::Screen) -> TermGrid {
     let (rows, cols) = screen.size();
+    let (rows, cols) = (rows.get(), cols.get());
     let mut cells: Vec<Vec<Cell>> = Vec::with_capacity(rows as usize);
     for row in 0..rows {
         let mut line: Vec<Cell> = Vec::with_capacity(cols as usize);
@@ -133,7 +139,7 @@ fn grid_from_screen(screen: &vt100::Screen) -> TermGrid {
         cols,
         cells,
         cursor: screen.cursor_position(),
-        // `vt100::Screen` 0.16 doesn't expose OSC 0/2 titles directly;
+        // `vt100::Screen` 0.18 doesn't expose OSC 0/2 titles directly;
         // leave the field for future wiring via the callbacks API.
         title: None,
         alternate_screen: screen.alternate_screen(),
@@ -142,7 +148,7 @@ fn grid_from_screen(screen: &vt100::Screen) -> TermGrid {
 
 // Intensity is a single exclusive slot in the emulator, so a cell is
 // bold or dim but never both, and SGR 22 clears whichever is live.
-// Strike has no representation at all: vt100 0.16 carries no mode bit
+// Strike has no representation at all: vt100 0.18 carries no mode bit
 // for SGR 9 and offers no accessor, so the attribute is lost inside the
 // emulator before a snapshot can see it.
 // [spec:mw:req:ansi.term.style-mapping+1]

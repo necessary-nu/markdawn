@@ -8,7 +8,7 @@
 #[cfg(test)]
 mod tests {
     use crate::{VdomDocument, VdomParser, filter_from_options, parse_to_vdom_json};
-    use jni::JNIEnv;
+    use jni::EnvUnowned;
     use jni::objects::{JClass, JString};
     use jni::sys::{jboolean, jlong, jstring};
     use serde_json::Value;
@@ -21,7 +21,7 @@ mod tests {
         // exact `Java_nu_necessary_markdawn_Native_<method>` name and the
         // signature. Renaming the Kotlin package, class or method breaks
         // this instead of failing silently at first call.
-        type Env<'a> = JNIEnv<'a>;
+        type Env<'a> = EnvUnowned<'a>;
         type Class<'a> = JClass<'a>;
         type Str<'a> = JString<'a>;
 

@@ -241,7 +241,7 @@ fn wrap_with_preamble(source: &str) -> String {
 }
 
 fn format_diagnostics<W: typst::World>(
-    diags: &ecow::EcoVec<typst::diag::SourceDiagnostic>,
+    diags: &[typst::diag::SourceDiagnostic],
     world: &W,
 ) -> String {
     let mut s = String::new();

@@ -59,7 +59,6 @@ typst = [
     "dep:typst-syntax",
     "dep:typst-assets",
     "dep:comemo",
-    "dep:ecow",
     "dep:include_dir",
 ]
 ansi = ["dep:vte", "dep:strip-ansi-escapes"]
@@ -84,7 +83,7 @@ ntreesitter-highlight = { git = "https://github.com/necessary-nu/ntreesitter", o
 # defaults to `all`, which would make the empty-registry `highlight`
 # feature silently link every parser.
 ntreesitter-catalog = { git = "https://github.com/necessary-nu/ntreesitter", optional = true, default-features = false }
-base64 = "0.22"
+base64 = "0.23"
 dioxus = { version = "0.7", optional = true, default-features = false, features = ["lib"] }
 dioxus-core = { version = "0.7", optional = true }
 entities = "1.0"
@@ -102,15 +101,14 @@ typst-library = { version = "0.15", optional = true }
 typst-syntax = { version = "0.15", optional = true }
 typst-assets = { version = "0.15", optional = true, features = ["fonts"] }
 comemo = { version = "0.5", optional = true }
-ecow = { version = "0.2", optional = true }
 include_dir = { version = "0.7", optional = true }
 sanitizer = { git = "https://github.com/necessary-nu/sanitizer-rs" }
-vte = { version = "0.14", optional = true }
+vte = { version = "0.15", optional = true }
 strip-ansi-escapes = { version = "0.2", optional = true }
-vt100 = { version = "0.16", optional = true }
+vt100 = { version = "0.18", optional = true }
 serde = { version = "1", optional = true, features = ["derive"] }
 serde_yaml = { version = "0.9", optional = true }
-toml = { version = "0.8", optional = true }
+toml = { version = "1.1", optional = true }
 # The markdown adapter builds `Element` trees, so it depends on iced's
 # widget-level crates — NOT the umbrella `iced`, whose unconditional
 # `iced_winit` dep drags in winit + a conflicting wasm-bindgen tree. Tracks the

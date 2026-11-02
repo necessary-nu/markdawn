@@ -21,9 +21,11 @@ use indexmap::IndexMap;
 use markdawn::{self as md, Sink};
 use serde::Serialize;
 
-use jni::JNIEnv;
+use jni::errors::ThrowRuntimeExAndDefault;
 use jni::objects::{JClass, JString};
+use jni::strings::JNIString;
 use jni::sys::{JNI_FALSE, JNI_TRUE, jboolean, jlong, jstring};
+use jni::{Env, EnvUnowned, jni_str};
 
 // ===================================================================
 // JNI-free core logic (host-testable without an emulator)
@@ -225,24 +227,32 @@ fn register_plugin_language(name: &str) -> bool {
 // JNI surface — class `nu.necessary.markdawn.Native`
 // ===================================================================
 
+/// Run an entry point's body against the `Env` behind its `EnvUnowned`.
+///
+/// Every body reports its failures in-band before returning, so the closure
+/// handed to jni never fails and the error policy is never consulted. The
+/// `_no_catch` variant keeps a `catch_unwind` out of the entry points, which
+/// must not depend on one.
+fn with_env<'local, T: Default>(
+    mut env: EnvUnowned<'local>,
+    body: impl FnOnce(&mut Env<'local>) -> T,
+) -> T {
+    env.with_env_no_catch(|env| Ok::<_, jni::errors::Error>(body(env)))
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
+
 // A null `JString` and an unconvertible one both degrade to "" — no failure
 // path here can raise, so callers keep their own error reporting.
 // [spec:mw:req:ffi.safety.null-guard+1]
-fn jstr(env: &mut JNIEnv, s: &JString) -> String {
+fn jstr(env: &Env, s: &JString) -> String {
     if s.is_null() {
         return String::new();
     }
-    env.get_string(s).map(Into::into).unwrap_or_default()
+    s.try_to_string(env).unwrap_or_default()
 }
 
-fn to_jstring(env: &mut JNIEnv, s: &str) -> jstring {
-    env.new_string(s)
-        .map(|o| o.into_raw())
-        .unwrap_or(std::ptr::null_mut())
-}
-
-fn throw(env: &mut JNIEnv, msg: &str) {
-    let _ = env.throw_new("java/lang/RuntimeException", msg);
+fn throw(env: &mut Env, msg: &str) {
+    let _ = env.throw_new(jni_str!("java/lang/RuntimeException"), JNIString::from(msg));
 }
 
 /// Reborrow a `jlong` handle. A zero handle is the one host mistake this
@@ -253,7 +263,7 @@ fn throw(env: &mut JNIEnv, msg: &str) {
 /// # Safety
 /// A non-zero `ptr` must be a live handle minted by the matching constructor.
 // [spec:mw:req:ffi.safety.null-guard+1]
-unsafe fn handle<'a, T>(env: &mut JNIEnv, ptr: jlong) -> Option<&'a mut T> {
+unsafe fn handle<'a, T>(env: &mut Env, ptr: jlong) -> Option<&'a mut T> {
     if ptr == 0 {
         throw(env, "null handle");
         return None;
@@ -264,29 +274,32 @@ unsafe fn handle<'a, T>(env: &mut JNIEnv, ptr: jlong) -> Option<&'a mut T> {
 // [spec:mw:def:ffi.host.jni]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_parseToVdom<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     source: JString<'local>,
     options: JString<'local>,
 ) -> jstring {
-    let source = jstr(&mut env, &source);
-    let options = jstr(&mut env, &options);
-    match parse_to_vdom_json(&source, &options) {
-        Ok(json) => to_jstring(&mut env, &json),
-        Err(e) => {
-            throw(&mut env, &e);
-            std::ptr::null_mut()
+    with_env(env, |env| {
+        let source = jstr(env, &source);
+        let options = jstr(env, &options);
+        match parse_to_vdom_json(&source, &options) {
+            Ok(json) => env.new_string(&json).unwrap_or_default(),
+            Err(e) => {
+                throw(env, &e);
+                JString::default()
+            }
         }
-    }
+    })
+    .into_raw()
 }
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_loadLanguage<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     name: JString<'local>,
 ) -> jboolean {
-    let name = jstr(&mut env, &name);
+    let name = with_env(env, |env| jstr(env, &name));
     if register_plugin_language(&name) {
         JNI_TRUE
     } else {
@@ -298,11 +311,11 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_loadLanguage<'local>(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_parserNew<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     options: JString<'local>,
 ) -> jlong {
-    let options = jstr(&mut env, &options);
+    let options = with_env(env, |env| jstr(env, &options));
     Box::into_raw(Box::new(VdomParser::new(&options))) as jlong
 }
 
@@ -311,56 +324,63 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_parserNew<'local>(
 // [spec:mw:req:ffi.safety.no-unwind]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_parserPush<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     ptr: jlong,
     chunk: JString<'local>,
 ) {
-    let Some(parser) = (unsafe { handle::<VdomParser>(&mut env, ptr) }) else {
-        return;
-    };
-    let chunk = jstr(&mut env, &chunk);
-    if let Err(e) = parser.push_str(&chunk) {
-        throw(&mut env, &e);
-    }
+    with_env(env, |env| {
+        let Some(parser) = (unsafe { handle::<VdomParser>(env, ptr) }) else {
+            return;
+        };
+        let chunk = jstr(env, &chunk);
+        if let Err(e) = parser.push_str(&chunk) {
+            throw(env, &e);
+        }
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_parserFinish<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     ptr: jlong,
 ) {
-    let Some(parser) = (unsafe { handle::<VdomParser>(&mut env, ptr) }) else {
-        return;
-    };
-    if let Err(e) = parser.finish() {
-        throw(&mut env, &e);
-    }
+    with_env(env, |env| {
+        let Some(parser) = (unsafe { handle::<VdomParser>(env, ptr) }) else {
+            return;
+        };
+        if let Err(e) = parser.finish() {
+            throw(env, &e);
+        }
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_parserTakeEvents<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     ptr: jlong,
 ) -> jstring {
-    let Some(parser) = (unsafe { handle::<VdomParser>(&mut env, ptr) }) else {
-        return std::ptr::null_mut();
-    };
-    match parser.take_events() {
-        Ok(json) => to_jstring(&mut env, &json),
-        Err(e) => {
-            throw(&mut env, &e);
-            std::ptr::null_mut()
+    with_env(env, |env| {
+        let Some(parser) = (unsafe { handle::<VdomParser>(env, ptr) }) else {
+            return JString::default();
+        };
+        match parser.take_events() {
+            Ok(json) => env.new_string(&json).unwrap_or_default(),
+            Err(e) => {
+                throw(env, &e);
+                JString::default()
+            }
         }
-    }
+    })
+    .into_raw()
 }
 
 // [spec:mw:req:ffi.ownership.handle-release]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_parserFree<'local>(
-    _env: JNIEnv<'local>,
+    _env: EnvUnowned<'local>,
     _class: JClass<'local>,
     ptr: jlong,
 ) {
@@ -373,91 +393,100 @@ pub extern "system" fn Java_nu_necessary_markdawn_Native_parserFree<'local>(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_documentNew<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     options: JString<'local>,
 ) -> jlong {
-    let options = jstr(&mut env, &options);
+    let options = with_env(env, |env| jstr(env, &options));
     Box::into_raw(Box::new(VdomDocument::new(&options))) as jlong
 }
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_documentSetSource<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     ptr: jlong,
     source: JString<'local>,
 ) {
-    let Some(doc) = (unsafe { handle::<VdomDocument>(&mut env, ptr) }) else {
-        return;
-    };
-    let source = jstr(&mut env, &source);
-    if let Err(e) = doc.set_source(&source) {
-        throw(&mut env, &e);
-    }
+    with_env(env, |env| {
+        let Some(doc) = (unsafe { handle::<VdomDocument>(env, ptr) }) else {
+            return;
+        };
+        let source = jstr(env, &source);
+        if let Err(e) = doc.set_source(&source) {
+            throw(env, &e);
+        }
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_documentEdit<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     ptr: jlong,
     start: jlong,
     end: jlong,
     replacement: JString<'local>,
 ) {
-    let Some(doc) = (unsafe { handle::<VdomDocument>(&mut env, ptr) }) else {
-        return;
-    };
-    let replacement = jstr(&mut env, &replacement);
-    if let Err(e) = doc.edit(start as usize, end as usize, &replacement) {
-        throw(&mut env, &e);
-    }
+    with_env(env, |env| {
+        let Some(doc) = (unsafe { handle::<VdomDocument>(env, ptr) }) else {
+            return;
+        };
+        let replacement = jstr(env, &replacement);
+        if let Err(e) = doc.edit(start as usize, end as usize, &replacement) {
+            throw(env, &e);
+        }
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_documentSetCursor<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     ptr: jlong,
     byte_offset: jlong,
 ) {
-    let Some(doc) = (unsafe { handle::<VdomDocument>(&mut env, ptr) }) else {
-        return;
-    };
-    // A negative offset clears the cursor (Kotlin passes -1 for null).
-    let offset = if byte_offset < 0 {
-        None
-    } else {
-        Some(byte_offset as usize)
-    };
-    if let Err(e) = doc.set_cursor(offset) {
-        throw(&mut env, &e);
-    }
+    with_env(env, |env| {
+        let Some(doc) = (unsafe { handle::<VdomDocument>(env, ptr) }) else {
+            return;
+        };
+        // A negative offset clears the cursor (Kotlin passes -1 for null).
+        let offset = if byte_offset < 0 {
+            None
+        } else {
+            Some(byte_offset as usize)
+        };
+        if let Err(e) = doc.set_cursor(offset) {
+            throw(env, &e);
+        }
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_documentTakeEvents<'local>(
-    mut env: JNIEnv<'local>,
+    env: EnvUnowned<'local>,
     _class: JClass<'local>,
     ptr: jlong,
 ) -> jstring {
-    let Some(doc) = (unsafe { handle::<VdomDocument>(&mut env, ptr) }) else {
-        return std::ptr::null_mut();
-    };
-    match doc.take_events() {
-        Ok(json) => to_jstring(&mut env, &json),
-        Err(e) => {
-            throw(&mut env, &e);
-            std::ptr::null_mut()
+    with_env(env, |env| {
+        let Some(doc) = (unsafe { handle::<VdomDocument>(env, ptr) }) else {
+            return JString::default();
+        };
+        match doc.take_events() {
+            Ok(json) => env.new_string(&json).unwrap_or_default(),
+            Err(e) => {
+                throw(env, &e);
+                JString::default()
+            }
         }
-    }
+    })
+    .into_raw()
 }
 
 // [spec:mw:req:ffi.ownership.handle-release]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_nu_necessary_markdawn_Native_documentFree<'local>(
-    _env: JNIEnv<'local>,
+    _env: EnvUnowned<'local>,
     _class: JClass<'local>,
     ptr: jlong,
 ) {

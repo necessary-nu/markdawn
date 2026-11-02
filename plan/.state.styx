@@ -1042,6 +1042,7 @@ assertions (
     {id defects.readme-workspace-layout-stale, kind @complete, author "brendan@necessary.nu", at 2026-08-03T22:32:52.425958Z}
     {id defects.iced-rtl-selection-rect-per-glyph, kind @complete, author "brendan@necessary.nu", at 2026-08-03T23:52:21.132652Z}
     {id defects.build-override-unset-runs-codegen-unoptimized, kind @complete, author "brendan@necessary.nu", at 2026-08-03T23:52:17.297466Z}
+    {id deps, kind @doing, author "brendan@necessary.nu", at 2026-11-02T23:41:11.610226Z}
 )
 
 impl_evidence (

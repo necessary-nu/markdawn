@@ -11,7 +11,6 @@
 use std::path::Path;
 use std::sync::OnceLock;
 
-use ecow::EcoString;
 use include_dir::{Dir, include_dir};
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime, Duration as TypstDuration};
@@ -145,7 +144,7 @@ fn bundled_package_relative_path(spec: &PackageSpec, inner: &Path) -> Option<std
     if spec.namespace.as_str() != "preview" {
         return None;
     }
-    if !is_bundled(&spec.name, &spec.version.to_string()) {
+    if !is_bundled(spec.name.as_str(), &spec.version.to_string()) {
         return None;
     }
     let mut p = std::path::PathBuf::from("preview");
@@ -165,8 +164,6 @@ fn bundled_package_relative_path(spec: &PackageSpec, inner: &Path) -> Option<std
 // [spec:mw:req:typst.packages.offline-resolution]
 const BUNDLED: &[(&str, &str)] = &[("syntree", "0.2.1"), ("cetz", "0.5.0"), ("oxifmt", "1.0.0")];
 
-fn is_bundled(name: &EcoString, version: &str) -> bool {
-    BUNDLED
-        .iter()
-        .any(|(n, v)| name.as_str() == *n && version == *v)
+fn is_bundled(name: &str, version: &str) -> bool {
+    BUNDLED.iter().any(|(n, v)| name == *n && version == *v)
 }

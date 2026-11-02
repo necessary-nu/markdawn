@@ -1952,6 +1952,11 @@ children (
                     }
                 )
             }
+
+            {
+                id defects.document-edit-range
+                title "documentEdit panics on an offset past the document's end and aborts the process, instead of reporting the failure in-band (ffi.safety.no-unwind)"
+            }
         )
     }
 
@@ -2349,6 +2354,27 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "SCOPE CORRECTION from the operator, 2026-07-31: coexistence is not the plan; arborium is replaced.\n\nI had let a property of the tooling become a planning goal. Once the ntreesitter-abi split landed, the 104 plugin crates no longer reached a links crate, so they *could* have landed in their own commit ahead of the core swap — and I structured plugin-crates around that. But being able to hold both backends in one graph for one commit is worth nothing when the intent is to delete one of them. It buys a bisection point on a boundary nobody will bisect across, at the cost of a transient state that has to be reasoned about and reviewed.\n\nCONSEQUENCE. plugin-crates, core-binding, swift-loader and android-loader are now siblings on [spec, output-parity, plugin-split-upstream] rather than a chain, and land as ONE commit that removes arborium. retire-arborium depends on all four and stays separate, because verifying the dependency graph is clean and refreshing the docs is genuinely after-the-fact work.\n\nWHAT DOES NOT CHANGE. The generated plugin crates still take ntreesitter-abi rather than ntreesitter-plugin. That choice was only ever half about the links identity; the other half is that a provider library has no reason to link the Tree-sitter runtime for a decode path it never calls, across 104 iOS dylibs. The host takes ntreesitter-plugin, a provider takes ntreesitter-abi, and that split is correct on its own terms.\n\nALSO IN THE REPLACEMENT COMMIT. examples/arborium_span_dump.rs, which was scheduled for retire-arborium — it depends on arborium and cannot outlive it. Its baseline is already captured and analysed on ntreesitter.output-parity."
+            }
+        )
+    }
+
+    {
+        id deps
+        title "Bump every dependency to its latest release"
+        kind @build
+        log (
+            {
+                at 2026-11-02T23:41:11.287384Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "2026-11-03, for Pahkat's dependency sweep: base64 0.23, toml 1.1, vt100 0.18, vte 0.15, jni 0.22 (markdawn-android), ecow removed (markdawn only named typst's EcoString and EcoVec; is_bundled takes &str and format_diagnostics a slice), and 383 compatible lockfile updates; git dependencies moved to their branch heads. Rendering is byte-identical to before (html_snapshot, the cli example with pikchr and graphviz, ssg_blog, ansi_demo); 790 workspace tests and 1041 nextest pass; wasm32, emscripten, iOS and Android build with unchanged warnings; a Java harness made the same 30 JNI calls with identical results. Held back by pins elsewhere: wasm-bindgen 0.2.108 (the iced fork pins web-sys =0.3.85), tree-sitter-generate =0.26.8 (ntreesitter), psm (pest_stack_guard). Left for later: the wayland-scanner rev patch can likely go now that 0.31.11 is released; citationberg's is still needed. Spec wording now behind the code: ansi.term.grid and ansi.term.style-mapping+1 name vt100 0.16 (still true on 0.18), and ffi.host.jni names JNIEnv where the entry points now take jni's EnvUnowned (the same pointer at the ABI)."
+            }
+
+            {
+                at 2026-11-02T23:41:11.610226Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }
